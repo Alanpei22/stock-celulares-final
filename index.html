@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stock Cel">
+<meta name="theme-color" content="#0f172a">
+<title>Stock de Celulares</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-icon">📱</div>
+    <h2 class="login-title">Stock de Celulares</h2>
+    <p class="login-sub">Ingresá tu PIN de acceso</p>
+    <div class="pin-dots" id="pin-dots">
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" data-n="1">1</button>
+      <button class="pin-btn" data-n="2">2</button>
+      <button class="pin-btn" data-n="3">3</button>
+      <button class="pin-btn" data-n="4">4</button>
+      <button class="pin-btn" data-n="5">5</button>
+      <button class="pin-btn" data-n="6">6</button>
+      <button class="pin-btn" data-n="7">7</button>
+      <button class="pin-btn" data-n="8">8</button>
+      <button class="pin-btn" data-n="9">9</button>
+      <button class="pin-btn pin-clear" id="pin-clear">✕</button>
+      <button class="pin-btn" data-n="0">0</button>
+      <button class="pin-btn pin-back" id="pin-back">⌫</button>
+    </div>
+    <p class="pin-error" id="pin-error"></p>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app" class="app-hidden">
+
+  <!-- PWA Banner -->
+  <div id="install-banner" class="install-banner">
+    <span>📲 Instalá esta app en tu pantalla de inicio</span>
+    <button id="install-btn">Instalar</button>
+    <button class="banner-close" onclick="document.getElementById('install-banner').classList.remove('show')">✕</button>
+  </div>
+  <div id="ios-tip" class="install-banner">
+    <span>📲 Tocá <strong>Compartir</strong> ↑ luego <strong>"Agregar a inicio"</strong></span>
+    <button class="banner-close" onclick="document.getElementById('ios-tip').classList.remove('show')">✕</button>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="hdr-top">
+      <h1>📱 Stock de Celulares</h1>
+      <div class="hdr-actions">
+        <button class="hdr-btn" id="stats-btn" title="Estadísticas y historial">📊</button>
+        <button class="hdr-btn" id="export-btn" title="Exportar stock">💾</button>
+        <button class="hdr-btn" id="add-btn" title="Agregar equipo">＋</button>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input id="search" type="search" placeholder="Buscar marca, modelo, IMEI..."
+        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div class="filters">
+      <select class="pill" id="f-marca"><option value="">Todas las marcas</option></select>
+      <select class="pill" id="f-estado">
+        <option value="">Todos los estados</option>
+        <option value="Nuevo">Nuevo</option>
+        <option value="Usado">Usado</option>
+        <option value="Reacondicionado">Reacondicionado</option>
+      </select>
+      <select class="pill" id="f-vendido">
+        <option value="0">En stock</option>
+        <option value="1">Vendidos</option>
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="price-filter">
+      <span class="price-filter-lbl">💰 Precio:</span>
+      <input id="f-min" class="price-input" type="number" placeholder="Mín" min="0" inputmode="numeric">
+      <span class="price-filter-sep">—</span>
+      <input id="f-max" class="price-input" type="number" placeholder="Máx" min="0" inputmode="numeric">
+    </div>
+  </header>
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat"><span class="stat-num" id="s-stock">0</span><span class="stat-lbl">En stock</span></div>
+    <div class="stat"><span class="stat-num" id="s-sold">0</span><span class="stat-lbl">Vendidos</span></div>
+    <div class="stat stat-val"><span class="stat-num" id="s-value">$0</span><span class="stat-lbl">Valor stock</span></div>
+  </div>
+
+  <!-- Lista -->
+  <div class="list-wrap">
+    <div id="list"></div>
+    <div class="empty-state" id="empty" style="display:none">
+      <span class="empty-ico">📦</span>
+      <p class="empty-txt">No hay equipos registrados</p>
+      <button class="btn-primary" onclick="openForm()">Agregar primer equipo</button>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ── MODAL FORMULARIO ── -->
+<div id="form-modal" class="modal-overlay hidden">
+  <div class="modal-card form-card">
+    <div class="modal-header">
+      <h3 id="form-title">📱 Agregar Equipo</h3>
+      <button class="modal-close" id="form-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+
+        <div class="fg">
+          <label class="fl">Marca *</label>
+          <input id="fi-marca" class="fi" type="text"
+            placeholder="Samsung, Apple…" list="dl-marca" autocomplete="off">
+          <datalist id="dl-marca">
+            <option value="Samsung"><option value="Apple"><option value="Motorola">
+            <option value="Xiaomi"><option value="LG"><option value="Huawei">
+            <option value="Nokia"><option value="TCL"><option value="OPPO">
+            <option value="Realme"><option value="OnePlus"><option value="Honor">
+            <option value="ZTE"><option value="Sony"><option value="Google">
+          </datalist>
+        </div>
+
+        <div class="fg">
+          <label class="fl">Modelo *</label>
+          <input id="fi-modelo" class="fi" type="text"
+            placeholder="Galaxy A54, iPhone 14…" autocomplete="off">
+        </div>
+
+        <div class="fg">
+          <label class="fl">Estado *</label>
+          <select id="fi-estado" class="fs">
+            <option value="">Seleccionar…</option>
+            <option value="Nuevo">Nuevo</option>
+            <option value="Usado">Usado</option>
+            <option value="Reacondicionado">Reacondicionado</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label class="fl">Precio ($) *</label>
+          <input id="fi-precio" class="fi" type="number"
+            placeholder="85000" min="0" inputmode="numeric">
+        </div>
+
+        <div class="fg">
+          <label class="fl">Almacenamiento</label>
+          <select id="fi-storage" class="fs">
+            <option value="">—</option>
+            <option value="16GB">16 GB</option>
+            <option value="32GB">32 GB</option>
+            <option value="64GB">64 GB</option>
+            <option value="128GB">128 GB</option>
+            <option value="256GB">256 GB</option>
+            <option value="512GB">512 GB</option>
+            <option value="1TB">1 TB</option>
+          </select>
+        </div>
+
+        <div class="fg">
+          <label class="fl">RAM</label>
+          <select id="fi-ram" class="fs">
+            <option value="">—</option>
+            <option value="1GB">1 GB</option>
+            <option value="2GB">2 GB</option>
+            <option value="3GB">3 GB</option>
+            <option value="4GB">4 GB</option>
+            <option value="6GB">6 GB</option>
+            <option value="8GB">8 GB</option>
+            <option value="12GB">12 GB</option>
+            <option value="16GB">16 GB</option>
+          </select>
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">IMEI</label>
+          <input id="fi-imei" class="fi" type="text"
+            placeholder="123456789012345" maxlength="15" inputmode="numeric">
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Notas</label>
+          <textarea id="fi-notas" class="fi fi-area"
+            placeholder="Accesorios, detalles, color…" rows="2"></textarea>
+        </div>
+
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-secondary" id="form-cancel">Cancelar</button>
+        <button class="btn-primary" id="form-save">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL DETALLE ── -->
+<div id="detail-modal" class="modal-overlay hidden">
+  <div class="modal-card detail-card">
+    <div class="modal-header">
+      <div>
+        <span class="det-marca" id="det-marca"></span>
+        <span class="det-modelo" id="det-modelo"></span>
+      </div>
+      <button class="modal-close" id="detail-close">✕</button>
+    </div>
+    <div class="det-body" id="det-body"></div>
+    <div class="det-actions" id="det-actions"></div>
+  </div>
+</div>
+
+<!-- ── MODAL ESTADÍSTICAS ── -->
+<div id="stats-modal" class="modal-overlay hidden">
+  <div class="modal-card stats-card">
+    <div class="modal-header">
+      <h3>📊 Estadísticas</h3>
+      <button class="modal-close" id="stats-close">✕</button>
+    </div>
+    <div class="modal-body" id="stats-body"></div>
+  </div>
+</div>
+
+<!-- ── MODAL EXPORT ── -->
+<div id="export-modal" class="modal-overlay hidden">
+  <div class="modal-card export-card">
+    <div class="modal-header">
+      <h3>💾 Exportar Stock</h3>
+      <button class="modal-close" id="export-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="export-desc">Descargá una copia de tu stock para respaldo o para abrir en Excel.</p>
+      <div class="export-options">
+        <button class="export-opt" id="export-csv">
+          <span class="export-opt-ico">📊</span>
+          <div>
+            <div class="export-opt-title">Exportar como CSV</div>
+            <div class="export-opt-sub">Compatible con Excel y Google Sheets</div>
+          </div>
+        </button>
+        <button class="export-opt" id="export-json">
+          <span class="export-opt-ico">🗃️</span>
+          <div>
+            <div class="export-opt-title">Exportar como JSON</div>
+            <div class="export-opt-sub">Backup completo para restaurar</div>
+          </div>
+        </button>
+        <button class="export-opt" id="import-json-btn">
+          <span class="export-opt-ico">📥</span>
+          <div>
+            <div class="export-opt-title">Restaurar desde backup</div>
+            <div class="export-opt-sub">Importar un JSON guardado anteriormente</div>
+          </div>
+        </button>
+        <input type="file" id="import-file" accept=".json" hidden>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
