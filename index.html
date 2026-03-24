@@ -1,23 +1,26 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Stock Cel">
-<meta name="theme-color" content="#0f172a">
-<title>Stock de Celulares</title>
-<link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Stock Cel">
+  <meta name="theme-color" content="#0f172a">
+  <title>Stock de Celulares</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ── LOGIN ── -->
+<!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-icon">📱</div>
+    <div class="login-logo">
+      <img id="login-biz-img" src="" alt="Logo" style="display:none" class="login-biz-img-el">
+      <div class="login-icon" id="login-default-icon">📱</div>
+    </div>
     <h2 class="login-title">Stock de Celulares</h2>
     <p class="login-sub">Ingresá tu PIN de acceso</p>
     <div class="pin-dots" id="pin-dots">
@@ -41,10 +44,9 @@
   </div>
 </div>
 
-<!-- ── APP ── -->
+<!-- APP -->
 <div id="app" class="app-hidden">
 
-  <!-- PWA Banner -->
   <div id="install-banner" class="install-banner">
     <span>📲 Instalá esta app en tu pantalla de inicio</span>
     <button id="install-btn">Instalar</button>
@@ -55,11 +57,14 @@
     <button class="banner-close" onclick="document.getElementById('ios-tip').classList.remove('show')">✕</button>
   </div>
 
-  <!-- Header -->
   <header>
     <div class="hdr-top">
-      <h1>📱 Stock de Celulares</h1>
+      <div class="hdr-brand">
+        <img id="hdr-biz-img" src="" alt="Logo" style="display:none" class="hdr-logo">
+        <h1>📱 Stock de Celulares</h1>
+      </div>
       <div class="hdr-actions">
+        <button class="hdr-btn" id="settings-btn" title="Configuración">⚙️</button>
         <button class="hdr-btn" id="stats-btn" title="Estadísticas y historial">📊</button>
         <button class="hdr-btn" id="export-btn" title="Exportar stock">💾</button>
         <button class="hdr-btn" id="add-btn" title="Agregar equipo">＋</button>
@@ -67,8 +72,7 @@
     </div>
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
-      <input id="search" type="search" placeholder="Buscar marca, modelo, IMEI..."
-        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <input id="search" type="search" placeholder="Buscar marca, modelo, IMEI..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
     </div>
     <div class="filters">
       <select class="pill" id="f-marca"><option value="">Todas las marcas</option></select>
@@ -92,14 +96,12 @@
     </div>
   </header>
 
-  <!-- Stats bar -->
   <div class="stats-bar">
     <div class="stat"><span class="stat-num" id="s-stock">0</span><span class="stat-lbl">En stock</span></div>
     <div class="stat"><span class="stat-num" id="s-sold">0</span><span class="stat-lbl">Vendidos</span></div>
     <div class="stat stat-val"><span class="stat-num" id="s-value">$0</span><span class="stat-lbl">Valor stock</span></div>
   </div>
 
-  <!-- Lista -->
   <div class="list-wrap">
     <div id="list"></div>
     <div class="empty-state" id="empty" style="display:none">
@@ -109,9 +111,9 @@
     </div>
   </div>
 
-</div><!-- /app -->
+</div>
 
-<!-- ── MODAL FORMULARIO ── -->
+<!-- MODAL FORMULARIO -->
 <div id="form-modal" class="modal-overlay hidden">
   <div class="modal-card form-card">
     <div class="modal-header">
@@ -120,11 +122,9 @@
     </div>
     <div class="modal-body">
       <div class="form-grid">
-
         <div class="fg">
           <label class="fl">Marca *</label>
-          <input id="fi-marca" class="fi" type="text"
-            placeholder="Samsung, Apple…" list="dl-marca" autocomplete="off">
+          <input id="fi-marca" class="fi" type="text" placeholder="Samsung, Apple…" list="dl-marca" autocomplete="off">
           <datalist id="dl-marca">
             <option value="Samsung"><option value="Apple"><option value="Motorola">
             <option value="Xiaomi"><option value="LG"><option value="Huawei">
@@ -133,13 +133,10 @@
             <option value="ZTE"><option value="Sony"><option value="Google">
           </datalist>
         </div>
-
         <div class="fg">
           <label class="fl">Modelo *</label>
-          <input id="fi-modelo" class="fi" type="text"
-            placeholder="Galaxy A54, iPhone 14…" autocomplete="off">
+          <input id="fi-modelo" class="fi" type="text" placeholder="Galaxy A54, iPhone 14…" autocomplete="off">
         </div>
-
         <div class="fg">
           <label class="fl">Estado *</label>
           <select id="fi-estado" class="fs">
@@ -149,13 +146,10 @@
             <option value="Reacondicionado">Reacondicionado</option>
           </select>
         </div>
-
         <div class="fg">
           <label class="fl">Precio ($) *</label>
-          <input id="fi-precio" class="fi" type="number"
-            placeholder="85000" min="0" inputmode="numeric">
+          <input id="fi-precio" class="fi" type="number" placeholder="85000" min="0" inputmode="numeric">
         </div>
-
         <div class="fg">
           <label class="fl">Almacenamiento</label>
           <select id="fi-storage" class="fs">
@@ -169,7 +163,6 @@
             <option value="1TB">1 TB</option>
           </select>
         </div>
-
         <div class="fg">
           <label class="fl">RAM</label>
           <select id="fi-ram" class="fs">
@@ -184,21 +177,15 @@
             <option value="16GB">16 GB</option>
           </select>
         </div>
-
         <div class="fg fg--full">
           <label class="fl">IMEI</label>
-          <input id="fi-imei" class="fi" type="text"
-            placeholder="123456789012345" maxlength="15" inputmode="numeric">
+          <input id="fi-imei" class="fi" type="text" placeholder="123456789012345" maxlength="15" inputmode="numeric">
         </div>
-
         <div class="fg fg--full">
           <label class="fl">Notas</label>
-          <textarea id="fi-notas" class="fi fi-area"
-            placeholder="Accesorios, detalles, color…" rows="2"></textarea>
+          <textarea id="fi-notas" class="fi fi-area" placeholder="Accesorios, detalles, color…" rows="2"></textarea>
         </div>
-
       </div>
-
       <div class="form-actions">
         <button class="btn-secondary" id="form-cancel">Cancelar</button>
         <button class="btn-primary" id="form-save">💾 Guardar</button>
@@ -207,7 +194,31 @@
   </div>
 </div>
 
-<!-- ── MODAL DETALLE ── -->
+<!-- MODAL VENTA -->
+<div id="sell-modal" class="modal-overlay hidden">
+  <div class="modal-card sell-card">
+    <div class="modal-header">
+      <h3>💰 Registrar Venta</h3>
+      <button class="modal-close" id="sell-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+        <label class="fl">👤 Vendedor</label>
+        <select id="sell-vendedor" class="fs"></select>
+      </div>
+      <div class="fg">
+        <label class="fl">💳 Forma de pago</label>
+        <select id="sell-pago" class="fs"></select>
+      </div>
+      <div class="form-actions" style="margin-top:8px">
+        <button class="btn-secondary" id="sell-cancel">Cancelar</button>
+        <button class="btn-primary" id="sell-confirm">💰 Confirmar Venta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE -->
 <div id="detail-modal" class="modal-overlay hidden">
   <div class="modal-card detail-card">
     <div class="modal-header">
@@ -222,18 +233,22 @@
   </div>
 </div>
 
-<!-- ── MODAL ESTADÍSTICAS ── -->
+<!-- MODAL ESTADÍSTICAS -->
 <div id="stats-modal" class="modal-overlay hidden">
   <div class="modal-card stats-card">
     <div class="modal-header">
       <h3>📊 Estadísticas</h3>
       <button class="modal-close" id="stats-close">✕</button>
     </div>
+    <div class="stats-tabs">
+      <button class="stats-tab active" id="tab-ventas" onclick="switchTab('ventas')">💰 Ventas</button>
+      <button class="stats-tab" id="tab-entradas" onclick="switchTab('entradas')">📥 Entradas</button>
+    </div>
     <div class="modal-body" id="stats-body"></div>
   </div>
 </div>
 
-<!-- ── MODAL EXPORT ── -->
+<!-- MODAL EXPORT -->
 <div id="export-modal" class="modal-overlay hidden">
   <div class="modal-card export-card">
     <div class="modal-header">
@@ -270,9 +285,52 @@
   </div>
 </div>
 
-<!-- Toast -->
-<div id="toast" class="toast"></div>
+<!-- MODAL CONFIGURACIÓN -->
+<div id="settings-modal" class="modal-overlay hidden">
+  <div class="modal-card settings-card">
+    <div class="modal-header">
+      <h3>⚙️ Configuración</h3>
+      <button class="modal-close" id="settings-close">✕</button>
+    </div>
+    <div class="modal-body">
 
+      <div class="settings-section">
+        <h4 class="settings-title">🏪 Imagen del Negocio</h4>
+        <div class="biz-preview" id="biz-preview">
+          <span class="biz-no-img">Sin imagen cargada</span>
+        </div>
+        <div class="settings-row">
+          <label class="btn-secondary settings-upload-btn">
+            📷 Subir imagen
+            <input type="file" id="biz-image-input" accept="image/*" hidden>
+          </label>
+          <button class="btn-secondary" id="biz-remove" style="display:none" onclick="removeBizImage()">🗑️ Quitar</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h4 class="settings-title">👤 Vendedores</h4>
+        <div id="sellers-list" class="settings-list"></div>
+        <div class="settings-add-row">
+          <input id="new-seller" class="fi" type="text" placeholder="Nombre del vendedor" autocomplete="off">
+          <button class="btn-primary settings-add-btn" onclick="addSeller()">＋ Agregar</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h4 class="settings-title">💳 Medios de Pago</h4>
+        <div id="payments-list" class="settings-list"></div>
+        <div class="settings-add-row">
+          <input id="new-payment" class="fi" type="text" placeholder="Medio de pago" autocomplete="off">
+          <button class="btn-primary settings-add-btn" onclick="addPayment()">＋ Agregar</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
 <script src="app.js"></script>
 </body>
 </html>
