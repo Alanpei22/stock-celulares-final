@@ -32,7 +32,7 @@ function listenStock() {
           console.error('Firestore:', err);
           toast('Error de conexion', 'error');
     });
-}h
+}
 
 // ── Auth ──────────────────────────────────────────────────
 let pinBuffer = '';
