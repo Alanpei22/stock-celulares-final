@@ -9,6 +9,30 @@ const AUTH_DAYS = 30;
 
 const DEFAULT_SELLERS = ['Vendedor 1', 'Vendedor 2'];
 const DEFAULT_PAYMENTS = ['Efectivo', 'Transferencia', 'Tarjeta débito', 'Tarjeta crédito', 'Mercado Pago'];
+// ── Firebase ─────────────────────────────────────────────
+const FB_CONFIG = {
+    apiKey: "AIzaSyAMRkrADBxRF6rST8rNwO5IqdWneXocBsE",
+    authDomain: "stockcelustech.firebaseapp.com",
+    projectId: "stockcelustech",
+    storageBucket: "stockcelustech.firebasestorage.app",
+    messagingSenderId: "140592485004",
+    appId: "1:140592485004:web:29f6b0aa0f02fdf99ba1a9"
+};
+let db = null;
+function initFirebase() {
+    if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+    db = firebase.firestore();
+}
+function listenStock() {
+    db.collection('stock').onSnapshot(snapshot => {
+          STOCK = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          STOCK.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+          render();
+    }, err => {
+          console.error('Firestore:', err);
+          toast('Error de conexion', 'error');
+    });
+}h
 
 // ── Auth ──────────────────────────────────────────────────
 let pinBuffer = '';
@@ -108,7 +132,7 @@ function saveBizImage() { if (BIZ_IMAGE) localStorage.setItem(BIZ_KEY, BIZ_IMAGE
 function initApp() {
   if (appInited) return;
   appInited = true;
-  loadStock();
+  initFirebase();
   loadConfig();
   applyBizImage();
 
@@ -151,7 +175,7 @@ function initApp() {
   document.getElementById('biz-image-input').addEventListener('change', handleBizImage);
 
   initPWA();
-  render();
+    listenStock();
 }
 
 // ── Render ────────────────────────────────────────────────
@@ -287,23 +311,21 @@ function savePhone() {
   }
 
   if (editingId) {
-    const idx = STOCK.findIndex(x => x.id === editingId);
-    if (idx >= 0) {
-      STOCK[idx] = { ...STOCK[idx], marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas };
-    }
-    toast('Equipo actualizado', 'success');
+        const existing = STOCK.find(x => x.id === editingId);
+        if (!existing) { closeForm(); return; }
+        db.collection('stock').doc(editingId).set({
+                ...existing, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas
+        });
+        toast('Equipo actualizado', 'success');
   } else {
-    STOCK.unshift({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas,
-      fecha: new Date().toISOString(),
-      vendido: false,
-    });
-    toast('Equipo agregado al stock', 'success');
+        const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        db.collection('stock').doc(id).set({
+                id, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas,
+                fecha: new Date().toISOString(), vendido: false
+        });
+        toast('Equipo agregado al stock', 'success');
   }
-  saveStock();
-  closeForm();
-  render();
+    closeForm();
 }
 
 // ── Detalle ───────────────────────────────────────────────
@@ -399,24 +421,20 @@ function markSold(id) { openSellModal(id); }
 function markUnsold(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
-  p.vendido = false;
-  delete p.fecha_venta;
-  delete p.vendedor;
-  delete p.forma_pago;
-  saveStock();
+  const updated = { ...p, vendido: false };
+  delete updated.fecha_venta;
+  delete updated.vendedor;
+  delete updated.forma_pago;
+  db.collection('stock').doc(id).set(updated);
   closeDetail();
-  render();
   toast('Reactivado al stock', 'success');
 }
-
 function deletePhone(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
   if (!confirm('¿Eliminar ' + p.marca + ' ' + p.modelo + '?')) return;
-  STOCK = STOCK.filter(x => x.id !== id);
-  saveStock();
+  db.collection('stock').doc(id).delete();
   closeDetail();
-  render();
   toast('Equipo eliminado', 'info');
 }
 
@@ -440,16 +458,14 @@ function closeSellModal() {
 function confirmSell() {
   const id = pendingSellId;
   if (!id) return;
-  const p = STOCK.find(x => x.id === id);
-  if (!p) return;
-  p.vendido = true;
-  p.fecha_venta = new Date().toISOString();
-  p.vendedor = document.getElementById('sell-vendedor').value;
-  p.forma_pago = document.getElementById('sell-pago').value;
-  saveStock();
+  db.collection('stock').doc(id).update({
+        vendido: true,
+        fecha_venta: new Date().toISOString(),
+        vendedor: document.getElementById('sell-vendedor').value,
+        forma_pago: document.getElementById('sell-pago').value
+  });
   closeSellModal();
   closeDetail();
-  render();
   toast('Venta registrada ✅', 'success');
 }
 
@@ -622,8 +638,18 @@ function importJSON(e) {
       const data = JSON.parse(ev.target.result);
       if (!Array.isArray(data)) throw new Error('Formato inválido');
       if (!confirm(`¿Restaurar ${data.length} equipos? Esto reemplazará el stock actual.`)) return;
-      STOCK = data; saveStock(); closeExport(); render();
-      toast(`Stock restaurado: ${data.length} equipos ✅`, 'success');
+      db.collection('stock').get().then(snap => {
+                const batch = db.batch();
+                snap.docs.forEach(doc => batch.delete(doc.ref));
+                data.forEach(p => {
+                            const id = p.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+                            batch.set(db.collection('stock').doc(id), { ...p, id });
+                });
+                return batch.commit();
+      }).then(() => {
+                closeExport();
+                toast(`Stock restaurado: ${data.length} equipos ✅`, 'success');
+      }).catch(err => toast('Error al importar: ' + err.message, 'error'));
     } catch (err) { toast('Archivo inválido: ' + err.message, 'error'); }
   };
   reader.readAsText(file, 'UTF-8'); e.target.value = '';
