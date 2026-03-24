@@ -1,10 +1,16 @@
-// ── Configuración ──────────────────────────────────────────
-const PIN       = '2210';
-const AUTH_KEY  = 'cel_auth';
+// ── Configuración ─────────────────────────────────────────
+const PIN = '2210';
+const AUTH_KEY = 'cel_auth';
 const STOCK_KEY = 'cel_stock';
+const SELLERS_KEY = 'cel_sellers';
+const PAYMENTS_KEY = 'cel_payments';
+const BIZ_KEY = 'cel_biz';
 const AUTH_DAYS = 30;
 
-// ── Auth ───────────────────────────────────────────────────
+const DEFAULT_SELLERS = ['Vendedor 1', 'Vendedor 2'];
+const DEFAULT_PAYMENTS = ['Efectivo', 'Transferencia', 'Tarjeta débito', 'Tarjeta crédito', 'Mercado Pago'];
+
+// ── Auth ──────────────────────────────────────────────────
 let pinBuffer = '';
 
 function checkAuth() {
@@ -33,7 +39,6 @@ function initPinPad() {
   });
   document.getElementById('pin-back').addEventListener('click', backPin);
   document.getElementById('pin-clear').addEventListener('click', clearPin);
-
   document.addEventListener('keydown', e => {
     const ls = document.getElementById('login-screen');
     if (ls.style.display === 'none') return;
@@ -75,31 +80,42 @@ function checkPin() {
   }
 }
 
-// ── Stock ──────────────────────────────────────────────────
+// ── Stock ─────────────────────────────────────────────────
 let STOCK = [];
+let SELLERS = [];
+let PAYMENTS = [];
+let BIZ_IMAGE = null;
 let editingId = null;
+let pendingSellId = null;
 let appInited = false;
+let currentTab = 'ventas';
 
 function loadStock() {
-  try {
-    STOCK = JSON.parse(localStorage.getItem(STOCK_KEY) || '[]');
-  } catch (e) { STOCK = []; }
+  try { STOCK = JSON.parse(localStorage.getItem(STOCK_KEY) || '[]'); } catch { STOCK = []; }
 }
+function saveStock() { localStorage.setItem(STOCK_KEY, JSON.stringify(STOCK)); }
 
-function saveStock() {
-  localStorage.setItem(STOCK_KEY, JSON.stringify(STOCK));
+function loadConfig() {
+  try { SELLERS = JSON.parse(localStorage.getItem(SELLERS_KEY)); if (!Array.isArray(SELLERS) || !SELLERS.length) SELLERS = DEFAULT_SELLERS.slice(); } catch { SELLERS = DEFAULT_SELLERS.slice(); }
+  try { PAYMENTS = JSON.parse(localStorage.getItem(PAYMENTS_KEY)); if (!Array.isArray(PAYMENTS) || !PAYMENTS.length) PAYMENTS = DEFAULT_PAYMENTS.slice(); } catch { PAYMENTS = DEFAULT_PAYMENTS.slice(); }
+  BIZ_IMAGE = localStorage.getItem(BIZ_KEY) || null;
 }
+function saveSellers() { localStorage.setItem(SELLERS_KEY, JSON.stringify(SELLERS)); }
+function savePayments() { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(PAYMENTS)); }
+function saveBizImage() { if (BIZ_IMAGE) localStorage.setItem(BIZ_KEY, BIZ_IMAGE); else localStorage.removeItem(BIZ_KEY); }
 
-// ── Init ───────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────
 function initApp() {
   if (appInited) return;
   appInited = true;
   loadStock();
+  loadConfig();
+  applyBizImage();
 
   document.getElementById('add-btn').addEventListener('click', () => openForm());
   document.getElementById('stats-btn').addEventListener('click', openStats);
   document.getElementById('export-btn').addEventListener('click', openExport);
-
+  document.getElementById('settings-btn').addEventListener('click', openSettings);
   document.getElementById('search').addEventListener('input', debounceRender);
   document.getElementById('f-marca').addEventListener('change', debounceRender);
   document.getElementById('f-estado').addEventListener('change', debounceRender);
@@ -107,76 +123,62 @@ function initApp() {
   document.getElementById('f-min').addEventListener('input', debounceRender);
   document.getElementById('f-max').addEventListener('input', debounceRender);
 
-  // Form modal
   document.getElementById('form-close').addEventListener('click', closeForm);
   document.getElementById('form-cancel').addEventListener('click', closeForm);
   document.getElementById('form-save').addEventListener('click', savePhone);
-  document.getElementById('form-modal').addEventListener('click', e => {
-    if (e.target.id === 'form-modal') closeForm();
-  });
+  document.getElementById('form-modal').addEventListener('click', e => { if (e.target.id === 'form-modal') closeForm(); });
 
-  // Detail modal
+  document.getElementById('sell-close').addEventListener('click', closeSellModal);
+  document.getElementById('sell-cancel').addEventListener('click', closeSellModal);
+  document.getElementById('sell-confirm').addEventListener('click', confirmSell);
+  document.getElementById('sell-modal').addEventListener('click', e => { if (e.target.id === 'sell-modal') closeSellModal(); });
+
   document.getElementById('detail-close').addEventListener('click', closeDetail);
-  document.getElementById('detail-modal').addEventListener('click', e => {
-    if (e.target.id === 'detail-modal') closeDetail();
-  });
+  document.getElementById('detail-modal').addEventListener('click', e => { if (e.target.id === 'detail-modal') closeDetail(); });
 
-  // Stats modal
   document.getElementById('stats-close').addEventListener('click', closeStats);
-  document.getElementById('stats-modal').addEventListener('click', e => {
-    if (e.target.id === 'stats-modal') closeStats();
-  });
+  document.getElementById('stats-modal').addEventListener('click', e => { if (e.target.id === 'stats-modal') closeStats(); });
 
-  // Export modal
   document.getElementById('export-close').addEventListener('click', closeExport);
-  document.getElementById('export-modal').addEventListener('click', e => {
-    if (e.target.id === 'export-modal') closeExport();
-  });
+  document.getElementById('export-modal').addEventListener('click', e => { if (e.target.id === 'export-modal') closeExport(); });
   document.getElementById('export-csv').addEventListener('click', exportCSV);
   document.getElementById('export-json').addEventListener('click', exportJSON);
-  document.getElementById('import-json-btn').addEventListener('click', () => {
-    document.getElementById('import-file').click();
-  });
+  document.getElementById('import-json-btn').addEventListener('click', () => { document.getElementById('import-file').click(); });
   document.getElementById('import-file').addEventListener('change', importJSON);
+
+  document.getElementById('settings-close').addEventListener('click', closeSettings);
+  document.getElementById('settings-modal').addEventListener('click', e => { if (e.target.id === 'settings-modal') closeSettings(); });
+  document.getElementById('biz-image-input').addEventListener('change', handleBizImage);
 
   initPWA();
   render();
 }
 
-// ── Render ─────────────────────────────────────────────────
+// ── Render ────────────────────────────────────────────────
 let renderTimer;
-function debounceRender() {
-  clearTimeout(renderTimer);
-  renderTimer = setTimeout(render, 60);
-}
+function debounceRender() { clearTimeout(renderTimer); renderTimer = setTimeout(render, 60); }
 
 function render() {
-  const q       = (document.getElementById('search').value || '').trim().toLowerCase();
-  const fMarca  = document.getElementById('f-marca').value;
+  const q = (document.getElementById('search').value || '').trim().toLowerCase();
+  const fMarca = document.getElementById('f-marca').value;
   const fEstado = document.getElementById('f-estado').value;
-  const fVend   = document.getElementById('f-vendido').value;
-  const fMin    = parseInt(document.getElementById('f-min').value) || 0;
-  const fMax    = parseInt(document.getElementById('f-max').value) || 0;
-  const words   = q ? q.split(/\s+/).filter(Boolean) : [];
+  const fVend = document.getElementById('f-vendido').value;
+  const fMin = parseInt(document.getElementById('f-min').value) || 0;
+  const fMax = parseInt(document.getElementById('f-max').value) || 0;
+  const words = q ? q.split(/\s+/).filter(Boolean) : [];
 
-  // Actualizar select de marcas
   const marcas = [...new Set(STOCK.map(p => p.marca))].sort();
-  const selM   = document.getElementById('f-marca');
-  const prev   = selM.value;
+  const selM = document.getElementById('f-marca');
+  const prev = selM.value;
   while (selM.options.length > 1) selM.remove(1);
-  marcas.forEach(m => {
-    const o = document.createElement('option');
-    o.value = m; o.textContent = m;
-    selM.appendChild(o);
-  });
+  marcas.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; selM.appendChild(o); });
   selM.value = prev;
 
-  // Filtrar
   const filtered = STOCK.filter(p => {
-    if (fMarca  && p.marca  !== fMarca)  return false;
+    if (fMarca && p.marca !== fMarca) return false;
     if (fEstado && p.estado !== fEstado) return false;
-    if (fVend === '0' && p.vendido)      return false;
-    if (fVend === '1' && !p.vendido)     return false;
+    if (fVend === '0' && p.vendido) return false;
+    if (fVend === '1' && !p.vendido) return false;
     if (fMin > 0 && (p.precio || 0) < fMin) return false;
     if (fMax > 0 && (p.precio || 0) > fMax) return false;
     if (words.length) {
@@ -186,53 +188,43 @@ function render() {
     return true;
   });
 
-  // Stats
-  const inStock  = STOCK.filter(p => !p.vendido);
-  const sold     = STOCK.filter(p => p.vendido);
+  const inStock = STOCK.filter(p => !p.vendido);
+  const sold = STOCK.filter(p => p.vendido);
   const totalVal = inStock.reduce((s, p) => s + (p.precio || 0), 0);
   document.getElementById('s-stock').textContent = inStock.length;
-  document.getElementById('s-sold').textContent  = sold.length;
+  document.getElementById('s-sold').textContent = sold.length;
   document.getElementById('s-value').textContent = '$' + totalVal.toLocaleString('es-AR');
 
-  // Render lista
-  const listEl  = document.getElementById('list');
+  const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');
-
-  if (filtered.length === 0) {
-    listEl.innerHTML = '';
-    emptyEl.style.display = '';
-    return;
-  }
+  if (filtered.length === 0) { listEl.innerHTML = ''; emptyEl.style.display = ''; return; }
   emptyEl.style.display = 'none';
 
   const badgeCls = { Nuevo: 'bg-new', Usado: 'bg-used', Reacondicionado: 'bg-refurb' };
-
   listEl.innerHTML = filtered.map(p => {
     const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' · ');
-    const fecha = p.fecha
-      ? new Date(p.fecha).toLocaleDateString('es-AR', { day:'2-digit', month:'short' })
-      : '';
+    const fecha = p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR', { day:'2-digit', month:'short' }) : '';
     return `
-<div class="card${p.vendido ? ' card-sold' : ''}" onclick="openDetail('${p.id}')">
-  <div class="card-top">
-    <div class="card-info">
-      <span class="card-marca">${esc(p.marca)}</span>
-      <span class="card-modelo">${esc(p.modelo)}</span>
-      ${specs ? `<span class="card-specs">${esc(specs)}</span>` : ''}
-    </div>
-    <div class="card-right">
-      <span class="badge ${badgeCls[p.estado] || ''}">${esc(p.estado)}</span>
-      ${p.vendido ? '<span class="badge bg-sold">VENDIDO</span>' : ''}
-    </div>
-  </div>
-  <div class="card-bottom">
-    <span class="card-price">${p.precio ? '$ ' + p.precio.toLocaleString('es-AR') : '—'}</span>
-    <div class="card-meta">
-      ${p.imei ? `<span class="card-imei">${esc(p.imei)}</span>` : ''}
-      ${fecha ? `<span class="card-date">${fecha}</span>` : ''}
-    </div>
-  </div>
-</div>`;
+      <div class="card${p.vendido ? ' card-sold' : ''}" onclick="openDetail('${p.id}')">
+        <div class="card-top">
+          <div class="card-info">
+            <span class="card-marca">${esc(p.marca)}</span>
+            <span class="card-modelo">${esc(p.modelo)}</span>
+            ${specs ? `<span class="card-specs">${esc(specs)}</span>` : ''}
+          </div>
+          <div class="card-right">
+            <span class="badge ${badgeCls[p.estado] || ''}">${esc(p.estado)}</span>
+            ${p.vendido ? '<span class="badge bg-sold">VENDIDO</span>' : ''}
+          </div>
+        </div>
+        <div class="card-bottom">
+          <span class="card-price">${p.precio ? '$ ' + p.precio.toLocaleString('es-AR') : '—'}</span>
+          <div class="card-meta">
+            ${p.imei ? `<span class="card-imei">${esc(p.imei)}</span>` : ''}
+            ${fecha ? `<span class="card-date">${fecha}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
   }).join('');
 }
 
@@ -240,33 +232,29 @@ function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Formulario ─────────────────────────────────────────────
+// ── Formulario ────────────────────────────────────────────
 function openForm(id) {
   editingId = id || null;
   const t = document.getElementById('form-title');
-
   if (id) {
     const p = STOCK.find(x => x.id === id);
     if (!p) return;
     t.textContent = '✏️ Editar Equipo';
-    document.getElementById('fi-marca').value   = p.marca || '';
-    document.getElementById('fi-modelo').value  = p.modelo || '';
-    document.getElementById('fi-estado').value  = p.estado || '';
-    document.getElementById('fi-precio').value  = p.precio || '';
+    document.getElementById('fi-marca').value = p.marca || '';
+    document.getElementById('fi-modelo').value = p.modelo || '';
+    document.getElementById('fi-estado').value = p.estado || '';
+    document.getElementById('fi-precio').value = p.precio || '';
     document.getElementById('fi-storage').value = p.almacenamiento || '';
-    document.getElementById('fi-ram').value     = p.ram || '';
-    document.getElementById('fi-imei').value    = p.imei || '';
-    document.getElementById('fi-notas').value   = p.notas || '';
+    document.getElementById('fi-ram').value = p.ram || '';
+    document.getElementById('fi-imei').value = p.imei || '';
+    document.getElementById('fi-notas').value = p.notas || '';
   } else {
     t.textContent = '📱 Agregar Equipo';
-    ['fi-marca','fi-modelo','fi-precio','fi-imei','fi-notas'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
-    document.getElementById('fi-estado').value  = '';
+    ['fi-marca','fi-modelo','fi-precio','fi-imei','fi-notas'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('fi-estado').value = '';
     document.getElementById('fi-storage').value = '';
-    document.getElementById('fi-ram').value     = '';
+    document.getElementById('fi-ram').value = '';
   }
-
   document.getElementById('form-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   setTimeout(() => document.getElementById('fi-marca').focus(), 300);
@@ -279,27 +267,23 @@ function closeForm() {
 }
 
 function savePhone() {
-  const marca   = document.getElementById('fi-marca').value.trim();
-  const modelo  = document.getElementById('fi-modelo').value.trim();
-  const estado  = document.getElementById('fi-estado').value;
-  const precio  = parseInt(document.getElementById('fi-precio').value) || 0;
+  const marca = document.getElementById('fi-marca').value.trim();
+  const modelo = document.getElementById('fi-modelo').value.trim();
+  const estado = document.getElementById('fi-estado').value;
+  const precio = parseInt(document.getElementById('fi-precio').value) || 0;
   const storage = document.getElementById('fi-storage').value;
-  const ram     = document.getElementById('fi-ram').value;
-  const imei    = document.getElementById('fi-imei').value.trim();
-  const notas   = document.getElementById('fi-notas').value.trim();
+  const ram = document.getElementById('fi-ram').value;
+  const imei = document.getElementById('fi-imei').value.trim();
+  const notas = document.getElementById('fi-notas').value.trim();
 
-  if (!marca)  { toast('Ingresá la marca', 'error');  return; }
+  if (!marca) { toast('Ingresá la marca', 'error'); return; }
   if (!modelo) { toast('Ingresá el modelo', 'error'); return; }
   if (!estado) { toast('Seleccioná el estado', 'error'); return; }
   if (!precio || precio <= 0) { toast('Ingresá un precio válido', 'error'); return; }
-  if (imei && !/^\d{15}$/.test(imei)) {
-    toast('El IMEI debe tener 15 dígitos', 'error'); return;
-  }
+  if (imei && !/^\d{15}$/.test(imei)) { toast('El IMEI debe tener 15 dígitos', 'error'); return; }
   if (imei) {
     const dup = STOCK.find(x => x.imei === imei && x.id !== editingId);
-    if (dup) {
-      toast('Ya existe un equipo con ese IMEI', 'error'); return;
-    }
+    if (dup) { toast('Ya existe un equipo con ese IMEI', 'error'); return; }
   }
 
   if (editingId) {
@@ -311,31 +295,28 @@ function savePhone() {
   } else {
     STOCK.unshift({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      marca, modelo, estado, precio,
-      almacenamiento: storage, ram, imei, notas,
+      marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas,
       fecha: new Date().toISOString(),
       vendido: false,
     });
     toast('Equipo agregado al stock', 'success');
   }
-
   saveStock();
   closeForm();
   render();
 }
 
-// ── Detalle ────────────────────────────────────────────────
+// ── Detalle ───────────────────────────────────────────────
 function openDetail(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
-
-  document.getElementById('det-marca').textContent  = p.marca;
+  document.getElementById('det-marca').textContent = p.marca;
   document.getElementById('det-modelo').textContent = p.modelo;
 
   const badgeCls = { Nuevo: 'bg-new', Usado: 'bg-used', Reacondicionado: 'bg-refurb' };
   const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' · ');
-  const fechaIng  = p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR') : '—';
-  const fechaVta  = p.fecha_venta ? new Date(p.fecha_venta).toLocaleDateString('es-AR') : null;
+  const fechaIng = p.fecha ? fmtDateTime(p.fecha) : '—';
+  const fechaVta = p.fecha_venta ? fmtDateTime(p.fecha_venta) : null;
 
   document.getElementById('det-body').innerHTML = `
     <div class="det-row">
@@ -353,6 +334,8 @@ function openDetail(id) {
       <span class="det-val">${fechaIng}</span>
     </div>
     ${fechaVta ? `<div class="det-row"><span class="det-label">Venta</span><span class="det-val">${fechaVta}</span></div>` : ''}
+    ${p.vendedor ? `<div class="det-row"><span class="det-label">Vendedor</span><span class="det-val">${esc(p.vendedor)}</span></div>` : ''}
+    ${p.forma_pago ? `<div class="det-row"><span class="det-label">Forma de pago</span><span class="det-val">${esc(p.forma_pago)}</span></div>` : ''}
     ${p.notas ? `<div class="det-row det-row--full"><span class="det-label">Notas</span><span class="det-val">${esc(p.notas)}</span></div>` : ''}
     ${p.vendido ? '<div class="det-sold-badge">VENDIDO</div>' : ''}
   `;
@@ -361,9 +344,7 @@ function openDetail(id) {
     ${!p.vendido ? `<button class="btn-whatsapp" onclick="shareWhatsApp('${p.id}')">🟢 WhatsApp</button>` : ''}
     <button class="btn-copy" onclick="copyInfo('${p.id}')">📋 Copiar</button>
     ${!p.vendido ? `<button class="btn-edit" onclick="closeDetail();openForm('${p.id}')">✏️ Editar</button>` : ''}
-    ${!p.vendido
-      ? `<button class="btn-sell" onclick="markSold('${p.id}')">💰 Vendido</button>`
-      : `<button class="btn-unsell" onclick="markSold('${p.id}')">↩️ Reactivar</button>`}
+    ${!p.vendido ? `<button class="btn-sell" onclick="markSold('${p.id}')">💰 Vendido</button>` : `<button class="btn-unsell" onclick="markUnsold('${p.id}')">↩️ Reactivar</button>`}
     <button class="btn-delete" onclick="deletePhone('${p.id}')">🗑️</button>
   `;
 
@@ -376,55 +357,56 @@ function closeDetail() {
   document.body.style.overflow = '';
 }
 
-// ── WhatsApp ───────────────────────────────────────────────
+function fmtDateTime(iso) {
+  return new Date(iso).toLocaleString('es-AR', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
+
+// ── WhatsApp ──────────────────────────────────────────────
 function shareWhatsApp(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
-
   const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' / ');
   const precio = p.precio ? '$ ' + p.precio.toLocaleString('es-AR') : '—';
-
   let msg = `📱 *${p.marca} ${p.modelo}*\n`;
-  if (specs)    msg += `💾 ${specs}\n`;
+  if (specs) msg += `💾 ${specs}\n`;
   if (p.estado) msg += `✅ Estado: ${p.estado}\n`;
   msg += `💰 Precio: ${precio}`;
-  if (p.notas)  msg += `\n📝 ${p.notas}`;
+  if (p.notas) msg += `\n📝 ${p.notas}`;
   msg += `\n\n_Consultá disponibilidad_ 👋`;
-
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
-// ── Copiar info ────────────────────────────────────────────
+// ── Copiar info ───────────────────────────────────────────
 function copyInfo(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
-
   const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' / ');
   let text = `${p.marca} ${p.modelo}`;
-  if (specs)    text += ` - ${specs}`;
+  if (specs) text += ` - ${specs}`;
   if (p.estado) text += ` - ${p.estado}`;
   text += ` - $${(p.precio || 0).toLocaleString('es-AR')}`;
-
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => {
-      toast('Info copiada al portapapeles', 'success');
-    }).catch(() => toast('No se pudo copiar', 'error'));
-  } else {
-    toast('Tu navegador no soporta copiar', 'error');
-  }
+    navigator.clipboard.writeText(text).then(() => { toast('Info copiada al portapapeles', 'success'); }).catch(() => toast('No se pudo copiar', 'error'));
+  } else { toast('Tu navegador no soporta copiar', 'error'); }
 }
 
-// ── Acciones ───────────────────────────────────────────────
-function markSold(id) {
+// ── Acciones ──────────────────────────────────────────────
+function markSold(id) { openSellModal(id); }
+
+function markUnsold(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
-  p.vendido = !p.vendido;
-  if (p.vendido) p.fecha_venta = new Date().toISOString();
-  else           delete p.fecha_venta;
+  p.vendido = false;
+  delete p.fecha_venta;
+  delete p.vendedor;
+  delete p.forma_pago;
   saveStock();
   closeDetail();
   render();
-  toast(p.vendido ? 'Marcado como vendido' : 'Reactivado al stock', 'success');
+  toast('Reactivado al stock', 'success');
 }
 
 function deletePhone(id) {
@@ -438,81 +420,45 @@ function deletePhone(id) {
   toast('Equipo eliminado', 'info');
 }
 
-// ── Modal Estadísticas ─────────────────────────────────────
+// ── Modal Venta ───────────────────────────────────────────
+function openSellModal(id) {
+  pendingSellId = id;
+  const selV = document.getElementById('sell-vendedor');
+  const selP = document.getElementById('sell-pago');
+  selV.innerHTML = SELLERS.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  selP.innerHTML = PAYMENTS.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  document.getElementById('sell-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSellModal() {
+  document.getElementById('sell-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+  pendingSellId = null;
+}
+
+function confirmSell() {
+  const id = pendingSellId;
+  if (!id) return;
+  const p = STOCK.find(x => x.id === id);
+  if (!p) return;
+  p.vendido = true;
+  p.fecha_venta = new Date().toISOString();
+  p.vendedor = document.getElementById('sell-vendedor').value;
+  p.forma_pago = document.getElementById('sell-pago').value;
+  saveStock();
+  closeSellModal();
+  closeDetail();
+  render();
+  toast('Venta registrada ✅', 'success');
+}
+
+// ── Modal Estadísticas ────────────────────────────────────
 function openStats() {
-  const sold   = STOCK.filter(p => p.vendido && p.fecha_venta);
-  const inStock = STOCK.filter(p => !p.vendido);
-  const totalVal = inStock.reduce((s, p) => s + (p.precio || 0), 0);
-
-  // Agrupar ventas por mes
-  const byMonth = {};
-  sold.forEach(p => {
-    const d   = new Date(p.fecha_venta);
-    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    const lbl = d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-    if (!byMonth[key]) byMonth[key] = { label: lbl, items: [], total: 0 };
-    byMonth[key].items.push(p);
-    byMonth[key].total += p.precio || 0;
-  });
-
-  const keys = Object.keys(byMonth).sort().reverse();
-
-  // Marca más vendida
-  const marcaCount = {};
-  sold.forEach(p => { marcaCount[p.marca] = (marcaCount[p.marca] || 0) + 1; });
-  const topMarca = Object.entries(marcaCount).sort((a,b) => b[1]-a[1])[0];
-
-  let html = `
-    <div class="ss-grid">
-      <div class="ss-card">
-        <div class="ss-num">${inStock.length}</div>
-        <div class="ss-lbl">En stock</div>
-      </div>
-      <div class="ss-card">
-        <div class="ss-num">${sold.length}</div>
-        <div class="ss-lbl">Total vendidos</div>
-      </div>
-      <div class="ss-card ss-green">
-        <div class="ss-num">$${totalVal.toLocaleString('es-AR')}</div>
-        <div class="ss-lbl">Valor stock</div>
-      </div>
-      ${topMarca ? `
-      <div class="ss-card ss-blue">
-        <div class="ss-num">${topMarca[0]}</div>
-        <div class="ss-lbl">Marca más vendida</div>
-      </div>` : ''}
-    </div>
-    <h4 class="hist-title">Historial de ventas por mes</h4>
-  `;
-
-  if (keys.length === 0) {
-    html += '<p class="hist-empty">Sin ventas registradas aún 📦</p>';
-  } else {
-    keys.forEach(k => {
-      const m = byMonth[k];
-      html += `
-        <div class="hist-month">
-          <div class="hist-month-hdr">
-            <span class="hist-month-name">${m.label}</span>
-            <span class="hist-month-stats">${m.items.length} venta${m.items.length !== 1 ? 's' : ''} · $${m.total.toLocaleString('es-AR')}</span>
-          </div>
-          ${m.items.map(p => {
-            const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' · ');
-            return `
-            <div class="hist-item">
-              <div class="hist-item-info">
-                <span class="hist-item-name">${esc(p.marca)} ${esc(p.modelo)}</span>
-                ${specs ? `<span class="hist-item-specs">${esc(specs)}</span>` : ''}
-              </div>
-              <span class="hist-item-price">$${(p.precio || 0).toLocaleString('es-AR')}</span>
-            </div>`;
-          }).join('')}
-        </div>
-      `;
-    });
-  }
-
-  document.getElementById('stats-body').innerHTML = html;
+  currentTab = 'ventas';
+  document.getElementById('tab-ventas').classList.add('active');
+  document.getElementById('tab-entradas').classList.remove('active');
+  renderStatsVentas();
   document.getElementById('stats-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
@@ -522,115 +468,310 @@ function closeStats() {
   document.body.style.overflow = '';
 }
 
-// ── Export / Import ────────────────────────────────────────
-function openExport() {
-  document.getElementById('export-modal').classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-ventas').classList.toggle('active', tab === 'ventas');
+  document.getElementById('tab-entradas').classList.toggle('active', tab === 'entradas');
+  if (tab === 'ventas') renderStatsVentas();
+  else renderStatsEntradas();
 }
 
-function closeExport() {
-  document.getElementById('export-modal').classList.add('hidden');
-  document.body.style.overflow = '';
+function renderStatsVentas() {
+  const sold = STOCK.filter(p => p.vendido && p.fecha_venta);
+  const inStock = STOCK.filter(p => !p.vendido);
+  const totalVal = inStock.reduce((s, p) => s + (p.precio || 0), 0);
+  const totalVentas = sold.reduce((s, p) => s + (p.precio || 0), 0);
+
+  const byMonth = {};
+  sold.forEach(p => {
+    const d = new Date(p.fecha_venta);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const lbl = d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    if (!byMonth[key]) byMonth[key] = { label: lbl, items: [], total: 0 };
+    byMonth[key].items.push(p);
+    byMonth[key].total += p.precio || 0;
+  });
+  const keys = Object.keys(byMonth).sort().reverse();
+
+  const marcaCount = {};
+  sold.forEach(p => { marcaCount[p.marca] = (marcaCount[p.marca] || 0) + 1; });
+  const topMarca = Object.entries(marcaCount).sort((a,b) => b[1]-a[1])[0];
+
+  const vendCount = {};
+  sold.filter(p => p.vendedor).forEach(p => { vendCount[p.vendedor] = (vendCount[p.vendedor] || 0) + 1; });
+  const topVend = Object.entries(vendCount).sort((a,b) => b[1]-a[1])[0];
+
+  let html = `
+    <div class="ss-grid">
+      <div class="ss-card"><div class="ss-num">${inStock.length}</div><div class="ss-lbl">En stock</div></div>
+      <div class="ss-card"><div class="ss-num">${sold.length}</div><div class="ss-lbl">Total vendidos</div></div>
+      <div class="ss-card ss-green"><div class="ss-num">$${totalVal.toLocaleString('es-AR')}</div><div class="ss-lbl">Valor stock</div></div>
+      <div class="ss-card ss-green"><div class="ss-num">$${totalVentas.toLocaleString('es-AR')}</div><div class="ss-lbl">Total vendido</div></div>
+      ${topMarca ? `<div class="ss-card ss-blue"><div class="ss-num">${topMarca[0]}</div><div class="ss-lbl">Marca top</div></div>` : ''}
+      ${topVend ? `<div class="ss-card ss-blue"><div class="ss-num">${esc(topVend[0])}</div><div class="ss-lbl">Vendedor top</div></div>` : ''}
+    </div>
+    <h4 class="hist-title">Historial de ventas por mes</h4>
+  `;
+
+  if (keys.length === 0) {
+    html += '<p class="hist-empty">Sin ventas registradas aún 📦</p>';
+  } else {
+    keys.forEach(k => {
+      const m = byMonth[k];
+      html += `<div class="hist-month">
+        <div class="hist-month-hdr">
+          <span class="hist-month-name">${m.label}</span>
+          <span class="hist-month-stats">${m.items.length} venta${m.items.length !== 1 ? 's' : ''} · $${m.total.toLocaleString('es-AR')}</span>
+        </div>
+        ${m.items.map(p => {
+          const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' · ');
+          const hora = p.fecha_venta ? fmtDateTime(p.fecha_venta) : '';
+          return `<div class="hist-item">
+            <div class="hist-item-info">
+              <span class="hist-item-name">${esc(p.marca)} ${esc(p.modelo)}</span>
+              ${specs ? `<span class="hist-item-specs">${esc(specs)}</span>` : ''}
+              <span class="hist-item-meta">${hora}${p.vendedor ? ' · ' + esc(p.vendedor) : ''}${p.forma_pago ? ' · ' + esc(p.forma_pago) : ''}</span>
+            </div>
+            <span class="hist-item-price">$${(p.precio || 0).toLocaleString('es-AR')}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    });
+  }
+  document.getElementById('stats-body').innerHTML = html;
 }
+
+function renderStatsEntradas() {
+  const byMonth = {};
+  STOCK.forEach(p => {
+    if (!p.fecha) return;
+    const d = new Date(p.fecha);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const lbl = d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    if (!byMonth[key]) byMonth[key] = { label: lbl, items: [] };
+    byMonth[key].items.push(p);
+  });
+  const keys = Object.keys(byMonth).sort().reverse();
+  const badgeCls = { Nuevo: 'bg-new', Usado: 'bg-used', Reacondicionado: 'bg-refurb' };
+
+  let html = '<h4 class="hist-title">Entradas de equipos por mes</h4>';
+  if (keys.length === 0) {
+    html += '<p class="hist-empty">Sin entradas registradas 📦</p>';
+  } else {
+    keys.forEach(k => {
+      const m = byMonth[k];
+      html += `<div class="hist-month">
+        <div class="hist-month-hdr">
+          <span class="hist-month-name">${m.label}</span>
+          <span class="hist-month-stats">${m.items.length} equipo${m.items.length !== 1 ? 's' : ''}</span>
+        </div>
+        ${m.items.map(p => {
+          const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' · ');
+          const hora = p.fecha ? fmtDateTime(p.fecha) : '';
+          return `<div class="hist-item">
+            <div class="hist-item-info">
+              <span class="hist-item-name">${esc(p.marca)} ${esc(p.modelo)}</span>
+              ${specs ? `<span class="hist-item-specs">${esc(specs)}</span>` : ''}
+              <span class="hist-item-meta">${hora}</span>
+            </div>
+            <div style="text-align:right">
+              <span class="badge ${badgeCls[p.estado] || ''}" style="font-size:.6rem">${esc(p.estado)}</span>
+              <div class="hist-item-price" style="margin-top:3px">$${(p.precio || 0).toLocaleString('es-AR')}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    });
+  }
+  document.getElementById('stats-body').innerHTML = html;
+}
+
+// ── Export / Import ───────────────────────────────────────
+function openExport() { document.getElementById('export-modal').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+function closeExport() { document.getElementById('export-modal').classList.add('hidden'); document.body.style.overflow = ''; }
 
 function exportCSV() {
-  const headers = ['Marca','Modelo','Estado','Precio','Almacenamiento','RAM','IMEI','Notas','Fecha Ingreso','Vendido','Fecha Venta'];
+  const headers = ['Marca','Modelo','Estado','Precio','Almacenamiento','RAM','IMEI','Notas','Fecha Ingreso','Vendido','Fecha Venta','Vendedor','Forma de Pago'];
   const rows = STOCK.map(p => [
     p.marca, p.modelo, p.estado, p.precio || 0,
     p.almacenamiento || '', p.ram || '', p.imei || '', p.notas || '',
-    p.fecha     ? new Date(p.fecha).toLocaleDateString('es-AR')       : '',
-    p.vendido   ? 'Sí' : 'No',
-    p.fecha_venta ? new Date(p.fecha_venta).toLocaleDateString('es-AR') : ''
+    p.fecha ? fmtDateTime(p.fecha) : '',
+    p.vendido ? 'Sí' : 'No',
+    p.fecha_venta ? fmtDateTime(p.fecha_venta) : '',
+    p.vendedor || '', p.forma_pago || ''
   ]);
-
-  const csv = [headers, ...rows]
-    .map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
-    .join('\n');
-
+  const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(blob),
-    download: 'stock_celulares_' + new Date().toISOString().slice(0,10) + '.csv'
-  });
-  a.click();
-  URL.revokeObjectURL(a.href);
-  closeExport();
-  toast('Stock exportado como CSV ✅', 'success');
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'stock_celulares_' + new Date().toISOString().slice(0,10) + '.csv' });
+  a.click(); URL.revokeObjectURL(a.href);
+  closeExport(); toast('Stock exportado como CSV ✅', 'success');
 }
 
 function exportJSON() {
   const blob = new Blob([JSON.stringify(STOCK, null, 2)], { type: 'application/json' });
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(blob),
-    download: 'backup_stock_' + new Date().toISOString().slice(0,10) + '.json'
-  });
-  a.click();
-  URL.revokeObjectURL(a.href);
-  closeExport();
-  toast('Backup guardado ✅', 'success');
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'backup_stock_' + new Date().toISOString().slice(0,10) + '.json' });
+  a.click(); URL.revokeObjectURL(a.href);
+  closeExport(); toast('Backup guardado ✅', 'success');
 }
 
 function importJSON(e) {
-  const file = e.target.files[0];
-  if (!file) return;
+  const file = e.target.files[0]; if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
     try {
       const data = JSON.parse(ev.target.result);
       if (!Array.isArray(data)) throw new Error('Formato inválido');
       if (!confirm(`¿Restaurar ${data.length} equipos? Esto reemplazará el stock actual.`)) return;
-      STOCK = data;
-      saveStock();
-      closeExport();
-      render();
+      STOCK = data; saveStock(); closeExport(); render();
       toast(`Stock restaurado: ${data.length} equipos ✅`, 'success');
-    } catch (err) {
-      toast('Archivo inválido: ' + err.message, 'error');
-    }
+    } catch (err) { toast('Archivo inválido: ' + err.message, 'error'); }
   };
-  reader.readAsText(file, 'UTF-8');
-  e.target.value = '';
+  reader.readAsText(file, 'UTF-8'); e.target.value = '';
 }
 
-// ── Toast ──────────────────────────────────────────────────
+// ── Configuración ─────────────────────────────────────────
+function openSettings() {
+  renderSettingsSellers();
+  renderSettingsPayments();
+  updateBizPreview();
+  document.getElementById('settings-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSettings() {
+  document.getElementById('settings-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function renderSettingsSellers() {
+  const el = document.getElementById('sellers-list');
+  if (!SELLERS.length) { el.innerHTML = '<p class="settings-empty">Sin vendedores registrados</p>'; return; }
+  el.innerHTML = SELLERS.map((s, i) => `
+    <div class="settings-item">
+      <span class="settings-item-name">${esc(s)}</span>
+      <button class="settings-del-btn" onclick="removeSeller(${i})">🗑️</button>
+    </div>`).join('');
+}
+
+function renderSettingsPayments() {
+  const el = document.getElementById('payments-list');
+  if (!PAYMENTS.length) { el.innerHTML = '<p class="settings-empty">Sin medios de pago registrados</p>'; return; }
+  el.innerHTML = PAYMENTS.map((p, i) => `
+    <div class="settings-item">
+      <span class="settings-item-name">${esc(p)}</span>
+      <button class="settings-del-btn" onclick="removePayment(${i})">🗑️</button>
+    </div>`).join('');
+}
+
+function addSeller() {
+  const inp = document.getElementById('new-seller');
+  const val = inp.value.trim();
+  if (!val) { toast('Ingresá un nombre', 'error'); return; }
+  if (SELLERS.includes(val)) { toast('Ya existe ese vendedor', 'error'); return; }
+  SELLERS.push(val); saveSellers(); inp.value = '';
+  renderSettingsSellers(); toast('Vendedor agregado ✅', 'success');
+}
+
+function removeSeller(i) {
+  if (!confirm(`¿Eliminar "${SELLERS[i]}"?`)) return;
+  SELLERS.splice(i, 1); saveSellers(); renderSettingsSellers();
+  toast('Vendedor eliminado', 'info');
+}
+
+function addPayment() {
+  const inp = document.getElementById('new-payment');
+  const val = inp.value.trim();
+  if (!val) { toast('Ingresá un medio de pago', 'error'); return; }
+  if (PAYMENTS.includes(val)) { toast('Ya existe ese medio de pago', 'error'); return; }
+  PAYMENTS.push(val); savePayments(); inp.value = '';
+  renderSettingsPayments(); toast('Medio de pago agregado ✅', 'success');
+}
+
+function removePayment(i) {
+  if (!confirm(`¿Eliminar "${PAYMENTS[i]}"?`)) return;
+  PAYMENTS.splice(i, 1); savePayments(); renderSettingsPayments();
+  toast('Medio de pago eliminado', 'info');
+}
+
+// ── Imagen del negocio ────────────────────────────────────
+function handleBizImage(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    BIZ_IMAGE = ev.target.result;
+    saveBizImage(); applyBizImage(); updateBizPreview();
+    toast('Imagen guardada ✅', 'success');
+  };
+  reader.readAsDataURL(file); e.target.value = '';
+}
+
+function removeBizImage() {
+  BIZ_IMAGE = null; saveBizImage(); applyBizImage(); updateBizPreview();
+  toast('Imagen eliminada', 'info');
+}
+
+function applyBizImage() {
+  const hdrImg = document.getElementById('hdr-biz-img');
+  const loginImg = document.getElementById('login-biz-img');
+  const loginIcon = document.getElementById('login-default-icon');
+  if (BIZ_IMAGE) {
+    if (hdrImg) { hdrImg.src = BIZ_IMAGE; hdrImg.style.display = 'block'; }
+    if (loginImg) { loginImg.src = BIZ_IMAGE; loginImg.style.display = 'block'; }
+    if (loginIcon) loginIcon.style.display = 'none';
+  } else {
+    if (hdrImg) hdrImg.style.display = 'none';
+    if (loginImg) loginImg.style.display = 'none';
+    if (loginIcon) loginIcon.style.display = '';
+  }
+}
+
+function updateBizPreview() {
+  const preview = document.getElementById('biz-preview');
+  const removeBtn = document.getElementById('biz-remove');
+  if (!preview) return;
+  if (BIZ_IMAGE) {
+    preview.innerHTML = `<img src="${BIZ_IMAGE}" class="biz-preview-img" alt="Logo">`;
+    if (removeBtn) removeBtn.style.display = '';
+  } else {
+    preview.innerHTML = '<span class="biz-no-img">Sin imagen cargada</span>';
+    if (removeBtn) removeBtn.style.display = 'none';
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────
 let toastTimer;
 function toast(msg, type) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show ' + (type || 'info');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+  t.textContent = msg; t.className = 'toast show ' + (type || 'info');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ── PWA ────────────────────────────────────────────────────
+// ── PWA ───────────────────────────────────────────────────
 function initPWA() {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
-
+  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
   let deferredPrompt = null;
   const banner = document.getElementById('install-banner');
-
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    deferredPrompt = e;
-    banner.classList.add('show');
-  });
-
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; banner.classList.add('show'); });
   document.getElementById('install-btn').addEventListener('click', () => {
     banner.classList.remove('show');
     if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; }
   });
-
   window.addEventListener('appinstalled', () => banner.classList.remove('show'));
-
-  const isIOS        = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const isStandalone = window.navigator.standalone === true;
-  if (isIOS && !isStandalone) {
-    document.getElementById('ios-tip').classList.add('show');
-  }
+  if (isIOS && !isStandalone) { document.getElementById('ios-tip').classList.add('show'); }
 }
 
-// ── Arranque ───────────────────────────────────────────────
+// ── Arranque ──────────────────────────────────────────────
+(function() {
+  const img = localStorage.getItem(BIZ_KEY);
+  if (img) {
+    const loginImg = document.getElementById('login-biz-img');
+    const loginIcon = document.getElementById('login-default-icon');
+    if (loginImg) { loginImg.src = img; loginImg.style.display = 'block'; }
+    if (loginIcon) loginIcon.style.display = 'none';
+  }
+})();
+
 initPinPad();
 checkAuth();
