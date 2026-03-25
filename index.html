@@ -326,6 +326,38 @@
         </div>
       </div>
 
+      <div class="settings-section">
+        <h4 class="settings-title">💲 Precios Diferenciados</h4>
+        <div class="settings-item" style="justify-content:space-between">
+          <span class="settings-item-name">Dólar blue hoy:</span>
+          <span id="dolar-blue-display" style="font-weight:600;color:var(--grn);font-size:.9rem">Cargando...</span>
+        </div>
+        <div class="price-settings-grid">
+          <div class="price-settings-row">
+            <label class="price-settings-lbl">🏦 Transf. / 1 pago</label>
+            <div class="price-settings-input-wrap">
+              <input id="price-transfer" class="fi price-pct-input" type="number" min="0" max="200" placeholder="0" inputmode="numeric">
+              <span class="price-pct-sign">%</span>
+            </div>
+          </div>
+          <div class="price-settings-row">
+            <label class="price-settings-lbl">📆 3 cuotas</label>
+            <div class="price-settings-input-wrap">
+              <input id="price-c3" class="fi price-pct-input" type="number" min="0" max="200" placeholder="15" inputmode="numeric">
+              <span class="price-pct-sign">%</span>
+            </div>
+          </div>
+          <div class="price-settings-row">
+            <label class="price-settings-lbl">📆 6 cuotas</label>
+            <div class="price-settings-input-wrap">
+              <input id="price-c6" class="fi price-pct-input" type="number" min="0" max="200" placeholder="25" inputmode="numeric">
+              <span class="price-pct-sign">%</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="savePriceSettings()" style="margin-top:10px;width:100%">💾 Guardar porcentajes</button>
+      </div>
+
     </div>
   </div>
 </div>
