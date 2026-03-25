@@ -6,9 +6,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Stock Cel">
+  <meta name="apple-mobile-web-app-title" content="TechPoint">
   <meta name="theme-color" content="#0f172a">
-  <title>Stock de Celulares</title>
+  <title>TechPoint</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -21,7 +21,7 @@
       <img id="login-biz-img" src="" alt="Logo" style="display:none" class="login-biz-img-el">
       <div class="login-icon" id="login-default-icon">📱</div>
     </div>
-    <h2 class="login-title">Stock de Celulares</h2>
+    <h2 class="login-title">TechPoint</h2>
     <p class="login-sub">Ingresá tu PIN de acceso</p>
     <div class="pin-dots" id="pin-dots">
       <span></span><span></span><span></span><span></span>
@@ -57,63 +57,126 @@
     <button class="banner-close" onclick="document.getElementById('ios-tip').classList.remove('show')">✕</button>
   </div>
 
-  <header>
-    <div class="hdr-top">
-      <div class="hdr-brand">
-        <img id="hdr-biz-img" src="" alt="Logo" style="display:none" class="hdr-logo">
-        <h1>📱 Stock de Celulares</h1>
+  <!-- ── SECCIÓN STOCK ── -->
+  <section id="stock-section" class="main-section">
+    <header>
+      <div class="hdr-top">
+        <div class="hdr-brand">
+          <img id="hdr-biz-img" src="" alt="Logo" style="display:none" class="hdr-logo">
+          <h1>📱 Stock de Celulares</h1>
+        </div>
+        <div class="hdr-actions">
+          <button class="hdr-btn" id="settings-btn" title="Configuración">⚙️</button>
+          <button class="hdr-btn" id="stats-btn" title="Estadísticas y historial">📊</button>
+          <button class="hdr-btn" id="export-btn" title="Exportar stock">💾</button>
+          <button class="hdr-btn" id="add-btn" title="Agregar equipo">＋</button>
+        </div>
       </div>
-      <div class="hdr-actions">
-        <button class="hdr-btn" id="settings-btn" title="Configuración">⚙️</button>
-        <button class="hdr-btn" id="stats-btn" title="Estadísticas y historial">📊</button>
-        <button class="hdr-btn" id="export-btn" title="Exportar stock">💾</button>
-        <button class="hdr-btn" id="add-btn" title="Agregar equipo">＋</button>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="search" type="search" placeholder="Buscar marca, modelo, IMEI..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="filters">
+        <select class="pill" id="f-marca"><option value="">Todas las marcas</option></select>
+        <select class="pill" id="f-estado">
+          <option value="">Todos los estados</option>
+          <option value="Nuevo">Nuevo</option>
+          <option value="Usado">Usado</option>
+          <option value="Reacondicionado">Reacondicionado</option>
+        </select>
+        <select class="pill" id="f-vendido">
+          <option value="0">En stock</option>
+          <option value="1">Vendidos</option>
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="price-filter">
+        <span class="price-filter-lbl">💰 Precio:</span>
+        <input id="f-min" class="price-input" type="number" placeholder="Mín" min="0" inputmode="numeric">
+        <span class="price-filter-sep">—</span>
+        <input id="f-max" class="price-input" type="number" placeholder="Máx" min="0" inputmode="numeric">
+      </div>
+    </header>
+
+    <div class="stats-bar">
+      <div class="stat"><span class="stat-num" id="s-stock">0</span><span class="stat-lbl">En stock</span></div>
+      <div class="stat"><span class="stat-num" id="s-sold">0</span><span class="stat-lbl">Vendidos</span></div>
+      <div class="stat stat-val"><span class="stat-num" id="s-value">$0</span><span class="stat-lbl">Valor stock</span></div>
+    </div>
+
+    <div class="list-wrap">
+      <div id="list"></div>
+      <div class="empty-state" id="empty" style="display:none">
+        <span class="empty-ico">📦</span>
+        <p class="empty-txt">No hay equipos registrados</p>
+        <button class="btn-primary" onclick="openForm()">Agregar primer equipo</button>
       </div>
     </div>
-    <div class="search-wrap">
-      <span class="search-icon">🔍</span>
-      <input id="search" type="search" placeholder="Buscar marca, modelo, IMEI..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-    </div>
-    <div class="filters">
-      <select class="pill" id="f-marca"><option value="">Todas las marcas</option></select>
-      <select class="pill" id="f-estado">
-        <option value="">Todos los estados</option>
-        <option value="Nuevo">Nuevo</option>
-        <option value="Usado">Usado</option>
-        <option value="Reacondicionado">Reacondicionado</option>
-      </select>
-      <select class="pill" id="f-vendido">
-        <option value="0">En stock</option>
-        <option value="1">Vendidos</option>
-        <option value="">Todos</option>
-      </select>
-    </div>
-    <div class="price-filter">
-      <span class="price-filter-lbl">💰 Precio:</span>
-      <input id="f-min" class="price-input" type="number" placeholder="Mín" min="0" inputmode="numeric">
-      <span class="price-filter-sep">—</span>
-      <input id="f-max" class="price-input" type="number" placeholder="Máx" min="0" inputmode="numeric">
-    </div>
-  </header>
+  </section>
 
-  <div class="stats-bar">
-    <div class="stat"><span class="stat-num" id="s-stock">0</span><span class="stat-lbl">En stock</span></div>
-    <div class="stat"><span class="stat-num" id="s-sold">0</span><span class="stat-lbl">Vendidos</span></div>
-    <div class="stat stat-val"><span class="stat-num" id="s-value">$0</span><span class="stat-lbl">Valor stock</span></div>
-  </div>
+  <!-- ── SECCIÓN REPARACIONES ── -->
+  <section id="repairs-section" class="main-section section-hidden">
+    <header>
+      <div class="hdr-top">
+        <div class="hdr-brand">
+          <h1>🔧 Reparaciones</h1>
+        </div>
+        <div class="hdr-actions">
+          <button class="hdr-btn" id="rep-import-btn" title="Importar historial">💾</button>
+          <button class="hdr-btn" id="rep-stats-btn" title="Estadísticas">📊</button>
+          <button class="hdr-btn" id="rep-add-btn" title="Nueva reparación">＋</button>
+        </div>
+        <input type="file" id="rep-import-file" accept=".json" hidden>
+      </div>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="rep-search" type="search" placeholder="Buscar cliente, modelo, N° orden..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="filters">
+        <select class="pill" id="rep-f-estado">
+          <option value="">Todos los estados</option>
+          <option value="reparando">Reparando</option>
+          <option value="listo">Listo</option>
+          <option value="entregado">Entregado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+        <select class="pill" id="rep-f-marca"><option value="">Todas las marcas</option></select>
+      </div>
+    </header>
 
-  <div class="list-wrap">
-    <div id="list"></div>
-    <div class="empty-state" id="empty" style="display:none">
-      <span class="empty-ico">📦</span>
-      <p class="empty-txt">No hay equipos registrados</p>
-      <button class="btn-primary" onclick="openForm()">Agregar primer equipo</button>
+    <div class="stats-bar">
+      <div class="stat"><span class="stat-num" id="rs-reparando">0</span><span class="stat-lbl">Reparando</span></div>
+      <div class="stat"><span class="stat-num" id="rs-listo">0</span><span class="stat-lbl">Listos</span></div>
+      <div class="stat stat-val"><span class="stat-num" id="rs-mes">$0</span><span class="stat-lbl">Este mes</span></div>
     </div>
-  </div>
+
+    <div class="list-wrap">
+      <div id="rep-list"></div>
+      <div class="empty-state" id="rep-empty" style="display:none">
+        <span class="empty-ico">🔧</span>
+        <p class="empty-txt">No hay reparaciones registradas</p>
+        <button class="btn-primary" onclick="openRepairForm()">Nueva reparación</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── BOTTOM NAV ── -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-stock" onclick="switchSection('stock')">
+      <span class="nav-ico">📱</span>
+      <span class="nav-lbl">Stock</span>
+    </button>
+    <button class="nav-btn" id="nav-repairs" onclick="switchSection('repairs')">
+      <span class="nav-ico">🔧</span>
+      <span class="nav-lbl">Reparaciones</span>
+    </button>
+  </nav>
 
 </div>
 
-<!-- MODAL FORMULARIO -->
+<!-- ═══════════ MODALES STOCK ═══════════ -->
+
+<!-- MODAL FORMULARIO STOCK -->
 <div id="form-modal" class="modal-overlay hidden">
   <div class="modal-card form-card">
     <div class="modal-header">
@@ -218,7 +281,7 @@
   </div>
 </div>
 
-<!-- MODAL DETALLE -->
+<!-- MODAL DETALLE STOCK -->
 <div id="detail-modal" class="modal-overlay hidden">
   <div class="modal-card detail-card">
     <div class="modal-header">
@@ -233,7 +296,7 @@
   </div>
 </div>
 
-<!-- MODAL ESTADÍSTICAS -->
+<!-- MODAL ESTADÍSTICAS STOCK -->
 <div id="stats-modal" class="modal-overlay hidden">
   <div class="modal-card stats-card">
     <div class="modal-header">
@@ -362,9 +425,195 @@
   </div>
 </div>
 
+<!-- ═══════════ MODALES REPARACIONES ═══════════ -->
+
+<!-- MODAL FORMULARIO REPARACIÓN -->
+<div id="rep-form-modal" class="modal-overlay hidden">
+  <div class="modal-card form-card">
+    <div class="modal-header">
+      <h3 id="rep-form-title">🔧 Nueva Reparación</h3>
+      <button class="modal-close" id="rep-form-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+
+        <div class="fg" id="rep-orden-row" style="display:none">
+          <label class="fl">N° Orden</label>
+          <input id="rep-fi-orden" class="fi" type="text" readonly style="background:#f1f5f9;color:#64748b">
+        </div>
+        <div class="fg" id="rep-orden-spacer" style="display:none"></div>
+
+        <div class="fg">
+          <label class="fl">Marca *</label>
+          <input id="rep-fi-marca" class="fi" type="text" placeholder="Samsung, Apple..." list="rep-dl-marca" autocomplete="off">
+          <datalist id="rep-dl-marca">
+            <option value="Samsung"><option value="Apple / iPhone"><option value="Motorola">
+            <option value="Xiaomi"><option value="LG"><option value="TCL"><option value="Huawei">
+          </datalist>
+        </div>
+        <div class="fg">
+          <label class="fl">Modelo *</label>
+          <input id="rep-fi-modelo" class="fi" type="text" placeholder="A54, iPhone 13..." autocomplete="off">
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Tipo de arreglo *</label>
+          <select id="rep-fi-arreglo" class="fs">
+            <option value="">Seleccionar...</option>
+            <option value="Módulo / Pantalla">Módulo / Pantalla</option>
+            <option value="Ficha de carga">Ficha de carga</option>
+            <option value="Batería">Batería</option>
+            <option value="Módulo + Templado">Módulo + Templado</option>
+            <option value="Sistemas / Software">Sistemas / Software</option>
+            <option value="Conector">Conector</option>
+            <option value="Revisión">Revisión</option>
+            <option value="Placa">Placa</option>
+            <option value="Cámara">Cámara</option>
+            <option value="Altavoz / Micrófono">Altavoz / Micrófono</option>
+            <option value="Otro">Otro...</option>
+          </select>
+          <input id="rep-fi-arreglo-custom" class="fi" type="text" placeholder="Describir arreglo..." autocomplete="off" style="margin-top:6px;display:none">
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Condición visual al ingreso</label>
+          <textarea id="rep-fi-condicion" class="fi fi-area" placeholder="Rayones, pantalla rota, sin batería..." rows="2"></textarea>
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Código / Patrón de seguridad</label>
+          <div class="pass-wrap">
+            <input id="rep-fi-codigo" class="fi" type="password" placeholder="PIN, patrón o contraseña" autocomplete="new-password">
+            <button type="button" class="pass-toggle" onclick="togglePassField('rep-fi-codigo', this)">👁️</button>
+          </div>
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Accesorios recibidos</label>
+          <div class="accessories-grid">
+            <label class="acc-check"><input type="checkbox" id="acc-cargador"><span>🔌 Cargador</span></label>
+            <label class="acc-check"><input type="checkbox" id="acc-funda"><span>🛡️ Funda</span></label>
+            <label class="acc-check"><input type="checkbox" id="acc-caja"><span>📦 Caja</span></label>
+            <label class="acc-check"><input type="checkbox" id="acc-auriculares"><span>🎧 Auriculares</span></label>
+          </div>
+        </div>
+
+        <div class="fg">
+          <label class="fl">Monto ($)</label>
+          <input id="rep-fi-monto" class="fi" type="number" placeholder="28000" min="0" inputmode="numeric">
+        </div>
+        <div class="fg">
+          <label class="fl">Seña / Anticipo ($)</label>
+          <input id="rep-fi-sena" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Fecha estimada de entrega</label>
+          <input id="rep-fi-fecha-est" class="fi" type="date">
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Nombre del cliente</label>
+          <input id="rep-fi-nombre" class="fi" type="text" placeholder="Juan García" autocomplete="off">
+        </div>
+        <div class="fg">
+          <label class="fl">Teléfono</label>
+          <input id="rep-fi-tlf" class="fi" type="tel" placeholder="1155667788" inputmode="numeric">
+        </div>
+        <div class="fg">
+          <label class="fl">DNI</label>
+          <input id="rep-fi-dni" class="fi" type="text" placeholder="26427682" inputmode="numeric">
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Observaciones</label>
+          <textarea id="rep-fi-obs" class="fi fi-area" placeholder="Notas adicionales..." rows="2"></textarea>
+        </div>
+
+      </div>
+      <div class="form-actions">
+        <button class="btn-secondary" id="rep-form-cancel">Cancelar</button>
+        <button class="btn-primary" id="rep-form-save">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLE REPARACIÓN -->
+<div id="rep-detail-modal" class="modal-overlay hidden">
+  <div class="modal-card detail-card">
+    <div class="modal-header">
+      <div>
+        <span class="det-marca" id="rep-det-marca"></span>
+        <span class="det-modelo" id="rep-det-modelo"></span>
+      </div>
+      <button class="modal-close" id="rep-detail-close">✕</button>
+    </div>
+    <div class="det-body" id="rep-det-body"></div>
+    <div class="det-actions" id="rep-det-actions"></div>
+  </div>
+</div>
+
+<!-- MODAL GARANTÍA -->
+<div id="garantia-modal" class="modal-overlay hidden">
+  <div class="modal-card form-card">
+    <div class="modal-header">
+      <h3>🔄 Registrar Garantía</h3>
+      <button class="modal-close" id="garantia-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="garantia-ref-info"></div>
+      <div class="form-grid">
+        <div class="fg fg--full">
+          <label class="fl">Problema reportado *</label>
+          <textarea id="gar-fi-arreglo" class="fi fi-area" placeholder="¿Cuál es el problema que reporta el cliente?" rows="3"></textarea>
+        </div>
+        <div class="fg fg--full">
+          <label class="fl">Código / Patrón de seguridad</label>
+          <div class="pass-wrap">
+            <input id="gar-fi-codigo" class="fi" type="password" placeholder="PIN o patrón" autocomplete="new-password">
+            <button type="button" class="pass-toggle" onclick="togglePassField('gar-fi-codigo', this)">👁️</button>
+          </div>
+        </div>
+        <div class="fg fg--full">
+          <label class="fl">Observaciones</label>
+          <textarea id="gar-fi-obs" class="fi fi-area" placeholder="Notas adicionales..." rows="2"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-secondary" id="garantia-cancel">Cancelar</button>
+        <button class="btn-primary" id="garantia-save">🔄 Registrar Garantía</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL HISTORIAL CLIENTE -->
+<div id="history-modal" class="modal-overlay hidden">
+  <div class="modal-card stats-card">
+    <div class="modal-header">
+      <h3>👤 Historial del cliente</h3>
+      <button class="modal-close" id="history-close">✕</button>
+    </div>
+    <div class="modal-body" id="history-body"></div>
+  </div>
+</div>
+
+<!-- MODAL ESTADÍSTICAS REPARACIONES -->
+<div id="rep-stats-modal" class="modal-overlay hidden">
+  <div class="modal-card stats-card">
+    <div class="modal-header">
+      <h3>📊 Estadísticas de Reparaciones</h3>
+      <button class="modal-close" id="rep-stats-close">✕</button>
+    </div>
+    <div class="modal-body" id="rep-stats-body"></div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="app.js"></script>
+<script src="repairs.js"></script>
 </body>
 </html>

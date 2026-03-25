@@ -192,7 +192,21 @@ function initApp() {
   document.getElementById('biz-image-input').addEventListener('change', handleBizImage);
 
   initPWA();
-    listenStock();
+  listenStock();
+  initRepairs();
+}
+
+// ── Secciones ─────────────────────────────────────────────
+function switchSection(section) {
+  const isStock   = section === 'stock';
+  const stockSec  = document.getElementById('stock-section');
+  const repSec    = document.getElementById('repairs-section');
+  if (stockSec) stockSec.style.display  = isStock ? 'flex' : 'none';
+  if (repSec)   repSec.style.display    = isStock ? 'none' : 'flex';
+  const navStock   = document.getElementById('nav-stock');
+  const navRepairs = document.getElementById('nav-repairs');
+  if (navStock)   navStock.classList.toggle('active',  isStock);
+  if (navRepairs) navRepairs.classList.toggle('active', !isStock);
 }
 
 // ── Render ────────────────────────────────────────────────

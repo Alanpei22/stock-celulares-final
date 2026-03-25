@@ -658,3 +658,110 @@ header {
 .price-settings-input-wrap { display: flex; align-items: center; gap: 4px; }
 .price-pct-input { width: 64px !important; text-align: center; padding: 6px 8px !important; }
 .price-pct-sign { font-weight: 700; color: #64748b; font-size: .9rem; }
+
+/* ── MAIN SECTIONS ── */
+.main-section {
+  display: flex; flex-direction: column;
+  flex: 1; overflow: hidden; min-height: 0;
+}
+.section-hidden { display: none !important; }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  display: flex;
+  background: #fff;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -2px 10px rgba(0,0,0,.06);
+}
+.nav-btn {
+  flex: 1; border: none; background: none;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 8px 0 6px; gap: 2px; cursor: pointer;
+  color: #94a3b8; transition: color .15s;
+}
+.nav-btn.active { color: var(--acc); }
+.nav-btn:active { opacity: .7; }
+.nav-ico { font-size: 1.3rem; line-height: 1; }
+.nav-lbl { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── REPAIR STATUS BADGES ── */
+.bg-reparando { background: #fef3c7; color: #92400e; }
+.bg-listo     { background: #d1fae5; color: #065f46; }
+.bg-entregado { background: #e0e7ff; color: #3730a3; }
+.bg-cancelado { background: #fee2e2; color: #991b1b; }
+.bg-warn      { background: #fef3c7; color: #b45309; }
+
+/* ── STATUS CHANGE BUTTONS (in detail) ── */
+.rep-status-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+.status-btn {
+  border: 1.5px solid #e2e8f0; border-radius: 20px;
+  padding: 5px 11px; font-size: .72rem; font-weight: 600;
+  cursor: pointer; background: #f8fafc; color: #64748b;
+  transition: .15s; white-space: nowrap;
+}
+.status-btn:active { transform: scale(.95); }
+.status-btn--active.bg-reparando { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+.status-btn--active.bg-listo     { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+.status-btn--active.bg-entregado { background: #e0e7ff; color: #3730a3; border-color: #a5b4fc; }
+.status-btn--active.bg-cancelado { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+
+/* ── PASSWORD FIELD ── */
+.pass-wrap { position: relative; }
+.pass-wrap .fi { padding-right: 44px; }
+.pass-toggle {
+  position: absolute; right: 8px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  font-size: 1rem; padding: 4px; line-height: 1;
+}
+.pass-inline { display: flex; align-items: center; gap: 8px; }
+.pass-dots { font-size: 1rem; color: var(--pri); letter-spacing: .1em; }
+.pass-val { font-size: .88rem; color: var(--pri); font-weight: 600; font-family: 'SF Mono','Cascadia Code',monospace; word-break: break-all; }
+.pass-toggle-sm { background: none; border: none; cursor: pointer; font-size: .85rem; padding: 2px 4px; flex-shrink: 0; }
+
+/* ── ACCESSORIES CHECKBOXES ── */
+.accessories-grid { display: flex; flex-wrap: wrap; gap: 10px; padding: 4px 0; }
+.acc-check { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.acc-check input[type="checkbox"] { width: 17px; height: 17px; cursor: pointer; accent-color: var(--acc); }
+.acc-check span { font-size: .86rem; color: var(--pri); user-select: none; }
+
+/* ── REPAIR ACTION BUTTONS ── */
+.btn-garantia {
+  background: #fef3c7; color: #92400e;
+  border: none; border-radius: 12px; padding: 11px 10px;
+  font-size: .82rem; font-weight: 700; cursor: pointer; flex: 1;
+  transition: opacity .15s, transform .1s;
+}
+.btn-history {
+  background: #ede9fe; color: #5b21b6;
+  border: none; border-radius: 12px; padding: 11px 10px;
+  font-size: .82rem; font-weight: 700; cursor: pointer; flex: 1;
+  transition: opacity .15s, transform .1s;
+}
+.btn-garantia:active, .btn-history:active { opacity: .8; transform: scale(.97); }
+
+/* ── GUARANTEE MODAL ── */
+.garantia-ref-card {
+  background: #eff6ff; border: 1px solid #bfdbfe;
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 4px;
+}
+.garantia-ref-title { font-size: .7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
+.garantia-ref-desc { display: block; font-size: .9rem; font-weight: 600; color: var(--acc2); margin-top: 4px; }
+
+/* ── CUSTOMER HISTORY ── */
+.customer-hdr {
+  background: var(--pri); color: #fff;
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 12px;
+}
+.customer-name { font-size: 1rem; font-weight: 700; }
+.customer-meta { font-size: .8rem; color: rgba(255,255,255,.7); margin-top: 3px; }
+
+/* ── REPAIR CARD ── */
+.rep-card .card-specs { color: var(--acc2); font-weight: 500; }
+
+@media (max-width: 380px) {
+  .rep-status-btns { gap: 4px; }
+  .status-btn { padding: 4px 8px; font-size: .68rem; }
+}
