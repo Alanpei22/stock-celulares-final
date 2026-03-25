@@ -198,11 +198,11 @@ function initApp() {
 
 // ── Secciones ─────────────────────────────────────────────
 function switchSection(section) {
-  const isStock   = section === 'stock';
+  const isStock = section === 'stock';
   const stockSec  = document.getElementById('stock-section');
   const repSec    = document.getElementById('repairs-section');
-  if (stockSec) stockSec.style.display  = isStock ? 'flex' : 'none';
-  if (repSec)   repSec.style.display    = isStock ? 'none' : 'flex';
+  if (stockSec) stockSec.classList.toggle('section-hidden', !isStock);
+  if (repSec)   repSec.classList.toggle('section-hidden',  isStock);
   const navStock   = document.getElementById('nav-stock');
   const navRepairs = document.getElementById('nav-repairs');
   if (navStock)   navStock.classList.toggle('active',  isStock);
