@@ -9,6 +9,8 @@ const AUTH_DAYS = 30;
 
 const DEFAULT_SELLERS = ['Vendedor 1', 'Vendedor 2'];
 const DEFAULT_PAYMENTS = ['Efectivo', 'Transferencia', 'Tarjeta débito', 'Tarjeta crédito', 'Mercado Pago'];
+const PRICES_KEY = 'cel_prices';
+const DEFAULT_PRICES = { transfer: 0, c3: 15, c6: 25 };
 // ── Firebase ─────────────────────────────────────────────
 const FB_CONFIG = {
     apiKey: "AIzaSyAMRkrADBxRF6rST8rNwO5IqdWneXocBsE",
@@ -113,6 +115,8 @@ let editingId = null;
 let pendingSellId = null;
 let appInited = false;
 let currentTab = 'ventas';
+let PRICES = {};
+let dolarBlue = null;
 
 function loadStock() {
   try { STOCK = JSON.parse(localStorage.getItem(STOCK_KEY) || '[]'); } catch { STOCK = []; }
@@ -123,9 +127,21 @@ function loadConfig() {
   try { SELLERS = JSON.parse(localStorage.getItem(SELLERS_KEY)); if (!Array.isArray(SELLERS) || !SELLERS.length) SELLERS = DEFAULT_SELLERS.slice(); } catch { SELLERS = DEFAULT_SELLERS.slice(); }
   try { PAYMENTS = JSON.parse(localStorage.getItem(PAYMENTS_KEY)); if (!Array.isArray(PAYMENTS) || !PAYMENTS.length) PAYMENTS = DEFAULT_PAYMENTS.slice(); } catch { PAYMENTS = DEFAULT_PAYMENTS.slice(); }
   BIZ_IMAGE = localStorage.getItem(BIZ_KEY) || null;
+  loadPrices();
 }
 function saveSellers() { localStorage.setItem(SELLERS_KEY, JSON.stringify(SELLERS)); }
 function savePayments() { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(PAYMENTS)); }
+function loadPrices() {
+  try { PRICES = JSON.parse(localStorage.getItem(PRICES_KEY)); if (!PRICES || typeof PRICES !== 'object') PRICES = {...DEFAULT_PRICES}; } catch { PRICES = {...DEFAULT_PRICES}; }
+}
+function savePrices() { localStorage.setItem(PRICES_KEY, JSON.stringify(PRICES)); }
+async function fetchDolarBlue() {
+  try {
+    const r = await fetch('https://dolarapi.com/v1/dolares/blue');
+    const d = await r.json();
+    dolarBlue = Math.round(d.venta || d.compra || 0) + 10;
+  } catch(e) { dolarBlue = null; }
+}
 function saveBizImage() { if (BIZ_IMAGE) localStorage.setItem(BIZ_KEY, BIZ_IMAGE); else localStorage.removeItem(BIZ_KEY); }
 
 // ── Init ──────────────────────────────────────────────────
@@ -134,6 +150,7 @@ function initApp() {
   appInited = true;
   initFirebase();
   loadConfig();
+  fetchDolarBlue();
   applyBizImage();
 
   document.getElementById('add-btn').addEventListener('click', () => openForm());
@@ -346,7 +363,7 @@ function openDetail(id) {
       <span class="badge ${badgeCls[p.estado] || ''}">${esc(p.estado)}</span>
     </div>
     <div class="det-row">
-      <span class="det-label">Precio</span>
+      <span class="det-label">Precio efectivo</span>
       <span class="det-val det-price">$ ${p.precio ? p.precio.toLocaleString('es-AR') : '—'}</span>
     </div>
     ${specs ? `<div class="det-row"><span class="det-label">Specs</span><span class="det-val">${esc(specs)}</span></div>` : ''}
@@ -359,6 +376,7 @@ function openDetail(id) {
     ${p.vendedor ? `<div class="det-row"><span class="det-label">Vendedor</span><span class="det-val">${esc(p.vendedor)}</span></div>` : ''}
     ${p.forma_pago ? `<div class="det-row"><span class="det-label">Forma de pago</span><span class="det-val">${esc(p.forma_pago)}</span></div>` : ''}
     ${p.notas ? `<div class="det-row det-row--full"><span class="det-label">Notas</span><span class="det-val">${esc(p.notas)}</span></div>` : ''}
+    ${!p.vendido && p.precio ? buildPriceTable(p.precio) : ''}
     ${p.vendido ? '<div class="det-sold-badge">VENDIDO</div>' : ''}
   `;
 
@@ -377,6 +395,41 @@ function openDetail(id) {
 function closeDetail() {
   document.getElementById('detail-modal').classList.add('hidden');
   document.body.style.overflow = '';
+}
+
+function buildPriceTable(precio) {
+  if (!precio) return '';
+  const fmt = n => '$ ' + Math.round(n).toLocaleString('es-AR');
+  const transferTotal = Math.round(precio * (1 + (PRICES.transfer || 0) / 100));
+  const c3Total = Math.round(precio * (1 + (PRICES.c3 || 0) / 100));
+  const c6Total = Math.round(precio * (1 + (PRICES.c6 || 0) / 100));
+  const usd = dolarBlue ? Math.round(precio / dolarBlue) : null;
+  return `
+    <div class="price-table-wrap">
+      <div class="price-table-title">💳 Precios por forma de pago</div>
+      <div class="price-table">
+        <div class="pt-row pt-efectivo">
+          <span class="pt-label">💵 Efectivo</span>
+          <span class="pt-value">${fmt(precio)}</span>
+        </div>
+        <div class="pt-row">
+          <span class="pt-label">🏦 Transf. / 1 pago${(PRICES.transfer||0) > 0 ? ' <small>(+'+PRICES.transfer+'%)</small>' : ''}</span>
+          <span class="pt-value">${fmt(transferTotal)}</span>
+        </div>
+        <div class="pt-row">
+          <span class="pt-label">📆 3 cuotas${(PRICES.c3||0) > 0 ? ' <small>(+'+PRICES.c3+'%)</small>' : ''}</span>
+          <span class="pt-value">${fmt(c3Total / 3)}<span class="pt-sub">/cuota</span></span>
+        </div>
+        <div class="pt-row">
+          <span class="pt-label">📆 6 cuotas${(PRICES.c6||0) > 0 ? ' <small>(+'+PRICES.c6+'%)</small>' : ''}</span>
+          <span class="pt-value">${fmt(c6Total / 6)}<span class="pt-sub">/cuota</span></span>
+        </div>
+        ${usd !== null ? `<div class="pt-row pt-usd">
+          <span class="pt-label">💲 Dólares <span class="pt-sub">(blue ${dolarBlue.toLocaleString('es-AR')})</span></span>
+          <span class="pt-value">U$S ${usd.toLocaleString('es-AR')}</span>
+        </div>` : ''}
+      </div>
+    </div>`;
 }
 
 function fmtDateTime(iso) {
@@ -659,6 +712,7 @@ function importJSON(e) {
 function openSettings() {
   renderSettingsSellers();
   renderSettingsPayments();
+  renderSettingsPrices();
   updateBizPreview();
   document.getElementById('settings-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -687,6 +741,25 @@ function renderSettingsPayments() {
       <span class="settings-item-name">${esc(p)}</span>
       <button class="settings-del-btn" onclick="removePayment(${i})">🗑️</button>
     </div>`).join('');
+}
+
+function renderSettingsPrices() {
+  const inp = document.getElementById('price-transfer');
+  if (inp) inp.value = PRICES.transfer ?? 0;
+  const inp3 = document.getElementById('price-c3');
+  if (inp3) inp3.value = PRICES.c3 ?? 15;
+  const inp6 = document.getElementById('price-c6');
+  if (inp6) inp6.value = PRICES.c6 ?? 25;
+  const dolarEl = document.getElementById('dolar-blue-display');
+  if (dolarEl) dolarEl.textContent = dolarBlue !== null ? '$ ' + dolarBlue.toLocaleString('es-AR') + ' (blue + $10)' : 'No disponible';
+}
+
+function savePriceSettings() {
+  PRICES.transfer = parseInt(document.getElementById('price-transfer').value) || 0;
+  PRICES.c3 = parseInt(document.getElementById('price-c3').value) || 0;
+  PRICES.c6 = parseInt(document.getElementById('price-c6').value) || 0;
+  savePrices();
+  toast('Precios actualizados ✅', 'success');
 }
 
 function addSeller() {
