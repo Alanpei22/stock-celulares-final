@@ -123,14 +123,15 @@
         </div>
         <div class="hdr-actions">
           <button class="hdr-btn" id="rep-import-btn" title="Importar historial">💾</button>
+          <button class="hdr-btn" id="rep-staff-btn" title="Personal" onclick="openStaffModal()">👥</button>
           <button class="hdr-btn" id="rep-stats-btn" title="Estadísticas">📊</button>
           <button class="hdr-btn" id="rep-add-btn" title="Nueva reparación">＋</button>
         </div>
         <input type="file" id="rep-import-file" accept=".json" hidden>
       </div>
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input id="rep-search" type="search" placeholder="Buscar cliente, modelo, N° orden..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <div class="rep-search-wrap">
+        <svg class="rep-search-ico" viewBox="0 0 20 20" fill="none"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.8"/><path d="M13.5 13.5L17 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input id="rep-search" type="search" placeholder="Cliente, modelo, N° orden..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       </div>
       <div class="filters">
         <select class="pill" id="rep-f-estado">
@@ -148,6 +149,7 @@
           <option value="mes">Este mes</option>
         </select>
         <select class="pill" id="rep-sort">
+          <option value="nOrden">N° orden ↓</option>
           <option value="reciente">Más reciente</option>
           <option value="antiguo">Más antiguo</option>
           <option value="estado">Por estado</option>
@@ -525,7 +527,10 @@
           <label class="fl">Costo del repuesto ($)</label>
           <input id="rep-fi-costo" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
         </div>
-        <div class="fg"></div>
+        <div class="fg">
+          <label class="fl">Presupuesto previo ($)</label>
+          <input id="rep-fi-presupuesto" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+        </div>
 
         <div class="fg fg--full">
           <label class="fl">Fecha estimada de entrega</label>
@@ -548,6 +553,13 @@
         <div class="fg fg--full">
           <label class="fl">Observaciones</label>
           <textarea id="rep-fi-obs" class="fi fi-area" placeholder="Notas adicionales..." rows="2"></textarea>
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Tomado por</label>
+          <select id="rep-fi-tecnico" class="fi fs">
+            <option value="">— Sin asignar —</option>
+          </select>
         </div>
 
       </div>
@@ -627,6 +639,23 @@
       <button class="modal-close" id="rep-stats-close">✕</button>
     </div>
     <div class="modal-body" id="rep-stats-body"></div>
+  </div>
+</div>
+
+<!-- MODAL GESTIÓN DE PERSONAL -->
+<div id="staff-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:360px">
+    <div class="modal-header">
+      <h3>👥 Personal</h3>
+      <button class="modal-close" id="staff-modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="staff-list"></div>
+      <div class="staff-add-wrap">
+        <input id="staff-new-name" class="fi" type="text" placeholder="Nombre del técnico..." autocomplete="off" maxlength="40">
+        <button class="btn-primary" onclick="addStaffMember()">＋ Agregar</button>
+      </div>
+    </div>
   </div>
 </div>
 

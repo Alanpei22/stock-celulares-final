@@ -758,6 +758,90 @@ header {
 .customer-name { font-size: 1rem; font-weight: 700; }
 .customer-meta { font-size: .8rem; color: rgba(255,255,255,.7); margin-top: 3px; }
 
+/* ── REPAIRS SEARCH BAR (rediseñado) ── */
+.rep-search-wrap {
+  position: relative;
+  margin: 2px 0 0;
+}
+.rep-search-ico {
+  position: absolute; left: 13px; top: 50%;
+  transform: translateY(-50%);
+  width: 16px; height: 16px;
+  color: rgba(255,255,255,.55);
+  pointer-events: none;
+}
+#rep-search {
+  width: 100%;
+  padding: 11px 16px 11px 40px;
+  background: rgba(255,255,255,.13);
+  border: 1.5px solid rgba(255,255,255,.2);
+  border-radius: 14px;
+  color: #fff;
+  font-size: .92rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: background .2s, border-color .2s, box-shadow .2s;
+  -webkit-appearance: none;
+}
+#rep-search:focus {
+  background: rgba(255,255,255,.2);
+  border-color: rgba(255,255,255,.5);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.3);
+}
+#rep-search::placeholder { color: rgba(255,255,255,.4); }
+#rep-search::-webkit-search-cancel-button { filter: invert(1); opacity: .6; }
+
+/* ── REPAIRS FILTER PILLS (mejorados) ── */
+#repairs-section .filters { margin-top: 6px; gap: 5px; }
+#repairs-section .pill {
+  font-size: .71rem;
+  padding: 5px 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,.18);
+  letter-spacing: .01em;
+}
+#repairs-section .pill:focus {
+  border-color: rgba(255,255,255,.45);
+  box-shadow: 0 0 0 2px rgba(99,102,241,.25);
+}
+
+/* ── WA BUTTON ON CARD ── */
+.card-wa-btn {
+  background: none; border: none;
+  font-size: 1rem; line-height: 1;
+  cursor: pointer; padding: 0;
+  display: block; margin-top: 3px;
+  opacity: .85; transition: opacity .15s;
+}
+.card-wa-btn:active { opacity: 1; transform: scale(1.15); }
+
+/* ── STATE HISTORY TIMELINE ── */
+.state-timeline { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.state-tl-item { display: flex; align-items: center; gap: 7px; font-size: .75rem; }
+.state-tl-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.state-tl-dot--reparando { background: #f59e0b; }
+.state-tl-dot--listo     { background: #10b981; }
+.state-tl-dot--entregado { background: #3b82f6; }
+.state-tl-dot--cancelado { background: #6b7280; }
+.state-tl-label { font-weight: 600; color: var(--t1); flex: 1; }
+.state-tl-date  { color: var(--t3); font-size: .68rem; white-space: nowrap; }
+
+/* ── STAFF MODAL ── */
+.staff-member {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 0; border-bottom: 1px solid var(--bg3); gap: 8px;
+}
+.staff-name { font-size: .88rem; font-weight: 500; color: var(--t1); }
+.staff-del {
+  background: none; border: 1px solid var(--brd);
+  color: #ef4444; cursor: pointer;
+  font-size: .75rem; padding: 3px 8px; border-radius: 6px; flex-shrink: 0;
+}
+.staff-del:active { background: #fee2e2; }
+.staff-empty { color: var(--t3); font-size: .82rem; text-align: center; padding: 16px 0; }
+.staff-add-wrap { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+.staff-add-wrap .fi { flex: 1; margin: 0; }
+
 /* ── REPAIR CARD ── */
 .rep-card .card-specs { color: var(--acc2); font-weight: 500; }
 

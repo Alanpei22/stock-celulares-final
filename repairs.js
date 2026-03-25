@@ -10,7 +10,8 @@ const REPAIR_STATES = {
 };
 
 let REPAIRS = [];
-let editingRepairId = null;
+let STAFF   = [];
+let editingRepairId    = null;
 let pendingGarantiaRef = null;
 let repRenderTimer;
 
@@ -78,11 +79,20 @@ function initRepairs() {
     if (e.target.id === 'rep-ticket-modal') closeTicket();
   });
 
+  document.getElementById('staff-modal-close').addEventListener('click', closeStaffModal);
+  document.getElementById('staff-modal').addEventListener('click', e => {
+    if (e.target.id === 'staff-modal') closeStaffModal();
+  });
+  document.getElementById('staff-new-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addStaffMember();
+  });
+
   document.getElementById('rep-import-btn').addEventListener('click', () => {
     document.getElementById('rep-import-file').click();
   });
   document.getElementById('rep-import-file').addEventListener('change', importRepairHistory);
 
+  loadStaff();
   listenRepairs();
 }
 
@@ -137,8 +147,11 @@ function renderRepairs() {
     filtered.sort((a, b) => (STATE_ORDER[a.estado] ?? 9) - (STATE_ORDER[b.estado] ?? 9));
   } else if (fSort === 'monto') {
     filtered.sort((a, b) => (b.monto || 0) - (a.monto || 0));
-  } else {
+  } else if (fSort === 'reciente') {
     filtered.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
+  } else {
+    // nOrden (default)
+    filtered.sort((a, b) => (b.nOrden || 0) - (a.nOrden || 0));
   }
 
   // Stats bar: demorados = reparando > 3 días
@@ -207,6 +220,7 @@ function renderRepairs() {
             <span class="badge ${st.cls}">${st.label}</span>
             ${r.esGarantia ? '<span class="badge bg-warn" style="margin-top:3px">Garantía</span>' : ''}
             ${isDemorado ? '<span class="badge" style="margin-top:3px;background:#fee2e2;color:#dc2626;font-size:.6rem">⚠️ Demorado</span>' : ''}
+            ${r.tlf ? `<button class="card-wa-btn" title="WhatsApp" onclick="event.stopPropagation();repairWhatsApp('${r.id}')">🟢</button>` : ''}
           </div>
         </div>
         <div class="card-bottom">
@@ -254,8 +268,10 @@ function openRepairForm(id) {
     document.getElementById('rep-fi-nombre').value     = r.nombre       || '';
     document.getElementById('rep-fi-tlf').value        = r.tlf          || '';
     document.getElementById('rep-fi-dni').value        = r.dni          || '';
-    document.getElementById('rep-fi-obs').value        = r.observaciones|| '';
-    document.getElementById('rep-fi-costo').value      = r.costo        || '';
+    document.getElementById('rep-fi-obs').value         = r.observaciones || '';
+    document.getElementById('rep-fi-costo').value       = r.costo         || '';
+    document.getElementById('rep-fi-presupuesto').value = r.presupuesto   || '';
+    refreshStaffSelect(r.tecnico || '');
 
     const accs = r.accesorios || [];
     document.getElementById('acc-cargador').checked    = accs.includes('cargador');
@@ -268,7 +284,7 @@ function openRepairForm(id) {
     document.getElementById('rep-orden-spacer').style.display = 'none';
 
     ['rep-fi-marca','rep-fi-modelo','rep-fi-condicion','rep-fi-codigo',
-     'rep-fi-monto','rep-fi-sena','rep-fi-costo','rep-fi-fecha-est',
+     'rep-fi-monto','rep-fi-sena','rep-fi-costo','rep-fi-presupuesto','rep-fi-fecha-est',
      'rep-fi-nombre','rep-fi-tlf','rep-fi-dni','rep-fi-obs'].forEach(fid => {
       const el = document.getElementById(fid);
       if (el) el.value = '';
@@ -282,6 +298,7 @@ function openRepairForm(id) {
     // Resetear toggle password
     const passInput = document.getElementById('rep-fi-codigo');
     passInput.type = 'password';
+    refreshStaffSelect('');
   }
 
   document.getElementById('rep-form-modal').classList.remove('hidden');
@@ -303,9 +320,11 @@ async function saveRepair() {
   const arreglo  = arregloSel === 'Otro' ? arregloCustom : arregloSel;
   const condicion= document.getElementById('rep-fi-condicion').value.trim();
   const codigo   = document.getElementById('rep-fi-codigo').value.trim();
-  const monto    = parseInt(document.getElementById('rep-fi-monto').value)    || 0;
-  const sena     = parseInt(document.getElementById('rep-fi-sena').value)     || 0;
-  const costo    = parseInt(document.getElementById('rep-fi-costo').value)    || 0;
+  const monto       = parseInt(document.getElementById('rep-fi-monto').value)       || 0;
+  const sena        = parseInt(document.getElementById('rep-fi-sena').value)        || 0;
+  const costo       = parseInt(document.getElementById('rep-fi-costo').value)       || 0;
+  const presupuesto = parseInt(document.getElementById('rep-fi-presupuesto').value) || 0;
+  const tecnico     = document.getElementById('rep-fi-tecnico').value.trim();
   const fechaEstimada = document.getElementById('rep-fi-fecha-est').value;
   const nombre   = document.getElementById('rep-fi-nombre').value.trim();
   const tlf      = document.getElementById('rep-fi-tlf').value.trim();
@@ -331,7 +350,7 @@ async function saveRepair() {
       if (!existing) { closeRepairForm(); return; }
       await db.collection('repairs').doc(editingRepairId).set({
         ...existing,
-        marca, modelo, arreglo, condicion, codigo, monto, sena, costo,
+        marca, modelo, arreglo, condicion, codigo, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs
       });
       toast('Reparación actualizada', 'success');
@@ -345,11 +364,13 @@ async function saveRepair() {
       });
 
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const ahora = new Date().toISOString();
       await db.collection('repairs').doc(id).set({
-        id, nOrden, marca, modelo, arreglo, condicion, codigo, monto, sena, costo,
+        id, nOrden, marca, modelo, arreglo, condicion, codigo, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs,
         estado: 'reparando',
-        fechaIngreso: new Date().toISOString(),
+        fechaIngreso: ahora,
+        estadoHistorial: [{ estado: 'reparando', fecha: ahora }],
         esGarantia: false
       });
       toast('Reparación N°' + nOrden + ' registrada', 'success');
@@ -439,6 +460,14 @@ function openRepairDetail(id) {
       <span class="det-label">Ganancia</span>
       <span class="det-val" style="color:var(--grn2);font-weight:700">$ ${(r.monto - r.costo).toLocaleString('es-AR')}</span>
     </div>` : ''}
+    ${r.presupuesto ? `<div class="det-row">
+      <span class="det-label">Presupuesto</span>
+      <span class="det-val">$ ${r.presupuesto.toLocaleString('es-AR')}${r.monto ? ` → <strong style="color:${r.monto > r.presupuesto ? '#ef4444' : '#10b981'}">$ ${r.monto.toLocaleString('es-AR')}</strong>` : ''}</span>
+    </div>` : ''}
+    ${r.tecnico ? `<div class="det-row">
+      <span class="det-label">Tomado por</span>
+      <span class="det-val">👤 ${esc(r.tecnico)}</span>
+    </div>` : ''}
     ${r.fechaEstimada ? `<div class="det-row">
       <span class="det-label">Entrega est.</span>
       <span class="det-val">${fmtDate(r.fechaEstimada)}</span>
@@ -462,6 +491,25 @@ function openRepairDetail(id) {
     ${r.tieneGarantia ? `<div class="det-row">
       <span class="det-label">Reingreso</span>
       <span class="det-val" style="color:var(--warn)">⚠️ Tiene garantía</span>
+    </div>` : ''}
+    ${Array.isArray(r.estadoHistorial) && r.estadoHistorial.length > 0 ? `
+    <div class="det-row det-row--full">
+      <span class="det-label">Historial de estados</span>
+      <ul class="state-timeline">
+        ${[...r.estadoHistorial]
+          .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''))
+          .map(h => {
+            const hs   = REPAIR_STATES[h.estado] || { label: h.estado || '?' };
+            const hFec = h.fecha
+              ? new Date(h.fecha).toLocaleString('es-AR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+              : '—';
+            return `<li class="state-tl-item">
+              <span class="state-tl-dot state-tl-dot--${h.estado}"></span>
+              <span class="state-tl-label">${hs.label}</span>
+              <span class="state-tl-date">${hFec}</span>
+            </li>`;
+          }).join('')}
+      </ul>
     </div>` : ''}
   `;
 
@@ -511,8 +559,12 @@ async function changeRepairStatus(id, newStatus) {
   const r = REPAIRS.find(x => x.id === id);
   if (!r || r.estado === newStatus) return;
 
+  const ahora = new Date().toISOString();
   const update = { estado: newStatus };
-  if (newStatus === 'entregado') update.fechaEntrega = new Date().toISOString();
+  if (newStatus === 'entregado') update.fechaEntrega = ahora;
+  // Append to state history (avoid arrayUnion dependency — safe for single-user)
+  const prevHistory = Array.isArray(r.estadoHistorial) ? r.estadoHistorial : [];
+  update.estadoHistorial = [...prevHistory, { estado: newStatus, fecha: ahora }];
 
   try {
     await db.collection('repairs').doc(id).update(update);
@@ -730,6 +782,19 @@ function buildRepairStatsHTML() {
   });
   const topArreglos = Object.entries(arregloCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
+  // Tiempo promedio por tipo (solo entregados con fechaIngreso + fechaEntrega)
+  const avgByTipo = {};
+  REPAIRS.filter(r => r.estado === 'entregado' && r.fechaIngreso && r.fechaEntrega && r.arreglo)
+    .forEach(r => {
+      const dias = (new Date(r.fechaEntrega) - new Date(r.fechaIngreso)) / 86400000;
+      if (!avgByTipo[r.arreglo]) avgByTipo[r.arreglo] = { sum: 0, cnt: 0 };
+      avgByTipo[r.arreglo].sum += dias;
+      avgByTipo[r.arreglo].cnt++;
+    });
+  const avgTipoRows = Object.entries(avgByTipo)
+    .map(([tipo, v]) => ({ tipo, avg: v.sum / v.cnt, cnt: v.cnt }))
+    .sort((a, b) => b.cnt - a.cnt).slice(0, 6);
+
   // Historial mensual
   const byMonth = {};
   REPAIRS.filter(r => r.fechaIngreso).forEach(r => {
@@ -765,6 +830,17 @@ function buildRepairStatsHTML() {
           <div class="hist-item-name">${i + 1}. ${esc(arreglo)}</div>
         </div>
         <span class="badge bg-reparando">${count}</span>
+      </div>`).join('')}` : ''}
+
+    ${avgTipoRows.length > 0 ? `
+    <h4 class="hist-title" style="margin-top:12px">⏱ Tiempo promedio por tipo</h4>
+    ${avgTipoRows.map(row => `
+      <div class="hist-item">
+        <div class="hist-item-info">
+          <div class="hist-item-name">${esc(row.tipo)}</div>
+          <div class="hist-item-specs">${row.cnt} entregados</div>
+        </div>
+        <span class="badge bg-entregado">${row.avg < 1 ? '<1 día' : Math.round(row.avg) + ' día' + (Math.round(row.avg) !== 1 ? 's' : '')}</span>
       </div>`).join('')}` : ''}
 
     <h4 class="hist-title" style="margin-top:12px">Historial mensual</h4>
@@ -938,4 +1014,85 @@ function closeTicket() {
 
 function printTicket() {
   window.print();
+}
+
+// ── Personal (Staff) ──────────────────────
+async function loadStaff() {
+  try {
+    const doc = await db.collection('config').doc('staff').get();
+    STAFF = doc.exists ? (doc.data().members || []) : [];
+  } catch (e) {
+    STAFF = [];
+  }
+  refreshStaffSelect('');
+}
+
+function refreshStaffSelect(selectedValue) {
+  const sel = document.getElementById('rep-fi-tecnico');
+  if (!sel) return;
+  const current = selectedValue !== undefined ? selectedValue : sel.value;
+  while (sel.options.length > 1) sel.remove(1);
+  STAFF.forEach(name => {
+    const o = document.createElement('option');
+    o.value = name; o.textContent = name; sel.appendChild(o);
+  });
+  sel.value = current;
+}
+
+function openStaffModal() {
+  renderStaffList();
+  document.getElementById('staff-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('staff-new-name').focus(), 200);
+}
+
+function closeStaffModal() {
+  document.getElementById('staff-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function renderStaffList() {
+  const el = document.getElementById('staff-list');
+  if (!el) return;
+  if (STAFF.length === 0) {
+    el.innerHTML = '<p class="staff-empty">No hay técnicos registrados</p>';
+    return;
+  }
+  el.innerHTML = STAFF.map(name => `
+    <div class="staff-member">
+      <span class="staff-name">👤 ${esc(name)}</span>
+      <button class="staff-del" onclick="deleteStaffMember('${esc(name)}')">✕ Eliminar</button>
+    </div>`).join('');
+}
+
+async function addStaffMember() {
+  const input = document.getElementById('staff-new-name');
+  const name  = (input.value || '').trim();
+  if (!name) { toast('Ingresá un nombre', 'error'); return; }
+  if (STAFF.includes(name)) { toast('Ya existe ese técnico', 'error'); return; }
+
+  STAFF = [...STAFF, name];
+  try {
+    await db.collection('config').doc('staff').set({ members: STAFF });
+    input.value = '';
+    renderStaffList();
+    refreshStaffSelect('');
+    toast('✅ ' + name + ' agregado', 'success');
+  } catch (e) {
+    STAFF = STAFF.filter(x => x !== name);
+    toast('Error al guardar', 'error');
+  }
+}
+
+async function deleteStaffMember(name) {
+  if (!confirm('¿Eliminar a ' + name + '?')) return;
+  STAFF = STAFF.filter(x => x !== name);
+  try {
+    await db.collection('config').doc('staff').set({ members: STAFF });
+    renderStaffList();
+    refreshStaffSelect('');
+    toast(name + ' eliminado', 'info');
+  } catch (e) {
+    toast('Error al guardar', 'error');
+  }
 }
