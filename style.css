@@ -637,3 +637,24 @@ header {
 
 /* Sell modal must appear above detail modal */
 #sell-modal { z-index: 600; }
+
+/* ── PRICE TABLE (detail modal) ── */
+.price-table-wrap { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px; }
+.price-table-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-bottom: 8px; }
+.price-table { display: flex; flex-direction: column; gap: 2px; }
+.pt-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-radius: 8px; background: var(--bg); }
+.pt-row:nth-child(even) { background: #f1f5f9; }
+.pt-efectivo { background: #f0fdf4 !important; }
+.pt-usd { background: #fefce8 !important; }
+.pt-label { font-size: .82rem; color: #475569; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pt-label small { font-size: .7rem; color: #94a3b8; }
+.pt-value { font-size: .92rem; font-weight: 700; color: var(--pri); white-space: nowrap; }
+.pt-sub { font-size: .7rem; font-weight: 400; color: #94a3b8; margin-left: 2px; }
+
+/* ── PRICE SETTINGS ── */
+.price-settings-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.price-settings-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.price-settings-lbl { font-size: .85rem; color: var(--pri); flex: 1; }
+.price-settings-input-wrap { display: flex; align-items: center; gap: 4px; }
+.price-pct-input { width: 64px !important; text-align: center; padding: 6px 8px !important; }
+.price-pct-sign { font-weight: 700; color: #64748b; font-size: .9rem; }
