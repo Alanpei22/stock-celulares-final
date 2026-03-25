@@ -634,3 +634,6 @@ header {
 .biz-preview { background: #f8fafc; border: 2px dashed var(--border); border-radius: 12px; min-height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .biz-preview-img { width: 100%; max-height: 150px; object-fit: contain; border-radius: 10px; }
 .biz-no-img { font-size: .82rem; color: #94a3b8; }
+
+/* Sell modal must appear above detail modal */
+#sell-modal { z-index: 600; }
