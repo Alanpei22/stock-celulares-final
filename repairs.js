@@ -37,6 +37,8 @@ function initRepairs() {
   });
   document.getElementById('rep-f-estado').addEventListener('change', renderRepairs);
   document.getElementById('rep-f-marca').addEventListener('change', renderRepairs);
+  document.getElementById('rep-f-fecha').addEventListener('change', renderRepairs);
+  document.getElementById('rep-sort').addEventListener('change', renderRepairs);
 
   document.getElementById('rep-form-close').addEventListener('click', closeRepairForm);
   document.getElementById('rep-form-cancel').addEventListener('click', closeRepairForm);
@@ -71,6 +73,11 @@ function initRepairs() {
     if (e.target.id === 'rep-stats-modal') closeRepairStats();
   });
 
+  document.getElementById('rep-ticket-close').addEventListener('click', closeTicket);
+  document.getElementById('rep-ticket-modal').addEventListener('click', e => {
+    if (e.target.id === 'rep-ticket-modal') closeTicket();
+  });
+
   document.getElementById('rep-import-btn').addEventListener('click', () => {
     document.getElementById('rep-import-file').click();
   });
@@ -81,9 +88,11 @@ function initRepairs() {
 
 // ── Render ────────────────────────────────
 function renderRepairs() {
-  const q = (document.getElementById('rep-search').value || '').trim().toLowerCase();
+  const q       = (document.getElementById('rep-search').value || '').trim().toLowerCase();
   const fEstado = document.getElementById('rep-f-estado').value;
   const fMarca  = document.getElementById('rep-f-marca').value;
+  const fFecha  = document.getElementById('rep-f-fecha').value;
+  const fSort   = document.getElementById('rep-sort').value;
 
   // Actualizar filtro de marcas
   const marcas = [...new Set(REPAIRS.map(r => r.marca).filter(Boolean))].sort();
@@ -96,7 +105,13 @@ function renderRepairs() {
   });
   selM.value = prev;
 
-  const filtered = REPAIRS.filter(r => {
+  // Date filter refs
+  const now      = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const weekAgo  = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+  const monthStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+  let filtered = REPAIRS.filter(r => {
     if (fEstado && r.estado !== fEstado) return false;
     if (fMarca  && r.marca  !== fMarca)  return false;
     if (q) {
@@ -104,20 +119,39 @@ function renderRepairs() {
         .map(x => String(x || '')).join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
+    if (fFecha === 'hoy') {
+      if (!r.fechaIngreso || !r.fechaIngreso.startsWith(todayStr)) return false;
+    } else if (fFecha === 'semana') {
+      if (!r.fechaIngreso || new Date(r.fechaIngreso) < weekAgo) return false;
+    } else if (fFecha === 'mes') {
+      if (!r.fechaIngreso || !r.fechaIngreso.startsWith(monthStr)) return false;
+    }
     return true;
   });
 
-  // Stats bar
-  const now = new Date();
-  const thisMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  document.getElementById('rs-reparando').textContent =
-    REPAIRS.filter(r => r.estado === 'reparando').length;
-  document.getElementById('rs-listo').textContent =
-    REPAIRS.filter(r => r.estado === 'listo').length;
-  const mesIngresos = REPAIRS
-    .filter(r => r.fechaIngreso && r.fechaIngreso.startsWith(thisMonth))
-    .reduce((s, r) => s + (r.monto || 0), 0);
-  document.getElementById('rs-mes').textContent = '$' + mesIngresos.toLocaleString('es-AR');
+  // Sort
+  const STATE_ORDER = { reparando: 0, listo: 1, entregado: 2, cancelado: 3 };
+  if (fSort === 'antiguo') {
+    filtered.sort((a, b) => (a.fechaIngreso || '').localeCompare(b.fechaIngreso || ''));
+  } else if (fSort === 'estado') {
+    filtered.sort((a, b) => (STATE_ORDER[a.estado] ?? 9) - (STATE_ORDER[b.estado] ?? 9));
+  } else if (fSort === 'monto') {
+    filtered.sort((a, b) => (b.monto || 0) - (a.monto || 0));
+  } else {
+    filtered.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
+  }
+
+  // Stats bar: demorados = reparando > 3 días
+  const demorados = REPAIRS.filter(r => {
+    if (r.estado !== 'reparando' || !r.fechaIngreso) return false;
+    return (now - new Date(r.fechaIngreso)) / 86400000 > 3;
+  }).length;
+
+  document.getElementById('rs-reparando').textContent = REPAIRS.filter(r => r.estado === 'reparando').length;
+  document.getElementById('rs-listo').textContent     = REPAIRS.filter(r => r.estado === 'listo').length;
+  document.getElementById('rs-demorados').textContent = demorados;
+
+  updateNavBadge();
 
   const listEl  = document.getElementById('rep-list');
   const emptyEl = document.getElementById('rep-empty');
@@ -130,14 +164,39 @@ function renderRepairs() {
   emptyEl.style.display = 'none';
 
   listEl.innerHTML = filtered.map(r => {
-    const st    = REPAIR_STATES[r.estado] || { label: r.estado || '—', cls: '' };
+    const st   = REPAIR_STATES[r.estado] || { label: r.estado || '—', cls: '' };
     const fecha = r.fechaIngreso
       ? new Date(r.fechaIngreso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
       : '';
     const monto = r.monto ? '$ ' + r.monto.toLocaleString('es-AR') : '—';
-    const garantiaBadge = r.esGarantia ? ' <span class="badge bg-warn">Garantía</span>' : '';
+
+    // Demorado?
+    const isDemorado = r.estado === 'reparando' && r.fechaIngreso &&
+      (now - new Date(r.fechaIngreso)) / 86400000 > 3;
+
+    // Card class
+    let cardClass = `rep-card--${r.estado}`;
+    if (isDemorado) cardClass += ' rep-card--demorado';
+
+    // Time ago
+    const taStr  = r.fechaIngreso ? timeAgo(r.fechaIngreso) : '';
+    const taCls  = isDemorado ? 'card-time-ago card-time-demorado' : 'card-time-ago';
+
+    // Saldo pendiente
+    const saldoHTML = (r.monto && r.sena && r.monto > r.sena && r.estado !== 'entregado')
+      ? `<span class="card-saldo">Saldo: $${(r.monto - r.sena).toLocaleString('es-AR')}</span>`
+      : '';
+
+    // Quick status button (reparando→listo, listo→entregado)
+    const nextSt = { reparando: 'listo', listo: 'entregado' }[r.estado];
+    const quickBtn = nextSt
+      ? `<div class="card-quick-actions" onclick="event.stopPropagation()">
+           <button class="btn-quick-status" onclick="quickStatusChange(event,'${r.id}','${nextSt}')">→ ${REPAIR_STATES[nextSt].label}</button>
+         </div>`
+      : '';
+
     return `
-      <div class="card rep-card" onclick="openRepairDetail('${r.id}')">
+      <div class="card rep-card ${cardClass}" onclick="openRepairDetail('${r.id}')">
         <div class="card-top">
           <div class="card-info">
             <span class="card-marca">${esc(r.marca || '')} · N°${r.nOrden || '?'}</span>
@@ -147,15 +206,19 @@ function renderRepairs() {
           <div class="card-right">
             <span class="badge ${st.cls}">${st.label}</span>
             ${r.esGarantia ? '<span class="badge bg-warn" style="margin-top:3px">Garantía</span>' : ''}
+            ${isDemorado ? '<span class="badge" style="margin-top:3px;background:#fee2e2;color:#dc2626;font-size:.6rem">⚠️ Demorado</span>' : ''}
           </div>
         </div>
         <div class="card-bottom">
           <span class="card-price">${monto}</span>
           <div class="card-meta">
             ${r.nombre ? `<span class="card-imei">${esc(r.nombre)}</span>` : ''}
+            ${saldoHTML}
             ${fecha ? `<span class="card-date">${fecha}</span>` : ''}
+            ${taStr ? `<span class="${taCls}">${taStr}</span>` : ''}
           </div>
         </div>
+        ${quickBtn}
       </div>`;
   }).join('');
 }
@@ -192,6 +255,7 @@ function openRepairForm(id) {
     document.getElementById('rep-fi-tlf').value        = r.tlf          || '';
     document.getElementById('rep-fi-dni').value        = r.dni          || '';
     document.getElementById('rep-fi-obs').value        = r.observaciones|| '';
+    document.getElementById('rep-fi-costo').value      = r.costo        || '';
 
     const accs = r.accesorios || [];
     document.getElementById('acc-cargador').checked    = accs.includes('cargador');
@@ -204,7 +268,7 @@ function openRepairForm(id) {
     document.getElementById('rep-orden-spacer').style.display = 'none';
 
     ['rep-fi-marca','rep-fi-modelo','rep-fi-condicion','rep-fi-codigo',
-     'rep-fi-monto','rep-fi-sena','rep-fi-fecha-est',
+     'rep-fi-monto','rep-fi-sena','rep-fi-costo','rep-fi-fecha-est',
      'rep-fi-nombre','rep-fi-tlf','rep-fi-dni','rep-fi-obs'].forEach(fid => {
       const el = document.getElementById(fid);
       if (el) el.value = '';
@@ -241,6 +305,7 @@ async function saveRepair() {
   const codigo   = document.getElementById('rep-fi-codigo').value.trim();
   const monto    = parseInt(document.getElementById('rep-fi-monto').value)    || 0;
   const sena     = parseInt(document.getElementById('rep-fi-sena').value)     || 0;
+  const costo    = parseInt(document.getElementById('rep-fi-costo').value)    || 0;
   const fechaEstimada = document.getElementById('rep-fi-fecha-est').value;
   const nombre   = document.getElementById('rep-fi-nombre').value.trim();
   const tlf      = document.getElementById('rep-fi-tlf').value.trim();
@@ -266,7 +331,7 @@ async function saveRepair() {
       if (!existing) { closeRepairForm(); return; }
       await db.collection('repairs').doc(editingRepairId).set({
         ...existing,
-        marca, modelo, arreglo, condicion, codigo, monto, sena,
+        marca, modelo, arreglo, condicion, codigo, monto, sena, costo,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs
       });
       toast('Reparación actualizada', 'success');
@@ -281,7 +346,7 @@ async function saveRepair() {
 
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       await db.collection('repairs').doc(id).set({
-        id, nOrden, marca, modelo, arreglo, condicion, codigo, monto, sena,
+        id, nOrden, marca, modelo, arreglo, condicion, codigo, monto, sena, costo,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs,
         estado: 'reparando',
         fechaIngreso: new Date().toISOString(),
@@ -366,6 +431,14 @@ function openRepairDetail(id) {
       <span class="det-label">Saldo</span>
       <span class="det-val" style="color:var(--warn);font-weight:700">$ ${saldo.toLocaleString('es-AR')}</span>
     </div>` : ''}
+    ${r.costo ? `<div class="det-row">
+      <span class="det-label">Costo repuesto</span>
+      <span class="det-val">$ ${r.costo.toLocaleString('es-AR')}</span>
+    </div>` : ''}
+    ${(r.monto && r.costo) ? `<div class="det-row">
+      <span class="det-label">Ganancia</span>
+      <span class="det-val" style="color:var(--grn2);font-weight:700">$ ${(r.monto - r.costo).toLocaleString('es-AR')}</span>
+    </div>` : ''}
     ${r.fechaEstimada ? `<div class="det-row">
       <span class="det-label">Entrega est.</span>
       <span class="det-val">${fmtDate(r.fechaEstimada)}</span>
@@ -395,7 +468,9 @@ function openRepairDetail(id) {
   const hasHistory = (r.tlf || r.dni);
   document.getElementById('rep-det-actions').innerHTML = `
     ${r.tlf ? `<button class="btn-whatsapp" onclick="repairWhatsApp('${id}')">🟢 WhatsApp</button>` : ''}
+    ${r.tlf ? `<button class="btn-edit" onclick="copyPhone('${esc(r.tlf)}')">📋 Tel.</button>` : ''}
     <button class="btn-edit" onclick="closeRepairDetail();openRepairForm('${id}')">✏️ Editar</button>
+    <button class="btn-history" onclick="openTicket('${id}')">🧾 Ticket</button>
     ${!r.esGarantia ? `<button class="btn-garantia" onclick="openGarantiaModal('${id}')">🔄 Garantía</button>` : ''}
     ${hasHistory ? `<button class="btn-history" onclick="openCustomerHistory('${id}')">👤 Historial</button>` : ''}
     <button class="btn-delete" onclick="deleteRepair('${id}')">🗑️</button>
@@ -642,6 +717,11 @@ function buildRepairStatsHTML() {
   const mesReps    = REPAIRS.filter(r => r.fechaIngreso && r.fechaIngreso.startsWith(thisMonth));
   const mesTotal   = mesReps.length;
   const mesIngreso = mesReps.reduce((s, r) => s + (r.monto || 0), 0);
+  const mesGanancia = mesReps.filter(r => r.costo).reduce((s, r) => s + (r.monto || 0) - (r.costo || 0), 0);
+  const mesSeñas    = mesReps.reduce((s, r) => s + (r.sena || 0), 0);
+  const promedio    = mesTotal > 0 ? Math.round(mesIngreso / mesTotal) : 0;
+  const demorados   = REPAIRS.filter(r => r.estado === 'reparando' && r.fechaIngreso &&
+    (now - new Date(r.fechaIngreso)) / 86400000 > 3).length;
 
   // Top arreglos
   const arregloCount = {};
@@ -669,7 +749,11 @@ function buildRepairStatsHTML() {
       <div class="ss-card ss-blue"><div class="ss-num">${entregado}</div><div class="ss-lbl">Entregados</div></div>
       <div class="ss-card"><div class="ss-num">${total}</div><div class="ss-lbl">Total</div></div>
       <div class="ss-card ss-green"><div class="ss-num">${mesTotal}</div><div class="ss-lbl">Este mes</div></div>
-      <div class="ss-card ss-green"><div class="ss-num">$${mesIngreso.toLocaleString('es-AR')}</div><div class="ss-lbl">Ingresos mes</div></div>
+      <div class="ss-card ss-green"><div class="ss-num">$${mesIngreso.toLocaleString('es-AR')}</div><div class="ss-lbl">Recaudado mes</div></div>
+      ${mesGanancia > 0 ? `<div class="ss-card ss-green"><div class="ss-num">$${mesGanancia.toLocaleString('es-AR')}</div><div class="ss-lbl">Ganancia mes</div></div>` : ''}
+      ${mesSeñas > 0 ? `<div class="ss-card"><div class="ss-num">$${mesSeñas.toLocaleString('es-AR')}</div><div class="ss-lbl">Señas recibidas</div></div>` : ''}
+      ${promedio > 0 ? `<div class="ss-card"><div class="ss-num">$${promedio.toLocaleString('es-AR')}</div><div class="ss-lbl">Promedio por rep.</div></div>` : ''}
+      ${demorados > 0 ? `<div class="ss-card" style="border-left:3px solid #ef4444"><div class="ss-num" style="color:#ef4444">${demorados}</div><div class="ss-lbl">Demorados +3días</div></div>` : ''}
       ${garantias > 0 ? `<div class="ss-card"><div class="ss-num">${garantias}</div><div class="ss-lbl">Garantías</div></div>` : ''}
     </div>
 
@@ -755,4 +839,103 @@ function fmtDate(dateStr) {
   if (!dateStr) return '—';
   const [y, m, d] = dateStr.split('-');
   return `${d}/${m}/${y}`;
+}
+
+function timeAgo(isoStr) {
+  if (!isoStr) return '';
+  const diff = (new Date() - new Date(isoStr)) / 1000;
+  if (diff < 60)    return 'Hace un momento';
+  if (diff < 3600)  return 'Hace ' + Math.floor(diff / 60) + ' min';
+  if (diff < 86400) return 'Hace ' + Math.floor(diff / 3600) + 'h';
+  const days = Math.floor(diff / 86400);
+  if (days < 7)     return 'Hace ' + days + ' día' + (days !== 1 ? 's' : '');
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5)    return 'Hace ' + weeks + ' sem.';
+  const months = Math.floor(days / 30);
+  return 'Hace ' + months + ' mes' + (months !== 1 ? 'es' : '');
+}
+
+function updateNavBadge() {
+  const listos = REPAIRS.filter(r => r.estado === 'listo').length;
+  const badge  = document.getElementById('nav-badge-repairs');
+  if (!badge) return;
+  if (listos > 0) {
+    badge.textContent    = listos;
+    badge.style.display  = '';
+  } else {
+    badge.style.display  = 'none';
+  }
+}
+
+async function quickStatusChange(e, id, newStatus) {
+  e.stopPropagation();
+  const update = { estado: newStatus };
+  if (newStatus === 'entregado') update.fechaEntrega = new Date().toISOString();
+  try {
+    await db.collection('repairs').doc(id).update(update);
+    toast('→ ' + (REPAIR_STATES[newStatus]?.label || newStatus), 'success');
+  } catch (err) {
+    toast('Error al actualizar', 'error');
+  }
+}
+
+function copyPhone(tlf) {
+  if (!tlf) return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(tlf).then(() => toast('📋 Teléfono copiado', 'success'));
+  } else {
+    const el = document.createElement('textarea');
+    el.value = tlf;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    toast('📋 Teléfono copiado', 'success');
+  }
+}
+
+function openTicket(id) {
+  const r = REPAIRS.find(x => x.id === id);
+  if (!r) return;
+  const accsMap = { cargador: 'Cargador', funda: 'Funda', caja: 'Caja', auriculares: 'Auriculares' };
+  const accs  = (r.accesorios || []).map(a => accsMap[a] || a).join(', ');
+  const saldo = (r.monto && r.sena) ? r.monto - r.sena : null;
+  const fechaIng = r.fechaIngreso
+    ? new Date(r.fechaIngreso).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' })
+    : '—';
+  const st = REPAIR_STATES[r.estado] || { label: r.estado || '—' };
+
+  document.getElementById('ticket-body').innerHTML = `
+    <div class="ticket-section">Equipo</div>
+    <div class="ticket-row"><span class="ticket-lbl">N° Orden</span><span class="ticket-val">N°${r.nOrden}</span></div>
+    <div class="ticket-row"><span class="ticket-lbl">Equipo</span><span class="ticket-val">${esc(r.marca)} ${esc(r.modelo)}</span></div>
+    <div class="ticket-row"><span class="ticket-lbl">Arreglo</span><span class="ticket-val">${esc(r.arreglo || '—')}</span></div>
+    ${r.condicion ? `<div class="ticket-row"><span class="ticket-lbl">Condición</span><span class="ticket-val">${esc(r.condicion)}</span></div>` : ''}
+    ${accs ? `<div class="ticket-row"><span class="ticket-lbl">Accesorios</span><span class="ticket-val">${accs}</span></div>` : ''}
+    <div class="ticket-section">Cliente</div>
+    ${r.nombre ? `<div class="ticket-row"><span class="ticket-lbl">Nombre</span><span class="ticket-val">${esc(r.nombre)}</span></div>` : ''}
+    ${r.tlf    ? `<div class="ticket-row"><span class="ticket-lbl">Teléfono</span><span class="ticket-val">${esc(r.tlf)}</span></div>` : ''}
+    ${r.dni    ? `<div class="ticket-row"><span class="ticket-lbl">DNI</span><span class="ticket-val">${esc(r.dni)}</span></div>` : ''}
+    <div class="ticket-section">Pago</div>
+    ${r.monto  ? `<div class="ticket-row"><span class="ticket-lbl">Monto</span><span class="ticket-val">$ ${r.monto.toLocaleString('es-AR')}</span></div>` : ''}
+    ${r.sena   ? `<div class="ticket-row"><span class="ticket-lbl">Seña</span><span class="ticket-val">$ ${r.sena.toLocaleString('es-AR')}</span></div>` : ''}
+    ${saldo !== null ? `<div class="ticket-row"><span class="ticket-lbl">Saldo</span><span class="ticket-val" style="color:#f59e0b;font-weight:800">$ ${saldo.toLocaleString('es-AR')}</span></div>` : ''}
+    <div class="ticket-section">Información</div>
+    <div class="ticket-row"><span class="ticket-lbl">Estado</span><span class="ticket-val">${st.label}</span></div>
+    <div class="ticket-row"><span class="ticket-lbl">Ingreso</span><span class="ticket-val">${fechaIng}</span></div>
+    ${r.fechaEstimada ? `<div class="ticket-row"><span class="ticket-lbl">Entrega est.</span><span class="ticket-val">${fmtDate(r.fechaEstimada)}</span></div>` : ''}
+    ${r.observaciones ? `<div class="ticket-row" style="flex-direction:column;gap:2px"><span class="ticket-lbl">Observaciones</span><span class="ticket-val" style="text-align:left;font-weight:400">${esc(r.observaciones)}</span></div>` : ''}
+  `;
+
+  document.getElementById('rep-ticket-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeTicket() {
+  document.getElementById('rep-ticket-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function printTicket() {
+  window.print();
 }

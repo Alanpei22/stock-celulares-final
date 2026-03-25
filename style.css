@@ -761,6 +761,105 @@ header {
 /* ── REPAIR CARD ── */
 .rep-card .card-specs { color: var(--acc2); font-weight: 500; }
 
+/* ── CARD BORDER BY STATUS ── */
+.rep-card--reparando { border-left: 3px solid #f59e0b; }
+.rep-card--listo     { border-left: 3px solid #10b981; }
+.rep-card--entregado { border-left: 3px solid #3b82f6; }
+.rep-card--cancelado { border-left: 3px solid #6b7280; }
+.rep-card--demorado  { border-left: 3px solid #ef4444 !important; background: rgba(254,226,226,.18); }
+
+/* ── TIME AGO ON CARD ── */
+.card-time-ago { font-size: .65rem; color: var(--t3); }
+.card-time-demorado { color: #ef4444; font-weight: 600; }
+
+/* ── SALDO BADGE ON CARD ── */
+.card-saldo { font-size: .7rem; color: #f59e0b; font-weight: 700; }
+
+/* ── QUICK STATUS BUTTON ── */
+.card-quick-actions { padding: 4px 12px 6px; }
+.btn-quick-status {
+  background: transparent;
+  border: 1px solid var(--brd);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: .68rem;
+  cursor: pointer;
+  color: var(--t2);
+  white-space: nowrap;
+}
+.btn-quick-status:active { background: var(--bg3); }
+
+/* ── NAV BADGE ── */
+.nav-ico-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.nav-badge {
+  position: absolute;
+  top: -5px; right: -10px;
+  background: #ef4444;
+  color: #fff;
+  font-size: .58rem;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* ── DEMORADO STAT ── */
+.rep-demorado-num { color: #ef4444; }
+
+/* ── TICKET MODAL ── */
+.ticket-card { max-width: 400px; width: 100%; }
+.ticket-header {
+  text-align: center;
+  padding: 8px 0 10px;
+  border-bottom: 1px dashed var(--brd);
+  margin-bottom: 10px;
+}
+.ticket-brand { font-size: 1.1rem; font-weight: 700; color: var(--acc); }
+.ticket-subtitle { font-size: .72rem; color: var(--t3); margin-top: 2px; }
+.ticket-row {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--bg3);
+  font-size: .8rem;
+  gap: 8px;
+}
+.ticket-lbl { color: var(--t3); flex-shrink: 0; }
+.ticket-val { color: var(--t1); font-weight: 600; text-align: right; }
+.ticket-section {
+  margin: 10px 0 2px;
+  font-size: .62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--t3);
+}
+.ticket-footer {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+@media print {
+  body > *:not(#rep-ticket-modal) { display: none !important; }
+  #rep-ticket-modal {
+    position: static !important;
+    background: none !important;
+    display: block !important;
+  }
+  #rep-ticket-modal .modal-card {
+    box-shadow: none;
+    border: none;
+    max-width: 100%;
+    padding: 0;
+  }
+  .no-print { display: none !important; }
+}
+
 @media (max-width: 380px) {
   .rep-status-btns { gap: 4px; }
   .status-btn { padding: 4px 8px; font-size: .68rem; }

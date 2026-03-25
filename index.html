@@ -141,13 +141,25 @@
           <option value="cancelado">Cancelado</option>
         </select>
         <select class="pill" id="rep-f-marca"><option value="">Todas las marcas</option></select>
+        <select class="pill" id="rep-f-fecha">
+          <option value="">Todas las fechas</option>
+          <option value="hoy">Hoy</option>
+          <option value="semana">Esta semana</option>
+          <option value="mes">Este mes</option>
+        </select>
+        <select class="pill" id="rep-sort">
+          <option value="reciente">Más reciente</option>
+          <option value="antiguo">Más antiguo</option>
+          <option value="estado">Por estado</option>
+          <option value="monto">Por monto</option>
+        </select>
       </div>
     </header>
 
     <div class="stats-bar">
       <div class="stat"><span class="stat-num" id="rs-reparando">0</span><span class="stat-lbl">Reparando</span></div>
       <div class="stat"><span class="stat-num" id="rs-listo">0</span><span class="stat-lbl">Listos</span></div>
-      <div class="stat stat-val"><span class="stat-num" id="rs-mes">$0</span><span class="stat-lbl">Este mes</span></div>
+      <div class="stat"><span class="stat-num rep-demorado-num" id="rs-demorados">0</span><span class="stat-lbl">Demorados</span></div>
     </div>
 
     <div class="list-wrap">
@@ -167,7 +179,10 @@
       <span class="nav-lbl">Stock</span>
     </button>
     <button class="nav-btn" id="nav-repairs" onclick="switchSection('repairs')">
-      <span class="nav-ico">🔧</span>
+      <span class="nav-ico-wrap">
+        <span class="nav-ico">🔧</span>
+        <span class="nav-badge" id="nav-badge-repairs" style="display:none">0</span>
+      </span>
       <span class="nav-lbl">Reparaciones</span>
     </button>
   </nav>
@@ -499,13 +514,18 @@
         </div>
 
         <div class="fg">
-          <label class="fl">Monto ($)</label>
+          <label class="fl">Monto cobrado ($)</label>
           <input id="rep-fi-monto" class="fi" type="number" placeholder="28000" min="0" inputmode="numeric">
         </div>
         <div class="fg">
           <label class="fl">Seña / Anticipo ($)</label>
           <input id="rep-fi-sena" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
         </div>
+        <div class="fg">
+          <label class="fl">Costo del repuesto ($)</label>
+          <input id="rep-fi-costo" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+        </div>
+        <div class="fg"></div>
 
         <div class="fg fg--full">
           <label class="fl">Fecha estimada de entrega</label>
@@ -607,6 +627,25 @@
       <button class="modal-close" id="rep-stats-close">✕</button>
     </div>
     <div class="modal-body" id="rep-stats-body"></div>
+  </div>
+</div>
+
+<!-- MODAL TICKET / COMPROBANTE -->
+<div id="rep-ticket-modal" class="modal-overlay hidden">
+  <div class="modal-card ticket-card" id="ticket-printable">
+    <div class="modal-header no-print">
+      <h3>🧾 Comprobante de reparación</h3>
+      <button class="modal-close" id="rep-ticket-close">✕</button>
+    </div>
+    <div class="ticket-header">
+      <div class="ticket-brand">🔧 TechPoint</div>
+      <div class="ticket-subtitle">Comprobante de reparación</div>
+    </div>
+    <div id="ticket-body" class="modal-body"></div>
+    <div class="ticket-footer no-print">
+      <button class="btn-primary" onclick="printTicket()">🖨️ Imprimir</button>
+      <button class="btn-secondary" onclick="closeTicket()">Cerrar</button>
+    </div>
   </div>
 </div>
 
