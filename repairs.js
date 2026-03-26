@@ -284,6 +284,19 @@ function openRepairForm(id) {
     document.getElementById('acc-funda').checked       = accs.includes('funda');
     document.getElementById('acc-caja').checked        = accs.includes('caja');
     document.getElementById('acc-auriculares').checked = accs.includes('auriculares');
+
+    window._currentPatronDots = r.patron || null;
+    window._currentPatronImg  = r.patronImg || null;
+    const patronPrev = document.getElementById('patron-preview');
+    if (r.patronImg) {
+      patronPrev.innerHTML = r.patronImg;
+      patronPrev.style.display = '';
+      document.getElementById('btn-patron-clear').style.display = '';
+    } else {
+      patronPrev.innerHTML = '';
+      patronPrev.style.display = 'none';
+      document.getElementById('btn-patron-clear').style.display = 'none';
+    }
   } else {
     document.getElementById('rep-form-title').textContent = '🔧 Nueva Reparación';
     document.getElementById('rep-orden-row').style.display    = '';
@@ -312,6 +325,12 @@ function openRepairForm(id) {
     ['acc-cargador','acc-funda','acc-caja','acc-auriculares'].forEach(fid => {
       document.getElementById(fid).checked = false;
     });
+    window._currentPatronDots = null;
+    window._currentPatronImg  = null;
+    const patronPrevNew = document.getElementById('patron-preview');
+    patronPrevNew.innerHTML = '';
+    patronPrevNew.style.display = 'none';
+    document.getElementById('btn-patron-clear').style.display = 'none';
     // Resetear toggle password
     const passInput = document.getElementById('rep-fi-codigo');
     passInput.type = 'password';
@@ -347,6 +366,8 @@ async function saveRepair() {
   const tlf      = document.getElementById('rep-fi-tlf').value.trim();
   const dni      = document.getElementById('rep-fi-dni').value.trim();
   const obs      = document.getElementById('rep-fi-obs').value.trim();
+  const patron    = window._currentPatronDots  || null;
+  const patronImg = window._currentPatronImg   || null;
 
   const accesorios = [];
   if (document.getElementById('acc-cargador').checked)    accesorios.push('cargador');
@@ -367,7 +388,7 @@ async function saveRepair() {
       if (!existing) { closeRepairForm(); return; }
       await db.collection('repairs').doc(editingRepairId).set({
         ...existing,
-        marca, modelo, arreglo, condicion, codigo, monto, sena, costo, presupuesto, tecnico,
+        marca, modelo, arreglo, condicion, codigo, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs
       });
       toast('Reparación actualizada', 'success');
@@ -389,7 +410,7 @@ async function saveRepair() {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const ahora = new Date().toISOString();
       await db.collection('repairs').doc(id).set({
-        id, nOrden, marca, modelo, arreglo, condicion, codigo, monto, sena, costo, presupuesto, tecnico,
+        id, nOrden, marca, modelo, arreglo, condicion, codigo, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs,
         estado: 'reparando',
         fechaIngreso: ahora,
@@ -446,6 +467,10 @@ function openRepairDetail(id) {
         <span class="pass-val" id="det-pass-shown" style="display:none">${esc(r.codigo)}</span>
         <button class="pass-toggle-sm" onclick="toggleDetPass()">👁️</button>
       </div>
+    </div>` : ''}
+    ${r.patronImg ? `<div class="det-row det-row--full">
+      <span class="det-label">Patrón de desbloqueo</span>
+      <div class="det-patron">${r.patronImg}</div>
     </div>` : ''}
     ${accs ? `<div class="det-row det-row--full">
       <span class="det-label">Accesorios</span>
@@ -1103,6 +1128,230 @@ function updateNavBadge() {
     badge.style.display  = 'none';
   }
 }
+
+// ══════════════════════════════════════════
+//  PATRÓN DE DESBLOQUEO
+// ══════════════════════════════════════════
+
+let _patronDots     = [];   // secuencia de índices 0-8 dibujados
+let _patronDrawing  = false;
+const PATRON_COLS   = 3;
+const PATRON_RADIUS = 18;   // radio del punto
+const PATRON_SIZE   = 270;  // canvas px
+
+function openPatronModal() {
+  document.getElementById('patron-overlay').classList.remove('hidden');
+  document.getElementById('patron-modal').classList.remove('hidden');
+  resetPatronCanvas();
+}
+
+function closePatronModal() {
+  document.getElementById('patron-overlay').classList.add('hidden');
+  document.getElementById('patron-modal').classList.add('hidden');
+}
+
+function _patronDotCenters() {
+  const step = PATRON_SIZE / PATRON_COLS;
+  const off  = step / 2;
+  const pts  = [];
+  for (let r = 0; r < PATRON_COLS; r++) {
+    for (let c = 0; c < PATRON_COLS; c++) {
+      pts.push({ x: off + c * step, y: off + r * step });
+    }
+  }
+  return pts;
+}
+
+function _patronHitDot(px, py) {
+  const pts = _patronDotCenters();
+  for (let i = 0; i < pts.length; i++) {
+    const dx = px - pts[i].x, dy = py - pts[i].y;
+    if (Math.sqrt(dx * dx + dy * dy) <= PATRON_RADIUS + 8) return i;
+  }
+  return -1;
+}
+
+function drawPatronGrid(curX, curY) {
+  const canvas = document.getElementById('patron-canvas');
+  if (!canvas) return;
+  const ctx  = canvas.getContext('2d');
+  const pts  = _patronDotCenters();
+  ctx.clearRect(0, 0, PATRON_SIZE, PATRON_SIZE);
+
+  // Background
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, PATRON_SIZE, PATRON_SIZE);
+
+  // Lines connecting selected dots
+  if (_patronDots.length > 1) {
+    ctx.beginPath();
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth   = 3;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    ctx.moveTo(pts[_patronDots[0]].x, pts[_patronDots[0]].y);
+    for (let i = 1; i < _patronDots.length; i++) {
+      ctx.lineTo(pts[_patronDots[i]].x, pts[_patronDots[i]].y);
+    }
+    ctx.stroke();
+  }
+
+  // Line to cursor while drawing
+  if (_patronDrawing && _patronDots.length > 0 && curX !== undefined) {
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(99,102,241,0.5)';
+    ctx.lineWidth   = 2;
+    const last = pts[_patronDots[_patronDots.length - 1]];
+    ctx.moveTo(last.x, last.y);
+    ctx.lineTo(curX, curY);
+    ctx.stroke();
+  }
+
+  // Draw dots
+  pts.forEach((p, i) => {
+    const selected = _patronDots.includes(i);
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, PATRON_RADIUS, 0, Math.PI * 2);
+    ctx.strokeStyle = selected ? '#6366f1' : '#334155';
+    ctx.lineWidth   = 2;
+    ctx.stroke();
+    // Fill
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, selected ? 10 : 6, 0, Math.PI * 2);
+    ctx.fillStyle = selected ? '#818cf8' : '#475569';
+    ctx.fill();
+  });
+}
+
+function _patronPos(e) {
+  const canvas = document.getElementById('patron-canvas');
+  const rect   = canvas.getBoundingClientRect();
+  const scaleX = PATRON_SIZE / rect.width;
+  const scaleY = PATRON_SIZE / rect.height;
+  const src    = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - rect.left) * scaleX,
+    y: (src.clientY - rect.top)  * scaleY
+  };
+}
+
+function initPatronCanvas() {
+  const canvas = document.getElementById('patron-canvas');
+  if (!canvas || canvas._patronInited) return;
+  canvas._patronInited = true;
+
+  const start = e => {
+    e.preventDefault();
+    _patronDrawing = true;
+    _patronDots    = [];
+    const { x, y } = _patronPos(e);
+    const hit = _patronHitDot(x, y);
+    if (hit >= 0) _patronDots.push(hit);
+    drawPatronGrid(x, y);
+  };
+
+  const move = e => {
+    e.preventDefault();
+    if (!_patronDrawing) return;
+    const { x, y } = _patronPos(e);
+    const hit = _patronHitDot(x, y);
+    if (hit >= 0 && !_patronDots.includes(hit)) _patronDots.push(hit);
+    drawPatronGrid(x, y);
+  };
+
+  const end = e => {
+    e.preventDefault();
+    _patronDrawing = false;
+    drawPatronGrid();
+  };
+
+  canvas.addEventListener('mousedown',  start, { passive: false });
+  canvas.addEventListener('mousemove',  move,  { passive: false });
+  canvas.addEventListener('mouseup',    end,   { passive: false });
+  canvas.addEventListener('mouseleave', end,   { passive: false });
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove',  move,  { passive: false });
+  canvas.addEventListener('touchend',   end,   { passive: false });
+
+  drawPatronGrid();
+}
+
+function resetPatronCanvas() {
+  _patronDots    = [];
+  _patronDrawing = false;
+  initPatronCanvas();
+  drawPatronGrid();
+}
+
+function generatePatronSVG(dots) {
+  const step = 90;
+  const off  = 45;
+  const size = 270;
+
+  const positions = [];
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      positions.push({ x: off + c * step, y: off + r * step });
+    }
+  }
+
+  let lines = '';
+  for (let i = 1; i < dots.length; i++) {
+    const a = positions[dots[i - 1]];
+    const b = positions[dots[i]];
+    lines += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#6366f1" stroke-width="4" stroke-linecap="round"/>`;
+  }
+
+  let circles = '';
+  positions.forEach((p, i) => {
+    const sel = dots.includes(i);
+    circles += `<circle cx="${p.x}" cy="${p.y}" r="14" fill="none" stroke="${sel ? '#6366f1' : '#334155'}" stroke-width="2"/>`;
+    circles += `<circle cx="${p.x}" cy="${p.y}" r="${sel ? 8 : 5}" fill="${sel ? '#818cf8' : '#475569'}"/>`;
+  });
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="background:#0f172a;border-radius:10px">${lines}${circles}</svg>`;
+}
+
+function savePatron() {
+  if (_patronDots.length < 4) {
+    toast('Conectá al menos 4 puntos', 'error');
+    return;
+  }
+  const svg = generatePatronSVG(_patronDots);
+  window._currentPatronDots = [..._patronDots];
+  window._currentPatronImg  = svg;
+
+  const prev = document.getElementById('patron-preview');
+  prev.innerHTML     = svg;
+  prev.style.display = '';
+  document.getElementById('btn-patron-clear').style.display = '';
+
+  closePatronModal();
+  toast('Patrón guardado', 'success');
+}
+
+function clearPatronForm() {
+  window._currentPatronDots = null;
+  window._currentPatronImg  = null;
+  const prev = document.getElementById('patron-preview');
+  prev.innerHTML     = '';
+  prev.style.display = 'none';
+  document.getElementById('btn-patron-clear').style.display = 'none';
+}
+
+// Inicializar canvas cuando se abre el modal
+document.addEventListener('DOMContentLoaded', () => {
+  const overlay = document.getElementById('patron-overlay');
+  if (overlay) {
+    const obs = new MutationObserver(() => {
+      if (!document.getElementById('patron-modal').classList.contains('hidden')) {
+        initPatronCanvas();
+      }
+    });
+    obs.observe(document.getElementById('patron-modal'), { attributes: true, attributeFilter: ['class'] });
+  }
+});
 
 async function quickStatusChange(e, id, newStatus) {
   e.stopPropagation();
