@@ -634,7 +634,6 @@ function repairWhatsApp(id) {
 
 // ── WhatsApp resumen pendientes ───────────
 function sendPendingWA() {
-  // Últimas 100 órdenes, sólo las pendientes (reparando + listo)
   const sorted = [...REPAIRS]
     .sort((a, b) => (b.nOrden || 0) - (a.nOrden || 0))
     .slice(0, 100);
@@ -647,26 +646,62 @@ function sendPendingWA() {
     return;
   }
 
+  // Mostrar popup de selección
+  closePendingMenu();
+  const menu = document.createElement('div');
+  menu.id = 'pending-wa-menu';
+  menu.className = 'pending-wa-menu';
+  menu.innerHTML = `
+    <div class="pending-wa-title">Enviar por WhatsApp</div>
+    ${reparando.length > 0 ? `<button class="pending-wa-opt" onclick="buildAndSendPendingWA('reparando');closePendingMenu()">🔧 En reparación <span class="pending-wa-cnt">${reparando.length}</span></button>` : ''}
+    ${listos.length > 0 ? `<button class="pending-wa-opt" onclick="buildAndSendPendingWA('listo');closePendingMenu()">✅ Listos para retirar <span class="pending-wa-cnt">${listos.length}</span></button>` : ''}
+    ${reparando.length > 0 && listos.length > 0 ? `<button class="pending-wa-opt" onclick="buildAndSendPendingWA('ambos');closePendingMenu()">📋 Todos los pendientes <span class="pending-wa-cnt">${reparando.length + listos.length}</span></button>` : ''}
+  `;
+  document.body.appendChild(menu);
+  setTimeout(() => menu.classList.add('pending-wa-menu--show'), 10);
+  setTimeout(() => document.addEventListener('click', closePendingMenu, { once: true }), 50);
+}
+
+function closePendingMenu() {
+  const m = document.getElementById('pending-wa-menu');
+  if (m) m.remove();
+}
+
+function buildAndSendPendingWA(tipo) {
+  const sorted = [...REPAIRS]
+    .sort((a, b) => (b.nOrden || 0) - (a.nOrden || 0))
+    .slice(0, 100);
+
+  const reparando = sorted.filter(r => r.estado === 'reparando');
+  const listos    = sorted.filter(r => r.estado === 'listo');
+
   const fmtLine = r => {
     const partes = [`N°${r.nOrden || '?'}`, `${r.marca} ${r.modelo}`, r.arreglo].filter(Boolean);
     if (r.nombre) partes.push(r.nombre);
     return '• ' + partes.join(' | ');
   };
 
-  let msg = `📋 *EQUIPOS PENDIENTES*\n`;
-  msg += `_Últimas 100 órdenes · ${new Date().toLocaleDateString('es-AR')}_\n`;
+  let msg = '';
+  const fecha = new Date().toLocaleDateString('es-AR');
 
-  if (reparando.length > 0) {
-    msg += `\n🔧 *En reparación (${reparando.length})*\n`;
+  if (tipo === 'reparando') {
+    msg = `🔧 *EN REPARACIÓN (${reparando.length})*\n_${fecha}_\n\n`;
     msg += reparando.map(fmtLine).join('\n');
-  }
-
-  if (listos.length > 0) {
-    msg += `\n\n✅ *Listos para retirar (${listos.length})*\n`;
+  } else if (tipo === 'listo') {
+    msg = `✅ *LISTOS PARA RETIRAR (${listos.length})*\n_${fecha}_\n\n`;
     msg += listos.map(fmtLine).join('\n');
+  } else {
+    msg = `📋 *EQUIPOS PENDIENTES*\n_${fecha}_`;
+    if (reparando.length > 0) {
+      msg += `\n\n🔧 *En reparación (${reparando.length})*\n`;
+      msg += reparando.map(fmtLine).join('\n');
+    }
+    if (listos.length > 0) {
+      msg += `\n\n✅ *Listos para retirar (${listos.length})*\n`;
+      msg += listos.map(fmtLine).join('\n');
+    }
+    msg += `\n\n_Total: ${reparando.length + listos.length} equipos_`;
   }
-
-  msg += `\n\n_Total pendientes: ${reparando.length + listos.length} equipos_`;
 
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }

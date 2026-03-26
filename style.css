@@ -158,6 +158,48 @@ header {
 }
 .hdr-btn--wa:active { background: #1da851; }
 
+/* ── PENDING WA POPUP ── */
+.pending-wa-menu {
+  position: fixed;
+  top: 70px; right: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  z-index: 500;
+  min-width: 230px;
+  padding: 8px;
+  opacity: 0; transform: scale(.92) translateY(-6px);
+  transition: opacity .18s, transform .18s;
+  pointer-events: none;
+}
+.pending-wa-menu--show {
+  opacity: 1; transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+.pending-wa-title {
+  font-size: .72rem; font-weight: 700;
+  color: #94a3b8; text-transform: uppercase;
+  letter-spacing: .06em; padding: 4px 8px 6px;
+}
+.pending-wa-opt {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 10px 12px;
+  border: none; background: none;
+  border-radius: 10px; cursor: pointer;
+  font-size: .88rem; font-weight: 600; color: var(--pri);
+  text-align: left; gap: 8px;
+  transition: background .12s;
+  touch-action: manipulation;
+}
+.pending-wa-opt:hover, .pending-wa-opt:active { background: #f1f5f9; }
+.pending-wa-cnt {
+  background: #25D366; color: #fff;
+  border-radius: 20px; padding: 2px 9px;
+  font-size: .72rem; font-weight: 700;
+  flex-shrink: 0;
+}
+
 .search-wrap { position: relative; }
 #search {
   width: 100%; padding: 10px 14px 10px 38px;
