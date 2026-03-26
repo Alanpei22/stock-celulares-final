@@ -980,12 +980,12 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 /* ── REPAIR CARD ── */
 .rep-card .card-specs { color: var(--acc2); font-weight: 500; }
 
-/* ── CARD BORDER BY STATUS ── */
-.rep-card--reparando { border-left: 3px solid #f59e0b; }
-.rep-card--listo     { border-left: 3px solid #10b981; }
-.rep-card--entregado { border-left: 3px solid #3b82f6; }
-.rep-card--cancelado { border-left: 3px solid #6b7280; }
-.rep-card--demorado  { border-left: 3px solid #ef4444 !important; background: rgba(254,226,226,.18); }
+/* ── CARD BACKGROUND BY STATUS ── */
+.rep-card--reparando { background: #fffbeb; border-color: #fcd34d; }
+.rep-card--listo     { background: #f0fdf4; border-color: #6ee7b7; }
+.rep-card--entregado { background: #eff6ff; border-color: #bfdbfe; }
+.rep-card--cancelado { background: #f8fafc; border-color: #cbd5e1; }
+.rep-card--demorado  { background: #fff1f2 !important; border-color: #fca5a5 !important; }
 
 /* ── TIME AGO ON CARD ── */
 .card-time-ago { font-size: .65rem; color: var(--t3); }
