@@ -151,6 +151,12 @@ header {
   transition: background .15s;
 }
 .hdr-btn:active { background: rgba(255,255,255,.3); }
+.hdr-btn--wa {
+  background: #25D366;
+  border-color: #1da851;
+  color: #fff;
+}
+.hdr-btn--wa:active { background: #1da851; }
 
 .search-wrap { position: relative; }
 #search {
