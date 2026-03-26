@@ -219,6 +219,10 @@
           <label class="fl">Modelo *</label>
           <input id="fi-modelo" class="fi" type="text" placeholder="Galaxy A54, iPhone 14…" autocomplete="off">
         </div>
+        <div class="fg fg--full ai-btn-row">
+          <button type="button" class="btn-ai" onclick="aiStockSpecs()">🤖 Auto-specs</button>
+          <button type="button" class="btn-ai" onclick="aiStockPrice()">🤖 Precio sugerido</button>
+        </div>
         <div class="fg">
           <label class="fl">Estado *</label>
           <select id="fi-estado" class="fs">
@@ -516,6 +520,10 @@
           <label class="fl">Condición visual al ingreso</label>
           <textarea id="rep-fi-condicion" class="fi fi-area" placeholder="Rayones, pantalla rota, sin batería..." rows="2"></textarea>
         </div>
+        <div class="fg fg--full ai-btn-row">
+          <button type="button" class="btn-ai" onclick="aiRepairDiagnosis()">🤖 Diagnóstico IA</button>
+          <button type="button" class="btn-ai" onclick="aiRepairTimePrice()">⏱ Estimar precio</button>
+        </div>
 
         <div class="fg fg--full">
           <label class="fl">Código / Patrón de seguridad</label>
@@ -749,6 +757,23 @@
 <div id="toast" class="toast"></div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!-- IA PANEL -->
+<div id="ai-overlay" class="ai-overlay hidden" onclick="closeAiPanel()"></div>
+<div id="ai-panel" class="ai-panel hidden">
+  <div class="ai-panel-header">
+    <span class="ai-panel-title">✨ Asistente IA</span>
+    <button class="ai-panel-close" onclick="closeAiPanel()">✕</button>
+  </div>
+  <div class="ai-panel-body">
+    <div class="ai-loading" id="ai-loading">
+      <div class="ai-spinner"></div>
+      <span>Consultando IA...</span>
+    </div>
+    <div class="ai-result" id="ai-result" style="display:none"></div>
+  </div>
+  <div class="ai-panel-actions" id="ai-panel-actions"></div>
+</div>
+
 <script src="repairs.js"></script>
 <script src="app.js"></script>
 </body>

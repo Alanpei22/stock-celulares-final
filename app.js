@@ -1129,3 +1129,87 @@ function closeAccessLogModal() {
   document.getElementById('access-log-modal').classList.add('hidden');
   document.body.style.overflow = '';
 }
+
+// ── IA ────────────────────────────────────────────────────
+async function callAI(action, data) {
+  showAiPanel();
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action, data })
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+    return json.text;
+  } catch (err) {
+    showAiError(err.message);
+    throw err;
+  }
+}
+
+function showAiPanel() {
+  document.getElementById('ai-loading').style.display = '';
+  document.getElementById('ai-result').style.display  = 'none';
+  document.getElementById('ai-panel-actions').innerHTML = '';
+  document.getElementById('ai-panel').classList.remove('hidden');
+  document.getElementById('ai-overlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAiPanel() {
+  document.getElementById('ai-panel').classList.add('hidden');
+  document.getElementById('ai-overlay').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function showAiResult(text, actions) {
+  document.getElementById('ai-loading').style.display = 'none';
+  const res = document.getElementById('ai-result');
+  res.style.display = '';
+  res.innerHTML = text
+    .replace(/\n/g, '<br>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  const actEl = document.getElementById('ai-panel-actions');
+  if (actions && actions.length) {
+    actEl.innerHTML = actions.map(a =>
+      `<button class="ai-action-btn" onclick="${a.fn}">${a.label}</button>`
+    ).join('');
+  }
+}
+
+function showAiError(msg) {
+  document.getElementById('ai-loading').style.display = 'none';
+  const res = document.getElementById('ai-result');
+  res.style.display = '';
+  res.innerHTML = `<span style="color:#ef4444">⚠️ ${msg || 'Error al consultar IA'}</span>`;
+}
+
+async function aiStockSpecs() {
+  const marca  = (document.getElementById('fi-marca').value  || '').trim();
+  const modelo = (document.getElementById('fi-modelo').value || '').trim();
+  if (!marca || !modelo) { toast('Completá marca y modelo primero', 'error'); return; }
+  try {
+    const text = await callAI('stockSpecs', { marca, modelo });
+    showAiResult(text, [{
+      label: '📋 Copiar a notas',
+      fn: `document.getElementById('fi-notas').value=document.getElementById('ai-result').innerText;closeAiPanel()`
+    }]);
+  } catch {}
+}
+
+async function aiStockPrice() {
+  const marca  = (document.getElementById('fi-marca').value  || '').trim();
+  const modelo = (document.getElementById('fi-modelo').value || '').trim();
+  const estado = document.getElementById('fi-estado').value;
+  const almEl  = document.getElementById('fi-almacenamiento');
+  const almacenamiento = almEl ? almEl.value.trim() : '';
+  if (!marca || !modelo) { toast('Completá marca y modelo primero', 'error'); return; }
+  try {
+    const text = await callAI('stockPrice', { marca, modelo, estado, almacenamiento });
+    showAiResult(text, [{
+      label: '💰 Usar precio mínimo',
+      fn: `(function(){const m=document.getElementById('ai-result').innerText.match(/[\d]+\.?[\d]*/g);if(m){const nums=m.map(n=>parseInt(n.replace(/\./g,'')));const mn=Math.min(...nums.filter(n=>n>1000));if(mn)document.getElementById('fi-precio').value=mn;}closeAiPanel();})()`
+    }]);
+  } catch {}
+}

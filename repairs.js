@@ -539,6 +539,7 @@ function openRepairDetail(id) {
   const hasHistory = (r.tlf || r.dni);
   document.getElementById('rep-det-actions').innerHTML = `
     ${r.tlf ? `<button class="btn-whatsapp" onclick="repairWhatsApp('${id}')">🟢 WhatsApp</button>` : ''}
+    <button class="btn-ai-wa" onclick="aiRepairWaMessage('${id}')">✨ Mensaje IA</button>
     ${r.tlf ? `<button class="btn-edit" onclick="copyPhone('${esc(r.tlf)}')">📋 Tel.</button>` : ''}
     <button class="btn-edit" onclick="closeRepairDetail();openRepairForm('${id}')">✏️ Editar</button>
     <button class="btn-history" onclick="openTicket('${id}')">🧾 Ticket</button>
@@ -1255,4 +1256,73 @@ async function deleteStaffMember(name) {
   } catch (e) {
     toast('Error al guardar', 'error');
   }
+}
+
+// ── IA Reparaciones ──────────────────────
+async function aiRepairDiagnosis() {
+  const marca    = (document.getElementById('rep-fi-marca').value    || '').trim();
+  const modelo   = (document.getElementById('rep-fi-modelo').value   || '').trim();
+  const arreglo  = document.getElementById('rep-fi-arreglo').value === 'Otro'
+    ? document.getElementById('rep-fi-arreglo-custom').value
+    : document.getElementById('rep-fi-arreglo').value;
+  const condicion = (document.getElementById('rep-fi-condicion').value || '').trim();
+  const problema  = [arreglo, condicion].filter(Boolean).join('. ');
+
+  if (!marca || !modelo)  { toast('Completá marca y modelo primero', 'error'); return; }
+  if (!problema)          { toast('Seleccioná el tipo de arreglo', 'error'); return; }
+
+  try {
+    const text = await callAI('diagnosis', { marca, modelo, problema });
+    showAiResult(text);
+  } catch {}
+}
+
+async function aiRepairTimePrice() {
+  const marca   = (document.getElementById('rep-fi-marca').value   || '').trim();
+  const modelo  = (document.getElementById('rep-fi-modelo').value  || '').trim();
+  const arreglo = document.getElementById('rep-fi-arreglo').value === 'Otro'
+    ? document.getElementById('rep-fi-arreglo-custom').value
+    : document.getElementById('rep-fi-arreglo').value;
+
+  if (!marca || !modelo || !arreglo) {
+    toast('Completá marca, modelo y tipo de arreglo', 'error'); return;
+  }
+
+  try {
+    const text = await callAI('timePrice', { marca, modelo, arreglo });
+    showAiResult(text, [{
+      label: '💰 Usar precio mínimo',
+      fn: `(function(){const m=document.getElementById('ai-result').innerText.match(/[\d]+\.?[\d]*/g);if(m){const nums=m.map(n=>parseInt(n.replace(/\./g,'')));const mn=Math.min(...nums.filter(n=>n>500));if(mn)document.getElementById('rep-fi-monto').value=mn;}closeAiPanel();})()`
+    }]);
+  } catch {}
+}
+
+async function aiRepairWaMessage(id) {
+  const r = REPAIRS.find(x => x.id === id);
+  if (!r) return;
+  try {
+    const text = await callAI('waMessage', {
+      nombre:  r.nombre  || 'cliente',
+      marca:   r.marca   || '',
+      modelo:  r.modelo  || '',
+      estado:  (typeof REPAIR_STATES !== 'undefined' && REPAIR_STATES[r.estado])
+                 ? REPAIR_STATES[r.estado].label : r.estado,
+      arreglo: r.arreglo || '',
+      nOrden:  r.nOrden  || ''
+    });
+    showAiResult(text, [{
+      label: '📲 Enviar por WhatsApp',
+      fn: `repairWhatsAppText('${id}', document.getElementById('ai-result').innerText);closeAiPanel()`
+    }]);
+  } catch {}
+}
+
+function repairWhatsAppText(id, msg) {
+  const r = REPAIRS.find(x => x.id === id);
+  if (!r || !r.tlf) { toast('No hay teléfono registrado', 'error'); return; }
+  let phone = String(r.tlf).replace(/\D/g, '');
+  if (phone.length === 10)                            phone = '549' + phone;
+  else if (phone.length === 11 && phone.startsWith('0')) phone = '54' + phone.slice(1);
+  else if (!phone.startsWith('54'))                   phone = '549' + phone;
+  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
 }
