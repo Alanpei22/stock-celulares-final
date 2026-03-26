@@ -101,7 +101,8 @@
     <div class="stats-bar">
       <div class="stat"><span class="stat-num" id="s-stock">0</span><span class="stat-lbl">En stock</span></div>
       <div class="stat"><span class="stat-num" id="s-sold">0</span><span class="stat-lbl">Vendidos</span></div>
-      <div class="stat stat-val"><span class="stat-num" id="s-value">$0</span><span class="stat-lbl">Valor stock</span></div>
+      <div class="stat"><span class="stat-num" id="s-exhibicion">0</span><span class="stat-lbl">Exhibición</span></div>
+      <div class="stat"><span class="stat-num" id="s-deposito">0</span><span class="stat-lbl">Depósito</span></div>
     </div>
 
     <div class="list-wrap">
@@ -227,8 +228,12 @@
           </select>
         </div>
         <div class="fg">
-          <label class="fl">Precio ($) *</label>
-          <input id="fi-precio" class="fi" type="number" placeholder="85000" min="0" inputmode="numeric">
+          <label class="fl">Precio *</label>
+          <div class="price-toggle-wrap">
+            <button type="button" id="btn-moneda" class="btn-moneda" onclick="toggleMoneda()">ARS $</button>
+            <input id="fi-precio" class="fi" type="number" placeholder="85000" min="0" inputmode="numeric" style="flex:1;min-width:0">
+          </div>
+          <small id="fi-precio-helper" class="fi-helper"></small>
         </div>
         <div class="fg">
           <label class="fl">Almacenamiento</label>
@@ -255,6 +260,14 @@
             <option value="8GB">8 GB</option>
             <option value="12GB">12 GB</option>
             <option value="16GB">16 GB</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">Ubicación</label>
+          <select id="fi-ubicacion" class="fs">
+            <option value="">— Sin asignar —</option>
+            <option value="Exhibición">📺 Exhibición</option>
+            <option value="Depósito">📦 Depósito</option>
           </select>
         </div>
         <div class="fg fg--full">
@@ -438,6 +451,12 @@
         <button class="btn-primary" onclick="savePriceSettings()" style="margin-top:10px;width:100%">💾 Guardar porcentajes</button>
       </div>
 
+      <div class="settings-section">
+        <h4 class="settings-title">🛠 Herramientas</h4>
+        <button class="btn-secondary" style="width:100%;margin-bottom:8px" onclick="openWaTplModal()">💬 Editar mensajes de WhatsApp</button>
+        <button class="btn-secondary" style="width:100%" onclick="openAccessLogModal()">🔐 Historial de accesos</button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -455,8 +474,8 @@
       <div class="form-grid">
 
         <div class="fg" id="rep-orden-row" style="display:none">
-          <label class="fl">N° Orden</label>
-          <input id="rep-fi-orden" class="fi" type="text" readonly style="background:#f1f5f9;color:#64748b">
+          <label class="fl" id="rep-orden-label">N° Orden</label>
+          <input id="rep-fi-orden" class="fi" type="number" placeholder="Automático" min="1" inputmode="numeric">
         </div>
         <div class="fg" id="rep-orden-spacer" style="display:none"></div>
 
@@ -639,6 +658,50 @@
       <button class="modal-close" id="rep-stats-close">✕</button>
     </div>
     <div class="modal-body" id="rep-stats-body"></div>
+  </div>
+</div>
+
+<!-- MODAL TEMPLATES WHATSAPP -->
+<div id="wa-tpl-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:440px">
+    <div class="modal-header">
+      <h3>💬 Mensajes de WhatsApp</h3>
+      <button class="modal-close" onclick="closeWaTplModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="fi-helper" style="margin-bottom:10px">Variables: <code>{nombre}</code> <code>{equipo}</code> <code>{nOrden}</code> <code>{marca}</code> <code>{modelo}</code> <code>{precio}</code></p>
+      <div class="fg fg--full">
+        <label class="fl">Reparando</label>
+        <textarea id="wt-reparando" class="fi fi-area" rows="3"></textarea>
+      </div>
+      <div class="fg fg--full">
+        <label class="fl">Listo para retirar</label>
+        <textarea id="wt-listo" class="fi fi-area" rows="3"></textarea>
+      </div>
+      <div class="fg fg--full">
+        <label class="fl">Genérico (otros estados)</label>
+        <textarea id="wt-default" class="fi fi-area" rows="2"></textarea>
+      </div>
+      <div class="fg fg--full" style="margin-top:4px">
+        <label class="fl">Stock (equipo en venta)</label>
+        <textarea id="wt-stock" class="fi fi-area" rows="3"></textarea>
+      </div>
+      <div class="form-actions" style="margin-top:8px">
+        <button class="btn-secondary" onclick="resetWaTemplates()">Restablecer</button>
+        <button class="btn-primary" onclick="saveWaTemplates()">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LOG DE ACCESOS -->
+<div id="access-log-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:420px">
+    <div class="modal-header">
+      <h3>🔐 Historial de accesos</h3>
+      <button class="modal-close" onclick="closeAccessLogModal()">✕</button>
+    </div>
+    <div class="modal-body" id="access-log-body">Cargando...</div>
   </div>
 </div>
 

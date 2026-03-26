@@ -388,23 +388,28 @@ header {
   margin-top: 4px;
 }
 
-/* ── BUTTONS ── */
+/* ── BUTTONS (mobile-optimized) ── */
+button { touch-action: manipulation; -webkit-appearance: none; user-select: none; }
 .btn-primary {
   background: linear-gradient(135deg, var(--acc), var(--acc2));
   color: #fff; border: none;
   border-radius: 12px; padding: 12px 24px;
   font-size: .88rem; font-weight: 700; cursor: pointer;
+  min-height: 44px;
   transition: opacity .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
 }
-.btn-primary:active { opacity: .85; transform: scale(.97); }
+.btn-primary:active { opacity: .82; transform: scale(.96); }
 
 .btn-secondary {
   background: #f1f5f9; color: #64748b; border: none;
   border-radius: 12px; padding: 12px 24px;
   font-size: .88rem; font-weight: 600; cursor: pointer;
+  min-height: 44px;
   transition: background .15s;
+  -webkit-tap-highlight-color: transparent;
 }
-.btn-secondary:active { background: #e2e8f0; }
+.btn-secondary:active { background: #e2e8f0; transform: scale(.97); }
 
 /* ── DETAIL MODAL ── */
 .detail-card { max-height: 92vh; }
@@ -948,3 +953,45 @@ header {
   .rep-status-btns { gap: 4px; }
   .status-btn { padding: 4px 8px; font-size: .68rem; }
 }
+
+/* ── UBICACIÓN BADGE ── */
+.badge-ubicacion {
+  font-size: .62rem; font-weight: 700;
+  padding: 2px 6px; border-radius: 5px;
+  background: #e0f2fe; color: #0369a1;
+  white-space: nowrap;
+}
+.badge-ubicacion--deposito { background: #f0fdf4; color: #15803d; }
+
+/* ── USD EN CARD ── */
+.card-usd { font-size: .68rem; color: #6b7280; margin-left: 6px; }
+
+/* ── PRICE TOGGLE FORM ── */
+.price-toggle-wrap { display: flex; gap: 6px; align-items: center; }
+.btn-moneda {
+  background: var(--acc); color: #fff;
+  border: none; border-radius: 8px;
+  padding: 0 11px; font-size: .72rem; font-weight: 700;
+  cursor: pointer; white-space: nowrap; height: 40px;
+  flex-shrink: 0;
+  touch-action: manipulation;
+}
+.btn-moneda:active { opacity: .8; }
+.btn-moneda--usd { background: #059669; }
+.fi-helper { display: block; font-size: .72rem; color: var(--t3); margin-top: 3px; }
+
+/* ── ACCESS LOG ── */
+.access-item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 0; border-bottom: 1px solid var(--bg3);
+}
+.access-fecha { font-size: .8rem; font-weight: 600; color: var(--t1); }
+.access-ip { font-size: .72rem; color: var(--t3); font-family: monospace; }
+.access-ua { font-size: .65rem; color: var(--t3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.access-empty { color: var(--t3); font-size: .85rem; text-align: center; padding: 20px 0; }
+
+/* ── WA TEMPLATE MODAL ── */
+#wt-reparando, #wt-listo, #wt-default, #wt-stock {
+  font-size: .8rem; line-height: 1.4; resize: vertical;
+}
+code { background: var(--bg3); padding: 1px 5px; border-radius: 4px; font-size: .78rem; }

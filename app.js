@@ -90,8 +90,11 @@ function updateDots() {
   });
 }
 
+let justLoggedIn = false;
+
 function checkPin() {
   if (pinBuffer === PIN) {
+    justLoggedIn = true;
     localStorage.setItem(AUTH_KEY, Date.now().toString());
     document.getElementById('login-screen').classList.add('success');
     setTimeout(showApp, 650);
@@ -150,8 +153,10 @@ function initApp() {
   appInited = true;
   initFirebase();
   loadConfig();
+  loadWaTemplates();
   fetchDolarBlue();
   applyBizImage();
+  if (justLoggedIn) { justLoggedIn = false; setTimeout(logAccess, 800); }
 
   document.getElementById('add-btn').addEventListener('click', () => openForm());
   document.getElementById('stats-btn').addEventListener('click', openStats);
@@ -245,10 +250,10 @@ function render() {
 
   const inStock = STOCK.filter(p => !p.vendido);
   const sold = STOCK.filter(p => p.vendido);
-  const totalVal = inStock.reduce((s, p) => s + (p.precio || 0), 0);
-  document.getElementById('s-stock').textContent = inStock.length;
-  document.getElementById('s-sold').textContent = sold.length;
-  document.getElementById('s-value').textContent = '$' + totalVal.toLocaleString('es-AR');
+  document.getElementById('s-stock').textContent     = inStock.length;
+  document.getElementById('s-sold').textContent      = sold.length;
+  document.getElementById('s-exhibicion').textContent = inStock.filter(p => p.ubicacion === 'Exhibición').length;
+  document.getElementById('s-deposito').textContent   = inStock.filter(p => p.ubicacion === 'Depósito').length;
 
   const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');
@@ -259,6 +264,12 @@ function render() {
   listEl.innerHTML = filtered.map(p => {
     const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' · ');
     const fecha = p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR', { day:'2-digit', month:'short' }) : '';
+    const usd = (!p.vendido && p.precio && dolarBlue) ? Math.round(p.precio / dolarBlue) : null;
+    const ubiBadge = p.ubicacion === 'Exhibición'
+      ? '<span class="badge-ubicacion">📺 Exhibición</span>'
+      : p.ubicacion === 'Depósito'
+        ? '<span class="badge-ubicacion badge-ubicacion--deposito">📦 Depósito</span>'
+        : '';
     return `
       <div class="card${p.vendido ? ' card-sold' : ''}" onclick="openDetail('${p.id}')">
         <div class="card-top">
@@ -268,12 +279,13 @@ function render() {
             ${specs ? `<span class="card-specs">${esc(specs)}</span>` : ''}
           </div>
           <div class="card-right">
+            ${ubiBadge}
             <span class="badge ${badgeCls[p.estado] || ''}">${esc(p.estado)}</span>
             ${p.vendido ? '<span class="badge bg-sold">VENDIDO</span>' : ''}
           </div>
         </div>
         <div class="card-bottom">
-          <span class="card-price">${p.precio ? '$ ' + p.precio.toLocaleString('es-AR') : '—'}</span>
+          <span class="card-price">${p.precio ? '$ ' + p.precio.toLocaleString('es-AR') : '—'}${usd ? `<span class="card-usd">U$S ${usd.toLocaleString('es-AR')}</span>` : ''}</span>
           <div class="card-meta">
             ${p.imei ? `<span class="card-imei">${esc(p.imei)}</span>` : ''}
             ${fecha ? `<span class="card-date">${fecha}</span>` : ''}
@@ -295,21 +307,28 @@ function openForm(id) {
     const p = STOCK.find(x => x.id === id);
     if (!p) return;
     t.textContent = '✏️ Editar Equipo';
-    document.getElementById('fi-marca').value = p.marca || '';
-    document.getElementById('fi-modelo').value = p.modelo || '';
-    document.getElementById('fi-estado').value = p.estado || '';
-    document.getElementById('fi-precio').value = p.precio || '';
-    document.getElementById('fi-storage').value = p.almacenamiento || '';
-    document.getElementById('fi-ram').value = p.ram || '';
-    document.getElementById('fi-imei').value = p.imei || '';
-    document.getElementById('fi-notas').value = p.notas || '';
+    document.getElementById('fi-marca').value     = p.marca         || '';
+    document.getElementById('fi-modelo').value    = p.modelo        || '';
+    document.getElementById('fi-estado').value    = p.estado        || '';
+    document.getElementById('fi-precio').value    = p.precio        || '';
+    document.getElementById('fi-storage').value   = p.almacenamiento|| '';
+    document.getElementById('fi-ram').value       = p.ram           || '';
+    document.getElementById('fi-imei').value      = p.imei          || '';
+    document.getElementById('fi-notas').value     = p.notas         || '';
+    document.getElementById('fi-ubicacion').value = p.ubicacion     || '';
   } else {
     t.textContent = '📱 Agregar Equipo';
     ['fi-marca','fi-modelo','fi-precio','fi-imei','fi-notas'].forEach(id => { document.getElementById(id).value = ''; });
-    document.getElementById('fi-estado').value = '';
-    document.getElementById('fi-storage').value = '';
-    document.getElementById('fi-ram').value = '';
+    document.getElementById('fi-estado').value    = '';
+    document.getElementById('fi-storage').value   = '';
+    document.getElementById('fi-ram').value       = '';
+    document.getElementById('fi-ubicacion').value = '';
   }
+  // Reset moneda toggle to ARS
+  const btnM = document.getElementById('btn-moneda');
+  if (btnM) { btnM.textContent = 'ARS $'; btnM.classList.remove('btn-moneda--usd'); btnM.dataset.mode = 'ars'; }
+  const helper = document.getElementById('fi-precio-helper');
+  if (helper) helper.textContent = '';
   document.getElementById('form-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   setTimeout(() => document.getElementById('fi-marca').focus(), 300);
@@ -322,14 +341,15 @@ function closeForm() {
 }
 
 function savePhone() {
-  const marca = document.getElementById('fi-marca').value.trim();
-  const modelo = document.getElementById('fi-modelo').value.trim();
-  const estado = document.getElementById('fi-estado').value;
-  const precio = parseInt(document.getElementById('fi-precio').value) || 0;
-  const storage = document.getElementById('fi-storage').value;
-  const ram = document.getElementById('fi-ram').value;
-  const imei = document.getElementById('fi-imei').value.trim();
-  const notas = document.getElementById('fi-notas').value.trim();
+  const marca     = document.getElementById('fi-marca').value.trim();
+  const modelo    = document.getElementById('fi-modelo').value.trim();
+  const estado    = document.getElementById('fi-estado').value;
+  const precio    = parseInt(document.getElementById('fi-precio').value) || 0;
+  const storage   = document.getElementById('fi-storage').value;
+  const ram       = document.getElementById('fi-ram').value;
+  const imei      = document.getElementById('fi-imei').value.trim();
+  const notas     = document.getElementById('fi-notas').value.trim();
+  const ubicacion = document.getElementById('fi-ubicacion').value;
 
   if (!marca) { toast('Ingresá la marca', 'error'); return; }
   if (!modelo) { toast('Ingresá el modelo', 'error'); return; }
@@ -345,13 +365,13 @@ function savePhone() {
         const existing = STOCK.find(x => x.id === editingId);
         if (!existing) { closeForm(); return; }
         db.collection('stock').doc(editingId).set({
-                ...existing, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas
+                ...existing, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion
         });
         toast('Equipo actualizado', 'success');
   } else {
         const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         db.collection('stock').doc(id).set({
-                id, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas,
+                id, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion,
                 fecha: new Date().toISOString(), vendido: false
         });
         toast('Equipo agregado al stock', 'success');
@@ -457,14 +477,17 @@ function fmtDateTime(iso) {
 function shareWhatsApp(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
-  const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' / ');
+  const specs  = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' / ');
   const precio = p.precio ? '$ ' + p.precio.toLocaleString('es-AR') : '—';
-  let msg = `📱 *${p.marca} ${p.modelo}*\n`;
-  if (specs) msg += `💾 ${specs}\n`;
-  if (p.estado) msg += `✅ Estado: ${p.estado}\n`;
-  msg += `💰 Precio: ${precio}`;
-  if (p.notas) msg += `\n📝 ${p.notas}`;
-  msg += `\n\n_Consultá disponibilidad_ 👋`;
+  const tpl = WA_TEMPLATES.stock ||
+    '📱 *{marca} {modelo}*\n{specs}\n✅ Estado: {estado}\n💰 Precio: {precio}\n\n_Consultá disponibilidad_ 👋';
+  const msg = tpl
+    .replace(/{marca}/g, p.marca || '')
+    .replace(/{modelo}/g, p.modelo || '')
+    .replace(/{specs}/g, specs ? '💾 ' + specs : '')
+    .replace(/{estado}/g, p.estado || '')
+    .replace(/{precio}/g, precio)
+    .replace(/{notas}/g, p.notas || '');
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
@@ -560,11 +583,45 @@ function switchTab(tab) {
 }
 
 function renderStatsVentas() {
-  const sold = STOCK.filter(p => p.vendido && p.fecha_venta);
+  const now     = new Date();
+  const sold    = STOCK.filter(p => p.vendido && p.fecha_venta);
   const inStock = STOCK.filter(p => !p.vendido);
-  const totalVal = inStock.reduce((s, p) => s + (p.precio || 0), 0);
   const totalVentas = sold.reduce((s, p) => s + (p.precio || 0), 0);
+  const promedio    = sold.length > 0 ? Math.round(totalVentas / sold.length) : 0;
 
+  // Mes actual vs anterior
+  const mesCur  = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const prevDate = new Date(now); prevDate.setMonth(prevDate.getMonth() - 1);
+  const mesAnterior = prevDate.getFullYear() + '-' + String(prevDate.getMonth() + 1).padStart(2, '0');
+  const ventasMes  = sold.filter(p => p.fecha_venta && p.fecha_venta.startsWith(mesCur));
+  const ventasPrev = sold.filter(p => p.fecha_venta && p.fecha_venta.startsWith(mesAnterior));
+  const totalMes   = ventasMes.reduce((s, p) => s + (p.precio || 0), 0);
+  const totalPrev  = ventasPrev.reduce((s, p) => s + (p.precio || 0), 0);
+
+  // Top marcas
+  const marcaCount = {};
+  sold.forEach(p => { marcaCount[p.marca] = (marcaCount[p.marca] || 0) + 1; });
+  const topMarcas = Object.entries(marcaCount).sort((a,b) => b[1]-a[1]).slice(0, 5);
+
+  // Top modelos
+  const modelCount = {};
+  sold.forEach(p => {
+    const k = p.marca + ' ' + p.modelo;
+    modelCount[k] = (modelCount[k] || 0) + 1;
+  });
+  const topModelos = Object.entries(modelCount).sort((a,b) => b[1]-a[1]).slice(0, 5);
+
+  // Vendedores
+  const vendCount = {};
+  sold.filter(p => p.vendedor).forEach(p => { vendCount[p.vendedor] = (vendCount[p.vendedor] || 0) + 1; });
+  const topVend = Object.entries(vendCount).sort((a,b) => b[1]-a[1]);
+
+  // Formas de pago
+  const pagoCount = {};
+  sold.filter(p => p.forma_pago).forEach(p => { pagoCount[p.forma_pago] = (pagoCount[p.forma_pago] || 0) + 1; });
+  const topPagos = Object.entries(pagoCount).sort((a,b) => b[1]-a[1]);
+
+  // Por mes
   const byMonth = {};
   sold.forEach(p => {
     const d = new Date(p.fecha_venta);
@@ -575,27 +632,55 @@ function renderStatsVentas() {
     byMonth[key].total += p.precio || 0;
   });
   const keys = Object.keys(byMonth).sort().reverse();
+  const bestMonth = keys.reduce((best, k) => !best || byMonth[k].total > byMonth[best].total ? k : best, null);
 
-  const marcaCount = {};
-  sold.forEach(p => { marcaCount[p.marca] = (marcaCount[p.marca] || 0) + 1; });
-  const topMarca = Object.entries(marcaCount).sort((a,b) => b[1]-a[1])[0];
-
-  const vendCount = {};
-  sold.filter(p => p.vendedor).forEach(p => { vendCount[p.vendedor] = (vendCount[p.vendedor] || 0) + 1; });
-  const topVend = Object.entries(vendCount).sort((a,b) => b[1]-a[1])[0];
+  const diff = totalPrev > 0 ? Math.round(((totalMes - totalPrev) / totalPrev) * 100) : null;
 
   let html = `
     <div class="ss-grid">
       <div class="ss-card"><div class="ss-num">${inStock.length}</div><div class="ss-lbl">En stock</div></div>
       <div class="ss-card"><div class="ss-num">${sold.length}</div><div class="ss-lbl">Total vendidos</div></div>
-      <div class="ss-card ss-green"><div class="ss-num">$${totalVal.toLocaleString('es-AR')}</div><div class="ss-lbl">Valor stock</div></div>
-      <div class="ss-card ss-green"><div class="ss-num">$${totalVentas.toLocaleString('es-AR')}</div><div class="ss-lbl">Total vendido</div></div>
-      ${topMarca ? `<div class="ss-card ss-blue"><div class="ss-num">${topMarca[0]}</div><div class="ss-lbl">Marca top</div></div>` : ''}
-      ${topVend ? `<div class="ss-card ss-blue"><div class="ss-num">${esc(topVend[0])}</div><div class="ss-lbl">Vendedor top</div></div>` : ''}
-    </div>
-    <h4 class="hist-title">Historial de ventas por mes</h4>
-  `;
+      <div class="ss-card ss-green"><div class="ss-num">$${totalMes.toLocaleString('es-AR')}</div><div class="ss-lbl">Este mes</div></div>
+      <div class="ss-card ss-green"><div class="ss-num">$${totalVentas.toLocaleString('es-AR')}</div><div class="ss-lbl">Total acumulado</div></div>
+      ${promedio > 0 ? `<div class="ss-card"><div class="ss-num">$${promedio.toLocaleString('es-AR')}</div><div class="ss-lbl">Precio promedio</div></div>` : ''}
+      ${diff !== null ? `<div class="ss-card ${diff >= 0 ? 'ss-green' : ''}"><div class="ss-num" style="color:${diff >= 0 ? 'var(--grn)' : '#ef4444'}">${diff >= 0 ? '+' : ''}${diff}%</div><div class="ss-lbl">vs mes anterior</div></div>` : ''}
+      ${bestMonth ? `<div class="ss-card ss-blue"><div class="ss-num" style="font-size:.72rem">$${byMonth[bestMonth].total.toLocaleString('es-AR')}</div><div class="ss-lbl">Mejor mes</div></div>` : ''}
+      ${topVend[0] ? `<div class="ss-card ss-blue"><div class="ss-num" style="font-size:.75rem">${esc(topVend[0][0])}</div><div class="ss-lbl">Mejor vendedor</div></div>` : ''}
+    </div>`;
 
+  if (topMarcas.length > 0) {
+    html += `<h4 class="hist-title" style="margin-top:10px">📊 Top marcas vendidas</h4>`;
+    const maxMarca = topMarcas[0][1];
+    html += topMarcas.map(([marca, cnt]) => `
+      <div class="hist-item">
+        <div class="hist-item-info"><div class="hist-item-name">${esc(marca)}</div>
+          <div style="height:5px;border-radius:3px;background:#e2e8f0;margin-top:4px;overflow:hidden">
+            <div style="height:100%;width:${Math.round(cnt/maxMarca*100)}%;background:var(--acc);border-radius:3px"></div>
+          </div>
+        </div>
+        <span class="badge bg-reparando">${cnt}</span>
+      </div>`).join('');
+  }
+
+  if (topModelos.length > 0) {
+    html += `<h4 class="hist-title" style="margin-top:10px">📱 Modelos más vendidos</h4>`;
+    html += topModelos.map(([modelo, cnt], i) => `
+      <div class="hist-item">
+        <div class="hist-item-info"><div class="hist-item-name">${i+1}. ${esc(modelo)}</div></div>
+        <span class="badge bg-entregado">${cnt}</span>
+      </div>`).join('');
+  }
+
+  if (topPagos.length > 0) {
+    html += `<h4 class="hist-title" style="margin-top:10px">💳 Formas de pago</h4>`;
+    html += topPagos.map(([pago, cnt]) => `
+      <div class="hist-item">
+        <div class="hist-item-info"><div class="hist-item-name">${esc(pago)}</div></div>
+        <span class="badge bg-reparando">${cnt}</span>
+      </div>`).join('');
+  }
+
+  html += `<h4 class="hist-title" style="margin-top:12px">📅 Historial mensual</h4>`;
   if (keys.length === 0) {
     html += '<p class="hist-empty">Sin ventas registradas aún 📦</p>';
   } else {
@@ -603,7 +688,7 @@ function renderStatsVentas() {
       const m = byMonth[k];
       html += `<div class="hist-month">
         <div class="hist-month-hdr">
-          <span class="hist-month-name">${m.label}</span>
+          <span class="hist-month-name">${m.label}${k === bestMonth ? ' 🏆' : ''}</span>
           <span class="hist-month-stats">${m.items.length} venta${m.items.length !== 1 ? 's' : ''} · $${m.total.toLocaleString('es-AR')}</span>
         </div>
         ${m.items.map(p => {
@@ -888,3 +973,157 @@ function initPWA() {
 
 initPinPad();
 checkAuth();
+
+// ── Toggle moneda (USD/ARS en formulario stock) ───────────
+let monedaMode = 'ars';
+function toggleMoneda() {
+  const btn = document.getElementById('btn-moneda');
+  const input = document.getElementById('fi-precio');
+  const helper = document.getElementById('fi-precio-helper');
+  if (!btn || !input) return;
+
+  if (monedaMode === 'ars') {
+    monedaMode = 'usd';
+    btn.textContent = 'USD $';
+    btn.classList.add('btn-moneda--usd');
+    input.placeholder = '450';
+    helper.textContent = dolarBlue
+      ? `Cotización: $${dolarBlue.toLocaleString('es-AR')} (blue)`
+      : 'Cotización no disponible';
+    input.value = '';
+  } else {
+    monedaMode = 'ars';
+    btn.textContent = 'ARS $';
+    btn.classList.remove('btn-moneda--usd');
+    input.placeholder = '85000';
+    helper.textContent = '';
+    input.value = '';
+  }
+}
+
+// Al guardar, convertir USD→ARS si corresponde (se llama desde savePhone)
+// La conversión se hace leyendo monedaMode en savePhone():
+// En app.js savePhone, el precio ya usa fi-precio pero hay que convertir
+// Inyectar el override aquí para no romper savePhone:
+const _origSavePhone = window.savePhone;
+
+// Wrap savePhone to handle USD conversion
+(function () {
+  const orig = savePhone;
+  window.savePhone = function () {
+    if (monedaMode === 'usd' && dolarBlue) {
+      const usdVal = parseFloat(document.getElementById('fi-precio').value) || 0;
+      const arsVal = Math.round(usdVal * dolarBlue);
+      document.getElementById('fi-precio').value = arsVal;
+      monedaMode = 'ars'; // reset after conversion
+      const btn = document.getElementById('btn-moneda');
+      if (btn) { btn.textContent = 'ARS $'; btn.classList.remove('btn-moneda--usd'); }
+      const h = document.getElementById('fi-precio-helper');
+      if (h) h.textContent = '';
+    }
+    orig.apply(this, arguments);
+  };
+})();
+
+// ── WA Templates ─────────────────────────────────────────
+const WA_TEMPLATES_KEY = 'cel_wa_templates';
+const WA_TPL_DEFAULTS = {
+  repair_reparando: 'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}). Estamos trabajando en ella 🔧',
+  repair_listo:     'Hola {nombre}! 👋\nTu {equipo} (Orden N°{nOrden}) ya está *lista para retirar* 🔧✅\n_Cuando puedas coordinamos el horario._',
+  repair_default:   'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}).',
+  stock:            '📱 *{marca} {modelo}*\n{specs}\n✅ Estado: {estado}\n💰 Precio: {precio}\n\n_Consultá disponibilidad_ 👋'
+};
+let WA_TEMPLATES = {};
+
+function loadWaTemplates() {
+  try { WA_TEMPLATES = JSON.parse(localStorage.getItem(WA_TEMPLATES_KEY)) || {}; } catch { WA_TEMPLATES = {}; }
+  Object.keys(WA_TPL_DEFAULTS).forEach(k => { if (!WA_TEMPLATES[k]) WA_TEMPLATES[k] = WA_TPL_DEFAULTS[k]; });
+}
+
+function openWaTplModal() {
+  loadWaTemplates();
+  document.getElementById('wt-reparando').value = WA_TEMPLATES.repair_reparando;
+  document.getElementById('wt-listo').value     = WA_TEMPLATES.repair_listo;
+  document.getElementById('wt-default').value   = WA_TEMPLATES.repair_default;
+  document.getElementById('wt-stock').value     = WA_TEMPLATES.stock;
+  document.getElementById('wa-tpl-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  // close settings modal
+  document.getElementById('settings-modal').classList.add('hidden');
+}
+
+function closeWaTplModal() {
+  document.getElementById('wa-tpl-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function saveWaTemplates() {
+  WA_TEMPLATES.repair_reparando = document.getElementById('wt-reparando').value;
+  WA_TEMPLATES.repair_listo     = document.getElementById('wt-listo').value;
+  WA_TEMPLATES.repair_default   = document.getElementById('wt-default').value;
+  WA_TEMPLATES.stock            = document.getElementById('wt-stock').value;
+  localStorage.setItem(WA_TEMPLATES_KEY, JSON.stringify(WA_TEMPLATES));
+  toast('Templates guardados ✅', 'success');
+  closeWaTplModal();
+}
+
+function resetWaTemplates() {
+  if (!confirm('¿Restablecer todos los mensajes a los valores por defecto?')) return;
+  WA_TEMPLATES = { ...WA_TPL_DEFAULTS };
+  document.getElementById('wt-reparando').value = WA_TEMPLATES.repair_reparando;
+  document.getElementById('wt-listo').value     = WA_TEMPLATES.repair_listo;
+  document.getElementById('wt-default').value   = WA_TEMPLATES.repair_default;
+  document.getElementById('wt-stock').value     = WA_TEMPLATES.stock;
+}
+
+// ── Historial de accesos ──────────────────────────────────
+async function logAccess() {
+  try {
+    let ip = '—';
+    try {
+      const r = await fetch('https://api.ipify.org?format=json');
+      ip = (await r.json()).ip || '—';
+    } catch(e) {}
+    await db.collection('accessLogs').add({
+      fecha: new Date().toISOString(),
+      ip,
+      ua: navigator.userAgent.slice(0, 200)
+    });
+  } catch(e) { /* silent */ }
+}
+
+async function openAccessLogModal() {
+  document.getElementById('access-log-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('settings-modal').classList.add('hidden');
+  const body = document.getElementById('access-log-body');
+  body.innerHTML = 'Cargando...';
+  try {
+    const snap = await db.collection('accessLogs')
+      .orderBy('fecha', 'desc').limit(30).get();
+    if (snap.empty) {
+      body.innerHTML = '<p class="access-empty">Sin registros aún</p>';
+      return;
+    }
+    body.innerHTML = snap.docs.map(d => {
+      const data = d.data();
+      const fecha = data.fecha
+        ? new Date(data.fecha).toLocaleString('es-AR', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })
+        : '—';
+      const ua = data.ua || '—';
+      const isMobile = /Android|iPhone|iPad/i.test(ua);
+      return `<div class="access-item">
+        <span class="access-fecha">${fecha} ${isMobile ? '📱' : '💻'}</span>
+        <span class="access-ip">🌐 ${data.ip || '—'}</span>
+        <span class="access-ua">${esc(ua)}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    body.innerHTML = '<p class="access-empty">Error al cargar accesos</p>';
+  }
+}
+
+function closeAccessLogModal() {
+  document.getElementById('access-log-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}

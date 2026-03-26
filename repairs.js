@@ -251,7 +251,12 @@ function openRepairForm(id) {
     document.getElementById('rep-form-title').textContent = '✏️ Editar Reparación';
     document.getElementById('rep-orden-row').style.display    = '';
     document.getElementById('rep-orden-spacer').style.display = '';
-    document.getElementById('rep-fi-orden').value  = 'N°' + r.nOrden;
+    document.getElementById('rep-orden-label').textContent    = 'N° Orden';
+    const ordenInput = document.getElementById('rep-fi-orden');
+    ordenInput.value    = r.nOrden || '';
+    ordenInput.readOnly = true;
+    ordenInput.style.background = '#f1f5f9';
+    ordenInput.style.color      = '#64748b';
     document.getElementById('rep-fi-marca').value  = r.marca  || '';
     document.getElementById('rep-fi-modelo').value = r.modelo || '';
 
@@ -280,8 +285,19 @@ function openRepairForm(id) {
     document.getElementById('acc-auriculares').checked = accs.includes('auriculares');
   } else {
     document.getElementById('rep-form-title').textContent = '🔧 Nueva Reparación';
-    document.getElementById('rep-orden-row').style.display    = 'none';
-    document.getElementById('rep-orden-spacer').style.display = 'none';
+    document.getElementById('rep-orden-row').style.display    = '';
+    document.getElementById('rep-orden-spacer').style.display = '';
+    document.getElementById('rep-orden-label').textContent    = 'N° Orden (editable)';
+    const ordenInput = document.getElementById('rep-fi-orden');
+    ordenInput.value    = '';
+    ordenInput.readOnly = false;
+    ordenInput.style.background = '';
+    ordenInput.style.color      = '';
+    // Fetch suggested nOrden asynchronously
+    db.collection('config').doc('repairsMeta').get().then(snap => {
+      const suggested = snap.exists ? (snap.data().nextOrderNum || 7100) : 7100;
+      if (!ordenInput.value) ordenInput.value = suggested;
+    }).catch(() => {});
 
     ['rep-fi-marca','rep-fi-modelo','rep-fi-condicion','rep-fi-codigo',
      'rep-fi-monto','rep-fi-sena','rep-fi-costo','rep-fi-presupuesto','rep-fi-fecha-est',
@@ -355,12 +371,18 @@ async function saveRepair() {
       });
       toast('Reparación actualizada', 'success');
     } else {
+      // Usar nOrden ingresado por el usuario (o auto si está vacío)
+      const ordenInputVal = parseInt(document.getElementById('rep-fi-orden').value) || 0;
       const metaRef = db.collection('config').doc('repairsMeta');
       let nOrden;
       await db.runTransaction(async t => {
-        const meta = await t.get(metaRef);
-        nOrden = meta.exists ? (meta.data().nextOrderNum || 7100) : 7100;
-        t.set(metaRef, { nextOrderNum: nOrden + 1 }, { merge: true });
+        const meta  = await t.get(metaRef);
+        const next  = meta.exists ? (meta.data().nextOrderNum || 7100) : 7100;
+        nOrden = ordenInputVal > 0 ? ordenInputVal : next;
+        // Advance counter only if the entered value >= current next
+        if (nOrden >= next) {
+          t.set(metaRef, { nextOrderNum: nOrden + 1 }, { merge: true });
+        }
       });
 
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -590,14 +612,21 @@ function repairWhatsApp(id) {
   const nombre = r.nombre ? r.nombre.split(' ')[0] : '';
   const equipo = `*${r.marca} ${r.modelo}*`;
 
-  let msg;
+  const tpls = (typeof WA_TEMPLATES !== 'undefined' && WA_TEMPLATES) || {};
+  let tpl;
   if (r.estado === 'listo') {
-    msg = `Hola ${nombre}! 👋\nTu ${equipo} (Orden N°${r.nOrden}) ya está *lista para retirar* 🔧✅\n_Cuando puedas coordinamos el horario._`;
+    tpl = tpls.repair_listo     || 'Hola {nombre}! 👋\nTu {equipo} (Orden N°{nOrden}) ya está *lista para retirar* 🔧✅\n_Cuando puedas coordinamos el horario._';
   } else if (r.estado === 'reparando') {
-    msg = `Hola ${nombre}! 👋\nTe contactamos por tu ${equipo} (Orden N°${r.nOrden}). Estamos trabajando en ella 🔧`;
+    tpl = tpls.repair_reparando || 'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}). Estamos trabajando en ella 🔧';
   } else {
-    msg = `Hola ${nombre}! 👋\nTe contactamos por tu ${equipo} (Orden N°${r.nOrden}).`;
+    tpl = tpls.repair_default   || 'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}).';
   }
+  const msg = tpl
+    .replace(/{nombre}/g, nombre)
+    .replace(/{equipo}/g, equipo.replace(/\*/g, ''))
+    .replace(/{nOrden}/g, r.nOrden || '—')
+    .replace(/{marca}/g, r.marca || '')
+    .replace(/{modelo}/g, r.modelo || '');
 
   window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
 }
@@ -660,13 +689,8 @@ async function saveGarantia() {
   btn.disabled = true;
 
   try {
-    const metaRef = db.collection('config').doc('repairsMeta');
-    let nOrden;
-    await db.runTransaction(async t => {
-      const meta = await t.get(metaRef);
-      nOrden = meta.exists ? (meta.data().nextOrderNum || 7100) : 7100;
-      t.set(metaRef, { nextOrderNum: nOrden + 1 }, { merge: true });
-    });
+    // Garantía usa el mismo N° de orden que la original
+    const nOrden = original.nOrden;
 
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     await db.collection('repairs').doc(id).set({
