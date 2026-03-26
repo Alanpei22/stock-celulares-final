@@ -687,13 +687,6 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 @media (min-width: 900px) {
   html { font-size: 18px; }
 
-  /* 2-col card grid */
-  #list, #rep-list {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-
   /* Bump tiny text that needs extra help */
   .card-marca    { font-size: .76rem; }
   .card-specs    { font-size: .83rem; }
@@ -718,10 +711,6 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 
 @media (min-width: 1300px) {
   html { font-size: 20px; }
-
-  #list, #rep-list {
-    grid-template-columns: repeat(3, 1fr);
-  }
 
   .list-wrap  { padding: 16px 28px 28px; }
   .modal-card { max-width: 680px; }
