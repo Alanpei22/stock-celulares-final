@@ -11,6 +11,16 @@ const DEFAULT_SELLERS = ['Vendedor 1', 'Vendedor 2'];
 const DEFAULT_PAYMENTS = ['Efectivo', 'Transferencia', 'Tarjeta débito', 'Tarjeta crédito', 'Mercado Pago'];
 const PRICES_KEY = 'cel_prices';
 const DEFAULT_PRICES = { transfer: 0, c3: 15, c6: 25 };
+
+// ── WA Templates ─────────────────────────────────────────
+const WA_TEMPLATES_KEY = 'cel_wa_templates';
+const WA_TPL_DEFAULTS = {
+  repair_reparando: 'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}). Estamos trabajando en ella 🔧',
+  repair_listo:     'Hola {nombre}! 👋\nTu {equipo} (Orden N°{nOrden}) ya está *lista para retirar* 🔧✅\n_Cuando puedas coordinamos el horario._',
+  repair_default:   'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}).',
+  stock:            '📱 *{marca} {modelo}*\n{specs}\n✅ Estado: {estado}\n💰 Precio: {precio}\n\n_Consultá disponibilidad_ 👋'
+};
+let WA_TEMPLATES = {};
 // ── Firebase ─────────────────────────────────────────────
 const FB_CONFIG = {
     apiKey: "AIzaSyAMRkrADBxRF6rST8rNwO5IqdWneXocBsE",
@@ -1025,15 +1035,7 @@ const _origSavePhone = window.savePhone;
   };
 })();
 
-// ── WA Templates ─────────────────────────────────────────
-const WA_TEMPLATES_KEY = 'cel_wa_templates';
-const WA_TPL_DEFAULTS = {
-  repair_reparando: 'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}). Estamos trabajando en ella 🔧',
-  repair_listo:     'Hola {nombre}! 👋\nTu {equipo} (Orden N°{nOrden}) ya está *lista para retirar* 🔧✅\n_Cuando puedas coordinamos el horario._',
-  repair_default:   'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}).',
-  stock:            '📱 *{marca} {modelo}*\n{specs}\n✅ Estado: {estado}\n💰 Precio: {precio}\n\n_Consultá disponibilidad_ 👋'
-};
-let WA_TEMPLATES = {};
+// WA_TEMPLATES declared at top of file (see top of app.js)
 
 function loadWaTemplates() {
   try { WA_TEMPLATES = JSON.parse(localStorage.getItem(WA_TEMPLATES_KEY)) || {}; } catch { WA_TEMPLATES = {}; }
