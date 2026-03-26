@@ -849,12 +849,13 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 /* ── WA BUTTON ON CARD ── */
 .card-wa-btn {
   background: none; border: none;
-  font-size: 1rem; line-height: 1;
-  cursor: pointer; padding: 0;
-  display: block; margin-top: 3px;
-  opacity: .85; transition: opacity .15s;
+  line-height: 1; cursor: pointer;
+  padding: 2px; display: block; margin-top: 4px;
+  opacity: .9; transition: opacity .15s, transform .15s;
+  touch-action: manipulation;
 }
-.card-wa-btn:active { opacity: 1; transform: scale(1.15); }
+.card-wa-btn svg { display: block; }
+.card-wa-btn:active { opacity: 1; transform: scale(1.2); }
 
 /* ── STATE HISTORY TIMELINE ── */
 .state-timeline { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }

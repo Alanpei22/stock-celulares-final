@@ -202,9 +202,10 @@ function renderRepairs() {
 
     // Quick status button (reparando→listo, listo→entregado)
     const nextSt = { reparando: 'listo', listo: 'entregado' }[r.estado];
+    const quickIco = { listo: '✅', entregado: '📦' };
     const quickBtn = nextSt
       ? `<div class="card-quick-actions" onclick="event.stopPropagation()">
-           <button class="btn-quick-status" onclick="quickStatusChange(event,'${r.id}','${nextSt}')">→ ${REPAIR_STATES[nextSt].label}</button>
+           <button class="btn-quick-status" onclick="quickStatusChange(event,'${r.id}','${nextSt}')">${quickIco[nextSt]} ${REPAIR_STATES[nextSt].label}</button>
          </div>`
       : '';
 
@@ -212,24 +213,24 @@ function renderRepairs() {
       <div class="card rep-card ${cardClass}" onclick="openRepairDetail('${r.id}')">
         <div class="card-top">
           <div class="card-info">
-            <span class="card-marca">${esc(r.marca || '')} · N°${r.nOrden || '?'}</span>
+            <span class="card-marca">📱 ${esc(r.marca || '')} · N°${r.nOrden || '?'}</span>
             <span class="card-modelo">${esc(r.modelo || '')}</span>
-            <span class="card-specs">${esc(r.arreglo || '')}</span>
+            <span class="card-specs">🔧 ${esc(r.arreglo || '')}</span>
           </div>
           <div class="card-right">
             <span class="badge ${st.cls}">${st.label}</span>
             ${r.esGarantia ? '<span class="badge bg-warn" style="margin-top:3px">Garantía</span>' : ''}
             ${isDemorado ? '<span class="badge" style="margin-top:3px;background:#fee2e2;color:#dc2626;font-size:.6rem">⚠️ Demorado</span>' : ''}
-            ${r.tlf ? `<button class="card-wa-btn" title="WhatsApp" onclick="event.stopPropagation();repairWhatsApp('${r.id}')">🟢</button>` : ''}
+            ${r.tlf ? `<button class="card-wa-btn" title="WhatsApp" onclick="event.stopPropagation();repairWhatsApp('${r.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#25D366" width="28" height="28"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg></button>` : ''}
           </div>
         </div>
         <div class="card-bottom">
           <span class="card-price">${monto}</span>
           <div class="card-meta">
-            ${r.nombre ? `<span class="card-imei">${esc(r.nombre)}</span>` : ''}
+            ${r.nombre ? `<span class="card-imei">👤 ${esc(r.nombre)}</span>` : ''}
             ${saldoHTML}
-            ${fecha ? `<span class="card-date">${fecha}</span>` : ''}
-            ${taStr ? `<span class="${taCls}">${taStr}</span>` : ''}
+            ${fecha ? `<span class="card-date">📅 ${fecha}</span>` : ''}
+            ${taStr ? `<span class="${taCls}">⏱ ${taStr}</span>` : ''}
           </div>
         </div>
         ${quickBtn}
@@ -831,16 +832,16 @@ function buildStatsMonthHTML(now, thisMonth) {
   return `
     <p class="stats-period-label">${mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}</p>
     <div class="ss-grid">
-      <div class="ss-card"><div class="ss-num">${reparando}</div><div class="ss-lbl">En reparación</div></div>
-      <div class="ss-card ss-green"><div class="ss-num">${listo}</div><div class="ss-lbl">Listos p/ retirar</div></div>
-      <div class="ss-card ss-blue"><div class="ss-num">${mesTotal}</div><div class="ss-lbl">Ingresados mes</div></div>
-      <div class="ss-card ss-blue"><div class="ss-num">${mesEntregados}</div><div class="ss-lbl">Entregados mes</div></div>
-      <div class="ss-card ss-green"><div class="ss-num">$${mesIngreso.toLocaleString('es-AR')}</div><div class="ss-lbl">Recaudado mes</div></div>
-      ${mesGanancia > 0 ? `<div class="ss-card ss-green"><div class="ss-num">$${mesGanancia.toLocaleString('es-AR')}</div><div class="ss-lbl">Ganancia mes</div></div>` : ''}
-      ${mesSeñas > 0 ? `<div class="ss-card"><div class="ss-num">$${mesSeñas.toLocaleString('es-AR')}</div><div class="ss-lbl">Señas recibidas</div></div>` : ''}
-      ${promedio > 0 ? `<div class="ss-card"><div class="ss-num">$${promedio.toLocaleString('es-AR')}</div><div class="ss-lbl">Promedio por rep.</div></div>` : ''}
-      ${demorados > 0 ? `<div class="ss-card" style="border-left:3px solid #ef4444"><div class="ss-num" style="color:#ef4444">${demorados}</div><div class="ss-lbl">Demorados +3días</div></div>` : ''}
-      ${garantiasMes > 0 ? `<div class="ss-card"><div class="ss-num">${garantiasMes}</div><div class="ss-lbl">Garantías mes</div></div>` : ''}
+      <div class="ss-card"><div class="ss-num">${reparando}</div><div class="ss-lbl">🔧 En reparación</div></div>
+      <div class="ss-card ss-green"><div class="ss-num">${listo}</div><div class="ss-lbl">✅ Listos p/ retirar</div></div>
+      <div class="ss-card ss-blue"><div class="ss-num">${mesTotal}</div><div class="ss-lbl">📥 Ingresados mes</div></div>
+      <div class="ss-card ss-blue"><div class="ss-num">${mesEntregados}</div><div class="ss-lbl">📦 Entregados mes</div></div>
+      <div class="ss-card ss-green"><div class="ss-num">$${mesIngreso.toLocaleString('es-AR')}</div><div class="ss-lbl">💰 Recaudado mes</div></div>
+      ${mesGanancia > 0 ? `<div class="ss-card ss-green"><div class="ss-num">$${mesGanancia.toLocaleString('es-AR')}</div><div class="ss-lbl">📈 Ganancia mes</div></div>` : ''}
+      ${mesSeñas > 0 ? `<div class="ss-card"><div class="ss-num">$${mesSeñas.toLocaleString('es-AR')}</div><div class="ss-lbl">🤝 Señas recibidas</div></div>` : ''}
+      ${promedio > 0 ? `<div class="ss-card"><div class="ss-num">$${promedio.toLocaleString('es-AR')}</div><div class="ss-lbl">📊 Promedio por rep.</div></div>` : ''}
+      ${demorados > 0 ? `<div class="ss-card" style="border-left:3px solid #ef4444"><div class="ss-num" style="color:#ef4444">${demorados}</div><div class="ss-lbl">⚠️ Demorados +3días</div></div>` : ''}
+      ${garantiasMes > 0 ? `<div class="ss-card"><div class="ss-num">${garantiasMes}</div><div class="ss-lbl">🔄 Garantías mes</div></div>` : ''}
     </div>
 
     ${topArreglos.length > 0 ? `
@@ -900,12 +901,12 @@ function buildStatsAnnualHTML(now, thisYear, thisMonth) {
   return `
     <p class="stats-period-label">Año ${thisYear}</p>
     <div class="ss-grid">
-      <div class="ss-card ss-blue"><div class="ss-num">${yearTotal}</div><div class="ss-lbl">Total año</div></div>
-      <div class="ss-card ss-blue"><div class="ss-num">${yearEntregados}</div><div class="ss-lbl">Entregados</div></div>
-      <div class="ss-card ss-green"><div class="ss-num">$${yearIngreso.toLocaleString('es-AR')}</div><div class="ss-lbl">Recaudado año</div></div>
-      ${yearGanancia > 0 ? `<div class="ss-card ss-green"><div class="ss-num">$${yearGanancia.toLocaleString('es-AR')}</div><div class="ss-lbl">Ganancia año</div></div>` : ''}
-      ${avgMensual > 0 ? `<div class="ss-card"><div class="ss-num">${avgMensual}</div><div class="ss-lbl">Promedio mensual</div></div>` : ''}
-      ${garantiasYear > 0 ? `<div class="ss-card"><div class="ss-num">${garantiasYear}</div><div class="ss-lbl">Garantías año</div></div>` : ''}
+      <div class="ss-card ss-blue"><div class="ss-num">${yearTotal}</div><div class="ss-lbl">📋 Total año</div></div>
+      <div class="ss-card ss-blue"><div class="ss-num">${yearEntregados}</div><div class="ss-lbl">📦 Entregados</div></div>
+      <div class="ss-card ss-green"><div class="ss-num">$${yearIngreso.toLocaleString('es-AR')}</div><div class="ss-lbl">💰 Recaudado año</div></div>
+      ${yearGanancia > 0 ? `<div class="ss-card ss-green"><div class="ss-num">$${yearGanancia.toLocaleString('es-AR')}</div><div class="ss-lbl">📈 Ganancia año</div></div>` : ''}
+      ${avgMensual > 0 ? `<div class="ss-card"><div class="ss-num">${avgMensual}</div><div class="ss-lbl">📊 Promedio mensual</div></div>` : ''}
+      ${garantiasYear > 0 ? `<div class="ss-card"><div class="ss-num">${garantiasYear}</div><div class="ss-lbl">🔄 Garantías año</div></div>` : ''}
     </div>
 
     <h4 class="hist-title" style="margin-top:12px">Historial mensual ${thisYear}</h4>

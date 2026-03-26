@@ -284,7 +284,7 @@ function render() {
       <div class="card${p.vendido ? ' card-sold' : ''}" onclick="openDetail('${p.id}')">
         <div class="card-top">
           <div class="card-info">
-            <span class="card-marca">${esc(p.marca)}</span>
+            <span class="card-marca">📱 ${esc(p.marca)}</span>
             <span class="card-modelo">${esc(p.modelo)}</span>
             ${specs ? `<span class="card-specs">${esc(specs)}</span>` : ''}
           </div>
@@ -297,8 +297,8 @@ function render() {
         <div class="card-bottom">
           <span class="card-price">${p.precio ? '$ ' + p.precio.toLocaleString('es-AR') : '—'}${usd ? `<span class="card-usd">U$S ${usd.toLocaleString('es-AR')}</span>` : ''}</span>
           <div class="card-meta">
-            ${p.imei ? `<span class="card-imei">${esc(p.imei)}</span>` : ''}
-            ${fecha ? `<span class="card-date">${fecha}</span>` : ''}
+            ${p.imei ? `<span class="card-imei">🔑 ${esc(p.imei)}</span>` : ''}
+            ${fecha ? `<span class="card-date">📅 ${fecha}</span>` : ''}
           </div>
         </div>
       </div>`;
