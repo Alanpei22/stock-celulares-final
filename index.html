@@ -531,6 +531,11 @@
             <input id="rep-fi-codigo" class="fi" type="password" placeholder="PIN, patrón o contraseña" autocomplete="new-password">
             <button type="button" class="pass-toggle" onclick="togglePassField('rep-fi-codigo', this)">👁️</button>
           </div>
+          <div class="patron-form-row">
+            <button type="button" class="btn-patron-draw" onclick="openPatronModal()">🔐 Dibujar patrón</button>
+            <div id="patron-preview" class="patron-preview" style="display:none"></div>
+            <button type="button" id="btn-patron-clear" class="btn-patron-clear" onclick="clearPatronForm()" style="display:none">✕ Borrar</button>
+          </div>
         </div>
 
         <div class="fg fg--full">
@@ -772,6 +777,21 @@
     <div class="ai-result" id="ai-result" style="display:none"></div>
   </div>
   <div class="ai-panel-actions" id="ai-panel-actions"></div>
+</div>
+
+<!-- Modal Patrón de desbloqueo -->
+<div id="patron-overlay" class="patron-overlay hidden" onclick="closePatronModal()"></div>
+<div id="patron-modal" class="patron-modal hidden">
+  <div class="patron-modal-hdr">
+    <span>🔐 Patrón de desbloqueo</span>
+    <button type="button" onclick="closePatronModal()">✕</button>
+  </div>
+  <p class="patron-hint">Conectá al menos 4 puntos</p>
+  <canvas id="patron-canvas" width="270" height="270"></canvas>
+  <div class="patron-modal-btns">
+    <button type="button" class="btn-patron-reset" onclick="resetPatronCanvas()">🗑 Borrar</button>
+    <button type="button" class="btn-patron-save" onclick="savePatron()">✅ Guardar patrón</button>
+  </div>
 </div>
 
 <script src="repairs.js"></script>
