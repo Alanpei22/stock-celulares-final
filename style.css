@@ -485,6 +485,42 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 /* ── STATS MODAL ── */
 .stats-card { max-height: 92vh; }
 
+.stats-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.stats-tab {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: #f8fafc;
+  font-size: .82rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+  touch-action: manipulation;
+  min-height: 38px;
+}
+.stats-tab--active {
+  background: var(--pri);
+  color: #fff;
+  border-color: var(--pri);
+}
+
+.stats-period-label {
+  font-size: .75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin: 4px 0 8px;
+}
+
 .ss-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
