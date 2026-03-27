@@ -5,12 +5,20 @@ export default async function handler(req) {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  const { action, data } = await req.json();
+  let body;
+  try { body = await req.json(); } catch { body = {}; }
+  const { action, data = {} } = body;
   const key = process.env.ANTHROPIC_API_KEY;
 
   if (!key) {
     return new Response(JSON.stringify({ error: 'API key no configurada en Vercel' }), {
       status: 500, headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  if (!action) {
+    return new Response(JSON.stringify({ error: 'Parámetro action requerido' }), {
+      status: 400, headers: { 'content-type': 'application/json' }
     });
   }
 
@@ -62,7 +70,7 @@ Responde SOLO con el rango en pesos: "$XXX.000 - $XXX.000". Sin explicaciones ad
         'content-type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 350,
         messages: [{ role: 'user', content: prompts[action] }]
       })
