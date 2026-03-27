@@ -1219,6 +1219,20 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 .ai-chat-send:hover { filter: brightness(1.15); }
 .ai-chat-send:disabled { opacity: .5; cursor: not-allowed; }
 
+/* ── BOTÓN AGREGAR MARCA ── */
+.btn-add-marca {
+  background: #6366f1; color: #fff; border: none; border-radius: 6px;
+  padding: 1px 7px; font-size: .72rem; font-weight: 800; cursor: pointer;
+  margin-left: 6px; vertical-align: middle; line-height: 1.4;
+}
+.btn-add-marca:hover { background: #4f46e5; }
+.marca-chip {
+  background: #ede9fe; color: #7c3aed; border: 1.5px solid #c4b5fd;
+  border-radius: 50px; padding: 3px 10px; font-size: .72rem; font-weight: 700;
+  display: flex; align-items: center; gap: 5px;
+}
+.marca-chip button { background: none; border: none; color: #a78bfa; cursor: pointer; font-size: .8rem; padding: 0; line-height: 1; }
+
 /* ── MODAL ACTIVIDAD ── */
 .actividad-card { max-width: 520px; width: 96vw; max-height: 88vh; display: flex; flex-direction: column; }
 .actividad-filters { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }

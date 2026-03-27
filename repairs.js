@@ -93,6 +93,7 @@ function initRepairs() {
   document.getElementById('rep-import-file').addEventListener('change', importRepairHistory);
 
   loadStaff();
+  loadCustomMarcas();
   listenRepairs();
 }
 
@@ -122,7 +123,11 @@ function renderRepairs() {
   const monthStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 
   let filtered = REPAIRS.filter(r => {
-    if (fEstado && r.estado !== fEstado) return false;
+    if (fEstado === 'demorado') {
+      // Demorado = reparando hace más de 3 días
+      if (r.estado !== 'reparando' || !r.fechaIngreso) return false;
+      if ((now - new Date(r.fechaIngreso)) / 86400000 <= 3) return false;
+    } else if (fEstado && r.estado !== fEstado) return false;
     if (fMarca  && r.marca  !== fMarca)  return false;
     if (q) {
       const hay = [r.nOrden, r.marca, r.modelo, r.arreglo, r.nombre, r.tlf, r.dni]
@@ -1797,4 +1802,72 @@ function repairWhatsAppText(id, msg) {
   else if (phone.length === 11 && phone.startsWith('0')) phone = '54' + phone.slice(1);
   else if (!phone.startsWith('54'))                   phone = '549' + phone;
   window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// ── Gestión de marcas personalizadas ──────
+let _customMarcas = [];
+
+async function loadCustomMarcas() {
+  try {
+    const doc = await db.collection('config').doc('marcas').get();
+    _customMarcas = doc.exists ? (doc.data().lista || []) : [];
+    applyMarcasToDatalists();
+  } catch {}
+}
+
+function applyMarcasToDatalists() {
+  ['rep-dl-marca', 'dl-marca'].forEach(id => {
+    const dl = document.getElementById(id);
+    if (!dl) return;
+    [...dl.querySelectorAll('[data-custom]')].forEach(o => o.remove());
+    _customMarcas.forEach(m => {
+      const o = document.createElement('option');
+      o.value = m; o.dataset.custom = '1';
+      dl.appendChild(o);
+    });
+  });
+}
+
+function openAddMarcaModal() {
+  document.getElementById('add-marca-modal').classList.remove('hidden');
+  document.getElementById('new-marca-input').value = '';
+  renderMarcasGuardadas();
+  setTimeout(() => document.getElementById('new-marca-input').focus(), 100);
+}
+
+function closeAddMarcaModal() {
+  document.getElementById('add-marca-modal').classList.add('hidden');
+}
+
+function renderMarcasGuardadas() {
+  const cont = document.getElementById('marcas-guardadas');
+  if (!_customMarcas.length) {
+    cont.innerHTML = '<span style="color:#94a3b8;font-size:.75rem">Sin marcas personalizadas aún</span>';
+    return;
+  }
+  cont.innerHTML = _customMarcas.map((m, i) =>
+    `<span class="marca-chip">${m}<button onclick="deleteMarca(${i})" title="Eliminar">✕</button></span>`
+  ).join('');
+}
+
+async function saveNewMarca() {
+  const val = (document.getElementById('new-marca-input').value || '').trim();
+  if (!val) { toast('Escribí el nombre de la marca', 'error'); return; }
+  if (_customMarcas.map(m => m.toLowerCase()).includes(val.toLowerCase())) {
+    toast('Esa marca ya existe', 'error'); return;
+  }
+  _customMarcas.push(val);
+  await db.collection('config').doc('marcas').set({ lista: _customMarcas });
+  applyMarcasToDatalists();
+  document.getElementById('new-marca-input').value = '';
+  renderMarcasGuardadas();
+  toast(`Marca "${val}" guardada ✅`, 'success');
+}
+
+async function deleteMarca(idx) {
+  _customMarcas.splice(idx, 1);
+  await db.collection('config').doc('marcas').set({ lista: _customMarcas });
+  applyMarcasToDatalists();
+  renderMarcasGuardadas();
+  toast('Marca eliminada', 'success');
 }

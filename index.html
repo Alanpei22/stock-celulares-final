@@ -143,6 +143,7 @@
           <option value="listo">Listo</option>
           <option value="entregado">Entregado</option>
           <option value="cancelado">Cancelado</option>
+          <option value="demorado">⚠️ Demorados</option>
         </select>
         <select class="pill" id="rep-f-marca"><option value="">Todas las marcas</option></select>
         <select class="pill" id="rep-f-fecha">
@@ -206,7 +207,7 @@
     <div class="modal-body">
       <div class="form-grid">
         <div class="fg">
-          <label class="fl">Marca *</label>
+          <label class="fl">Marca * <button type="button" class="btn-add-marca" onclick="openAddMarcaModal()" title="Agregar nueva marca">＋</button></label>
           <input id="fi-marca" class="fi" type="text" placeholder="Samsung, Apple…" list="dl-marca" autocomplete="off">
           <datalist id="dl-marca">
             <option value="Samsung"><option value="Apple"><option value="Motorola">
@@ -493,7 +494,7 @@
         <div class="fg" id="rep-orden-spacer" style="display:none"></div>
 
         <div class="fg">
-          <label class="fl">Marca *</label>
+          <label class="fl">Marca * <button type="button" class="btn-add-marca" onclick="openAddMarcaModal()" title="Agregar nueva marca">＋</button></label>
           <input id="rep-fi-marca" class="fi" type="text" placeholder="Samsung, Apple..." list="rep-dl-marca" autocomplete="off">
           <datalist id="rep-dl-marca">
             <option value="Samsung"><option value="Apple / iPhone"><option value="Motorola">
@@ -846,6 +847,21 @@
   <div class="ai-chat-input-row">
     <textarea class="ai-chat-input" id="ai-chat-input" placeholder="Escribí tu consulta..." rows="1" onkeydown="aiChatKeydown(event)"></textarea>
     <button class="ai-chat-send" id="ai-chat-send" onclick="sendAiChat()">➤</button>
+  </div>
+</div>
+
+<!-- ── MODAL NUEVA MARCA ── -->
+<div class="modal-overlay hidden" id="add-marca-modal" onclick="if(event.target.id==='add-marca-modal')closeAddMarcaModal()">
+  <div class="modal-card" style="max-width:340px">
+    <div class="modal-header">
+      <h3>➕ Nueva marca</h3>
+      <button class="modal-close" onclick="closeAddMarcaModal()">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <input id="new-marca-input" class="fi" type="text" placeholder="Ej: Nothing, Infinix, Vivo..." autocomplete="off" onkeydown="if(event.key==='Enter')saveNewMarca()">
+      <div id="marcas-guardadas" style="display:flex;flex-wrap:wrap;gap:6px;min-height:28px"></div>
+      <button class="btn-save" onclick="saveNewMarca()">✅ Guardar marca</button>
+    </div>
   </div>
 </div>
 
