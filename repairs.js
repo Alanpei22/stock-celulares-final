@@ -447,7 +447,7 @@ function openRepairDetail(id) {
       <span class="det-label">Estado</span>
       <div class="rep-status-btns">
         ${Object.entries(REPAIR_STATES).map(([k, v]) =>
-          `<button class="status-btn ${k === r.estado ? 'status-btn--active ' + v.cls : ''}"
+          `<button class="status-btn ${v.cls}${k === r.estado ? ' status-btn--active' : ''}"
             onclick="changeRepairStatus('${id}','${k}')">${v.label}</button>`
         ).join('')}
       </div>
