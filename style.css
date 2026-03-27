@@ -1606,17 +1606,31 @@ body.dark .card-date,
 body.dark .card-time-ago { color: #475569; }
 body.dark .card-usd { color: #475569; }
 
-/* Repair cards por estado */
-body.dark .rep-card--reparando { background: #1c1700; border-color: #713f12; }
-body.dark .rep-card--listo     { background: #052e16; border-color: #166534; }
-body.dark .rep-card--entregado { background: #172554; border-color: #1e40af; }
+/* Repair cards en dark: fondo uniforme, estado solo por borde izquierdo de color */
+body.dark .rep-card--reparando,
+body.dark .rep-card--listo,
+body.dark .rep-card--entregado,
 body.dark .rep-card--cancelado,
-body.dark .rep-card--no-van    { background: #1a2332; border-color: #334155; }
-body.dark .rep-card--demorado  { background: #2d0b0b !important; border-color: #dc2626 !important; }
+body.dark .rep-card--no-van {
+  background: #1e293b;
+  border-color: #334155;
+  border-left-width: 4px;
+}
+body.dark .rep-card--reparando { border-left-color: #f59e0b; }
+body.dark .rep-card--listo     { border-left-color: #10b981; }
+body.dark .rep-card--entregado { border-left-color: #3b82f6; }
+body.dark .rep-card--cancelado,
+body.dark .rep-card--no-van    { border-left-color: #64748b; }
+body.dark .rep-card--demorado  {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  border-left-color: #ef4444 !important;
+  border-left-width: 4px !important;
+}
 body.dark .rep-card .card-specs { color: #60a5fa; }
-body.dark .card-nota { background: #1c1700; border-color: #713f12; color: #fbbf24; }
-body.dark .card-saldo-badge { background: #052e16; color: #34d399; }
-body.dark .card-saldo-row { background: #052e16; }
+body.dark .card-nota  { background: #162032; border-color: #334155; color: #fbbf24; }
+body.dark .card-saldo-badge { background: #162032; color: #34d399; }
+body.dark .card-saldo-row   { background: #162032; }
 
 /* Chips */
 body.dark .chip-listo     { background: #052e16; color: #34d399; border-color: #16a34a; }
