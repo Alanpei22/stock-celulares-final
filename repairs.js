@@ -200,13 +200,29 @@ function renderRepairs() {
       ? `<span class="card-saldo">Saldo: $${(r.monto - r.sena).toLocaleString('es-AR')}</span>`
       : '';
 
-    // Quick status button (reparando→listo, listo→entregado)
-    const nextSt = { reparando: 'listo', listo: 'entregado' }[r.estado];
-    const quickIco = { listo: '✅', entregado: '📦' };
-    const quickBtn = nextSt
-      ? `<div class="card-quick-actions" onclick="event.stopPropagation()">
-           <button class="btn-quick-status" onclick="quickStatusChange(event,'${r.id}','${nextSt}')">${quickIco[nextSt]} ${REPAIR_STATES[nextSt].label}</button>
-         </div>`
+    // Quick action chips
+    const CHIP_CFG = {
+      listo:     { ico: '✅', label: 'LISTO',      cls: 'chip-listo'     },
+      entregado: { ico: '📦', label: 'ENTREGADO',  cls: 'chip-entregado' },
+      reparando: { ico: '🔧', label: 'REPARANDO',  cls: 'chip-reparando' },
+      cancelado: { ico: '✖',  label: 'NO VAN',     cls: 'chip-cancelado' },
+    };
+    const CHIP_MAP = {
+      reparando: ['listo', 'cancelado'],
+      listo:     ['entregado', 'reparando', 'cancelado'],
+      entregado: ['reparando'],
+      cancelado: ['reparando'],
+    };
+    const chipsToShow = (CHIP_MAP[r.estado] || []);
+    const chipsHTML = chipsToShow.map(st => {
+      const c = CHIP_CFG[st];
+      return `<button class="card-chip ${c.cls}" onclick="quickStatusChange(event,'${r.id}','${st}')">${c.ico} ${c.label}</button>`;
+    }).join('');
+    const garantiaChip = !r.esGarantia && r.estado !== 'cancelado'
+      ? `<button class="card-chip chip-garantia" onclick="event.stopPropagation();openGarantiaModal('${r.id}')">🔄 GARANTÍA</button>`
+      : '';
+    const quickBtn = (chipsHTML || garantiaChip)
+      ? `<div class="card-quick-actions" onclick="event.stopPropagation()">${chipsHTML}${garantiaChip}</div>`
       : '';
 
     return `

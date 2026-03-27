@@ -319,6 +319,7 @@ header {
 .card-modelo {
   font-size: 1rem; font-weight: 800; color: var(--pri); line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-transform: uppercase; letter-spacing: .03em;
 }
 .card-specs { font-size: .75rem; color: #64748b; }
 
@@ -348,7 +349,7 @@ header {
   font-family: 'SF Mono', 'Cascadia Code', monospace;
   max-width: 100px; overflow: hidden; text-overflow: ellipsis;
 }
-.card-date { font-size: .65rem; color: #cbd5e1; white-space: nowrap; }
+.card-date { font-size: .65rem; color: #cbd5e1; white-space: nowrap; font-weight: 700; }
 
 /* ── EMPTY STATE ── */
 .empty-state {
@@ -1009,19 +1010,25 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 /* ── SALDO BADGE ON CARD ── */
 .card-saldo { font-size: .7rem; color: #f59e0b; font-weight: 700; }
 
-/* ── QUICK STATUS BUTTON ── */
-.card-quick-actions { padding: 4px 12px 6px; }
-.btn-quick-status {
-  background: transparent;
-  border: 1px solid var(--brd);
-  border-radius: 6px;
-  padding: 3px 10px;
-  font-size: .68rem;
-  cursor: pointer;
-  color: var(--t2);
-  white-space: nowrap;
+/* ── QUICK ACTION CHIPS ── */
+.card-quick-actions {
+  padding: 0 10px 9px;
+  display: flex; gap: 6px; flex-wrap: wrap;
 }
-.btn-quick-status:active { background: var(--bg3); }
+.card-chip {
+  border: none; border-radius: 50px;
+  padding: 5px 12px; font-size: .67rem; font-weight: 800;
+  cursor: pointer; letter-spacing: .04em;
+  transition: all .15s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,.10);
+}
+.card-chip:hover  { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,.16); }
+.card-chip:active { transform: scale(.93); box-shadow: none; }
+.chip-listo     { background: linear-gradient(135deg,#34d399,#10b981); color:#fff; }
+.chip-entregado { background: linear-gradient(135deg,#818cf8,#6366f1); color:#fff; }
+.chip-reparando { background: linear-gradient(135deg,#fbbf24,#f59e0b); color:#78350f; }
+.chip-cancelado { background: linear-gradient(135deg,#f87171,#ef4444); color:#fff; }
+.chip-garantia  { background: linear-gradient(135deg,#fb923c,#f97316); color:#fff; }
 
 /* ── NAV BADGE ── */
 .nav-ico-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
