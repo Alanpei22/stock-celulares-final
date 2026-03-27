@@ -35,15 +35,64 @@ function initFirebase() {
     if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
     db = firebase.firestore();
 }
+let _autoBackupDone = false;
 function listenStock() {
     db.collection('stock').onSnapshot(snapshot => {
           STOCK = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           STOCK.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
           render();
+          // Backup automático una vez por sesión, 3s después de cargar datos
+          if (!_autoBackupDone) { _autoBackupDone = true; setTimeout(autoBackup, 3000); }
     }, err => {
           console.error('Firestore:', err);
           toast('Error de conexion', 'error');
     });
+}
+
+// ── Modo Oscuro ────────────────────────────────────────────
+function initDarkMode() {
+  if (localStorage.getItem('darkMode') === '1') {
+    document.body.classList.add('dark');
+  }
+  _updateDarkIcon();
+}
+
+function toggleDarkMode() {
+  document.body.classList.toggle('dark');
+  localStorage.setItem('darkMode', document.body.classList.contains('dark') ? '1' : '0');
+  _updateDarkIcon();
+}
+
+function _updateDarkIcon() {
+  const isDark = document.body.classList.contains('dark');
+  document.querySelectorAll('.dark-toggle-btn').forEach(btn => {
+    btn.textContent = isDark ? '☀️' : '🌙';
+    btn.title = isDark ? 'Modo claro' : 'Modo oscuro';
+  });
+}
+
+// ── Backup Automático ──────────────────────────────────────
+async function autoBackup() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (localStorage.getItem('lastAutoBackup') === today) return;
+  try {
+    const backupData = {
+      fecha: new Date().toISOString(),
+      stock_count: STOCK.length,
+      stock: STOCK.map(p => ({
+        marca: p.marca || '', modelo: p.modelo || '',
+        almacenamiento: p.almacenamiento || '',
+        estado: p.estado || '', precio: p.precio || 0,
+        ubicacion: p.ubicacion || '', vendido: p.vendido || false,
+        imei: p.imei || '', fecha: p.fecha || ''
+      }))
+    };
+    await db.collection('backups').doc(today).set(backupData);
+    localStorage.setItem('lastAutoBackup', today);
+    toast('💾 Backup diario guardado', 'success');
+  } catch(e) {
+    console.warn('Auto-backup error:', e);
+  }
 }
 
 // ── Auth ──────────────────────────────────────────────────
@@ -200,6 +249,7 @@ function saveBizImage() {
 function initApp() {
   if (appInited) return;
   appInited = true;
+  initDarkMode();
   initFirebase();
   loadConfig();
   loadWaTemplates();
@@ -319,8 +369,12 @@ function render() {
       : p.ubicacion === 'Depósito'
         ? '<span class="badge-ubicacion badge-ubicacion--deposito">📦 Depósito</span>'
         : '';
+    const stCls = p.vendido ? 'stock-vendido'
+      : p.estado === 'Nuevo' ? 'stock-nuevo'
+      : p.estado === 'Reacondicionado' ? 'stock-refurb'
+      : 'stock-usado';
     return `
-      <div class="card${p.vendido ? ' card-sold' : ''}" onclick="openDetail('${p.id}')">
+      <div class="card ${stCls}${p.vendido ? ' card-sold' : ''}" onclick="openDetail('${p.id}')">
         <div class="card-top">
           <div class="card-info">
             <span class="card-marca">📱 ${esc(p.marca)}</span>

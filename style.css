@@ -12,6 +12,15 @@
   --border: #e2e8f0;
   --bg:     #f1f5f9;
   --radius: 14px;
+  /* Extra tokens usados en componentes */
+  --t1:     #1e293b;
+  --t2:     #475569;
+  --t3:     #94a3b8;
+  --brd:    #e2e8f0;
+  --bg2:    #f8fafc;
+  --bg3:    #f1f5f9;
+  --card:   #ffffff;
+  --input:  #f8fafc;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -1548,3 +1557,163 @@ code { background: var(--bg3); padding: 1px 5px; border-radius: 4px; font-size: 
 @media (min-width: 600px) {
   .ai-panel { left: 50%; right: auto; transform: translateX(-50%); width: 100%; max-width: 540px; border-radius: 22px 22px 0 0; }
 }
+
+/* ── STOCK CARDS — accent por estado ──────────────────────── */
+.stock-nuevo   { border-left: 4px solid #10b981 !important; }
+.stock-usado   { border-left: 4px solid #f59e0b !important; }
+.stock-refurb  { border-left: 4px solid #3b82f6 !important; }
+.stock-vendido { border-left: 4px solid #94a3b8 !important; opacity: .55; }
+
+/* ── REPAIR CARD — no van (legacy) ────────────────────────── */
+.rep-card--no-van { background: #f8fafc; border-color: #cbd5e1; }
+
+/* ══════════════════════════════════════════════════════════════
+   MODO OSCURO
+══════════════════════════════════════════════════════════════ */
+body.dark {
+  --border: #334155;
+  --bg:     #0f172a;
+  --bg2:    #0f172a;
+  --bg3:    #1e293b;
+  --brd:    #334155;
+  --t1:     #e2e8f0;
+  --t2:     #94a3b8;
+  --t3:     #64748b;
+  --card:   #1e293b;
+  --input:  #0f172a;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+/* Fondo general y listas */
+body.dark .list-wrap { background: #0f172a; }
+body.dark #rep-list,
+body.dark #list     { background: #0f172a; }
+
+/* Cards de stock */
+body.dark .card {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 1px 4px rgba(0,0,0,.3);
+}
+body.dark .card-bottom { border-color: #2d3f55; }
+body.dark .card-modelo { color: #f1f5f9; }
+body.dark .card-marca  { color: #64748b; }
+body.dark .card-specs  { color: #94a3b8; }
+body.dark .card-price  { color: #34d399; }
+body.dark .card-imei,
+body.dark .card-date,
+body.dark .card-time-ago { color: #475569; }
+body.dark .card-usd { color: #475569; }
+
+/* Repair cards por estado */
+body.dark .rep-card--reparando { background: #1c1700; border-color: #713f12; }
+body.dark .rep-card--listo     { background: #052e16; border-color: #166534; }
+body.dark .rep-card--entregado { background: #172554; border-color: #1e40af; }
+body.dark .rep-card--cancelado,
+body.dark .rep-card--no-van    { background: #1a2332; border-color: #334155; }
+body.dark .rep-card--demorado  { background: #2d0b0b !important; border-color: #dc2626 !important; }
+body.dark .rep-card .card-specs { color: #60a5fa; }
+body.dark .card-nota { background: #1c1700; border-color: #713f12; color: #fbbf24; }
+body.dark .card-saldo-badge { background: #052e16; color: #34d399; }
+body.dark .card-saldo-row { background: #052e16; }
+
+/* Chips */
+body.dark .chip-listo     { background: #052e16; color: #34d399; border-color: #16a34a; }
+body.dark .chip-entregado { background: #1e1b4b; color: #a78bfa; border-color: #7c3aed; }
+body.dark .chip-reparando { background: #1c1700; color: #fbbf24; border-color: #d97706; }
+body.dark .chip-cancelado { background: #2d0b0b; color: #f87171; border-color: #dc2626; }
+body.dark .chip-garantia  { background: #1c0a00; color: #fb923c; border-color: #ea580c; }
+body.dark .chip-nota      { background: #1e293b; color: #64748b; border-color: #334155; }
+
+/* Badges */
+body.dark .badge           { filter: brightness(.85) saturate(.9); }
+body.dark .badge-ubicacion { background: #1e3a5f; color: #60a5fa; }
+body.dark .badge-ubicacion--deposito { background: #052e16; color: #34d399; }
+
+/* Barra de búsqueda */
+body.dark .search-wrap {
+  background: #1e293b;
+  border-color: #334155;
+}
+body.dark .search-wrap input {
+  background: transparent;
+  color: #e2e8f0;
+}
+body.dark .search-wrap input::placeholder { color: #475569; }
+body.dark .search-icon { filter: grayscale(1) brightness(.6); }
+
+/* Filtros */
+body.dark .filters,
+body.dark .filter-bar { background: #1e293b; border-color: #334155; }
+body.dark .pill,
+body.dark select.pill {
+  background: #0f172a;
+  color: #94a3b8;
+  border-color: #334155;
+}
+body.dark .filter-chip {
+  background: #334155; color: #94a3b8; border-color: #475569;
+}
+body.dark .filter-chip.active { background: #3b82f6; color: #fff; border-color: #3b82f6; }
+
+/* Stats bar */
+body.dark .stats-bar { background: #1e293b; border-color: #334155; }
+body.dark .stat { border-color: #334155; }
+body.dark .stat-num { color: #e2e8f0; }
+body.dark .stat-lbl { color: #64748b; }
+body.dark .rep-demorado-num { color: #f87171 !important; }
+
+/* Modales */
+body.dark .modal-sheet {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+body.dark .modal-title { color: #e2e8f0; }
+body.dark .modal-close { color: #64748b; }
+body.dark .fi label { color: #94a3b8; }
+body.dark .fi input,
+body.dark .fi select,
+body.dark .fi textarea {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+body.dark .modal-divider { border-color: #334155; }
+body.dark .section-title { color: #64748b; }
+body.dark .section-label { color: #94a3b8; }
+
+/* Bottom nav */
+body.dark .bottom-nav {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+body.dark .nav-btn { color: #334155; }
+body.dark .nav-btn.active { color: #3b82f6; }
+body.dark .nav-label { color: #64748b; }
+
+/* Empty state */
+body.dark .empty-state { color: #334155; }
+
+/* Header ya es oscuro, nada que cambiar */
+
+/* Settings / modales adicionales */
+body.dark .settings-section { border-color: #334155; }
+body.dark .settings-item { border-color: #334155; color: #e2e8f0; }
+body.dark .settings-label { color: #94a3b8; }
+body.dark .settings-val { color: #e2e8f0; }
+body.dark .settings-empty { color: #475569; }
+body.dark .staff-member { border-color: #334155; }
+body.dark .staff-name { color: #e2e8f0; }
+body.dark .staff-empty { color: #475569; }
+body.dark .staff-del { border-color: #334155; }
+body.dark .staff-add-wrap .fi input { background: #0f172a; }
+
+/* Stock cards accent en dark mode */
+body.dark .stock-nuevo  { border-left-color: #059669 !important; }
+body.dark .stock-usado  { border-left-color: #d97706 !important; }
+body.dark .stock-refurb { border-left-color: #2563eb !important; }
+body.dark .stock-vendido { border-left-color: #334155 !important; }
+
+/* Toast en dark */
+body.dark .toast { background: #1e293b; color: #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,.5); }

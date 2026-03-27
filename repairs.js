@@ -6,7 +6,8 @@ const REPAIR_STATES = {
   reparando: { label: 'Reparando', cls: 'bg-reparando' },
   listo:     { label: 'Listo ✓',  cls: 'bg-listo'     },
   entregado: { label: 'Entregado', cls: 'bg-entregado' },
-  cancelado: { label: 'Cancelado', cls: 'bg-cancelado' },
+  cancelado: { label: 'No van',    cls: 'bg-cancelado' },
+  'no van':  { label: 'No van',    cls: 'bg-cancelado' },
 };
 
 let REPAIRS = [];
@@ -160,7 +161,7 @@ function renderRepairs() {
     filtered.sort((a, b) => (b.nOrden || 0) - (a.nOrden || 0));
   }
 
-  // Stats bar: demorados = reparando > 3 días
+  // Stats bar: demorados = reparando > 3 días (excluye cancelado y 'no van')
   const demorados = REPAIRS.filter(r => {
     if (r.estado !== 'reparando' || !r.fechaIngreso) return false;
     return (now - new Date(r.fechaIngreso)) / 86400000 > 3;
@@ -189,12 +190,13 @@ function renderRepairs() {
       : '';
     const monto = r.monto ? '$ ' + r.monto.toLocaleString('es-AR') : '—';
 
-    // Demorado?
+    // Demorado? Solo aplica a reparando (no van/cancelado nunca son demorados)
     const isDemorado = r.estado === 'reparando' && r.fechaIngreso &&
       (now - new Date(r.fechaIngreso)) / 86400000 > 3;
 
-    // Card class
-    let cardClass = `rep-card--${r.estado}`;
+    // Card class — sanitizar estado para evitar espacios en el nombre de clase CSS
+    const estadoSlug = (r.estado || '').replace(/\s+/g, '-').toLowerCase();
+    let cardClass = `rep-card--${estadoSlug}`;
     if (isDemorado) cardClass += ' rep-card--demorado';
 
     // Time ago
@@ -224,7 +226,8 @@ function renderRepairs() {
       reparando: ['listo', 'cancelado'],
       listo:     ['entregado', 'reparando', 'cancelado'],
       entregado: ['reparando'],
-      cancelado: ['reparando'],
+      cancelado: ['entregado', 'reparando'],  // después de "no van" → se puede entregar o volver a reparar
+      'no van':  ['entregado', 'reparando'],  // soporte para datos legacy
     };
     const chipsToShow = (CHIP_MAP[r.estado] || []);
     const chipsHTML = chipsToShow.map(st => {
