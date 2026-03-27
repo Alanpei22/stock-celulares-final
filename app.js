@@ -136,18 +136,46 @@ function loadStock() {
 }
 function saveStock() { localStorage.setItem(STOCK_KEY, JSON.stringify(STOCK)); }
 
+// ── Config: localStorage (caché) + Firestore (persistencia) ──
 function loadConfig() {
+  // Carga instantánea desde localStorage (caché)
   try { SELLERS = JSON.parse(localStorage.getItem(SELLERS_KEY)); if (!Array.isArray(SELLERS) || !SELLERS.length) SELLERS = DEFAULT_SELLERS.slice(); } catch { SELLERS = DEFAULT_SELLERS.slice(); }
   try { PAYMENTS = JSON.parse(localStorage.getItem(PAYMENTS_KEY)); if (!Array.isArray(PAYMENTS) || !PAYMENTS.length) PAYMENTS = DEFAULT_PAYMENTS.slice(); } catch { PAYMENTS = DEFAULT_PAYMENTS.slice(); }
   BIZ_IMAGE = localStorage.getItem(BIZ_KEY) || null;
   loadPrices();
+  // Luego sincroniza desde Firestore (fuente de verdad)
+  syncConfigFromFirestore();
 }
-function saveSellers() { localStorage.setItem(SELLERS_KEY, JSON.stringify(SELLERS)); }
-function savePayments() { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(PAYMENTS)); }
+
+async function syncConfigFromFirestore() {
+  try {
+    const doc = await db.collection('config').doc('appSettings').get();
+    if (!doc.exists) return;
+    const d = doc.data();
+    let changed = false;
+    if (Array.isArray(d.sellers) && d.sellers.length)   { SELLERS = d.sellers;   localStorage.setItem(SELLERS_KEY,  JSON.stringify(SELLERS));  changed = true; }
+    if (Array.isArray(d.payments) && d.payments.length) { PAYMENTS = d.payments; localStorage.setItem(PAYMENTS_KEY, JSON.stringify(PAYMENTS)); changed = true; }
+    if (d.prices && typeof d.prices === 'object')        { PRICES = d.prices;     localStorage.setItem(PRICES_KEY,   JSON.stringify(PRICES));   changed = true; }
+    if (d.bizImage)  { BIZ_IMAGE = d.bizImage; localStorage.setItem(BIZ_KEY, d.bizImage); applyBizImage(); changed = true; }
+    if (changed) render();
+  } catch {}
+}
+
+function saveSellers() {
+  localStorage.setItem(SELLERS_KEY, JSON.stringify(SELLERS));
+  db.collection('config').doc('appSettings').set({ sellers: SELLERS }, { merge: true }).catch(() => {});
+}
+function savePayments() {
+  localStorage.setItem(PAYMENTS_KEY, JSON.stringify(PAYMENTS));
+  db.collection('config').doc('appSettings').set({ payments: PAYMENTS }, { merge: true }).catch(() => {});
+}
 function loadPrices() {
   try { PRICES = JSON.parse(localStorage.getItem(PRICES_KEY)); if (!PRICES || typeof PRICES !== 'object') PRICES = {...DEFAULT_PRICES}; } catch { PRICES = {...DEFAULT_PRICES}; }
 }
-function savePrices() { localStorage.setItem(PRICES_KEY, JSON.stringify(PRICES)); }
+function savePrices() {
+  localStorage.setItem(PRICES_KEY, JSON.stringify(PRICES));
+  db.collection('config').doc('appSettings').set({ prices: PRICES }, { merge: true }).catch(() => {});
+}
 async function fetchDolarBlue() {
   try {
     const r = await fetch('https://dolarapi.com/v1/dolares/blue');
@@ -155,7 +183,18 @@ async function fetchDolarBlue() {
     dolarBlue = Math.round(d.venta || d.compra || 0) + 10;
   } catch(e) { dolarBlue = null; }
 }
-function saveBizImage() { if (BIZ_IMAGE) localStorage.setItem(BIZ_KEY, BIZ_IMAGE); else localStorage.removeItem(BIZ_KEY); }
+function saveBizImage() {
+  if (BIZ_IMAGE) {
+    localStorage.setItem(BIZ_KEY, BIZ_IMAGE);
+    // Solo guardar en Firestore si la imagen no es demasiado grande (límite ~900KB)
+    if (BIZ_IMAGE.length < 900000) {
+      db.collection('config').doc('appSettings').set({ bizImage: BIZ_IMAGE }, { merge: true }).catch(() => {});
+    }
+  } else {
+    localStorage.removeItem(BIZ_KEY);
+    db.collection('config').doc('appSettings').set({ bizImage: '' }, { merge: true }).catch(() => {});
+  }
+}
 
 // ── Init ──────────────────────────────────────────────────
 function initApp() {
@@ -1053,8 +1092,19 @@ const _origSavePhone = window.savePhone;
 // WA_TEMPLATES declared at top of file (see top of app.js)
 
 function loadWaTemplates() {
+  // Carga desde localStorage primero
   try { WA_TEMPLATES = JSON.parse(localStorage.getItem(WA_TEMPLATES_KEY)) || {}; } catch { WA_TEMPLATES = {}; }
   Object.keys(WA_TPL_DEFAULTS).forEach(k => { if (!WA_TEMPLATES[k]) WA_TEMPLATES[k] = WA_TPL_DEFAULTS[k]; });
+  // Luego sincroniza desde Firestore
+  db.collection('config').doc('waTemplates').get().then(doc => {
+    if (!doc.exists) return;
+    const d = doc.data();
+    let updated = false;
+    Object.keys(WA_TPL_DEFAULTS).forEach(k => {
+      if (d[k]) { WA_TEMPLATES[k] = d[k]; updated = true; }
+    });
+    if (updated) localStorage.setItem(WA_TEMPLATES_KEY, JSON.stringify(WA_TEMPLATES));
+  }).catch(() => {});
 }
 
 function openWaTplModal() {
@@ -1080,6 +1130,8 @@ function saveWaTemplates() {
   WA_TEMPLATES.repair_default   = document.getElementById('wt-default').value;
   WA_TEMPLATES.stock            = document.getElementById('wt-stock').value;
   localStorage.setItem(WA_TEMPLATES_KEY, JSON.stringify(WA_TEMPLATES));
+  // Guardar en Firestore
+  db.collection('config').doc('waTemplates').set(WA_TEMPLATES, { merge: true }).catch(() => {});
   toast('Templates guardados ✅', 'success');
   closeWaTplModal();
 }
