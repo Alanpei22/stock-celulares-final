@@ -95,6 +95,95 @@ async function autoBackup() {
   }
 }
 
+// ── Modo Dueño ──────────────────────────────────────────────
+let OWNER_MODE = false;
+let _ownerPinBuf = '';
+let _ownerLockTimer = null;
+
+function toggleOwnerLock() {
+  if (OWNER_MODE) { lockOwnerMode(); } else { openOwnerPinModal(); }
+}
+
+function openOwnerPinModal() {
+  _ownerPinBuf = '';
+  _updateOwnerDots();
+  document.getElementById('owner-pin-error').textContent = '';
+  document.getElementById('owner-pin-overlay').classList.remove('hidden');
+  document.getElementById('owner-pin-modal').classList.remove('hidden');
+}
+
+function closeOwnerPinModal() {
+  document.getElementById('owner-pin-overlay').classList.add('hidden');
+  document.getElementById('owner-pin-modal').classList.add('hidden');
+  _ownerPinBuf = '';
+}
+
+function addOwnerPin(d) {
+  if (_ownerPinBuf.length >= 4) return;
+  _ownerPinBuf += d;
+  _updateOwnerDots();
+  if (_ownerPinBuf.length === 4) setTimeout(submitOwnerPin, 200);
+}
+
+function backOwnerPin() {
+  _ownerPinBuf = _ownerPinBuf.slice(0, -1);
+  _updateOwnerDots();
+}
+
+function _updateOwnerDots() {
+  document.querySelectorAll('#owner-pin-dots span').forEach((d, i) => {
+    d.classList.toggle('filled', i < _ownerPinBuf.length);
+  });
+}
+
+async function submitOwnerPin() {
+  const pin = _ownerPinBuf;
+  try {
+    const doc = await db.collection('config').doc('owner').get();
+    if (!doc.exists || !doc.data().pin) {
+      // Primer uso: guardar el PIN elegido
+      await db.collection('config').doc('owner').set({ pin });
+      closeOwnerPinModal();
+      unlockOwnerMode();
+      toast('🔑 PIN de dueño configurado', 'success');
+      return;
+    }
+    if (pin === doc.data().pin) {
+      closeOwnerPinModal();
+      unlockOwnerMode();
+    } else {
+      document.getElementById('owner-pin-error').textContent = 'PIN incorrecto';
+      _ownerPinBuf = '';
+      _updateOwnerDots();
+    }
+  } catch(e) {
+    document.getElementById('owner-pin-error').textContent = 'Error de conexión';
+    _ownerPinBuf = '';
+    _updateOwnerDots();
+  }
+}
+
+function unlockOwnerMode() {
+  OWNER_MODE = true;
+  document.body.classList.add('owner-mode');
+  document.querySelectorAll('.owner-lock-btn').forEach(b => {
+    b.textContent = '🔓'; b.title = 'Bloquear';
+  });
+  clearTimeout(_ownerLockTimer);
+  _ownerLockTimer = setTimeout(lockOwnerMode, 15 * 60 * 1000);
+  toast('🔓 Modo dueño activo', 'success');
+}
+
+function lockOwnerMode() {
+  OWNER_MODE = false;
+  document.body.classList.remove('owner-mode');
+  clearTimeout(_ownerLockTimer);
+  document.querySelectorAll('.owner-lock-btn').forEach(b => {
+    b.textContent = '🔒'; b.title = 'Modo dueño';
+  });
+  toast('🔒 Vista bloqueada', 'info');
+}
+
 // ── Auth ──────────────────────────────────────────────────
 let pinBuffer = '';
 

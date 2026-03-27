@@ -172,7 +172,7 @@ function renderRepuestos() {
             <button class="rep2-qty-btn rep2-qty-plus" onclick="changeQty('${r.id}',+1)">＋</button>
           </div>
           <div class="card-meta">
-            <span class="card-date">${price}</span>
+            <span class="card-date owner-only">${price}</span>
             ${r.stockMin != null && r.stockMin > 0
               ? `<span class="card-imei">mín: ${r.stockMin}</span>` : ''}
           </div>

@@ -67,6 +67,7 @@
         </div>
         <div class="hdr-actions">
           <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
+          <button class="hdr-btn owner-lock-btn" onclick="toggleOwnerLock()" title="Modo dueño">🔒</button>
           <button class="hdr-btn" id="settings-btn" title="Configuración">⚙️</button>
           <button class="hdr-btn" id="stats-btn" title="Estadísticas y historial">📊</button>
           <button class="hdr-btn" id="export-btn" title="Exportar stock">💾</button>
@@ -125,6 +126,7 @@
         </div>
         <div class="hdr-actions">
           <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
+          <button class="hdr-btn owner-lock-btn" onclick="toggleOwnerLock()" title="Modo dueño">🔒</button>
           <button class="hdr-btn" id="rep-import-btn" title="Importar historial">💾</button>
           <button class="hdr-btn" id="rep-staff-btn" title="Personal" onclick="openStaffModal()">👥</button>
           <button class="hdr-btn" id="rep-stats-btn" title="Estadísticas">📊</button>
@@ -187,6 +189,7 @@
         <div class="hdr-brand"><h1>🔩 Repuestos</h1></div>
         <div class="hdr-actions">
           <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
+          <button class="hdr-btn owner-lock-btn" onclick="toggleOwnerLock()" title="Modo dueño">🔒</button>
           <button class="hdr-btn" id="rep2-add-btn" title="Agregar repuesto">＋</button>
         </div>
       </div>
@@ -214,7 +217,7 @@
     <div class="stats-bar">
       <div class="stat"><span class="stat-num" id="rs2-total">0</span><span class="stat-lbl">Repuestos</span></div>
       <div class="stat"><span class="stat-num rep2-lowstock-num" id="rs2-lowstock">0</span><span class="stat-lbl">Stock bajo</span></div>
-      <div class="stat stat-val"><span class="stat-num" id="rs2-valor">$0</span><span class="stat-lbl">Valor total</span></div>
+      <div class="stat stat-val owner-only"><span class="stat-num" id="rs2-valor">$0</span><span class="stat-lbl">Valor en stock</span></div>
     </div>
     <div class="list-wrap">
       <div id="rep2-list"></div>
@@ -854,6 +857,34 @@
   <div class="patron-modal-btns">
     <button type="button" class="btn-patron-reset" onclick="resetPatronCanvas()">🗑 Borrar</button>
     <button type="button" class="btn-patron-save" onclick="savePatron()">✅ Guardar patrón</button>
+  </div>
+</div>
+
+<!-- Modal PIN Dueño -->
+<div id="owner-pin-overlay" class="nota-overlay hidden" onclick="closeOwnerPinModal()"></div>
+<div id="owner-pin-modal" class="owner-pin-modal hidden">
+  <div class="nota-modal-hdr">
+    <span>🔒 Modo Dueño</span>
+    <button type="button" onclick="closeOwnerPinModal()">✕</button>
+  </div>
+  <p class="owner-pin-sub">Ingresá tu PIN de dueño</p>
+  <div class="pin-dots owner-pin-dots" id="owner-pin-dots">
+    <span></span><span></span><span></span><span></span>
+  </div>
+  <p class="pin-error" id="owner-pin-error"></p>
+  <div class="pin-grid owner-pin-grid">
+    <button class="pin-btn" onclick="addOwnerPin('1')">1</button>
+    <button class="pin-btn" onclick="addOwnerPin('2')">2</button>
+    <button class="pin-btn" onclick="addOwnerPin('3')">3</button>
+    <button class="pin-btn" onclick="addOwnerPin('4')">4</button>
+    <button class="pin-btn" onclick="addOwnerPin('5')">5</button>
+    <button class="pin-btn" onclick="addOwnerPin('6')">6</button>
+    <button class="pin-btn" onclick="addOwnerPin('7')">7</button>
+    <button class="pin-btn" onclick="addOwnerPin('8')">8</button>
+    <button class="pin-btn" onclick="addOwnerPin('9')">9</button>
+    <button class="pin-btn pin-clear" onclick="_ownerPinBuf='';_updateOwnerDots()">✕</button>
+    <button class="pin-btn" onclick="addOwnerPin('0')">0</button>
+    <button class="pin-btn pin-back" onclick="backOwnerPin()">⌫</button>
   </div>
 </div>
 

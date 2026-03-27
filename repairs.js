@@ -189,6 +189,11 @@ function renderRepairs() {
       ? new Date(r.fechaIngreso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
       : '';
     const monto = r.monto ? '$ ' + r.monto.toLocaleString('es-AR') : '—';
+    const ganancia = (r.monto != null && r.costoRepuesto != null)
+      ? r.monto - r.costoRepuesto : null;
+    const gananciaHTML = ganancia != null
+      ? `<span class="owner-only ganancia-chip ${ganancia >= 0 ? 'ganancia-pos' : 'ganancia-neg'}">📈 $${ganancia.toLocaleString('es-AR')}</span>`
+      : '';
 
     // Demorado? Solo aplica a reparando (no van/cancelado nunca son demorados)
     const isDemorado = r.estado === 'reparando' && r.fechaIngreso &&
@@ -257,7 +262,7 @@ function renderRepairs() {
           </div>
         </div>
         <div class="card-bottom">
-          <span class="card-price">${monto}</span>
+          <span class="card-price">${monto}</span>${gananciaHTML}
           <div class="card-meta">
             ${r.nombre ? `<span class="card-imei">👤 ${esc(r.nombre)}</span>` : ''}
             ${fecha ? `<span class="card-date">📅 ${fecha}</span>` : ''}
@@ -1514,7 +1519,10 @@ async function quickStatusChange(e, id, newStatus) {
         const rep = REPUESTOS.find(x => x.id === repuestoId);
         if (rep) {
           const nueva = Math.max(0, (rep.cantidad || 0) - 1);
-          db.collection('repuestos').doc(repuestoId).update({ cantidad: nueva })
+          Promise.all([
+            db.collection('repuestos').doc(repuestoId).update({ cantidad: nueva }),
+            db.collection('repairs').doc(id).update({ costoRepuesto: rep.precioCompra || 0 })
+          ])
             .then(() => toast(`🔩 −1 ${rep.nombre}`, 'success'))
             .catch(() => toast('Error al descontar repuesto', 'error'));
         }
