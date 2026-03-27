@@ -1558,6 +1558,77 @@ code { background: var(--bg3); padding: 1px 5px; border-radius: 4px; font-size: 
   .ai-panel { left: 50%; right: auto; transform: translateX(-50%); width: 100%; max-width: 540px; border-radius: 22px 22px 0 0; }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   REPUESTOS
+══════════════════════════════════════════════════════════════ */
+
+/* Badge nav — amber para stock bajo */
+.rep2-nav-badge { background: #f59e0b !important; }
+
+/* Stats bar */
+.rep2-lowstock-num { color: #d97706; font-weight: 800; }
+
+/* Card con stock bajo */
+.rep2-card--lowstock {
+  border-left: 4px solid #f59e0b !important;
+}
+
+/* Badges en card */
+.rep2-badge-low {
+  background: #fef3c7; color: #92400e;
+  font-size: .62rem; padding: 3px 8px; border-radius: 20px;
+  white-space: nowrap; font-weight: 700;
+}
+.rep2-badge-ok {
+  background: #d1fae5; color: #065f46;
+  font-size: .62rem; padding: 3px 8px; border-radius: 20px;
+  white-space: nowrap; font-weight: 700;
+}
+
+/* Controles de cantidad */
+.rep2-qty-display {
+  display: flex; align-items: center; gap: 10px;
+}
+.rep2-qty-btn {
+  width: 34px; height: 34px; border-radius: 10px; border: none;
+  font-size: 1.1rem; font-weight: 800; cursor: pointer; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: filter .12s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.rep2-qty-minus { background: #fee2e2; color: #991b1b; }
+.rep2-qty-minus:active { filter: brightness(.9); transform: scale(.88); }
+.rep2-qty-plus  { background: #d1fae5; color: #065f46; }
+.rep2-qty-plus:active  { filter: brightness(.9); transform: scale(.88); }
+.rep2-qty-num {
+  font-size: 1.2rem; font-weight: 800; color: var(--pri);
+  min-width: 30px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.rep2-qty-num--low { color: #d97706; }
+
+/* Botón eliminar */
+.btn-danger {
+  width: 100%; padding: 10px; border: 1.5px solid #fca5a5;
+  background: #fee2e2; color: #dc2626;
+  border-radius: 12px; font-size: .82rem; font-weight: 700;
+  cursor: pointer; touch-action: manipulation;
+}
+.btn-danger:active { background: #fecaca; }
+
+/* Dark mode repuestos */
+body.dark .rep2-badge-low  { background: #1c1700; color: #fbbf24; }
+body.dark .rep2-badge-ok   { background: #052e16; color: #34d399; }
+body.dark .rep2-qty-minus  { background: #2d0b0b; color: #f87171; }
+body.dark .rep2-qty-plus   { background: #052e16; color: #34d399; }
+body.dark .rep2-qty-num    { color: #f1f5f9; }
+body.dark .rep2-qty-num--low { color: #fbbf24; }
+body.dark .rep2-lowstock-num { color: #fbbf24; }
+body.dark .btn-danger {
+  background: #2d0b0b; border-color: #dc2626; color: #f87171;
+}
+
 /* ── STOCK CARDS — accent por estado ──────────────────────── */
 .stock-nuevo   { border-left: 4px solid #10b981 !important; }
 .stock-usado   { border-left: 4px solid #f59e0b !important; }

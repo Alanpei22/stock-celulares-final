@@ -298,19 +298,17 @@ function initApp() {
   initPWA();
   listenStock();
   initRepairs();
+  initRepuestos();
 }
 
 // ── Secciones ─────────────────────────────────────────────
 function switchSection(section) {
-  const isStock = section === 'stock';
-  const stockSec  = document.getElementById('stock-section');
-  const repSec    = document.getElementById('repairs-section');
-  if (stockSec) stockSec.classList.toggle('section-hidden', !isStock);
-  if (repSec)   repSec.classList.toggle('section-hidden',  isStock);
-  const navStock   = document.getElementById('nav-stock');
-  const navRepairs = document.getElementById('nav-repairs');
-  if (navStock)   navStock.classList.toggle('active',  isStock);
-  if (navRepairs) navRepairs.classList.toggle('active', !isStock);
+  ['stock', 'repairs', 'repuestos'].forEach(s => {
+    const sec = document.getElementById(s + '-section');
+    const btn = document.getElementById('nav-' + s);
+    if (sec) sec.classList.toggle('section-hidden', s !== section);
+    if (btn) btn.classList.toggle('active', s === section);
+  });
 }
 
 // ── Render ────────────────────────────────────────────────
