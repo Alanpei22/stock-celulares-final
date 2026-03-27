@@ -1,0 +1,263 @@
+/* ── DATE NAV ──────────────────────────────────────────── */
+.caja-date-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: .6rem 1rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--brd);
+  font-weight: 700;
+  font-size: .95rem;
+  color: var(--t1);
+}
+.date-nav-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: var(--acc);
+  padding: .3rem .7rem;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.date-nav-btn:hover { background: var(--bg3); }
+
+/* ── STATS ──────────────────────────────────────────────── */
+.caja-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  padding: .75rem;
+  background: var(--bg);
+}
+.caja-stat {
+  grid-column: span 2;
+  background: var(--card);
+  border-radius: 12px;
+  padding: .7rem .5rem;
+  text-align: center;
+  border: 1px solid var(--brd);
+}
+.caja-stat:nth-child(4) { grid-column: 1 / span 3; }
+.caja-stat:nth-child(5) { grid-column: 4 / span 3; }
+.caja-stat-num {
+  display: block;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--t1);
+}
+.caja-stat-lbl {
+  display: block;
+  font-size: .65rem;
+  color: var(--t3);
+  margin-top: 2px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+.caja-stat--ing .caja-stat-num { color: #10b981; }
+.caja-stat--eg  .caja-stat-num { color: #ef4444; }
+.caja-stat--ef  .caja-stat-num { color: #3b82f6; }
+
+/* ── MOVEMENT CARDS ─────────────────────────────────────── */
+.mov-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--card);
+  border-radius: 12px;
+  border: 1px solid var(--brd);
+  border-left: 4px solid var(--brd);
+  padding: .75rem 1rem;
+  margin: .4rem .75rem;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.mov-card:active { opacity: .75; }
+.mov-ingreso { border-left-color: #10b981; }
+.mov-egreso  { border-left-color: #ef4444; }
+.caja-card-left { flex: 1; min-width: 0; }
+.caja-cat {
+  display: block;
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--t3);
+}
+.caja-desc {
+  display: block;
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.caja-meta {
+  display: block;
+  font-size: .72rem;
+  color: var(--t3);
+  margin-top: 2px;
+}
+.caja-card-right { margin-left: 1rem; flex-shrink: 0; }
+.caja-monto {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.caja-monto.mov-ingreso { color: #10b981; }
+.caja-monto.mov-egreso  { color: #ef4444; }
+
+/* ── ARQUEO MODAL ──────────────────────────────────────── */
+.arqueo-modal {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 1100;
+  background: var(--card);
+  border-radius: 20px 20px 0 0;
+  padding: 1rem 1rem 2rem;
+  max-height: 85vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.18);
+  max-width: 480px;
+  margin: 0 auto;
+}
+.arqueo-sub {
+  text-align: center;
+  font-size: .82rem;
+  color: var(--t2);
+  margin: .3rem 0 .75rem;
+}
+.arqueo-billetes { display: flex; flex-direction: column; gap: 4px; margin-bottom: .75rem; }
+.arqueo-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 80px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--bg3);
+}
+.arqueo-denom { font-size: .82rem; font-weight: 700; color: var(--t1); }
+.arqueo-counter { display: flex; align-items: center; gap: 6px; }
+.arqueo-btn {
+  width: 32px; height: 32px;
+  border: none; border-radius: 8px;
+  background: var(--bg3);
+  color: var(--t1);
+  font-size: 1.1rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.arqueo-input {
+  width: 52px;
+  text-align: center;
+  border: 1px solid var(--brd);
+  border-radius: 8px;
+  padding: 4px;
+  font-size: .9rem;
+  font-weight: 700;
+  background: var(--input);
+  color: var(--t1);
+}
+.arqueo-subtotal {
+  text-align: right;
+  font-size: .78rem;
+  color: var(--t2);
+  font-weight: 600;
+}
+.arqueo-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .75rem .25rem;
+  border-top: 2px solid var(--brd);
+  margin-top: .25rem;
+}
+.arqueo-total-num {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--t1);
+}
+
+/* ── MOVEMENT FORM ──────────────────────────────────────── */
+.modal-sheet-bottom {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 1100;
+  background: var(--card);
+  border-radius: 20px 20px 0 0;
+  padding: 1rem 1.25rem 2rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: 0 -8px 40px rgba(0,0,0,.18);
+  max-width: 480px;
+  margin: 0 auto;
+}
+.tipo-toggle {
+  display: flex;
+  gap: 8px;
+  margin: .75rem 0;
+}
+.tipo-btn {
+  flex: 1;
+  padding: .6rem;
+  border: 2px solid var(--brd);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--t2);
+  font-size: .85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+}
+.tipo-ingreso.tipo-active { background: #dcfce7; border-color: #10b981; color: #166534; }
+.tipo-egreso.tipo-active  { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.cat-btn, .metodo-btn {
+  padding: 5px 12px;
+  border: 1.5px solid var(--brd);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--t2);
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .12s;
+}
+.cat-btn.cat-active, .metodo-btn.metodo-active {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: #fff;
+}
+.mov-monto-input {
+  font-size: 1.4rem !important;
+  font-weight: 800 !important;
+  text-align: center;
+}
+
+/* ── HEADER BACK BUTTON ─────────────────────────────────── */
+.hdr-back-btn {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+/* ── DARK MODE ──────────────────────────────────────────── */
+body.dark .caja-stat { background: #1e293b; border-color: #334155; }
+body.dark .mov-card   { background: #1e293b; border-color: #334155; }
+body.dark .arqueo-modal, body.dark .modal-sheet-bottom { background: #1e293b; }
+body.dark .arqueo-row { border-color: #334155; }
+body.dark .arqueo-btn { background: #334155; color: #f1f5f9; }
+body.dark .arqueo-input { background: #0f172a; color: #f1f5f9; border-color: #334155; }
+body.dark .tipo-btn { background: #1e293b; border-color: #334155; color: #94a3b8; }
+body.dark .tipo-ingreso.tipo-active { background: #14532d; border-color: #10b981; color: #86efac; }
+body.dark .tipo-egreso.tipo-active  { background: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
+body.dark .cat-btn, body.dark .metodo-btn { background: #1e293b; border-color: #334155; color: #94a3b8; }
+body.dark .caja-date-nav { background: #1e293b; border-color: #334155; color: #f1f5f9; }

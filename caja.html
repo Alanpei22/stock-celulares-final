@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f172a">
+  <title>Caja — TechPoint</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="caja.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-icon">💰</div>
+    </div>
+    <h2 class="login-title">Caja Diaria</h2>
+    <p class="login-sub">Ingresá tu PIN de acceso</p>
+    <div class="pin-dots" id="pin-dots">
+      <span></span><span></span><span></span><span></span>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" data-n="1">1</button>
+      <button class="pin-btn" data-n="2">2</button>
+      <button class="pin-btn" data-n="3">3</button>
+      <button class="pin-btn" data-n="4">4</button>
+      <button class="pin-btn" data-n="5">5</button>
+      <button class="pin-btn" data-n="6">6</button>
+      <button class="pin-btn" data-n="7">7</button>
+      <button class="pin-btn" data-n="8">8</button>
+      <button class="pin-btn" data-n="9">9</button>
+      <button class="pin-btn pin-clear" id="pin-clear">✕</button>
+      <button class="pin-btn" data-n="0">0</button>
+      <button class="pin-btn pin-back" id="pin-back">⌫</button>
+    </div>
+    <p class="pin-error" id="pin-error"></p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="app-hidden">
+
+  <header>
+    <div class="hdr-top">
+      <div class="hdr-brand">
+        <button class="hdr-btn hdr-back-btn" onclick="window.location.href='index.html'" title="Volver">←</button>
+        <h1>💰 Caja Diaria</h1>
+      </div>
+      <div class="hdr-actions">
+        <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
+        <button class="hdr-btn" onclick="reopenArqueo()" title="Ver/editar arqueo">🧾</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Date navigation -->
+  <div class="caja-date-nav">
+    <button class="date-nav-btn" onclick="prevDay()">◀</button>
+    <span id="caja-date-label">Hoy</span>
+    <button class="date-nav-btn" id="next-day-btn" onclick="nextDay()">▶</button>
+  </div>
+
+  <!-- Stats (2 rows) -->
+  <div class="caja-stats">
+    <div class="caja-stat"><span class="caja-stat-num" id="stat-apertura">$0</span><span class="caja-stat-lbl">Apertura</span></div>
+    <div class="caja-stat caja-stat--ing"><span class="caja-stat-num" id="stat-ingresos">$0</span><span class="caja-stat-lbl">Ingresos</span></div>
+    <div class="caja-stat caja-stat--eg"><span class="caja-stat-num" id="stat-egresos">$0</span><span class="caja-stat-lbl">Egresos</span></div>
+    <div class="caja-stat caja-stat--ef"><span class="caja-stat-num" id="stat-efectivo">$0</span><span class="caja-stat-lbl">Efectivo en caja</span></div>
+    <div class="caja-stat caja-stat--neto"><span class="caja-stat-num" id="stat-neto">$0</span><span class="caja-stat-lbl">Neto del día</span></div>
+  </div>
+
+  <!-- Movement list -->
+  <div class="list-wrap">
+    <div id="caja-list"></div>
+    <div id="caja-empty" style="display:none" class="empty-state">
+      <div class="empty-icon">💸</div>
+      <p>Sin movimientos hoy</p>
+      <p class="empty-sub">Tocá + para registrar</p>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" onclick="openMovForm()" title="Nuevo movimiento">＋</button>
+
+</div>
+
+<!-- MODAL ARQUEO (bill counter) -->
+<div id="arqueo-overlay" class="nota-overlay hidden" onclick="closeArqueoModal()"></div>
+<div id="arqueo-modal" class="arqueo-modal hidden">
+  <div class="nota-modal-hdr">
+    <span>🧾 Arqueo de apertura</span>
+    <button onclick="closeArqueoModal()">✕</button>
+  </div>
+  <p class="arqueo-sub">Contá los billetes en caja ahora</p>
+  <div id="arqueo-billetes" class="arqueo-billetes"></div>
+  <div class="arqueo-total-row">
+    <span>Total en caja</span>
+    <span id="arqueo-total" class="arqueo-total-num">$0</span>
+  </div>
+  <div class="nota-modal-btns">
+    <button class="btn-nota-save" onclick="saveArqueo()" style="width:100%">✅ Confirmar apertura</button>
+  </div>
+</div>
+
+<!-- MODAL MOVIMIENTO -->
+<div id="mov-overlay" class="nota-overlay hidden" onclick="closeMovForm()"></div>
+<div id="mov-modal" class="modal-sheet-bottom hidden">
+  <div class="nota-modal-hdr">
+    <span id="mov-form-title">➕ Nuevo movimiento</span>
+    <button onclick="closeMovForm()">✕</button>
+  </div>
+
+  <!-- Tipo toggle -->
+  <div class="tipo-toggle">
+    <button id="mov-btn-ingreso" class="tipo-btn tipo-ingreso tipo-active" onclick="setMovTipo('ingreso')">💚 Ingreso</button>
+    <button id="mov-btn-egreso" class="tipo-btn tipo-egreso" onclick="setMovTipo('egreso')">🔴 Egreso</button>
+  </div>
+
+  <!-- Monto -->
+  <div class="fg">
+    <label class="fl">Monto *</label>
+    <input id="mov-fi-monto" class="fi mov-monto-input" type="number" placeholder="0" min="0" inputmode="numeric">
+  </div>
+
+  <!-- Categorías -->
+  <div class="fg">
+    <label class="fl">Categoría</label>
+    <div id="mov-categorias" class="chip-group"></div>
+    <input type="hidden" id="mov-hidden-cat">
+  </div>
+
+  <!-- Descripción -->
+  <div class="fg">
+    <label class="fl">Descripción</label>
+    <input id="mov-fi-desc" class="fi" type="text" placeholder="Ej: Reparación N°123, compra módulo...">
+  </div>
+
+  <!-- Método de pago -->
+  <div class="fg">
+    <label class="fl">Método de pago</label>
+    <div class="chip-group metodos-group">
+      <button class="metodo-btn" data-m="Efectivo" onclick="selectMetodo('Efectivo')">💵 Efectivo</button>
+      <button class="metodo-btn" data-m="Transferencia" onclick="selectMetodo('Transferencia')">🏦 Transferencia</button>
+      <button class="metodo-btn" data-m="MercadoPago" onclick="selectMetodo('MercadoPago')">💙 MercadoPago</button>
+      <button class="metodo-btn" data-m="Tarjeta débito" onclick="selectMetodo('Tarjeta débito')">💳 Débito</button>
+      <button class="metodo-btn" data-m="Tarjeta crédito" onclick="selectMetodo('Tarjeta crédito')">💳 Crédito</button>
+    </div>
+    <input type="hidden" id="mov-hidden-metodo">
+  </div>
+
+  <!-- Actions -->
+  <div id="mov-delete-wrap" style="display:none;margin-top:4px">
+    <button class="btn-danger" onclick="deleteMov()">🗑 Eliminar</button>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:8px">
+    <button class="btn-secondary" onclick="closeMovForm()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" onclick="saveMov()" style="flex:2">💾 Guardar</button>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="caja.js"></script>
+</body>
+</html>

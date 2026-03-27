@@ -1,0 +1,562 @@
+// ══════════════════════════════════════════
+//  CAJA DIARIA — TechPoint
+// ══════════════════════════════════════════
+
+const PIN_CAJA   = '2210';
+const CAJA_AUTH  = 'caja_auth';
+const AUTH_DAYS  = 30;
+
+const FB_CONFIG = {
+  apiKey: "AIzaSyAMRkrADBxRF6rST8rNwO5IqdWneXocBsE",
+  authDomain: "stockcelustech.firebaseapp.com",
+  projectId: "stockcelustech",
+  storageBucket: "stockcelustech.firebasestorage.app",
+  messagingSenderId: "140592485004",
+  appId: "1:140592485004:web:29f6b0aa0f02fdf99ba1a9"
+};
+
+const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
+
+const CATEGORIAS = {
+  ingreso: ['Reparación', 'Venta equipo', 'Otro ingreso'],
+  egreso:  ['Compra repuesto', 'Gastos fijos', 'Retiro', 'Otro gasto']
+};
+
+const METODOS_PAGO = ['Efectivo', 'Transferencia', 'MercadoPago', 'Tarjeta débito', 'Tarjeta crédito'];
+
+let db = null;
+let MOVIMIENTOS = [];
+let ARQUEO = null;
+let currentDate = new Date().toISOString().slice(0, 10);
+let movListener = null;
+let editingMovId = null;
+let _pinBuf = '';
+
+// ══════════════════════════════════════════
+//  FIREBASE
+// ══════════════════════════════════════════
+
+function initFirebase() {
+  if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  db = firebase.firestore();
+}
+
+// ══════════════════════════════════════════
+//  DARK MODE
+// ══════════════════════════════════════════
+
+function initDarkMode() {
+  const dm = localStorage.getItem('darkMode');
+  if (dm === '1') document.body.classList.add('dark');
+  else document.body.classList.remove('dark');
+  _updateDarkIcon();
+}
+
+function toggleDarkMode() {
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem('darkMode', isDark ? '1' : '0');
+  _updateDarkIcon();
+}
+
+function _updateDarkIcon() {
+  const btn = document.querySelector('.dark-toggle-btn');
+  if (!btn) return;
+  const isDark = document.body.classList.contains('dark');
+  btn.textContent = isDark ? '☀️' : '🌙';
+}
+
+// ══════════════════════════════════════════
+//  AUTH / PIN
+// ══════════════════════════════════════════
+
+function checkAuth() {
+  const stored = localStorage.getItem(CAJA_AUTH);
+  if (stored) {
+    const ts = parseInt(stored, 10);
+    const days = (Date.now() - ts) / (1000 * 60 * 60 * 24);
+    if (days < AUTH_DAYS) {
+      showApp();
+      return;
+    }
+  }
+  showLogin();
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').classList.add('app-hidden');
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.remove('app-hidden');
+  initApp();
+}
+
+function initApp() {
+  initDarkMode();
+  initFirebase();
+  updateDateLabel();
+  listenMovimientos();
+  loadArqueo();
+}
+
+// PIN pad
+
+function addPin(d) {
+  if (_pinBuf.length >= 4) return;
+  _pinBuf += d;
+  _updateCajaDots();
+  if (_pinBuf.length === 4) checkCajaPin();
+}
+
+function backPin() {
+  _pinBuf = _pinBuf.slice(0, -1);
+  _updateCajaDots();
+}
+
+function clearCajaPin() {
+  _pinBuf = '';
+  _updateCajaDots();
+  const errEl = document.getElementById('pin-error');
+  if (errEl) errEl.textContent = '';
+}
+
+function _updateCajaDots() {
+  const dots = document.querySelectorAll('#pin-dots span');
+  dots.forEach((dot, i) => {
+    dot.classList.toggle('filled', i < _pinBuf.length);
+  });
+}
+
+function checkCajaPin() {
+  if (_pinBuf === PIN_CAJA) {
+    localStorage.setItem(CAJA_AUTH, Date.now().toString());
+    const screen = document.getElementById('login-screen');
+    screen.classList.add('success');
+    setTimeout(() => showApp(), 400);
+  } else {
+    const screen = document.getElementById('login-screen');
+    screen.classList.add('shake');
+    setTimeout(() => screen.classList.remove('shake'), 500);
+    const errEl = document.getElementById('pin-error');
+    if (errEl) errEl.textContent = 'PIN incorrecto';
+    _pinBuf = '';
+    _updateCajaDots();
+  }
+}
+
+function initPinPad() {
+  document.querySelectorAll('.pin-btn[data-n]').forEach(btn => {
+    btn.addEventListener('click', () => addPin(btn.dataset.n));
+  });
+  const backBtn = document.getElementById('pin-back');
+  if (backBtn) backBtn.addEventListener('click', backPin);
+  const clearBtn = document.getElementById('pin-clear');
+  if (clearBtn) clearBtn.addEventListener('click', clearCajaPin);
+}
+
+// ══════════════════════════════════════════
+//  DATE NAVIGATION
+// ══════════════════════════════════════════
+
+function prevDay() {
+  const d = new Date(currentDate + 'T12:00:00');
+  d.setDate(d.getDate() - 1);
+  setDate(d.toISOString().slice(0, 10));
+}
+
+function nextDay() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (currentDate >= today) return;
+  const d = new Date(currentDate + 'T12:00:00');
+  d.setDate(d.getDate() + 1);
+  setDate(d.toISOString().slice(0, 10));
+}
+
+function setDate(date) {
+  currentDate = date;
+  updateDateLabel();
+  if (movListener) {
+    movListener();
+    movListener = null;
+  }
+  MOVIMIENTOS = [];
+  ARQUEO = null;
+  listenMovimientos();
+  loadArqueo();
+}
+
+function updateDateLabel() {
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const label = document.getElementById('caja-date-label');
+  const nextBtn = document.getElementById('next-day-btn');
+
+  let text;
+  if (currentDate === today) {
+    text = 'Hoy';
+  } else if (currentDate === yesterday) {
+    text = 'Ayer';
+  } else {
+    const [y, m, d] = currentDate.split('-');
+    text = `${d}/${m}/${y}`;
+  }
+
+  if (label) label.textContent = text;
+  if (nextBtn) {
+    nextBtn.style.opacity = currentDate >= today ? '0.3' : '1';
+    nextBtn.style.pointerEvents = currentDate >= today ? 'none' : 'auto';
+  }
+}
+
+// ══════════════════════════════════════════
+//  ARQUEO
+// ══════════════════════════════════════════
+
+async function loadArqueo() {
+  try {
+    const doc = await db.collection('caja_arqueos').doc(currentDate).get();
+    if (doc.exists) {
+      ARQUEO = doc.data();
+    } else {
+      ARQUEO = null;
+      const today = new Date().toISOString().slice(0, 10);
+      if (currentDate === today) {
+        openArqueoModal();
+        return;
+      }
+    }
+  } catch (e) {
+    console.error('loadArqueo:', e);
+    ARQUEO = null;
+  }
+  renderStats();
+}
+
+function openArqueoModal() {
+  document.getElementById('arqueo-billetes').innerHTML = renderArqueoRows();
+  updateArqueoTotal();
+  document.getElementById('arqueo-overlay').classList.remove('hidden');
+  document.getElementById('arqueo-modal').classList.remove('hidden');
+}
+
+function renderArqueoRows() {
+  return DENOMINACIONES.map(denom => {
+    const label = '$' + denom.toLocaleString('es-AR');
+    return `
+      <div class="arqueo-row">
+        <span class="arqueo-denom">${label}</span>
+        <div class="arqueo-counter">
+          <button class="arqueo-btn" onclick="changeArqueoBillete(${denom}, -1)">−</button>
+          <input class="arqueo-input" id="billete-${denom}" type="number" value="0" min="0" inputmode="numeric">
+          <button class="arqueo-btn" onclick="changeArqueoBillete(${denom}, 1)">+</button>
+        </div>
+        <span class="arqueo-subtotal" id="sub-${denom}">$0</span>
+      </div>`;
+  }).join('');
+}
+
+function changeArqueoBillete(denom, delta) {
+  const input = document.getElementById('billete-' + denom);
+  if (!input) return;
+  const current = parseInt(input.value, 10) || 0;
+  input.value = Math.max(0, current + delta);
+  updateArqueoTotal();
+}
+
+function updateArqueoTotal() {
+  let total = 0;
+  DENOMINACIONES.forEach(denom => {
+    const input = document.getElementById('billete-' + denom);
+    const cantidad = input ? (parseInt(input.value, 10) || 0) : 0;
+    const subtotal = cantidad * denom;
+    total += subtotal;
+    const subEl = document.getElementById('sub-' + denom);
+    if (subEl) subEl.textContent = '$' + subtotal.toLocaleString('es-AR');
+  });
+  const totalEl = document.getElementById('arqueo-total');
+  if (totalEl) totalEl.textContent = '$' + total.toLocaleString('es-AR');
+}
+
+async function saveArqueo() {
+  const billetes = {};
+  let total = 0;
+  DENOMINACIONES.forEach(denom => {
+    const input = document.getElementById('billete-' + denom);
+    const cantidad = input ? (parseInt(input.value, 10) || 0) : 0;
+    billetes[denom] = cantidad;
+    total += cantidad * denom;
+  });
+
+  try {
+    await db.collection('caja_arqueos').doc(currentDate).set({
+      billetes,
+      total,
+      fecha: currentDate,
+      savedAt: new Date().toISOString()
+    });
+    ARQUEO = { billetes, total, fecha: currentDate };
+    closeArqueoModal();
+    renderStats();
+    toast('✅ Arqueo guardado: $' + total.toLocaleString('es-AR'), 'success');
+  } catch (e) {
+    console.error('saveArqueo:', e);
+    toast('Error al guardar arqueo', 'error');
+  }
+}
+
+function closeArqueoModal() {
+  document.getElementById('arqueo-overlay').classList.add('hidden');
+  document.getElementById('arqueo-modal').classList.add('hidden');
+}
+
+function reopenArqueo() {
+  // Pre-fill existing ARQUEO values if available
+  if (!document.getElementById('arqueo-billetes')) return;
+  document.getElementById('arqueo-billetes').innerHTML = renderArqueoRows();
+  if (ARQUEO && ARQUEO.billetes) {
+    DENOMINACIONES.forEach(denom => {
+      const input = document.getElementById('billete-' + denom);
+      if (input && ARQUEO.billetes[denom] !== undefined) {
+        input.value = ARQUEO.billetes[denom];
+      }
+    });
+  }
+  updateArqueoTotal();
+  document.getElementById('arqueo-overlay').classList.remove('hidden');
+  document.getElementById('arqueo-modal').classList.remove('hidden');
+}
+
+// ══════════════════════════════════════════
+//  MOVIMIENTOS
+// ══════════════════════════════════════════
+
+function listenMovimientos() {
+  const query = db.collection('caja_movimientos').where('fecha', '==', currentDate);
+
+  try {
+    movListener = query.onSnapshot(snap => {
+      MOVIMIENTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      MOVIMIENTOS.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      renderMovimientos();
+      renderStats();
+    }, err => {
+      console.error('listenMovimientos onSnapshot error:', err);
+      // fallback to get()
+      query.get().then(snap => {
+        MOVIMIENTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        MOVIMIENTOS.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+        renderMovimientos();
+        renderStats();
+      }).catch(e => console.error('listenMovimientos get fallback error:', e));
+    });
+  } catch (err) {
+    console.error('listenMovimientos setup error:', err);
+    query.get().then(snap => {
+      MOVIMIENTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      MOVIMIENTOS.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      renderMovimientos();
+      renderStats();
+    }).catch(e => console.error('listenMovimientos get error:', e));
+  }
+}
+
+function renderStats() {
+  const apertura = ARQUEO?.total || 0;
+  const ingresos = MOVIMIENTOS.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const egresos  = MOVIMIENTOS.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const ingresosEfectivo = MOVIMIENTOS.filter(m => m.tipo === 'ingreso' && m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const egresosEfectivo  = MOVIMIENTOS.filter(m => m.tipo === 'egreso'  && m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const efectivoEnCaja = apertura + ingresosEfectivo - egresosEfectivo;
+  const saldoNeto = ingresos - egresos;
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = fmt(val); };
+  set('stat-apertura', apertura);
+  set('stat-ingresos', ingresos);
+  set('stat-egresos',  egresos);
+  set('stat-efectivo', efectivoEnCaja);
+
+  const netoEl = document.getElementById('stat-neto');
+  if (netoEl) {
+    netoEl.textContent = fmt(saldoNeto);
+    netoEl.style.color = saldoNeto >= 0 ? '#10b981' : '#ef4444';
+  }
+}
+
+function renderMovimientos() {
+  const list  = document.getElementById('caja-list');
+  const empty = document.getElementById('caja-empty');
+  if (!list) return;
+
+  if (!MOVIMIENTOS.length) {
+    list.innerHTML = '';
+    if (empty) empty.style.display = '';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  list.innerHTML = MOVIMIENTOS.map(m => {
+    const hora = m.createdAt ? m.createdAt.slice(11, 16) : '';
+    const meta = [m.metodoPago, hora].filter(Boolean).join(' · ');
+    const signo = m.tipo === 'ingreso' ? '+' : '−';
+    return `
+      <div class="mov-card mov-${esc(m.tipo)}" onclick="openMovForm('${esc(m.id)}')">
+        <div class="caja-card-left">
+          <span class="caja-cat">${esc(m.categoria || '')}</span>
+          <span class="caja-desc">${esc(m.descripcion || '—')}</span>
+          <span class="caja-meta">${esc(meta)}</span>
+        </div>
+        <div class="caja-card-right">
+          <span class="caja-monto mov-${esc(m.tipo)}">${signo}${fmt(m.monto)}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════
+//  FORMULARIO MOVIMIENTO
+// ══════════════════════════════════════════
+
+function openMovForm(id) {
+  editingMovId = id || null;
+  const overlay = document.getElementById('mov-overlay');
+  const modal   = document.getElementById('mov-modal');
+  const title   = document.getElementById('mov-form-title');
+  const deleteWrap = document.getElementById('mov-delete-wrap');
+
+  if (id) {
+    const m = MOVIMIENTOS.find(x => x.id === id);
+    if (!m) return;
+    title.textContent = '✏️ Editar movimiento';
+    deleteWrap.style.display = '';
+    setMovTipo(m.tipo || 'ingreso');
+    document.getElementById('mov-fi-monto').value = m.monto || '';
+    document.getElementById('mov-fi-desc').value  = m.descripcion || '';
+    // select category
+    renderCatBtns(m.tipo || 'ingreso');
+    selectCat(m.categoria || '');
+    // select method
+    selectMetodo(m.metodoPago || 'Efectivo');
+  } else {
+    title.textContent = '➕ Nuevo movimiento';
+    deleteWrap.style.display = 'none';
+    setMovTipo('ingreso');
+    document.getElementById('mov-fi-monto').value = '';
+    document.getElementById('mov-fi-desc').value  = '';
+    selectMetodo('Efectivo');
+  }
+
+  overlay.classList.remove('hidden');
+  modal.classList.remove('hidden');
+}
+
+function closeMovForm() {
+  document.getElementById('mov-overlay').classList.add('hidden');
+  document.getElementById('mov-modal').classList.add('hidden');
+  editingMovId = null;
+}
+
+function setMovTipo(tipo) {
+  const btnIng = document.getElementById('mov-btn-ingreso');
+  const btnEg  = document.getElementById('mov-btn-egreso');
+  if (btnIng) btnIng.classList.toggle('tipo-active', tipo === 'ingreso');
+  if (btnEg)  btnEg.classList.toggle('tipo-active',  tipo === 'egreso');
+  renderCatBtns(tipo);
+  const cats = CATEGORIAS[tipo] || [];
+  selectCat(cats[0] || '');
+}
+
+function renderCatBtns(tipo) {
+  const container = document.getElementById('mov-categorias');
+  if (!container) return;
+  const cats = CATEGORIAS[tipo] || [];
+  container.innerHTML = cats.map(c =>
+    `<button class="cat-btn" data-cat="${esc(c)}" onclick="selectCat('${esc(c)}')">${esc(c)}</button>`
+  ).join('');
+}
+
+function selectCat(cat) {
+  document.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.classList.toggle('cat-active', btn.dataset.cat === cat);
+  });
+  const hidden = document.getElementById('mov-hidden-cat');
+  if (hidden) hidden.value = cat;
+}
+
+function selectMetodo(metodo) {
+  document.querySelectorAll('.metodo-btn').forEach(btn => {
+    btn.classList.toggle('metodo-active', btn.dataset.m === metodo);
+  });
+  const hidden = document.getElementById('mov-hidden-metodo');
+  if (hidden) hidden.value = metodo;
+}
+
+async function saveMov() {
+  const monto = parseFloat(document.getElementById('mov-fi-monto').value);
+  if (!monto || monto <= 0) { toast('Ingresá un monto válido', 'error'); return; }
+
+  const categoria = document.getElementById('mov-hidden-cat').value;
+  if (!categoria) { toast('Seleccioná una categoría', 'error'); return; }
+
+  const tipo       = document.getElementById('mov-btn-ingreso').classList.contains('tipo-active') ? 'ingreso' : 'egreso';
+  const descripcion = document.getElementById('mov-fi-desc').value.trim();
+  const metodoPago  = document.getElementById('mov-hidden-metodo').value || 'Efectivo';
+
+  const data = { tipo, categoria, descripcion, monto, metodoPago, fecha: currentDate };
+
+  try {
+    if (editingMovId) {
+      await db.collection('caja_movimientos').doc(editingMovId).update(data);
+      toast('Movimiento actualizado', 'success');
+    } else {
+      await db.collection('caja_movimientos').add({ ...data, createdAt: new Date().toISOString() });
+      toast('Movimiento registrado', 'success');
+    }
+    closeMovForm();
+  } catch (e) {
+    console.error('saveMov:', e);
+    toast('Error al guardar', 'error');
+  }
+}
+
+async function deleteMov() {
+  if (!editingMovId) return;
+  if (!confirm('¿Eliminar este movimiento?')) return;
+  try {
+    await db.collection('caja_movimientos').doc(editingMovId).delete();
+    toast('Movimiento eliminado', 'success');
+    closeMovForm();
+  } catch (e) {
+    console.error('deleteMov:', e);
+    toast('Error al eliminar', 'error');
+  }
+}
+
+// ══════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════
+
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function fmt(n) {
+  return '$' + Math.abs(Math.round(n)).toLocaleString('es-AR');
+}
+
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('show'), 10);
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
+}
+
+// ══════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════
+
+initPinPad();
+checkAuth();

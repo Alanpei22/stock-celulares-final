@@ -248,6 +248,10 @@
       </span>
       <span class="nav-lbl">Repuestos</span>
     </button>
+    <button class="nav-btn" id="nav-caja" onclick="window.location.href='caja.html'">
+      <span class="nav-ico">💰</span>
+      <span class="nav-lbl">Caja</span>
+    </button>
   </nav>
 
 </div>
@@ -857,6 +861,33 @@
   <div class="patron-modal-btns">
     <button type="button" class="btn-patron-reset" onclick="resetPatronCanvas()">🗑 Borrar</button>
     <button type="button" class="btn-patron-save" onclick="savePatron()">✅ Guardar patrón</button>
+  </div>
+</div>
+
+<!-- Modal: Registrar cobro en caja -->
+<div id="cobro-overlay" class="nota-overlay hidden" onclick="closeCobroModal()"></div>
+<div id="cobro-modal" class="nota-modal hidden">
+  <div class="nota-modal-hdr">
+    <span>💰 ¿Registrar cobro en caja?</span>
+    <button type="button" onclick="closeCobroModal()">✕</button>
+  </div>
+  <div class="cobro-info">
+    <span id="cobro-desc-label" class="cobro-desc"></span>
+    <span id="cobro-monto-label" class="cobro-monto"></span>
+  </div>
+  <div class="fg" style="margin-top:.75rem">
+    <label class="fl">Método de pago</label>
+    <div class="chip-group cobro-metodos">
+      <button class="cobro-metodo-btn cat-btn cobro-m-active" data-m="Efectivo" onclick="selectCobroMetodo('Efectivo')">💵 Efectivo</button>
+      <button class="cobro-metodo-btn cat-btn" data-m="Transferencia" onclick="selectCobroMetodo('Transferencia')">🏦 Transf.</button>
+      <button class="cobro-metodo-btn cat-btn" data-m="MercadoPago" onclick="selectCobroMetodo('MercadoPago')">💙 MP</button>
+      <button class="cobro-metodo-btn cat-btn" data-m="Tarjeta débito" onclick="selectCobroMetodo('Tarjeta débito')">💳 Débito</button>
+      <button class="cobro-metodo-btn cat-btn" data-m="Tarjeta crédito" onclick="selectCobroMetodo('Tarjeta crédito')">💳 Crédito</button>
+    </div>
+  </div>
+  <div class="nota-modal-btns" style="margin-top:1rem">
+    <button type="button" class="btn-nota-clear" onclick="closeCobroModal()">Ahora no</button>
+    <button type="button" class="btn-nota-save" onclick="confirmarCobro()">✅ Registrar</button>
   </div>
 </div>
 

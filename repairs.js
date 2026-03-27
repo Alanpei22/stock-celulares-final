@@ -722,10 +722,61 @@ async function _doChangeRepairStatus(id, newStatus, r) {
     });
 
     closeRepairDetail();
-    setTimeout(() => openRepairDetail(id), 120);
+    if (newStatus !== 'entregado') {
+      setTimeout(() => openRepairDetail(id), 120);
+    }
+    if (newStatus === 'entregado' && r.monto && r.monto > 0) {
+      setTimeout(() => openCobroModal(r), 400);
+    }
   } catch (e) {
     console.error(e);
     toast('Error al actualizar estado', 'error');
+  }
+}
+
+// ── Registrar cobro en caja ─────────────────────────────
+let _cobroRepair = null;
+
+function openCobroModal(r) {
+  _cobroRepair = r;
+  document.getElementById('cobro-monto-label').textContent = '$ ' + Number(r.monto).toLocaleString('es-AR');
+  document.getElementById('cobro-desc-label').textContent = `N°${r.nOrden} ${r.marca} ${r.modelo}`;
+  // reset method selection
+  document.querySelectorAll('.cobro-metodo-btn').forEach(b => b.classList.remove('cobro-m-active'));
+  document.querySelector('.cobro-metodo-btn[data-m="Efectivo"]').classList.add('cobro-m-active');
+  document.getElementById('cobro-overlay').classList.remove('hidden');
+  document.getElementById('cobro-modal').classList.remove('hidden');
+}
+
+function closeCobroModal() {
+  document.getElementById('cobro-overlay').classList.add('hidden');
+  document.getElementById('cobro-modal').classList.add('hidden');
+  _cobroRepair = null;
+}
+
+function selectCobroMetodo(metodo) {
+  document.querySelectorAll('.cobro-metodo-btn').forEach(b => b.classList.toggle('cobro-m-active', b.dataset.m === metodo));
+}
+
+async function confirmarCobro() {
+  if (!_cobroRepair) return;
+  const metodo = document.querySelector('.cobro-metodo-btn.cobro-m-active')?.dataset.m || 'Efectivo';
+  const r = _cobroRepair;
+  closeCobroModal();
+  try {
+    await db.collection('caja_movimientos').add({
+      tipo: 'ingreso',
+      categoria: 'Reparación',
+      descripcion: `N°${r.nOrden} ${r.marca} ${r.modelo} — ${r.arreglo || ''}`.trim(),
+      monto: r.monto,
+      metodoPago: metodo,
+      fecha: new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
+      repairId: r.id
+    });
+    toast('💰 Cobro registrado en caja', 'success');
+  } catch(e) {
+    toast('Error al registrar en caja', 'error');
   }
 }
 
