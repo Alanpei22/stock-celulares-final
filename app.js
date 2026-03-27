@@ -1131,6 +1131,16 @@ function closeAccessLogModal() {
   document.body.style.overflow = '';
 }
 
+// ── AGREGAR STOCK DESDE IA CHAT ───────────────────────────
+async function addPhoneFromAI(phone) {
+  const ref = db.collection('phones').doc();
+  phone.id = ref.id;
+  phone.nOrden = Date.now();
+  await ref.set(phone);
+  // Recargar lista si está visible
+  if (typeof loadPhones === 'function') loadPhones();
+}
+
 // ── IA ────────────────────────────────────────────────────
 async function callAI(action, data) {
   showAiPanel();
