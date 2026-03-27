@@ -104,10 +104,22 @@ function toggleOwnerLock() {
   if (OWNER_MODE) { lockOwnerMode(); } else { openOwnerPinModal(); }
 }
 
-function openOwnerPinModal() {
+async function openOwnerPinModal() {
   _ownerPinBuf = '';
   _updateOwnerDots();
   document.getElementById('owner-pin-error').textContent = '';
+  // Detectar si es primer uso para mostrar mensaje apropiado
+  try {
+    const doc = await db.collection('config').doc('owner').get();
+    const sub = document.getElementById('owner-pin-sub');
+    if (!doc.exists || !doc.data().pin) {
+      sub.textContent = 'Primera vez: elegí tu PIN de 4 dígitos';
+      sub.style.color = '#f59e0b';
+    } else {
+      sub.textContent = 'Ingresá tu PIN de dueño';
+      sub.style.color = '';
+    }
+  } catch {}
   document.getElementById('owner-pin-overlay').classList.remove('hidden');
   document.getElementById('owner-pin-modal').classList.remove('hidden');
 }
@@ -127,6 +139,11 @@ function addOwnerPin(d) {
 
 function backOwnerPin() {
   _ownerPinBuf = _ownerPinBuf.slice(0, -1);
+  _updateOwnerDots();
+}
+
+function clearOwnerPin() {
+  _ownerPinBuf = '';
   _updateOwnerDots();
 }
 
