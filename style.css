@@ -1670,6 +1670,73 @@ body.dark .rep2-ac-item:hover { background: #273549; }
 body.dark .rep2-ac-name { color: #f1f5f9; }
 body.dark .rep2-ac-meta { color: #64748b; }
 
+/* ── MODAL REPUESTO USADO ──────────────────────────────────── */
+.rep-uso-modal {
+  max-height: 75vh;
+  display: flex;
+  flex-direction: column;
+}
+#rep-uso-search {
+  margin: .5rem 0 .25rem;
+  flex-shrink: 0;
+}
+.rep-uso-list {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--brd);
+  border-radius: 10px;
+  margin: .25rem 0 .5rem;
+  max-height: 260px;
+  -webkit-overflow-scrolling: touch;
+}
+.rep-uso-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--brd);
+  transition: background .1s;
+}
+.rep-uso-item:last-child { border-bottom: none; }
+.rep-uso-item:hover,
+.rep-uso-item:active { background: #f0f9ff; }
+.rep-uso-item--sel { background: #e0f2fe !important; }
+.rep-uso-name {
+  display: block;
+  font-size: .86rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+.rep-uso-meta {
+  display: block;
+  font-size: .72rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+.rep-uso-empty {
+  color: #94a3b8;
+  text-align: center;
+  padding: 1.2rem;
+  font-size: .85rem;
+}
+.rep-uso-selected {
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  border-radius: 8px;
+  padding: .5rem .75rem;
+  font-size: .8rem;
+  color: #065f46;
+  font-weight: 600;
+  margin-bottom: .5rem;
+  flex-shrink: 0;
+}
+/* dark mode */
+body.dark .rep-uso-list { border-color: #334155; background: #0f172a; }
+body.dark .rep-uso-item { border-color: #334155; }
+body.dark .rep-uso-item:hover { background: #1e293b; }
+body.dark .rep-uso-item--sel { background: #1e3a5f !important; }
+body.dark .rep-uso-name { color: #f1f5f9; }
+body.dark .rep-uso-meta { color: #64748b; }
+body.dark .rep-uso-selected { background: #064e3b; border-color: #065f46; color: #6ee7b7; }
+
 /* ── STOCK CARDS — accent por estado ──────────────────────── */
 .stock-nuevo   { border-left: 4px solid #10b981 !important; }
 .stock-usado   { border-left: 4px solid #f59e0b !important; }

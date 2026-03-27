@@ -101,6 +101,16 @@ async function sendAiChat() {
       } catch {}
     }
 
+    // Detectar comando de actualizar repuestos
+    const cmdRepMatch = text.match(/\{"__cmd":"update_repuestos"[\s\S]*?\}/);
+    if (cmdRepMatch) {
+      try {
+        const cmd = JSON.parse(cmdRepMatch[0]);
+        showUpdateRepuestosConfirm(cmd);
+        return;
+      } catch {}
+    }
+
     addChatBubble(text, 'ai', true);
   } catch (err) {
     typingEl.remove();
@@ -221,6 +231,86 @@ async function executeAddStock(cmd, actions) {
     }
     actions.innerHTML = '<span style="color:#34d399;font-size:.8rem;font-weight:700">✅ ¡Agregado al stock!</span>';
     _chatHistory.push({ role: 'assistant', content: `Equipo ${cmd.marca} ${cmd.modelo} agregado al stock correctamente.` });
+  } catch (err) {
+    actions.innerHTML = `<span style="color:#ef4444;font-size:.75rem">❌ Error: ${err.message}</span>`;
+  }
+}
+
+// ── Confirmar actualización de repuestos ─────────────────────
+function showUpdateRepuestosConfirm(cmd) {
+  const msgs = document.getElementById('ai-chat-messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'ai-chat-bubble ai-bubble';
+
+  const items = Array.isArray(cmd.items) ? cmd.items : [];
+  const rows = items.map(it =>
+    `<div class="ai-confirm-row"><span>${it.marca || ''} · ${it.nombre || ''}</span><b>+${it.cantidad}</b></div>`
+  ).join('');
+
+  wrap.innerHTML = `
+    ✅ Actualizando cantidades en repuestos:
+    <div class="ai-confirm-card">
+      <div class="ai-confirm-title">🔩 STOCK DE REPUESTOS</div>
+      ${rows}
+    </div>
+  `;
+
+  const actions = document.createElement('div');
+  actions.className = 'ai-bubble-actions';
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'ai-add-btn';
+  addBtn.textContent = '➕ Sí, actualizar';
+  addBtn.onclick = () => executeUpdateRepuestos(cmd, actions);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'ai-copy-btn';
+  cancelBtn.textContent = '✕ Cancelar';
+  cancelBtn.onclick = () => { actions.innerHTML = '<span style="color:#64748b;font-size:.75rem">Cancelado</span>'; };
+
+  actions.appendChild(addBtn);
+  actions.appendChild(cancelBtn);
+  wrap.appendChild(actions);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function executeUpdateRepuestos(cmd, actions) {
+  actions.innerHTML = '<span style="color:#94a3b8;font-size:.75rem">⏳ Actualizando...</span>';
+  try {
+    if (typeof db === 'undefined') throw new Error('Sin conexión a base de datos');
+    const items = Array.isArray(cmd.items) ? cmd.items : [];
+    let updated = 0;
+    let notFound = [];
+
+    for (const it of items) {
+      // Fuzzy match: buscar en REPUESTOS por nombre (contiene) o marca+nombre
+      const needle = (it.nombre || '').toLowerCase();
+      const marcaNeedle = (it.marca || '').toLowerCase();
+      let match = null;
+
+      if (typeof REPUESTOS !== 'undefined') {
+        // Exact name match first
+        match = REPUESTOS.find(r => (r.nombre || '').toLowerCase() === needle);
+        // Fallback: contains
+        if (!match) match = REPUESTOS.find(r => (r.nombre || '').toLowerCase().includes(needle) && (!marcaNeedle || (r.marca || '').toLowerCase().includes(marcaNeedle)));
+        // Fallback: needle contains repuesto name
+        if (!match) match = REPUESTOS.find(r => needle.includes((r.nombre || '').toLowerCase()) && (!marcaNeedle || (r.marca || '').toLowerCase().includes(marcaNeedle)));
+      }
+
+      if (match) {
+        const nueva = Math.max(0, (match.cantidad || 0) + Number(it.cantidad || 0));
+        await db.collection('repuestos').doc(match.id).update({ cantidad: nueva });
+        updated++;
+      } else {
+        notFound.push(it.nombre || '?');
+      }
+    }
+
+    let msg = `✅ ${updated} repuesto${updated !== 1 ? 's' : ''} actualizado${updated !== 1 ? 's' : ''}.`;
+    if (notFound.length) msg += ` No encontrados: ${notFound.join(', ')}`;
+    actions.innerHTML = `<span style="color:#34d399;font-size:.8rem;font-weight:700">${msg}</span>`;
+    _chatHistory.push({ role: 'assistant', content: `Stock de repuestos actualizado: ${updated} items.` });
   } catch (err) {
     actions.innerHTML = `<span style="color:#ef4444;font-size:.75rem">❌ Error: ${err.message}</span>`;
   }

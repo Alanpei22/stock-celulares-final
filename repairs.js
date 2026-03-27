@@ -1505,6 +1505,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function quickStatusChange(e, id, newStatus) {
   e.stopPropagation();
+
+  // Al marcar como "listo", preguntar qué repuesto se usó
+  if (newStatus === 'listo') {
+    openRepUsoModal(async (repuestoId) => {
+      await _doStatusChange(id, newStatus);
+      if (repuestoId && typeof REPUESTOS !== 'undefined') {
+        const rep = REPUESTOS.find(x => x.id === repuestoId);
+        if (rep) {
+          const nueva = Math.max(0, (rep.cantidad || 0) - 1);
+          db.collection('repuestos').doc(repuestoId).update({ cantidad: nueva })
+            .then(() => toast(`🔩 −1 ${rep.nombre}`, 'success'))
+            .catch(() => toast('Error al descontar repuesto', 'error'));
+        }
+      }
+    });
+    return;
+  }
+
+  await _doStatusChange(id, newStatus);
+}
+
+async function _doStatusChange(id, newStatus) {
   const update = { estado: newStatus };
   if (newStatus === 'entregado') update.fechaEntrega = new Date().toISOString();
   try {
@@ -1518,6 +1540,83 @@ async function quickStatusChange(e, id, newStatus) {
   } catch (err) {
     toast('Error al actualizar', 'error');
   }
+}
+
+// ── Modal: Repuesto Usado ────────────────────
+let _repUsoCallback   = null;
+let _repUsoSelectedId = null;
+
+function openRepUsoModal(callback) {
+  _repUsoCallback   = callback;
+  _repUsoSelectedId = null;
+  const searchEl = document.getElementById('rep-uso-search');
+  if (searchEl) searchEl.value = '';
+  const selEl = document.getElementById('rep-uso-selected');
+  if (selEl) selEl.classList.add('hidden');
+  const confirmBtn = document.getElementById('rep-uso-confirm-btn');
+  if (confirmBtn) confirmBtn.disabled = true;
+  renderRepUsoList();
+  document.getElementById('rep-uso-overlay').classList.remove('hidden');
+  document.getElementById('rep-uso-modal').classList.remove('hidden');
+  setTimeout(() => { if (searchEl) searchEl.focus(); }, 100);
+}
+
+function closeRepUsoModal() {
+  document.getElementById('rep-uso-overlay').classList.add('hidden');
+  document.getElementById('rep-uso-modal').classList.add('hidden');
+  _repUsoCallback   = null;
+  _repUsoSelectedId = null;
+}
+
+function renderRepUsoList() {
+  const q    = (document.getElementById('rep-uso-search').value || '').trim().toLowerCase();
+  const list = document.getElementById('rep-uso-list');
+  if (!list) return;
+  if (typeof REPUESTOS === 'undefined' || !REPUESTOS.length) {
+    list.innerHTML = '<p class="rep-uso-empty">Sin repuestos cargados</p>';
+    return;
+  }
+  let items = REPUESTOS;
+  if (q) {
+    items = items.filter(r =>
+      [r.nombre, r.marca, r.modelo, r.tipo]
+        .map(x => (x || '').toLowerCase()).join(' ').includes(q)
+    );
+  }
+  if (!items.length) {
+    list.innerHTML = '<p class="rep-uso-empty">Sin resultados</p>';
+    return;
+  }
+  list.innerHTML = items.slice(0, 20).map(r => {
+    const sel = r.id === _repUsoSelectedId ? ' rep-uso-item--sel' : '';
+    return `<div class="rep-uso-item${sel}" onclick="selectRepUsoItem('${r.id}')">
+      <span class="rep-uso-name">${esc(r.nombre)}</span>
+      <span class="rep-uso-meta">${esc(r.marca || '')}${r.modelo ? ' · ' + esc(r.modelo) : ''} <b>· Stock: ${r.cantidad ?? 0}</b></span>
+    </div>`;
+  }).join('');
+}
+
+function selectRepUsoItem(id) {
+  _repUsoSelectedId = id;
+  const r = typeof REPUESTOS !== 'undefined' && REPUESTOS.find(x => x.id === id);
+  if (r) {
+    const selEl = document.getElementById('rep-uso-selected');
+    selEl.textContent = `✔ ${r.nombre} (${r.marca || ''}) — Stock actual: ${r.cantidad ?? 0}`;
+    selEl.classList.remove('hidden');
+  }
+  const confirmBtn = document.getElementById('rep-uso-confirm-btn');
+  if (confirmBtn) confirmBtn.disabled = false;
+  renderRepUsoList();
+}
+
+function confirmRepUso() {
+  if (_repUsoCallback) _repUsoCallback(_repUsoSelectedId);
+  closeRepUsoModal();
+}
+
+function skipRepUso() {
+  if (_repUsoCallback) _repUsoCallback(null);
+  closeRepUsoModal();
 }
 
 // ── Nota rápida ────────────────────────────

@@ -857,6 +857,22 @@
   </div>
 </div>
 
+<!-- Modal Repuesto Usado en Reparación -->
+<div id="rep-uso-overlay" class="nota-overlay hidden" onclick="skipRepUso()"></div>
+<div id="rep-uso-modal" class="nota-modal rep-uso-modal hidden">
+  <div class="nota-modal-hdr">
+    <span>🔩 ¿Qué repuesto usaste?</span>
+    <button type="button" onclick="skipRepUso()">✕</button>
+  </div>
+  <input id="rep-uso-search" class="fi" type="text" placeholder="Buscar repuesto…" oninput="renderRepUsoList()" autocomplete="off">
+  <div id="rep-uso-list" class="rep-uso-list"></div>
+  <div id="rep-uso-selected" class="rep-uso-selected hidden"></div>
+  <div class="nota-modal-btns">
+    <button type="button" class="btn-nota-clear" onclick="skipRepUso()">Omitir</button>
+    <button type="button" class="btn-nota-save" id="rep-uso-confirm-btn" onclick="confirmRepUso()" disabled>✅ Confirmar</button>
+  </div>
+</div>
+
 <!-- Modal Nota Rápida -->
 <div id="nota-overlay" class="nota-overlay hidden" onclick="closeNotaModal()"></div>
 <div id="nota-modal" class="nota-modal hidden">

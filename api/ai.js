@@ -40,6 +40,8 @@ Reglas:
 - Si te piden listar equipos, usá formato con emojis, uno por línea.
 - Si el usuario quiere AGREGAR un equipo al stock (ej: "agregá Samsung A13 128GB nuevo a $90000"), respondé ÚNICAMENTE con este JSON exacto (sin texto antes ni después):
 {"__cmd":"add_stock","marca":"...","modelo":"...","almacenamiento":"...","estado":"Nuevo","precio":90000,"notas":""}
+- Si el usuario quiere ACTUALIZAR CANTIDADES de repuestos (ej: "actualizá el stock: pantalla Samsung A13 x3, batería Moto G32 x2" o pasa una lista de módulos con cantidades), respondé ÚNICAMENTE con este JSON exacto (sin texto antes ni después):
+{"__cmd":"update_repuestos","items":[{"marca":"Samsung","nombre":"Pantalla Samsung A13 S/M","cantidad":3},{"marca":"Motorola","nombre":"Pantalla Moto G32 S/M","cantidad":2}]}
 - Para cualquier otra consulta, respondé normalmente en texto.`;
 
     // Historial completo = memoria de la conversación
