@@ -34,7 +34,58 @@ function initRepuestos() {
   document.getElementById('rep2-form-modal').addEventListener('click', e => {
     if (e.target.id === 'rep2-form-modal') closeRepuestoForm();
   });
+  initCatalogAutocomplete();
   listenRepuestos();
+}
+
+// ── Autocompletado desde catálogo de módulos ───────────────
+function initCatalogAutocomplete() {
+  if (typeof MODULOS_CATALOG === 'undefined') return;
+  const input = document.getElementById('rep2-fi-nombre');
+  const list  = document.getElementById('rep2-ac-list');
+  if (!input || !list) return;
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (q.length < 2) { list.classList.add('hidden'); return; }
+
+    const matches = MODULOS_CATALOG.filter(([marca, nombre]) =>
+      nombre.toLowerCase().includes(q) || marca.toLowerCase().includes(q)
+    ).slice(0, 12);
+
+    if (!matches.length) { list.classList.add('hidden'); return; }
+
+    list.innerHTML = matches.map(([marca, nombre, precio, notas]) => {
+      const precioStr = precio > 0
+        ? '$ ' + precio.toLocaleString('es-AR')
+        : '<span style="color:#ef4444">Sin stock</span>';
+      const notaStr = notas ? ` · ${notas}` : '';
+      const safeM = marca.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const safeN = nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const safeT = (notas||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return `<div class="rep2-ac-item" onclick="selectCatalogItem('${safeM}','${safeN}',${precio},'${safeT}')">
+        <span class="rep2-ac-name">${nombre}</span>
+        <span class="rep2-ac-meta">${marca}${notaStr} · ${precioStr}</span>
+      </div>`;
+    }).join('');
+    list.classList.remove('hidden');
+  });
+
+  // Cerrar al hacer click fuera
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#rep2-ac-wrap')) list.classList.add('hidden');
+  });
+}
+
+function selectCatalogItem(marca, nombre, precio, notas) {
+  document.getElementById('rep2-fi-nombre').value    = nombre;
+  document.getElementById('rep2-fi-marca').value     = marca;
+  document.getElementById('rep2-fi-tipo').value      = 'Pantalla';
+  document.getElementById('rep2-fi-precio').value    = precio > 0 ? precio : '';
+  document.getElementById('rep2-fi-notas').value     = notas || '';
+  document.getElementById('rep2-ac-list').classList.add('hidden');
+  // Foco en cantidad para completar rápido
+  document.getElementById('rep2-fi-cantidad').focus();
 }
 
 // ── Render ────────────────────────────────

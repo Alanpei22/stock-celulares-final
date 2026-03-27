@@ -881,9 +881,10 @@
       <button class="modal-close" id="rep2-form-close">✕</button>
     </div>
     <div class="modal-body">
-      <div class="fg fg--full">
-        <label class="fl">Nombre *</label>
-        <input id="rep2-fi-nombre" class="fi" type="text" placeholder="Ej: Pantalla OLED A54" autocomplete="off">
+      <div class="fg fg--full" id="rep2-ac-wrap" style="position:relative">
+        <label class="fl">Nombre * <span class="fl-hint">— escribí para buscar en catálogo</span></label>
+        <input id="rep2-fi-nombre" class="fi" type="text" placeholder="Ej: A14 5G, iPhone 14 Pro, G32…" autocomplete="off">
+        <div id="rep2-ac-list" class="rep2-ac-dropdown hidden"></div>
       </div>
       <div style="display:flex;gap:10px">
         <div class="fg" style="flex:1">
@@ -993,6 +994,7 @@
   </div>
 </div>
 
+<script src="modulos_catalog.js"></script>
 <script src="repuestos.js"></script>
 <script src="aichat.js"></script>
 

@@ -1629,6 +1629,47 @@ body.dark .btn-danger {
   background: #2d0b0b; border-color: #dc2626; color: #f87171;
 }
 
+/* ── AUTOCOMPLETE CATÁLOGO ────────────────────────────────── */
+.fl-hint {
+  font-size: .68rem; color: #94a3b8; font-weight: 400;
+}
+.rep2-ac-dropdown {
+  position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 200;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.14);
+  max-height: 240px; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.rep2-ac-dropdown.hidden { display: none; }
+.rep2-ac-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex; flex-direction: column; gap: 3px;
+  transition: background .1s;
+}
+.rep2-ac-item:last-child { border-bottom: none; }
+.rep2-ac-item:hover,
+.rep2-ac-item:active { background: #f0f9ff; }
+.rep2-ac-name {
+  font-size: .86rem; font-weight: 700; color: #1e293b;
+}
+.rep2-ac-meta {
+  font-size: .72rem; color: #64748b;
+}
+
+/* Dark mode autocomplete */
+body.dark .rep2-ac-dropdown {
+  background: #1e293b; border-color: #334155;
+  box-shadow: 0 8px 28px rgba(0,0,0,.4);
+}
+body.dark .rep2-ac-item { border-color: #334155; }
+body.dark .rep2-ac-item:hover { background: #273549; }
+body.dark .rep2-ac-name { color: #f1f5f9; }
+body.dark .rep2-ac-meta { color: #64748b; }
+
 /* ── STOCK CARDS — accent por estado ──────────────────────── */
 .stock-nuevo   { border-left: 4px solid #10b981 !important; }
 .stock-usado   { border-left: 4px solid #f59e0b !important; }
