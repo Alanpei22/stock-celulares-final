@@ -135,6 +135,26 @@ function renderRepuestos() {
     badge.style.display = lowStock > 0 ? '' : 'none';
   }
 
+  // Banner de stock bajo
+  const lowItems = REPUESTOS.filter(r =>
+    r.stockMin != null && r.stockMin > 0 && (r.cantidad || 0) <= r.stockMin
+  );
+  const banner    = document.getElementById('rep2-lowstock-banner');
+  const bannerCnt = document.getElementById('rep2-lowstock-count');
+  const bannerList = document.getElementById('rep2-lowstock-list');
+  if (banner) {
+    banner.style.display = lowItems.length > 0 ? '' : 'none';
+    if (bannerCnt) bannerCnt.textContent = lowItems.length;
+    if (bannerList) {
+      bannerList.innerHTML = lowItems.map(r =>
+        `<div class="lowstock-item">
+          <span class="lowstock-item-name">🔩 ${esc(r.marca || '')} ${esc(r.nombre)}</span>
+          <span class="lowstock-item-qty">${r.cantidad ?? 0} / mín ${r.stockMin}</span>
+        </div>`
+      ).join('');
+    }
+  }
+
   const listEl  = document.getElementById('rep2-list');
   const emptyEl = document.getElementById('rep2-empty');
 
@@ -270,4 +290,13 @@ function deleteRepuesto(id) {
   db.collection('repuestos').doc(id).delete()
     .then(() => { toast('Repuesto eliminado', 'success'); closeRepuestoForm(); })
     .catch(() => toast('Error al eliminar', 'error'));
+}
+
+function toggleLowStockBanner() {
+  const list = document.getElementById('rep2-lowstock-list');
+  const chevron = document.getElementById('rep2-lowstock-chevron');
+  if (!list) return;
+  const isOpen = !list.classList.contains('hidden');
+  list.classList.toggle('hidden', isOpen);
+  if (chevron) chevron.classList.toggle('open', !isOpen);
 }

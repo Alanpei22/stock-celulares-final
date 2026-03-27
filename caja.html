@@ -53,6 +53,8 @@
       <div class="hdr-actions">
         <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
         <button class="hdr-btn" onclick="reopenArqueo()" title="Ver/editar arqueo">🧾</button>
+        <button class="hdr-btn owner-only" onclick="openCajaHistorial()" title="Historial / Stats">📊</button>
+        <button class="hdr-btn owner-lock-btn" id="caja-owner-btn" onclick="openCajaOwnerPin()" title="Modo dueño">🔒</button>
       </div>
     </div>
   </header>
@@ -162,8 +164,52 @@
   </div>
 </div>
 
+<!-- OWNER PIN MODAL -->
+<div id="caja-owner-overlay" class="nota-overlay hidden" onclick="closeCajaOwnerPin()"></div>
+<div id="caja-owner-modal" class="arqueo-modal hidden" style="max-width:320px">
+  <div class="nota-modal-hdr">
+    <span>🔒 Modo Dueño</span>
+    <button onclick="closeCajaOwnerPin()">✕</button>
+  </div>
+  <p class="arqueo-sub" id="caja-owner-sub">Ingresá el PIN de dueño</p>
+  <div class="pin-dots" id="caja-owner-dots" style="margin:10px auto">
+    <span></span><span></span><span></span><span></span>
+  </div>
+  <div class="pin-grid" style="max-width:240px;margin:0 auto">
+    <button class="pin-btn" onclick="cajaOwnerPin('1')">1</button>
+    <button class="pin-btn" onclick="cajaOwnerPin('2')">2</button>
+    <button class="pin-btn" onclick="cajaOwnerPin('3')">3</button>
+    <button class="pin-btn" onclick="cajaOwnerPin('4')">4</button>
+    <button class="pin-btn" onclick="cajaOwnerPin('5')">5</button>
+    <button class="pin-btn" onclick="cajaOwnerPin('6')">6</button>
+    <button class="pin-btn" onclick="cajaOwnerPin('7')">7</button>
+    <button class="pin-btn" onclick="cajaOwnerPin('8')">8</button>
+    <button class="pin-btn" onclick="cajaOwnerPin('9')">9</button>
+    <button class="pin-btn pin-clear" onclick="cajaOwnerPinClear()">✕</button>
+    <button class="pin-btn" onclick="cajaOwnerPin('0')">0</button>
+    <button class="pin-btn pin-back" onclick="cajaOwnerPinBack()">⌫</button>
+  </div>
+  <p class="pin-error" id="caja-owner-error"></p>
+</div>
+
+<!-- HISTORIAL + STATS MODAL (owner) -->
+<div id="caja-hist-overlay" class="nota-overlay hidden" onclick="closeCajaHistorial()"></div>
+<div id="caja-hist-modal" class="arqueo-modal hidden" style="max-width:440px;max-height:85vh;overflow-y:auto">
+  <div class="nota-modal-hdr" style="position:sticky;top:0;background:var(--bg2);z-index:1">
+    <span>📊 Historial de Caja</span>
+    <button onclick="closeCajaHistorial()">✕</button>
+  </div>
+  <div class="caja-hist-tabs">
+    <button class="caja-hist-tab caja-hist-tab--active" id="cht-sem" onclick="switchHistTab('sem')">Semana</button>
+    <button class="caja-hist-tab" id="cht-mes" onclick="switchHistTab('mes')">Mes</button>
+    <button class="caja-hist-tab" id="cht-stats" onclick="switchHistTab('stats')">📈 Stats</button>
+  </div>
+  <div id="caja-hist-body" class="caja-hist-body"></div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="caja.js"></script>
+<script src="caja_extra.js"></script>
 </body>
 </html>

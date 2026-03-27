@@ -338,6 +338,16 @@ function openRepairForm(id) {
       patronPrev.style.display = 'none';
       document.getElementById('btn-patron-clear').style.display = 'none';
     }
+    // Foto
+    window._currentFotoBase64 = null;
+    if (r.foto) {
+      window._currentFotoBase64 = r.foto;
+      document.getElementById('rep-fi-foto-img').src = r.foto;
+      document.getElementById('rep-fi-foto-preview').classList.remove('hidden');
+    } else {
+      document.getElementById('rep-fi-foto-img').src = '';
+      document.getElementById('rep-fi-foto-preview').classList.add('hidden');
+    }
   } else {
     document.getElementById('rep-form-title').textContent = '🔧 Nueva Reparación';
     document.getElementById('rep-orden-row').style.display    = '';
@@ -376,6 +386,11 @@ function openRepairForm(id) {
     const passInput = document.getElementById('rep-fi-codigo');
     passInput.type = 'password';
     refreshStaffSelect('');
+    // Foto
+    window._currentFotoBase64 = null;
+    document.getElementById('rep-fi-foto').value = '';
+    document.getElementById('rep-fi-foto-img').src = '';
+    document.getElementById('rep-fi-foto-preview').classList.add('hidden');
   }
 
   document.getElementById('rep-form-modal').classList.remove('hidden');
@@ -387,6 +402,54 @@ function closeRepairForm() {
   document.getElementById('rep-form-modal').classList.add('hidden');
   document.body.style.overflow = '';
   editingRepairId = null;
+  window._currentFotoBase64 = null;
+}
+
+// ── Foto handling ─────────────────────────
+window._currentFotoBase64 = null;
+
+function handleFotoSelect(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 900;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else       { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const b64 = canvas.toDataURL('image/jpeg', 0.65);
+      window._currentFotoBase64 = b64;
+      document.getElementById('rep-fi-foto-img').src = b64;
+      document.getElementById('rep-fi-foto-preview').classList.remove('hidden');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeFoto() {
+  window._currentFotoBase64 = null;
+  document.getElementById('rep-fi-foto').value = '';
+  document.getElementById('rep-fi-foto-img').src = '';
+  document.getElementById('rep-fi-foto-preview').classList.add('hidden');
+}
+
+function openFotoModal(src) {
+  document.getElementById('foto-modal-img').src = src;
+  document.getElementById('foto-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeFotoModal() {
+  document.getElementById('foto-modal').classList.add('hidden');
+  document.body.style.overflow = '';
 }
 
 async function saveRepair() {
@@ -409,6 +472,7 @@ async function saveRepair() {
   const obs      = document.getElementById('rep-fi-obs').value.trim();
   const patron    = window._currentPatronDots  || null;
   const patronImg = window._currentPatronImg   || null;
+  const foto      = window._currentFotoBase64  || null;
 
   const accesorios = [];
   if (document.getElementById('acc-cargador').checked)    accesorios.push('cargador');
@@ -427,11 +491,13 @@ async function saveRepair() {
     if (editingRepairId) {
       const existing = REPAIRS.find(x => x.id === editingRepairId);
       if (!existing) { closeRepairForm(); return; }
-      await db.collection('repairs').doc(editingRepairId).set({
+      const updateData = {
         ...existing,
         marca, modelo, arreglo, condicion, codigo, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs
-      });
+      };
+      if (foto) updateData.foto = foto;
+      await db.collection('repairs').doc(editingRepairId).set(updateData);
       toast('Reparación actualizada', 'success');
       logActivity({
         tipo: 'edicion',
@@ -457,14 +523,16 @@ async function saveRepair() {
 
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const ahora = new Date().toISOString();
-      await db.collection('repairs').doc(id).set({
+      const newDoc = {
         id, nOrden, marca, modelo, arreglo, condicion, codigo, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs,
         estado: 'reparando',
         fechaIngreso: ahora,
         estadoHistorial: [{ estado: 'reparando', fecha: ahora }],
         esGarantia: false
-      });
+      };
+      if (foto) newDoc.foto = foto;
+      await db.collection('repairs').doc(id).set(newDoc);
       toast('Reparación N°' + nOrden + ' registrada', 'success');
       logActivity({
         tipo: 'ingreso',
@@ -492,6 +560,19 @@ function openRepairDetail(id) {
   document.getElementById('rep-det-marca').textContent  =
     (r.marca || '') + (r.nOrden ? ' · N°' + r.nOrden : '');
   document.getElementById('rep-det-modelo').textContent = r.modelo || '';
+
+  // Foto
+  const fotoWrap = document.getElementById('rep-det-foto-wrap');
+  const fotoImg  = document.getElementById('rep-det-foto-img');
+  if (fotoWrap && fotoImg) {
+    if (r.foto) {
+      fotoImg.src = r.foto;
+      fotoWrap.classList.remove('hidden');
+    } else {
+      fotoWrap.classList.add('hidden');
+      fotoImg.src = '';
+    }
+  }
 
   const accsMap = { cargador:'🔌 Cargador', funda:'🛡️ Funda', caja:'📦 Caja', auriculares:'🎧 Auriculares' };
   const accs = (r.accesorios || []).map(a => accsMap[a] || a).join(', ');
@@ -620,6 +701,7 @@ function openRepairDetail(id) {
   const hasHistory = (r.tlf || r.dni);
   document.getElementById('rep-det-actions').innerHTML = `
     ${r.tlf ? `<button class="btn-whatsapp" onclick="repairWhatsApp('${id}')">🟢 WhatsApp</button>` : ''}
+    ${(r.tlf && r.presupuesto) ? `<button class="btn-presupuesto" onclick="sendPresupuestoWA('${id}')">💬 Presupuesto</button>` : ''}
     <button class="btn-ai-wa" onclick="aiRepairWaMessage('${id}')">✨ Mensaje IA</button>
     ${r.tlf ? `<button class="btn-edit" onclick="copyPhone('${esc(r.tlf)}')">📋 Tel.</button>` : ''}
     <button class="btn-edit" onclick="closeRepairDetail();openRepairForm('${id}')">✏️ Editar</button>
@@ -816,6 +898,42 @@ function repairWhatsApp(id) {
     .replace(/{marca}/g, r.marca || '')
     .replace(/{modelo}/g, r.modelo || '');
 
+  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// ── WhatsApp Presupuesto ──────────────────
+function sendPresupuestoWA(id) {
+  const r = REPAIRS.find(x => x.id === id);
+  if (!r || !r.tlf) { toast('No hay teléfono registrado', 'error'); return; }
+  if (!r.presupuesto) { toast('No hay presupuesto cargado', 'error'); return; }
+
+  let phone = String(r.tlf).replace(/\D/g, '');
+  if (phone.length === 10)                             phone = '549' + phone;
+  else if (phone.length === 11 && phone.startsWith('0')) phone = '54' + phone.slice(1);
+  else if (!phone.startsWith('54'))                    phone = '549' + phone;
+
+  const nombre = r.nombre ? r.nombre.split(' ')[0] : 'cliente';
+  const equipo = `${r.marca} ${r.modelo}`;
+  const monto  = Number(r.presupuesto).toLocaleString('es-AR');
+  const arreglo = r.arreglo || '';
+
+  const tpls = (typeof WA_TEMPLATES !== 'undefined' && WA_TEMPLATES) || {};
+  const tpl = tpls.repair_presupuesto ||
+    'Hola {nombre}! 👋\nTe paso el presupuesto para tu *{equipo}* (Orden N°{nOrden}):\n\n🔧 Trabajo: {arreglo}\n💰 Presupuesto: *${monto}*\n\n¿Querés que lo hagamos? Cualquier consulta, avisá. 😊';
+
+  const msg = tpl
+    .replace(/{nombre}/g, nombre)
+    .replace(/{equipo}/g,  equipo)
+    .replace(/{nOrden}/g,  r.nOrden || '—')
+    .replace(/{arreglo}/g, arreglo)
+    .replace(/{monto}/g,   monto);
+
+  logActivity({
+    tipo: 'whatsapp',
+    desc: `Presupuesto WA a ${r.nombre || r.tlf} — N°${r.nOrden} $${monto}`,
+    repairId: id,
+    extra: { nOrden: r.nOrden, presupuesto: r.presupuesto }
+  });
   window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
 }
 

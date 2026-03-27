@@ -219,6 +219,13 @@
       <div class="stat"><span class="stat-num rep2-lowstock-num" id="rs2-lowstock">0</span><span class="stat-lbl">Stock bajo</span></div>
       <div class="stat stat-val owner-only"><span class="stat-num" id="rs2-valor">$0</span><span class="stat-lbl">Valor en stock</span></div>
     </div>
+    <div id="rep2-lowstock-banner" class="lowstock-banner" style="display:none">
+      <div class="lowstock-banner-hdr" onclick="toggleLowStockBanner()">
+        <span>⚠️ Stock bajo — <span id="rep2-lowstock-count">0</span> repuesto(s)</span>
+        <span id="rep2-lowstock-chevron" class="lowstock-chevron">▼</span>
+      </div>
+      <div id="rep2-lowstock-list" class="lowstock-list hidden"></div>
+    </div>
     <div class="list-wrap">
       <div id="rep2-list"></div>
       <div class="empty-state" id="rep2-empty" style="display:none">
@@ -665,6 +672,18 @@
           </select>
         </div>
 
+        <div class="fg fg--full">
+          <label class="fl">📷 Foto del equipo</label>
+          <div class="foto-input-wrap">
+            <input type="file" id="rep-fi-foto" accept="image/*" capture="environment" style="display:none" onchange="handleFotoSelect(this)">
+            <button type="button" class="btn-foto-add" onclick="document.getElementById('rep-fi-foto').click()">📷 Tomar / elegir foto</button>
+            <div id="rep-fi-foto-preview" class="foto-preview hidden">
+              <img id="rep-fi-foto-img" src="" alt="Foto del equipo">
+              <button type="button" class="btn-foto-remove" onclick="removeFoto()">✕</button>
+            </div>
+          </div>
+        </div>
+
       </div>
       <div class="form-actions">
         <button class="btn-secondary" id="rep-form-cancel">Cancelar</button>
@@ -684,9 +703,18 @@
       </div>
       <button class="modal-close" id="rep-detail-close">✕</button>
     </div>
+    <div id="rep-det-foto-wrap" class="det-foto-wrap hidden">
+      <img id="rep-det-foto-img" src="" alt="Foto del equipo" class="det-foto-img" onclick="openFotoModal(this.src)">
+    </div>
     <div class="det-body" id="rep-det-body"></div>
     <div class="det-actions" id="rep-det-actions"></div>
   </div>
+</div>
+
+<!-- MODAL FOTO FULLSCREEN -->
+<div id="foto-modal" class="foto-modal hidden" onclick="closeFotoModal()">
+  <img id="foto-modal-img" src="" alt="Foto" class="foto-modal-img">
+  <button class="foto-modal-close" onclick="closeFotoModal()">✕</button>
 </div>
 
 <!-- MODAL GARANTÍA -->

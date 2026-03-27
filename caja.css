@@ -261,3 +261,59 @@ body.dark .tipo-ingreso.tipo-active { background: #14532d; border-color: #10b981
 body.dark .tipo-egreso.tipo-active  { background: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
 body.dark .cat-btn, body.dark .metodo-btn { background: #1e293b; border-color: #334155; color: #94a3b8; }
 body.dark .caja-date-nav { background: #1e293b; border-color: #334155; color: #f1f5f9; }
+
+/* ── HISTORIAL / STATS MODAL ── */
+.caja-hist-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border);
+  padding: 0 2px;
+}
+.caja-hist-tab {
+  flex: 1; padding: 10px 6px; font-size: .83rem; font-weight: 600;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; color: var(--t2);
+}
+.caja-hist-tab--active { color: var(--acc); border-bottom-color: var(--acc); }
+.caja-hist-body { padding: 8px 0 16px; }
+.hist-totales {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  margin: 6px 12px 12px; padding: 10px; background: var(--bg2);
+  border-radius: 10px;
+}
+.hist-tot-item { text-align: center; }
+.hist-tot-lbl { display: block; font-size: .7rem; color: var(--t2); }
+.hist-tot-val { display: block; font-size: .95rem; font-weight: 800; }
+.hist-day-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .1s;
+}
+.hist-day-row:active { background: var(--bg2); }
+.hist-day-info { display: flex; flex-direction: column; gap: 2px; }
+.hist-day-lbl { font-size: .85rem; font-weight: 700; color: var(--t1); text-transform: capitalize; }
+.hist-day-aper { font-size: .75rem; color: var(--t2); }
+.hist-day-nums { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.hist-day-ing  { font-size: .8rem; font-weight: 700; color: #10b981; }
+.hist-day-eg   { font-size: .8rem; font-weight: 700; color: #ef4444; }
+.hist-day-neto { font-size: .85rem; font-weight: 800; }
+.neto-pos { color: #10b981; }
+.neto-neg { color: #ef4444; }
+
+/* stats */
+.stats-section-title {
+  margin: 12px 14px 6px; font-size: .8rem; font-weight: 700;
+  color: var(--t2); text-transform: uppercase; letter-spacing: .04em;
+}
+.stats-empty { text-align: center; color: var(--t2); font-size: .8rem; padding: 4px 0; }
+.stats-met-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px; border-bottom: 1px solid var(--border);
+}
+.stats-met-lbl { flex: 1; font-size: .83rem; color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stats-met-bar-wrap { width: 60px; height: 6px; background: var(--border); border-radius: 3px; }
+.stats-met-bar { height: 6px; background: var(--acc); border-radius: 3px; }
+.stats-met-val { font-size: .78rem; font-weight: 700; color: var(--t1); white-space: nowrap; }
+
+body.dark .caja-hist-tab { color: #64748b; }
+body.dark .caja-hist-tab--active { color: #818cf8; border-bottom-color: #818cf8; }
+body.dark .hist-day-row:active { background: #1e293b; }
+body.dark .stats-met-bar-wrap { background: #334155; }

@@ -902,6 +902,13 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
   transition: opacity .15s, transform .1s;
 }
 .btn-garantia:active, .btn-history:active { opacity: .8; transform: scale(.97); }
+.btn-presupuesto {
+  background: linear-gradient(135deg, #10b981, #059669); color: #fff;
+  border: none; border-radius: 12px; padding: 11px 10px;
+  font-size: .82rem; font-weight: 700; cursor: pointer; flex: 1;
+  transition: opacity .15s, transform .1s;
+}
+.btn-presupuesto:active { opacity: .8; transform: scale(.97); }
 
 /* ── GUARANTEE MODAL ── */
 .garantia-ref-card {
@@ -1978,3 +1985,65 @@ body.dark .toast { background: #1e293b; color: #e2e8f0; box-shadow: 0 4px 20px r
 .cobro-desc { display: block; font-size: .82rem; color: var(--t2); margin-bottom: .25rem; }
 .cobro-monto { display: block; font-size: 1.6rem; font-weight: 900; color: var(--t1); }
 .cobro-m-active { background: var(--acc) !important; border-color: var(--acc) !important; color: #fff !important; }
+
+/* ── LOW STOCK BANNER ── */
+.lowstock-banner {
+  margin: 0 16px 8px;
+  border-radius: 12px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  overflow: hidden;
+}
+.lowstock-banner-hdr {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px;
+  font-size: .85rem; font-weight: 700; color: #92400e;
+  cursor: pointer; user-select: none;
+}
+.lowstock-chevron { font-size: .75rem; transition: transform .2s; }
+.lowstock-chevron.open { transform: rotate(180deg); }
+.lowstock-list { padding: 0 14px 10px; }
+.lowstock-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; border-top: 1px solid #fde68a;
+  font-size: .82rem; color: #78350f;
+}
+.lowstock-item-name { font-weight: 600; }
+.lowstock-item-qty { font-size: .8rem; color: #ef4444; font-weight: 700; }
+body.dark .lowstock-banner { background: #292015; border-color: #78350f; }
+body.dark .lowstock-banner-hdr { color: #fcd34d; }
+body.dark .lowstock-item { border-color: #3d2b10; color: #fcd34d; }
+body.dark .lowstock-item-qty { color: #f87171; }
+
+/* ── FOTOS EN REPARACIONES ── */
+.foto-input-wrap { display: flex; flex-direction: column; gap: 8px; }
+.btn-foto-add {
+  background: #e0f2fe; color: #0369a1; border: 1.5px dashed #7dd3fc;
+  border-radius: 10px; padding: 10px; font-size: .85rem; font-weight: 600;
+  cursor: pointer; text-align: center;
+}
+.btn-foto-add:active { opacity: .8; }
+.foto-preview { position: relative; display: inline-block; width: 100%; }
+.foto-preview img { width: 100%; max-height: 200px; object-fit: cover; border-radius: 10px; display: block; }
+.btn-foto-remove {
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(0,0,0,.55); color: #fff; border: none;
+  border-radius: 50%; width: 26px; height: 26px; font-size: .85rem;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.det-foto-wrap { padding: 0 16px 10px; }
+.det-foto-img { width: 100%; max-height: 180px; object-fit: cover; border-radius: 10px; cursor: zoom-in; }
+/* fullscreen */
+.foto-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.92);
+  z-index: 9999; display: flex; align-items: center; justify-content: center;
+}
+.foto-modal.hidden { display: none; }
+.foto-modal-img { max-width: 96vw; max-height: 90vh; object-fit: contain; border-radius: 8px; }
+.foto-modal-close {
+  position: absolute; top: 16px; right: 16px;
+  background: rgba(255,255,255,.2); color: #fff; border: none;
+  border-radius: 50%; width: 36px; height: 36px; font-size: 1rem;
+  cursor: pointer;
+}
+body.dark .btn-foto-add { background: #0c2d3d; border-color: #0ea5e9; color: #7dd3fc; }
