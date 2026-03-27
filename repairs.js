@@ -94,6 +94,7 @@ function initRepairs() {
 
   loadStaff();
   loadCustomMarcas();
+  loadWaNotifyNumber();
   listenRepairs();
 }
 
@@ -1558,8 +1559,25 @@ async function clearNota() {
 }
 
 // ── WhatsApp notificaciones automáticas ────
+function _getWaNum() {
+  // Firestore tiene prioridad; localStorage como caché local
+  return window._waNotifyNum || localStorage.getItem('tp_wa_notify') || '';
+}
+
+async function loadWaNotifyNumber() {
+  try {
+    const doc = await db.collection('config').doc('settings').get();
+    const num = doc.exists ? (doc.data().waNotify || '') : '';
+    if (num) {
+      window._waNotifyNum = num;
+      localStorage.setItem('tp_wa_notify', num); // caché local
+    }
+  } catch {}
+  updateWaNotifyStatus();
+}
+
 function triggerWaNotify(tipo, r) {
-  const waNum = localStorage.getItem('tp_wa_notify');
+  const waNum = _getWaNum();
   if (!waNum) return;
   let msg = '';
   if (tipo === 'entregado') {
@@ -1572,14 +1590,21 @@ function triggerWaNotify(tipo, r) {
 }
 
 function setWaNotifyNumber() {
-  const current = localStorage.getItem('tp_wa_notify') || '';
+  const current = _getWaNum();
   const num = prompt('Número para notificaciones WhatsApp\n(con código de país, ej: 5491112345678)\nDejá vacío para desactivar:', current);
   if (num === null) return;
-  if (num.trim()) {
-    localStorage.setItem('tp_wa_notify', num.trim());
-    toast('✅ Número configurado', 'success');
+  const trimmed = num.trim();
+  if (trimmed) {
+    window._waNotifyNum = trimmed;
+    localStorage.setItem('tp_wa_notify', trimmed);
+    // Guardar en Firestore para que no se pierda nunca
+    db.collection('config').doc('settings').set({ waNotify: trimmed }, { merge: true })
+      .then(() => toast('✅ Número guardado permanentemente', 'success'))
+      .catch(() => toast('✅ Número configurado (sin sincronizar)', 'success'));
   } else {
+    window._waNotifyNum = '';
     localStorage.removeItem('tp_wa_notify');
+    db.collection('config').doc('settings').set({ waNotify: '' }, { merge: true }).catch(() => {});
     toast('🔕 Notificaciones desactivadas', 'success');
   }
   updateWaNotifyStatus();
