@@ -1219,6 +1219,34 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 .ai-chat-send:hover { filter: brightness(1.15); }
 .ai-chat-send:disabled { opacity: .5; cursor: not-allowed; }
 
+/* ── MODAL ACTIVIDAD ── */
+.actividad-card { max-width: 520px; width: 96vw; max-height: 88vh; display: flex; flex-direction: column; }
+.actividad-filters { display: flex; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
+.actividad-filters select {
+  flex: 1; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px;
+  padding: 6px 10px; font-size: .78rem; color: #334155; font-weight: 600; outline: none;
+}
+.actividad-feed { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.act-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 12px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0;
+}
+.act-ico {
+  font-size: 1.05rem; flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.act-ico--ingreso  { background: #dcfce7; }
+.act-ico--estado   { background: #ede9fe; }
+.act-ico--edicion  { background: #fef3c7; }
+.act-ico--whatsapp { background: #dcfce7; }
+.act-ico--venta    { background: #e0f2fe; }
+.act-body { flex: 1; min-width: 0; }
+.act-desc { font-size: .82rem; font-weight: 600; color: #1e293b; line-height: 1.3; }
+.act-meta { font-size: .7rem; color: #94a3b8; margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.act-tec  { background: #f1f5f9; color: #475569; border-radius: 50px; padding: 1px 8px; font-weight: 700; font-size: .67rem; }
+.act-empty { text-align: center; color: #94a3b8; font-size: .85rem; padding: 30px; }
+
 /* ── NAV BADGE ── */
 .nav-ico-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
 .nav-badge {

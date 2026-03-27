@@ -419,6 +419,13 @@ async function saveRepair() {
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs
       });
       toast('Reparación actualizada', 'success');
+      logActivity({
+        tipo: 'edicion',
+        desc: `Editó ${marca} ${modelo} N°${existing.nOrden}`,
+        repairId: editingRepairId,
+        tecnico,
+        extra: { nOrden: existing.nOrden, marca, modelo, arreglo }
+      });
     } else {
       // Usar nOrden ingresado por el usuario (o auto si está vacío)
       const ordenInputVal = parseInt(document.getElementById('rep-fi-orden').value) || 0;
@@ -445,6 +452,13 @@ async function saveRepair() {
         esGarantia: false
       });
       toast('Reparación N°' + nOrden + ' registrada', 'success');
+      logActivity({
+        tipo: 'ingreso',
+        desc: `Nuevo ingreso: ${marca} ${modelo} N°${nOrden} — ${arreglo}`,
+        repairId: id,
+        tecnico,
+        extra: { nOrden, marca, modelo, arreglo, monto, nombre }
+      });
       triggerWaNotify('ingreso', { marca, modelo, nOrden, arreglo, nombre, monto });
     }
     closeRepairForm();
@@ -631,6 +645,20 @@ function togglePassField(inputId, btn) {
   }
 }
 
+// ── Log de actividad ──────────────────────
+async function logActivity({ tipo, desc, repairId, tecnico, extra = {} }) {
+  try {
+    await db.collection('actividad').add({
+      tipo,
+      desc,
+      repairId: repairId || null,
+      tecnico:  tecnico  || null,
+      extra,
+      fecha: new Date().toISOString()
+    });
+  } catch (e) { /* silencioso */ }
+}
+
 // ── Cambio de estado ──────────────────────
 async function changeRepairStatus(id, newStatus) {
   const r = REPAIRS.find(x => x.id === id);
@@ -639,13 +667,23 @@ async function changeRepairStatus(id, newStatus) {
   const ahora = new Date().toISOString();
   const update = { estado: newStatus };
   if (newStatus === 'entregado') update.fechaEntrega = ahora;
-  // Append to state history (avoid arrayUnion dependency — safe for single-user)
   const prevHistory = Array.isArray(r.estadoHistorial) ? r.estadoHistorial : [];
   update.estadoHistorial = [...prevHistory, { estado: newStatus, fecha: ahora }];
 
   try {
     await db.collection('repairs').doc(id).update(update);
     toast('Estado: ' + (REPAIR_STATES[newStatus]?.label || newStatus), 'success');
+
+    // Log actividad
+    const estadoLabel = REPAIR_STATES[newStatus]?.label || newStatus;
+    logActivity({
+      tipo: 'estado',
+      desc: `${r.marca} ${r.modelo} N°${r.nOrden} → ${estadoLabel}`,
+      repairId: id,
+      tecnico: r.tecnico || null,
+      extra: { estadoAnterior: r.estado, estadoNuevo: newStatus, nOrden: r.nOrden }
+    });
+
     closeRepairDetail();
     setTimeout(() => openRepairDetail(id), 120);
   } catch (e) {
@@ -658,6 +696,13 @@ async function changeRepairStatus(id, newStatus) {
 function repairWhatsApp(id) {
   const r = REPAIRS.find(x => x.id === id);
   if (!r || !r.tlf) { toast('No hay teléfono registrado', 'error'); return; }
+  logActivity({
+    tipo: 'whatsapp',
+    desc: `WhatsApp enviado a ${r.nombre || r.tlf} — ${r.marca} ${r.modelo} N°${r.nOrden}`,
+    repairId: id,
+    tecnico: r.tecnico || null,
+    extra: { nOrden: r.nOrden, tlf: r.tlf, estado: r.estado }
+  });
 
   let phone = String(r.tlf).replace(/\D/g, '');
   if (phone.length === 10)                      phone = '549' + phone;
@@ -848,6 +893,74 @@ async function saveGarantia() {
   } finally {
     btn.disabled = false;
   }
+}
+
+// ── Modal de actividad ────────────────────
+let _actividadData = [];
+
+async function openActividadModal() {
+  document.getElementById('actividad-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('actividad-feed').innerHTML = '<div class="act-empty">Cargando...</div>';
+
+  // Poblar filtro de técnicos
+  const tecSel = document.getElementById('act-filter-tec');
+  const tecOpts = ['<option value="">Todos los técnicos</option>'];
+  STAFF.forEach(s => { tecOpts.push(`<option value="${s}">${s}</option>`); });
+  tecSel.innerHTML = tecOpts.join('');
+
+  try {
+    const snap = await db.collection('actividad')
+      .orderBy('fecha', 'desc')
+      .limit(200)
+      .get();
+    _actividadData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderActividad();
+  } catch (e) {
+    document.getElementById('actividad-feed').innerHTML =
+      '<div class="act-empty">Error al cargar actividad</div>';
+  }
+}
+
+function closeActividadModal() {
+  document.getElementById('actividad-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function renderActividad() {
+  const tipoFil = document.getElementById('act-filter-tipo').value;
+  const tecFil  = document.getElementById('act-filter-tec').value;
+
+  const ICOS = {
+    ingreso:  '📥', estado: '🔄', edicion: '✏️',
+    whatsapp: '💬', venta:  '💰'
+  };
+
+  let items = _actividadData;
+  if (tipoFil) items = items.filter(a => a.tipo === tipoFil);
+  if (tecFil)  items = items.filter(a => a.tecnico === tecFil);
+
+  if (!items.length) {
+    document.getElementById('actividad-feed').innerHTML =
+      '<div class="act-empty">Sin actividad para este filtro</div>';
+    return;
+  }
+
+  document.getElementById('actividad-feed').innerHTML = items.map(a => {
+    const ico   = ICOS[a.tipo] || '📌';
+    const fecha = a.fecha ? new Date(a.fecha).toLocaleString('es-AR', {
+      day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'
+    }) : '';
+    const tec = a.tecnico ? `<span class="act-tec">👤 ${a.tecnico}</span>` : '';
+    return `
+      <div class="act-item">
+        <div class="act-ico act-ico--${a.tipo || ''}">${ico}</div>
+        <div class="act-body">
+          <div class="act-desc">${a.desc || '—'}</div>
+          <div class="act-meta">${fecha}${tec}</div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 // ── Historial del cliente ─────────────────

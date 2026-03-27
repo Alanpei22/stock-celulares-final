@@ -558,12 +558,26 @@ function closeSellModal() {
 function confirmSell() {
   const id = pendingSellId;
   if (!id) return;
+  const p = STOCK.find(x => x.id === id);
+  const vendedor = document.getElementById('sell-vendedor').value;
+  const formaPago = document.getElementById('sell-pago').value;
   db.collection('stock').doc(id).update({
-        vendido: true,
-        fecha_venta: new Date().toISOString(),
-        vendedor: document.getElementById('sell-vendedor').value,
-        forma_pago: document.getElementById('sell-pago').value
+    vendido: true,
+    fecha_venta: new Date().toISOString(),
+    vendedor,
+    forma_pago: formaPago
   });
+  // Log de venta
+  if (p) {
+    db.collection('actividad').add({
+      tipo: 'venta',
+      desc: `Venta: ${p.marca} ${p.modelo}${p.almacenamiento ? ' '+p.almacenamiento : ''} — $${(p.precio||0).toLocaleString('es-AR')}`,
+      tecnico: vendedor || null,
+      repairId: null,
+      extra: { stockId: id, precio: p.precio, formaPago, marca: p.marca, modelo: p.modelo },
+      fecha: new Date().toISOString()
+    }).catch(() => {});
+  }
   closeSellModal();
   closeDetail();
   toast('Venta registrada ✅', 'success');
