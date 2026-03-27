@@ -24,21 +24,28 @@ export default async function handler(req) {
 
   const year = new Date().getFullYear();
 
-  // ── Chat libre con contexto de stock ──
+  // ── Chat libre con contexto de stock y memoria ──
   if (action === 'chat') {
     const stockCtx = data.stockContext
-      ? `\nContexto actual del stock del negocio:\n${data.stockContext}\n`
+      ? `\n\nDATOS REALES DEL NEGOCIO HOY:\n${data.stockContext}\n`
       : '';
 
     const systemPrompt =
 `Sos el asistente IA de TechPoint, una tienda y taller de celulares en Argentina.
-Ayudás con consultas sobre stock, precios, recomendaciones de equipos y gestión del negocio.${stockCtx}
-Respondé siempre en español rioplatense, de forma clara y útil.
-Precios siempre en pesos argentinos (${year}).
-Si te piden listar equipos, usá formato claro con emojis para separar cada uno.
-Si el mensaje del usuario parece un comando para AGREGAR un equipo al stock (ej: "agregá Samsung A13 128GB nuevo a $90000"), respondé ÚNICAMENTE con un JSON así (sin texto extra):
-{"__cmd":"add_stock","marca":"...","modelo":"...","almacenamiento":"...","estado":"Nuevo/Usado","precio":NUMERO,"notas":"..."}
-Si no es un comando de agregar, respondé normalmente en texto.`;
+Tenés acceso a los datos reales del negocio y recordás toda la conversación actual.${stockCtx}
+Reglas:
+- Respondé en español rioplatense, claro y útil.
+- Usá los datos reales del stock cuando te pregunten por equipos disponibles, precios o reparaciones.
+- Precios en pesos argentinos (${year}).
+- Si te piden listar equipos, usá formato con emojis, uno por línea.
+- Si el usuario quiere AGREGAR un equipo al stock (ej: "agregá Samsung A13 128GB nuevo a $90000"), respondé ÚNICAMENTE con este JSON exacto (sin texto antes ni después):
+{"__cmd":"add_stock","marca":"...","modelo":"...","almacenamiento":"...","estado":"Nuevo","precio":90000,"notas":""}
+- Para cualquier otra consulta, respondé normalmente en texto.`;
+
+    // Historial completo = memoria de la conversación
+    const messages = Array.isArray(data.messages) && data.messages.length
+      ? data.messages
+      : [{ role: 'user', content: data.message || '' }];
 
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -50,9 +57,9 @@ Si no es un comando de agregar, respondé normalmente en texto.`;
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 700,
+          max_tokens: 900,
           system: systemPrompt,
-          messages: [{ role: 'user', content: data.message || '' }]
+          messages   // historial completo para memoria
         })
       });
       const result = await res.json();

@@ -1133,12 +1133,9 @@ function closeAccessLogModal() {
 
 // ── AGREGAR STOCK DESDE IA CHAT ───────────────────────────
 async function addPhoneFromAI(phone) {
-  const ref = db.collection('phones').doc();
+  const ref = db.collection('stock').doc();
   phone.id = ref.id;
-  phone.nOrden = Date.now();
   await ref.set(phone);
-  // Recargar lista si está visible
-  if (typeof loadPhones === 'function') loadPhones();
 }
 
 // ── IA ────────────────────────────────────────────────────

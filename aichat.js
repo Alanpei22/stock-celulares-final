@@ -1,52 +1,51 @@
 // ── AI CHAT FLOTANTE ─────────────────────────────────────────
-// Capacidades:
-// 1. Consultas libres (precios, listados, recomendaciones)
-// 2. Agregar stock con lenguaje natural
-// 3. Contexto del stock actual para respuestas precisas
-// 4. Diagnóstico de reparaciones
-// 5. Redactar mensajes de WhatsApp para clientes
-// 6. Análisis del negocio (qué equipos rotan más, etc.)
-
 let _aiChatOpen = false;
+let _chatHistory = []; // historial de la conversación (memoria)
 
 function toggleAiChat() {
   _aiChatOpen ? closeAiChat() : openAiChat();
 }
-
 function openAiChat() {
   _aiChatOpen = true;
   document.getElementById('ai-chat-overlay').classList.remove('hidden');
   document.getElementById('ai-chat-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('ai-chat-input').focus(), 100);
 }
-
 function closeAiChat() {
   _aiChatOpen = false;
   document.getElementById('ai-chat-overlay').classList.add('hidden');
   document.getElementById('ai-chat-modal').classList.add('hidden');
 }
-
 function aiChatKeydown(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendAiChat();
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAiChat(); }
 }
 
-// Construye un resumen del stock actual para dar contexto a la IA
+// ── Contexto real del negocio ─────────────────────────────
 function buildStockContext() {
-  try {
-    // Intentar acceder a datos de PHONES (stock) si están disponibles
-    if (typeof PHONES !== 'undefined' && PHONES.length) {
-      const resumen = PHONES.slice(0, 60).map(p =>
-        `${p.marca} ${p.modelo}${p.almacenamiento ? ' '+p.almacenamiento : ''} | ${p.estado || ''} | $${(p.precio||0).toLocaleString('es-AR')}`
-      ).join('\n');
-      return `Stock actual (${PHONES.length} equipos):\n${resumen}`;
-    }
-  } catch {}
-  return '';
+  const lines = [];
+
+  // Stock de equipos
+  if (typeof STOCK !== 'undefined' && STOCK.length) {
+    lines.push(`📦 STOCK ACTUAL (${STOCK.length} equipos):`);
+    STOCK.slice(0, 80).forEach(p => {
+      const precio = p.precio ? `$${Number(p.precio).toLocaleString('es-AR')}` : 'sin precio';
+      lines.push(`  · ${p.marca || ''} ${p.modelo || ''}${p.almacenamiento ? ' '+p.almacenamiento : ''} | ${p.estado || ''} | ${precio} | ${p.ubicacion || 'Stock'}`);
+    });
+  }
+
+  // Reparaciones activas
+  if (typeof REPAIRS !== 'undefined' && REPAIRS.length) {
+    const activas = REPAIRS.filter(r => r.estado !== 'entregado' && r.estado !== 'cancelado');
+    lines.push(`\n🔧 REPARACIONES ACTIVAS (${activas.length}):`);
+    activas.slice(0, 30).forEach(r => {
+      lines.push(`  · N°${r.nOrden} ${r.marca||''} ${r.modelo||''} | ${r.arreglo||''} | ${r.estado||''} | $${(r.monto||0).toLocaleString('es-AR')}`);
+    });
+  }
+
+  return lines.join('\n');
 }
 
+// ── Enviar mensaje ────────────────────────────────────────
 async function sendAiChat() {
   const input = document.getElementById('ai-chat-input');
   const msg = input.value.trim();
@@ -55,12 +54,12 @@ async function sendAiChat() {
   input.value = '';
   input.style.height = 'auto';
 
-  // Agregar burbuja del usuario
   addChatBubble(msg, 'user');
 
-  // Mostrar typing
-  const typingEl = addTyping();
+  // Agregar al historial
+  _chatHistory.push({ role: 'user', content: msg });
 
+  const typingEl = addTyping();
   const btn = document.getElementById('ai-chat-send');
   btn.disabled = true;
 
@@ -71,8 +70,8 @@ async function sendAiChat() {
       body: JSON.stringify({
         action: 'chat',
         data: {
-          message: msg,
-          stockContext: buildStockContext()
+          messages: _chatHistory,          // historial completo = memoria
+          stockContext: buildStockContext() // datos reales del negocio
         }
       })
     });
@@ -86,8 +85,14 @@ async function sendAiChat() {
 
     const text = json.text || '';
 
-    // Detectar si es un comando de agregar stock
-    const cmdMatch = text.match(/\{"__cmd":"add_stock"[\s\S]*\}/);
+    // Guardar respuesta en historial
+    _chatHistory.push({ role: 'assistant', content: text });
+
+    // Limitar historial a últimos 20 mensajes (10 intercambios)
+    if (_chatHistory.length > 20) _chatHistory = _chatHistory.slice(-20);
+
+    // Detectar comando de agregar stock
+    const cmdMatch = text.match(/\{"__cmd":"add_stock"[\s\S]*?\}/);
     if (cmdMatch) {
       try {
         const cmd = JSON.parse(cmdMatch[0]);
@@ -106,17 +111,16 @@ async function sendAiChat() {
   }
 }
 
+// ── Renderizar burbujas ───────────────────────────────────
 function addChatBubble(text, who, withCopy = false) {
   const msgs = document.getElementById('ai-chat-messages');
   const wrap = document.createElement('div');
   wrap.className = `ai-chat-bubble ${who === 'ai' ? 'ai-bubble' : 'user-bubble'}`;
 
-  // Convertir markdown básico
   const html = text
     .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
     .replace(/\*(.*?)\*/g, '<i>$1</i>')
     .replace(/\n/g, '<br>');
-
   wrap.innerHTML = html;
 
   if (who === 'ai' && withCopy) {
@@ -130,10 +134,7 @@ function addChatBubble(text, who, withCopy = false) {
       navigator.clipboard.writeText(text).then(() => {
         copyBtn.textContent = '✅ Copiado';
         copyBtn.classList.add('copied');
-        setTimeout(() => {
-          copyBtn.textContent = '📋 Copiar';
-          copyBtn.classList.remove('copied');
-        }, 2000);
+        setTimeout(() => { copyBtn.textContent = '📋 Copiar'; copyBtn.classList.remove('copied'); }, 2000);
       });
     };
     actions.appendChild(copyBtn);
@@ -155,7 +156,7 @@ function addTyping() {
   return el;
 }
 
-// ── Confirmar agregar stock ───────────────────────────────────
+// ── Confirmar agregar stock ───────────────────────────────
 function showAddStockConfirm(cmd) {
   const msgs = document.getElementById('ai-chat-messages');
   const wrap = document.createElement('div');
@@ -166,73 +167,66 @@ function showAddStockConfirm(cmd) {
     ✅ Entendido. ¿Querés agregar este equipo al stock?
     <div class="ai-confirm-card">
       <div class="ai-confirm-title">📱 NUEVO EQUIPO</div>
-      <div class="ai-confirm-row"><span>Marca</span><b>${cmd.marca || '—'}</b></div>
-      <div class="ai-confirm-row"><span>Modelo</span><b>${cmd.modelo || '—'}</b></div>
-      ${cmd.almacenamiento ? `<div class="ai-confirm-row"><span>Almacenamiento</span><b>${cmd.almacenamiento}</b></div>` : ''}
-      <div class="ai-confirm-row"><span>Estado</span><b>${cmd.estado || 'Usado'}</b></div>
+      <div class="ai-confirm-row"><span>Marca</span><b>${cmd.marca||'—'}</b></div>
+      <div class="ai-confirm-row"><span>Modelo</span><b>${cmd.modelo||'—'}</b></div>
+      ${cmd.almacenamiento?`<div class="ai-confirm-row"><span>Almacenamiento</span><b>${cmd.almacenamiento}</b></div>`:''}
+      <div class="ai-confirm-row"><span>Estado</span><b>${cmd.estado||'Usado'}</b></div>
       <div class="ai-confirm-row"><span>Precio</span><b>${precio}</b></div>
-      ${cmd.notas ? `<div class="ai-confirm-row"><span>Notas</span><b>${cmd.notas}</b></div>` : ''}
+      ${cmd.notas?`<div class="ai-confirm-row"><span>Notas</span><b>${cmd.notas}</b></div>`:''}
     </div>
-    <div class="ai-bubble-actions">
   `;
+
+  const actions = document.createElement('div');
+  actions.className = 'ai-bubble-actions';
 
   const addBtn = document.createElement('button');
   addBtn.className = 'ai-add-btn';
   addBtn.textContent = '➕ Sí, agregar';
-  addBtn.onclick = () => executeAddStock(cmd, wrap);
+  addBtn.onclick = () => executeAddStock(cmd, actions);
 
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'ai-copy-btn';
   cancelBtn.textContent = '✕ Cancelar';
-  cancelBtn.onclick = () => {
-    wrap.querySelector('.ai-bubble-actions').innerHTML = '<span style="color:#64748b;font-size:.75rem">Cancelado</span>';
-  };
+  cancelBtn.onclick = () => { actions.innerHTML = '<span style="color:#64748b;font-size:.75rem">Cancelado</span>'; };
 
-  const actions = wrap.querySelector('.ai-bubble-actions');
   actions.appendChild(addBtn);
   actions.appendChild(cancelBtn);
-
+  wrap.appendChild(actions);
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-async function executeAddStock(cmd, wrap) {
-  const actions = wrap.querySelector('.ai-bubble-actions');
+async function executeAddStock(cmd, actions) {
   actions.innerHTML = '<span style="color:#94a3b8;font-size:.75rem">⏳ Guardando...</span>';
-
   try {
-    // Construir objeto compatible con el formato de la app
     const newPhone = {
-      marca: (cmd.marca || '').trim(),
-      modelo: (cmd.modelo || '').trim(),
-      almacenamiento: (cmd.almacenamiento || '').trim(),
-      estado: cmd.estado || 'Usado',
-      precio: Number(cmd.precio) || 0,
-      notas: cmd.notas || '',
-      ubicacion: 'Stock',
-      fecha: new Date().toISOString(),
-      vendido: false,
+      marca:          (cmd.marca||'').trim(),
+      modelo:         (cmd.modelo||'').trim(),
+      almacenamiento: (cmd.almacenamiento||'').trim(),
+      estado:         cmd.estado||'Usado',
+      precio:         Number(cmd.precio)||0,
+      notas:          cmd.notas||'',
+      ubicacion:      'Stock',
+      fecha:          new Date().toISOString(),
+      vendido:        false,
     };
-
-    // Usar la función global de la app si existe
     if (typeof addPhoneFromAI === 'function') {
       await addPhoneFromAI(newPhone);
     } else if (typeof db !== 'undefined') {
-      const ref = db.collection('phones').doc();
+      const ref = db.collection('stock').doc();
       newPhone.id = ref.id;
       await ref.set(newPhone);
     } else {
-      throw new Error('No se encontró la conexión con la base de datos');
+      throw new Error('Sin conexión a base de datos');
     }
-
-    actions.innerHTML = '<span style="color:#34d399;font-size:.8rem;font-weight:700">✅ ¡Equipo agregado al stock!</span>';
-    addChatBubble(`📱 ${cmd.marca} ${cmd.modelo} agregado correctamente. Ya aparece en el stock.`, 'ai');
+    actions.innerHTML = '<span style="color:#34d399;font-size:.8rem;font-weight:700">✅ ¡Agregado al stock!</span>';
+    _chatHistory.push({ role: 'assistant', content: `Equipo ${cmd.marca} ${cmd.modelo} agregado al stock correctamente.` });
   } catch (err) {
     actions.innerHTML = `<span style="color:#ef4444;font-size:.75rem">❌ Error: ${err.message}</span>`;
   }
 }
 
-// Auto-resize del textarea
+// Auto-resize textarea
 document.getElementById('ai-chat-input').addEventListener('input', function() {
   this.style.height = 'auto';
   this.style.height = Math.min(this.scrollHeight, 100) + 'px';
