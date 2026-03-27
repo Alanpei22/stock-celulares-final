@@ -196,8 +196,15 @@ function renderRepairs() {
     const taCls  = isDemorado ? 'card-time-ago card-time-demorado' : 'card-time-ago';
 
     // Saldo pendiente
-    const saldoHTML = (r.monto && r.sena && r.monto > r.sena && r.estado !== 'entregado')
-      ? `<span class="card-saldo">Saldo: $${(r.monto - r.sena).toLocaleString('es-AR')}</span>`
+    const saldoVal = (r.monto && r.sena && r.monto > r.sena && r.estado !== 'entregado')
+      ? r.monto - r.sena : null;
+    const saldoHTML = saldoVal
+      ? `<span class="card-saldo-badge">💰 Saldo $${saldoVal.toLocaleString('es-AR')}</span>`
+      : '';
+
+    // Nota rápida
+    const notaHTML = r.notaRapida
+      ? `<div class="card-nota" onclick="event.stopPropagation();openNotaModal('${r.id}')">📝 ${esc(r.notaRapida)}</div>`
       : '';
 
     // Quick action chips
@@ -244,12 +251,16 @@ function renderRepairs() {
           <span class="card-price">${monto}</span>
           <div class="card-meta">
             ${r.nombre ? `<span class="card-imei">👤 ${esc(r.nombre)}</span>` : ''}
-            ${saldoHTML}
             ${fecha ? `<span class="card-date">📅 ${fecha}</span>` : ''}
             ${taStr ? `<span class="${taCls}">⏱ ${taStr}</span>` : ''}
           </div>
         </div>
-        ${quickBtn}
+        ${saldoVal ? `<div class="card-saldo-row">${saldoHTML}</div>` : ''}
+        ${notaHTML}
+        <div class="card-quick-actions" onclick="event.stopPropagation()">
+          ${chipsHTML}${garantiaChip}
+          <button class="card-chip chip-nota" onclick="openNotaModal('${r.id}')">${r.notaRapida ? '📝' : '📝 NOTA'}</button>
+        </div>
       </div>`;
   }).join('');
 }
@@ -434,6 +445,7 @@ async function saveRepair() {
         esGarantia: false
       });
       toast('Reparación N°' + nOrden + ' registrada', 'success');
+      triggerWaNotify('ingreso', { marca, modelo, nOrden, arreglo, nombre, monto });
     }
     closeRepairForm();
   } catch (e) {
@@ -1376,9 +1388,91 @@ async function quickStatusChange(e, id, newStatus) {
   try {
     await db.collection('repairs').doc(id).update(update);
     toast('→ ' + (REPAIR_STATES[newStatus]?.label || newStatus), 'success');
+    // WA auto-notify on entregado
+    if (newStatus === 'entregado') {
+      const r = REPAIRS.find(x => x.id === id);
+      if (r) triggerWaNotify('entregado', r);
+    }
   } catch (err) {
     toast('Error al actualizar', 'error');
   }
+}
+
+// ── Nota rápida ────────────────────────────
+let _notaCurrentId = null;
+
+function openNotaModal(id) {
+  _notaCurrentId = id;
+  const r = REPAIRS.find(x => x.id === id);
+  const input = document.getElementById('nota-input');
+  input.value = r?.notaRapida || '';
+  updateNotaChars();
+  document.getElementById('nota-overlay').classList.remove('hidden');
+  document.getElementById('nota-modal').classList.remove('hidden');
+  setTimeout(() => input.focus(), 100);
+}
+
+function closeNotaModal() {
+  document.getElementById('nota-overlay').classList.add('hidden');
+  document.getElementById('nota-modal').classList.add('hidden');
+  _notaCurrentId = null;
+}
+
+function updateNotaChars() {
+  const v = document.getElementById('nota-input').value.length;
+  document.getElementById('nota-chars-left').textContent = 200 - v;
+}
+
+async function saveNota() {
+  if (!_notaCurrentId) return;
+  const val = document.getElementById('nota-input').value.trim();
+  try {
+    await db.collection('repairs').doc(_notaCurrentId).update({ notaRapida: val || null });
+    toast(val ? '📝 Nota guardada' : '🗑 Nota eliminada', 'success');
+    closeNotaModal();
+  } catch { toast('Error al guardar nota', 'error'); }
+}
+
+async function clearNota() {
+  document.getElementById('nota-input').value = '';
+  updateNotaChars();
+  await saveNota();
+}
+
+// ── WhatsApp notificaciones automáticas ────
+function triggerWaNotify(tipo, r) {
+  const waNum = localStorage.getItem('tp_wa_notify');
+  if (!waNum) return;
+  let msg = '';
+  if (tipo === 'entregado') {
+    msg = `✅ *EQUIPO ENTREGADO*\n📱 ${r.marca} ${r.modelo} (N°${r.nOrden})\n🔧 ${r.arreglo || ''}\n👤 ${r.nombre || '—'}\n💰 $${(r.monto||0).toLocaleString('es-AR')}`;
+  } else if (tipo === 'ingreso') {
+    msg = `📥 *NUEVO INGRESO*\n📱 ${r.marca} ${r.modelo} (N°${r.nOrden})\n🔧 ${r.arreglo || ''}\n👤 ${r.nombre || '—'}\n💰 $${(r.monto||0).toLocaleString('es-AR')}`;
+  }
+  const url = `https://wa.me/${waNum.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
+
+function setWaNotifyNumber() {
+  const current = localStorage.getItem('tp_wa_notify') || '';
+  const num = prompt('Número para notificaciones WhatsApp\n(con código de país, ej: 5491112345678)\nDejá vacío para desactivar:', current);
+  if (num === null) return;
+  if (num.trim()) {
+    localStorage.setItem('tp_wa_notify', num.trim());
+    toast('✅ Número configurado', 'success');
+  } else {
+    localStorage.removeItem('tp_wa_notify');
+    toast('🔕 Notificaciones desactivadas', 'success');
+  }
+  updateWaNotifyStatus();
+}
+
+function updateWaNotifyStatus() {
+  const el = document.getElementById('wa-notify-status');
+  if (!el) return;
+  const num = localStorage.getItem('tp_wa_notify');
+  el.textContent = num ? `✅ Activo: +${num}` : '🔕 No configurado';
+  el.style.color = num ? '#10b981' : '#94a3b8';
 }
 
 function copyPhone(tlf) {

@@ -823,6 +823,7 @@ function openSettings() {
   renderSettingsPayments();
   renderSettingsPrices();
   updateBizPreview();
+  if (typeof updateWaNotifyStatus === 'function') updateWaNotifyStatus();
   document.getElementById('settings-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }

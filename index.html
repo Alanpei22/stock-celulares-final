@@ -457,6 +457,13 @@
       </div>
 
       <div class="settings-section">
+        <h4 class="settings-title">🔔 Notificaciones WhatsApp</h4>
+        <p class="settings-desc">Al ingresar un equipo o marcarlo como entregado, se abre WhatsApp con el mensaje listo para enviar.</p>
+        <button class="btn-secondary" style="width:100%" onclick="setWaNotifyNumber()">📲 Configurar número de notificación</button>
+        <div id="wa-notify-status" class="wa-notify-status"></div>
+      </div>
+
+      <div class="settings-section">
         <h4 class="settings-title">🛠 Herramientas</h4>
         <button class="btn-secondary" style="width:100%;margin-bottom:8px" onclick="openWaTplModal()">💬 Editar mensajes de WhatsApp</button>
         <button class="btn-secondary" style="width:100%" onclick="openAccessLogModal()">🔐 Historial de accesos</button>
@@ -791,6 +798,21 @@
   <div class="patron-modal-btns">
     <button type="button" class="btn-patron-reset" onclick="resetPatronCanvas()">🗑 Borrar</button>
     <button type="button" class="btn-patron-save" onclick="savePatron()">✅ Guardar patrón</button>
+  </div>
+</div>
+
+<!-- Modal Nota Rápida -->
+<div id="nota-overlay" class="nota-overlay hidden" onclick="closeNotaModal()"></div>
+<div id="nota-modal" class="nota-modal hidden">
+  <div class="nota-modal-hdr">
+    <span>📝 Nota rápida</span>
+    <button type="button" onclick="closeNotaModal()">✕</button>
+  </div>
+  <textarea id="nota-input" class="nota-input" placeholder="Ej: Llamé, no contestó. Esperando repuesto…" maxlength="200" rows="4" oninput="updateNotaChars()"></textarea>
+  <div class="nota-chars"><span id="nota-chars-left">200</span> caracteres restantes</div>
+  <div class="nota-modal-btns">
+    <button type="button" class="btn-nota-clear" onclick="clearNota()">🗑 Borrar nota</button>
+    <button type="button" class="btn-nota-save" onclick="saveNota()">✅ Guardar</button>
   </div>
 </div>
 
