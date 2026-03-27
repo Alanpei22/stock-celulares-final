@@ -678,6 +678,30 @@ async function changeRepairStatus(id, newStatus) {
   const r = REPAIRS.find(x => x.id === id);
   if (!r || r.estado === newStatus) return;
 
+  // Al marcar como "listo", preguntar qué repuesto se usó
+  if (newStatus === 'listo') {
+    openRepUsoModal(async (repuestoId) => {
+      await _doChangeRepairStatus(id, newStatus, r);
+      if (repuestoId && typeof REPUESTOS !== 'undefined') {
+        const rep = REPUESTOS.find(x => x.id === repuestoId);
+        if (rep) {
+          const nueva = Math.max(0, (rep.cantidad || 0) - 1);
+          Promise.all([
+            db.collection('repuestos').doc(repuestoId).update({ cantidad: nueva }),
+            db.collection('repairs').doc(id).update({ costoRepuesto: rep.precioCompra || 0 })
+          ])
+            .then(() => toast(`🔩 −1 ${rep.nombre}`, 'success'))
+            .catch(() => toast('Error al descontar repuesto', 'error'));
+        }
+      }
+    });
+    return;
+  }
+
+  await _doChangeRepairStatus(id, newStatus, r);
+}
+
+async function _doChangeRepairStatus(id, newStatus, r) {
   const ahora = new Date().toISOString();
   const update = { estado: newStatus };
   if (newStatus === 'entregado') update.fechaEntrega = ahora;
@@ -688,7 +712,6 @@ async function changeRepairStatus(id, newStatus) {
     await db.collection('repairs').doc(id).update(update);
     toast('Estado: ' + (REPAIR_STATES[newStatus]?.label || newStatus), 'success');
 
-    // Log actividad
     const estadoLabel = REPAIR_STATES[newStatus]?.label || newStatus;
     logActivity({
       tipo: 'estado',
