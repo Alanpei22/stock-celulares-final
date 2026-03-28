@@ -216,7 +216,10 @@
 
   <!-- Método de pago -->
   <div class="fg">
-    <label class="fl">Método de pago</label>
+    <div class="metodo-hdr-row">
+      <label class="fl">Método de pago</label>
+      <button class="btn-split-toggle" id="btn-split-toggle" onclick="toggleSplit()">＋ Dividir</button>
+    </div>
     <div class="chip-group metodos-group">
       <button class="metodo-btn" data-m="Efectivo" onclick="selectMetodo('Efectivo')">💵 Efectivo</button>
       <button class="metodo-btn" data-m="Transferencia" onclick="selectMetodo('Transferencia')">🏦 Transferencia</button>
@@ -224,7 +227,29 @@
       <button class="metodo-btn" data-m="Tarjeta débito" onclick="selectMetodo('Tarjeta débito')">💳 Débito</button>
       <button class="metodo-btn" data-m="Tarjeta crédito" onclick="selectMetodo('Tarjeta crédito')">💳 Crédito</button>
     </div>
+    <!-- Split section -->
+    <div id="split-section" class="split-section hidden">
+      <div class="split-sep">
+        <span>2do método</span>
+      </div>
+      <div class="chip-group metodos-group2">
+        <button class="metodo-btn2" data-m2="Efectivo" onclick="selectMetodo2('Efectivo')">💵 Efectivo</button>
+        <button class="metodo-btn2" data-m2="Transferencia" onclick="selectMetodo2('Transferencia')">🏦 Transferencia</button>
+        <button class="metodo-btn2" data-m2="MercadoPago" onclick="selectMetodo2('MercadoPago')">💙 MercadoPago</button>
+        <button class="metodo-btn2" data-m2="Tarjeta débito" onclick="selectMetodo2('Tarjeta débito')">💳 Débito</button>
+        <button class="metodo-btn2" data-m2="Tarjeta crédito" onclick="selectMetodo2('Tarjeta crédito')">💳 Crédito</button>
+      </div>
+      <div class="split-amt-row">
+        <span class="split-amt-lbl">Monto en 2do método</span>
+        <input id="mov-split-amt" class="fi split-amt-input" type="number" placeholder="0" min="0" inputmode="numeric" oninput="updateSplitRemainder()">
+      </div>
+      <div class="split-remainder-row">
+        <span class="split-amt-lbl">Resto en 1er método</span>
+        <span id="split-remainder-val" class="split-remainder-val">$0</span>
+      </div>
+    </div>
     <input type="hidden" id="mov-hidden-metodo">
+    <input type="hidden" id="mov-hidden-metodo2">
   </div>
 
   <!-- Actions -->

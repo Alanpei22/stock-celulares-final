@@ -384,8 +384,16 @@ function renderStats() {
   const totalIng    = ingMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const totalEg     = egMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const totalGastos = gastos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const ingEfec     = ingMovs.filter(m => m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const egEfec      = egMovs.filter(m => m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const _efecPortion = m => {
+    const total = Number(m.monto) || 0;
+    const m2amt = Number(m.monto2) || 0;
+    if (m.metodoPago === 'Efectivo' && m.metodoPago2) return total - m2amt;
+    if (m.metodoPago === 'Efectivo') return total;
+    if (m.metodoPago2 === 'Efectivo') return m2amt;
+    return 0;
+  };
+  const ingEfec = ingMovs.reduce((s, m) => s + _efecPortion(m), 0);
+  const egEfec  = egMovs.reduce((s, m) => s + _efecPortion(m), 0);
   const efectivoEnCaja = apertura + ingEfec - egEfec;
   const neto = totalIng - totalGastos; // retiros no afectan neto
 
@@ -429,7 +437,10 @@ function renderMovimientos() {
 
   list.innerHTML = MOVIMIENTOS.map(m => {
     const hora = m.createdAt ? m.createdAt.slice(11, 16) : '';
-    const meta = [m.metodoPago, hora].filter(Boolean).join(' · ');
+    const metodoStr = m.metodoPago2
+      ? `${m.metodoPago} $${(m.monto - (m.monto2||0)).toLocaleString('es-AR')} + ${m.metodoPago2} $${(m.monto2||0).toLocaleString('es-AR')}`
+      : m.metodoPago;
+    const meta = [metodoStr, hora].filter(Boolean).join(' · ');
     const signo = m.tipo === 'ingreso' ? '+' : '−';
     return `
       <div class="mov-card mov-${esc(m.tipo)}" onclick="openMovForm('${esc(m.id)}')">
@@ -503,6 +514,17 @@ function openMovForm(id) {
     selectCat(m.categoria || '');
     // select method
     selectMetodo(m.metodoPago || 'Efectivo');
+    if (m.metodoPago2 && m.monto2) {
+      _splitActive = true;
+      const section = document.getElementById('split-section');
+      const btn = document.getElementById('btn-split-toggle');
+      if (section) section.classList.remove('hidden');
+      if (btn) { btn.textContent = '✕ Quitar'; btn.classList.add('split-active'); }
+      selectMetodo2(m.metodoPago2);
+      const splitInput = document.getElementById('mov-split-amt');
+      if (splitInput) splitInput.value = m.monto2;
+      updateSplitRemainder();
+    }
   } else {
     deleteWrap.style.display = 'none';
     setMovTipo('ingreso');
@@ -511,8 +533,9 @@ function openMovForm(id) {
     selectMetodo('Efectivo');
   }
 
-  // Clear any previous error highlights
+  // Clear any previous error highlights and split state
   document.querySelectorAll('#mov-modal .field-error').forEach(el => el.classList.remove('field-error'));
+  resetSplit();
 
   // Auto-clear error on input
   document.getElementById('mov-fi-monto').oninput = () =>
@@ -564,6 +587,59 @@ function selectMetodo(metodo) {
   });
   const hidden = document.getElementById('mov-hidden-metodo');
   if (hidden) hidden.value = metodo;
+  updateSplitRemainder();
+}
+
+function selectMetodo2(metodo) {
+  document.querySelectorAll('.metodo-btn2').forEach(btn => {
+    btn.classList.toggle('metodo2-active', btn.dataset.m2 === metodo);
+  });
+  const hidden = document.getElementById('mov-hidden-metodo2');
+  if (hidden) hidden.value = metodo;
+}
+
+let _splitActive = false;
+
+function toggleSplit() {
+  _splitActive = !_splitActive;
+  const section  = document.getElementById('split-section');
+  const btn      = document.getElementById('btn-split-toggle');
+  if (_splitActive) {
+    section.classList.remove('hidden');
+    btn.textContent = '✕ Quitar';
+    btn.classList.add('split-active');
+    // Default second method to Transferencia if first is Efectivo
+    const m1 = document.getElementById('mov-hidden-metodo')?.value || '';
+    selectMetodo2(m1 === 'Efectivo' ? 'Transferencia' : 'Efectivo');
+    updateSplitRemainder();
+  } else {
+    section.classList.add('hidden');
+    btn.textContent = '＋ Dividir';
+    btn.classList.remove('split-active');
+    document.getElementById('mov-split-amt').value = '';
+    document.getElementById('mov-hidden-metodo2').value = '';
+  }
+}
+
+function updateSplitRemainder() {
+  if (!_splitActive) return;
+  const total  = parseFloat(document.getElementById('mov-fi-monto')?.value) || 0;
+  const split2 = parseFloat(document.getElementById('mov-split-amt')?.value) || 0;
+  const resto  = Math.max(0, total - split2);
+  const el = document.getElementById('split-remainder-val');
+  if (el) el.textContent = '$' + resto.toLocaleString('es-AR');
+}
+
+function resetSplit() {
+  _splitActive = false;
+  const section = document.getElementById('split-section');
+  const btn     = document.getElementById('btn-split-toggle');
+  if (section) section.classList.add('hidden');
+  if (btn)   { btn.textContent = '＋ Dividir'; btn.classList.remove('split-active'); }
+  const splitAmt = document.getElementById('mov-split-amt');
+  if (splitAmt) splitAmt.value = '';
+  const hidden2 = document.getElementById('mov-hidden-metodo2');
+  if (hidden2) hidden2.value = '';
 }
 
 function _markError(el, on) {
@@ -590,15 +666,19 @@ async function saveMov() {
   const categoria  = document.getElementById('mov-hidden-cat')?.value || '';
   const metodoPago = document.getElementById('mov-hidden-metodo')?.value || '';
 
-  const montoOk  = monto > 0;
-  const descOk   = descripcion.length > 0;
-  const catOk    = categoria.length > 0;
-  const metOk    = metodoPago.length > 0;
+  const metodo2  = document.getElementById('mov-hidden-metodo2')?.value || '';
+  const splitAmt = _splitActive ? (parseFloat(document.getElementById('mov-split-amt')?.value) || 0) : 0;
+
+  const montoOk = monto > 0;
+  const descOk  = descripcion.length > 0;
+  const catOk   = categoria.length > 0;
+  const metOk   = metodoPago.length > 0;
+  const splitOk = !_splitActive || (metodo2.length > 0 && splitAmt > 0 && splitAmt < monto);
 
   _markError(montoInput?.closest('.mov-monto-area'), !montoOk);
   _markError(descInput?.closest('.fg'), !descOk);
-  _markError(catWrap,  !catOk);
-  _markError(metWrap,  !metOk);
+  _markError(catWrap, !catOk);
+  _markError(metWrap, !metOk);
 
   if (!montoOk || !descOk || !catOk || !metOk) {
     const faltantes = [
@@ -610,10 +690,18 @@ async function saveMov() {
     toast('Completá: ' + faltantes, 'error');
     return;
   }
+  if (!splitOk) {
+    toast('El monto del 2do método debe ser > $0 y < total', 'error');
+    return;
+  }
 
   const tipo = document.getElementById('mov-btn-ingreso').classList.contains('tipo-active') ? 'ingreso' : 'egreso';
 
   const data = { tipo, categoria, descripcion, monto, metodoPago, fecha: currentDate };
+  if (_splitActive && metodo2 && splitAmt > 0) {
+    data.metodoPago2 = metodo2;
+    data.monto2 = splitAmt;
+  }
 
   try {
     if (editingMovId) {
