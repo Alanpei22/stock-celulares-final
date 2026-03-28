@@ -317,3 +317,82 @@ body.dark .caja-hist-tab { color: #64748b; }
 body.dark .caja-hist-tab--active { color: #818cf8; border-bottom-color: #818cf8; }
 body.dark .hist-day-row:active { background: #1e293b; }
 body.dark .stats-met-bar-wrap { background: #334155; }
+
+/* ── DESGLOSE DEL DÍA ─────────────────────────────────── */
+.caja-desglose {
+  display: flex;
+  gap: 4px;
+  padding: 7px 10px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--brd);
+  overflow-x: auto;
+}
+.desglose-item {
+  flex: 1;
+  min-width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 4px;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--brd);
+}
+.desglose-num {
+  font-size: .75rem;
+  font-weight: 800;
+  color: var(--t1);
+  white-space: nowrap;
+}
+.desglose-num--gasto { color: #ef4444; }
+.desglose-num--retiro { color: #f59e0b; }
+.desglose-lbl {
+  font-size: .58rem;
+  color: var(--t2);
+  text-align: center;
+  font-weight: 500;
+}
+
+/* ── CIERRE DE CAJA ───────────────────────────────────── */
+.cierre-resumen {
+  margin: 10px 0 4px;
+  border: 1px solid var(--brd);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.cierre-resumen-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: .88rem;
+  color: var(--t1);
+  border-bottom: 1px solid var(--brd);
+}
+.cierre-resumen-row:last-child { border-bottom: none; }
+.cierre-resumen-dif { font-weight: 700; }
+.cierre-dif-val {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.cierre-dif-val.dif-ok   { color: #10b981; }
+.cierre-dif-val.dif-warn { color: #ef4444; }
+
+/* ── HISTORIAL COMPARACIÓN ───────────────────────────── */
+.hist-comp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--brd);
+  font-size: .83rem;
+}
+.hist-comp-lbl { color: var(--t2); flex: 1; }
+.hist-comp-val { font-weight: 800; font-size: .95rem; }
+.hist-comp-prev { color: var(--t2); font-size: .78rem; }
+
+body.dark .desglose-item { background: #1e293b; border-color: #334155; }
+body.dark .cierre-resumen { border-color: #334155; }
+body.dark .cierre-resumen-row { border-color: #334155; }

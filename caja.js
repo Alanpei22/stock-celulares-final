@@ -18,9 +18,10 @@ const FB_CONFIG = {
 const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
 
 const CATEGORIAS = {
-  ingreso: ['Reparación', 'Venta equipo', 'Otro ingreso'],
-  egreso:  ['Compra repuesto', 'Gastos fijos', 'Retiro', 'Otro gasto']
+  ingreso: ['Venta equipo', 'Reparación', 'Hidrogel / Accesorio', 'Seña', 'Otro ingreso'],
+  egreso:  ['Compra repuesto', 'Gasto fijo', 'Retiro dueño', 'Otro gasto']
 };
+const RETIRO_CAT = 'Retiro dueño';
 
 const METODOS_PAGO = ['Efectivo', 'Transferencia', 'MercadoPago', 'Tarjeta débito', 'Tarjeta crédito'];
 
@@ -30,6 +31,7 @@ let ARQUEO = null;
 let currentDate = new Date().toISOString().slice(0, 10);
 let movListener = null;
 let editingMovId = null;
+let CIERRE = null;
 let _pinBuf = '';
 
 // ══════════════════════════════════════════
@@ -99,6 +101,7 @@ function initApp() {
   updateDateLabel();
   listenMovimientos();
   loadArqueo();
+  loadCierre();
 }
 
 // PIN pad
@@ -183,8 +186,10 @@ function setDate(date) {
   }
   MOVIMIENTOS = [];
   ARQUEO = null;
+  CIERRE = null;
   listenMovimientos();
   loadArqueo();
+  loadCierre();
 }
 
 function updateDateLabel() {
@@ -363,24 +368,43 @@ function listenMovimientos() {
 }
 
 function renderStats() {
-  const apertura = ARQUEO?.total || 0;
-  const ingresos = MOVIMIENTOS.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const egresos  = MOVIMIENTOS.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const ingresosEfectivo = MOVIMIENTOS.filter(m => m.tipo === 'ingreso' && m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const egresosEfectivo  = MOVIMIENTOS.filter(m => m.tipo === 'egreso'  && m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const efectivoEnCaja = apertura + ingresosEfectivo - egresosEfectivo;
-  const saldoNeto = ingresos - egresos;
+  const apertura  = ARQUEO?.total || 0;
+  const ingMovs   = MOVIMIENTOS.filter(m => m.tipo === 'ingreso');
+  const egMovs    = MOVIMIENTOS.filter(m => m.tipo === 'egreso');
+  const retiros   = egMovs.filter(m => m.categoria === RETIRO_CAT);
+  const gastos    = egMovs.filter(m => m.categoria !== RETIRO_CAT);
+
+  const totalIng    = ingMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const totalEg     = egMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const totalGastos = gastos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const ingEfec     = ingMovs.filter(m => m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const egEfec      = egMovs.filter(m => m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const efectivoEnCaja = apertura + ingEfec - egEfec;
+  const neto = totalIng - totalGastos; // retiros no afectan neto
 
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = fmt(val); };
   set('stat-apertura', apertura);
-  set('stat-ingresos', ingresos);
-  set('stat-egresos',  egresos);
+  set('stat-ingresos', totalIng);
+  set('stat-egresos',  totalEg);
   set('stat-efectivo', efectivoEnCaja);
 
   const netoEl = document.getElementById('stat-neto');
-  if (netoEl) {
-    netoEl.textContent = fmt(saldoNeto);
-    netoEl.style.color = saldoNeto >= 0 ? '#10b981' : '#ef4444';
+  if (netoEl) { netoEl.textContent = fmt(neto); netoEl.style.color = neto >= 0 ? '#10b981' : '#ef4444'; }
+
+  // Desglose del día
+  const reparac   = ingMovs.filter(m => m.categoria === 'Reparación').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const ventaEfec = ingMovs.filter(m => m.metodoPago === 'Efectivo' && m.categoria !== 'Reparación').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const digital   = ingMovs.filter(m => m.metodoPago !== 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const totalRetiros = retiros.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  set('desglose-efectivo', ventaEfec);
+  set('desglose-digital', digital);
+  set('desglose-reparac', reparac);
+  set('desglose-gastos', totalGastos);
+  const retWrap = document.getElementById('desglose-retiros-wrap');
+  if (retWrap) {
+    retWrap.style.display = totalRetiros > 0 ? '' : 'none';
+    const retEl = document.getElementById('desglose-retiros');
+    if (retEl) retEl.textContent = fmt(totalRetiros);
   }
 }
 
@@ -531,6 +555,119 @@ async function deleteMov() {
     console.error('deleteMov:', e);
     toast('Error al eliminar', 'error');
   }
+}
+
+// ══════════════════════════════════════════
+//  CIERRE DE CAJA
+// ══════════════════════════════════════════
+
+async function loadCierre() {
+  try {
+    const doc = await db.collection('caja_cierres').doc(currentDate).get();
+    CIERRE = doc.exists ? doc.data() : null;
+  } catch(e) { CIERRE = null; }
+  renderCierreStatus();
+}
+
+function renderCierreStatus() {
+  const btn = document.getElementById('cierre-btn');
+  if (!btn) return;
+  btn.style.opacity = CIERRE ? '0.5' : '1';
+  btn.title = CIERRE
+    ? 'Cierre registrado — contado: $' + (CIERRE.contado || 0).toLocaleString('es-AR')
+    : 'Cerrar caja del día';
+}
+
+function openCierreModal() {
+  document.getElementById('cierre-billetes').innerHTML = renderCierreArqueoRows();
+  if (CIERRE && CIERRE.billetes) {
+    DENOMINACIONES.forEach(d => {
+      const inp = document.getElementById('cierre-b-' + d);
+      if (inp) inp.value = CIERRE.billetes[d] || 0;
+    });
+  }
+  updateCierreTotal();
+  document.getElementById('cierre-overlay').classList.remove('hidden');
+  document.getElementById('cierre-modal').classList.remove('hidden');
+}
+
+function closeCierreModal() {
+  document.getElementById('cierre-overlay').classList.add('hidden');
+  document.getElementById('cierre-modal').classList.add('hidden');
+}
+
+function renderCierreArqueoRows() {
+  return DENOMINACIONES.map(d => `
+    <div class="arqueo-row">
+      <span class="arqueo-denom">$${d.toLocaleString('es-AR')}</span>
+      <div class="arqueo-counter">
+        <button class="arqueo-btn" onclick="changeCierreBillete(${d},-1)">−</button>
+        <input class="arqueo-input" id="cierre-b-${d}" type="number" value="0" min="0" inputmode="numeric" oninput="updateCierreTotal()">
+        <button class="arqueo-btn" onclick="changeCierreBillete(${d},1)">+</button>
+      </div>
+      <span class="arqueo-subtotal" id="cierre-s-${d}">$0</span>
+    </div>`).join('');
+}
+
+function changeCierreBillete(d, delta) {
+  const inp = document.getElementById('cierre-b-' + d);
+  if (!inp) return;
+  inp.value = Math.max(0, (parseInt(inp.value) || 0) + delta);
+  updateCierreTotal();
+}
+
+function _getCierreEsperado() {
+  const apertura = ARQUEO?.total || 0;
+  const ingEfec = MOVIMIENTOS.filter(m => m.tipo === 'ingreso' && m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const egEfec  = MOVIMIENTOS.filter(m => m.tipo === 'egreso'  && m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  return apertura + ingEfec - egEfec;
+}
+
+function updateCierreTotal() {
+  const esperado = _getCierreEsperado();
+  let contado = 0;
+  DENOMINACIONES.forEach(d => {
+    const inp = document.getElementById('cierre-b-' + d);
+    const cant = inp ? (parseInt(inp.value) || 0) : 0;
+    const sub = cant * d;
+    contado += sub;
+    const subEl = document.getElementById('cierre-s-' + d);
+    if (subEl) subEl.textContent = '$' + sub.toLocaleString('es-AR');
+  });
+  const dif = contado - esperado;
+  document.getElementById('cierre-esperado-val').textContent = fmt(esperado);
+  document.getElementById('cierre-contado-val').textContent  = fmt(contado);
+  const difEl = document.getElementById('cierre-dif-val');
+  if (difEl) {
+    difEl.textContent = (dif >= 0 ? '+' : '') + '$' + dif.toLocaleString('es-AR');
+    difEl.className = 'cierre-dif-val ' + (Math.abs(dif) <= 500 ? 'dif-ok' : 'dif-warn');
+  }
+}
+
+async function saveCierre() {
+  const esperado = _getCierreEsperado();
+  const billetes = {};
+  let contado = 0;
+  DENOMINACIONES.forEach(d => {
+    const inp = document.getElementById('cierre-b-' + d);
+    const cant = inp ? (parseInt(inp.value) || 0) : 0;
+    billetes[d] = cant;
+    contado += cant * d;
+  });
+  const diferencia = contado - esperado;
+  try {
+    await db.collection('caja_cierres').doc(currentDate).set({
+      fecha: currentDate, billetes, contado, esperado, diferencia,
+      savedAt: new Date().toISOString()
+    });
+    CIERRE = { billetes, contado, esperado, diferencia };
+    closeCierreModal();
+    renderCierreStatus();
+    const difStr = diferencia === 0
+      ? 'sin diferencia ✅'
+      : (diferencia > 0 ? '+' : '') + '$' + diferencia.toLocaleString('es-AR');
+    toast('🔐 Cierre guardado — ' + difStr, Math.abs(diferencia) <= 500 ? 'success' : 'info');
+  } catch(e) { toast('Error al guardar cierre', 'error'); }
 }
 
 // ══════════════════════════════════════════

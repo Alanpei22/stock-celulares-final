@@ -147,14 +147,27 @@ async function loadHistorialData(tab) {
       const arqueos = {};
       arqueoSnap.docs.forEach(d => { const data = d.data(); arqueos[data.fecha] = data.total; });
 
-      body.innerHTML = buildHistorialHTML(movs, arqueos, desde, today);
+      // Período anterior (misma cantidad de días)
+      let prevMovs = [];
+      if (tab === 'mes') {
+        const dPrevEnd = new Date(desde + 'T12:00:00');
+        dPrevEnd.setDate(0); // último día del mes anterior
+        const dPrevStart = new Date(dPrevEnd.getFullYear(), dPrevEnd.getMonth(), 1);
+        const prevDesde = dPrevStart.toISOString().slice(0, 10);
+        const prevHasta = dPrevEnd.toISOString().slice(0, 10);
+        const prevSnap = await db.collection('caja_movimientos')
+          .where('fecha', '>=', prevDesde).where('fecha', '<=', prevHasta).get();
+        prevMovs = prevSnap.docs.map(d => d.data());
+      }
+
+      body.innerHTML = buildHistorialHTML(movs, arqueos, desde, today, prevMovs, tab);
     }
   } catch (e) {
     body.innerHTML = '<p style="text-align:center;padding:20px;color:#ef4444">Error al cargar</p>';
   }
 }
 
-function buildHistorialHTML(movs, arqueos, desde, today) {
+function buildHistorialHTML(movs, arqueos, desde, today, prevMovs, tab) {
   const byDate = {};
   movs.forEach(m => {
     if (!byDate[m.fecha]) byDate[m.fecha] = [];
@@ -169,12 +182,13 @@ function buildHistorialHTML(movs, arqueos, desde, today) {
     d.setDate(d.getDate() - 1);
   }
 
-  let totalIngresos = 0, totalEgresos = 0;
+  let totalIngresos = 0, totalEgresos = 0, diasActivos = 0;
   const rows = dates.map(fecha => {
     const ms = byDate[fecha] || [];
     const ing = ms.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-    const eg  = ms.filter(m => m.tipo === 'egreso').reduce((s, m)  => s + (Number(m.monto) || 0), 0);
+    const eg  = ms.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
     const neto = ing - eg;
+    if (ing > 0 || eg > 0) diasActivos++;
     totalIngresos += ing; totalEgresos += eg;
     const aper = arqueos[fecha] != null ? fmt(arqueos[fecha]) : '--';
     const fmtFecha = new Date(fecha + 'T12:00:00').toLocaleDateString('es-AR', { weekday:'short', day:'2-digit', month:'short' });
@@ -191,11 +205,29 @@ function buildHistorialHTML(movs, arqueos, desde, today) {
   }).join('');
 
   const totalNeto = totalIngresos - totalEgresos;
+  const promDiario = diasActivos > 0 ? Math.round(totalIngresos / diasActivos) : 0;
+
+  // Comparación mes anterior
+  let compHTML = '';
+  if (tab === 'mes' && prevMovs && prevMovs.length > 0) {
+    const prevIng = prevMovs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    if (prevIng > 0 && totalIngresos > 0) {
+      const pct = Math.round(((totalIngresos - prevIng) / prevIng) * 100);
+      const cls = pct >= 0 ? 'neto-pos' : 'neto-neg';
+      compHTML = '<div class="hist-comp-row">' +
+        '<span class="hist-comp-lbl">vs mes anterior</span>' +
+        '<span class="hist-comp-val ' + cls + '">' + (pct >= 0 ? '+' : '') + pct + '%</span>' +
+        '<span class="hist-comp-prev">(' + fmt(prevIng) + ')</span>' +
+        '</div>';
+    }
+  }
+
   return '<div class="hist-totales">' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Total ingresos</span><span class="hist-tot-val hist-day-ing">+' + fmt(totalIngresos) + '</span></div>' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Total egresos</span><span class="hist-tot-val hist-day-eg">-' + fmt(totalEgresos) + '</span></div>' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Neto</span><span class="hist-tot-val ' + (totalNeto >= 0 ? 'neto-pos' : 'neto-neg') + '">' + fmt(totalNeto) + '</span></div>' +
-    '</div>' + rows;
+    '<div class="hist-tot-item"><span class="hist-tot-lbl">Prom. diario</span><span class="hist-tot-val">' + fmt(promDiario) + '</span></div>' +
+    '</div>' + compHTML + rows;
 }
 
 function buildCajaStatsHTML(movs) {
@@ -244,10 +276,15 @@ function buildCajaStatsHTML(movs) {
   const catItems   = catRanking.map(([c, v]) => catItem(c, v, 'hist-day-ing')).join('') || '<p class="stats-empty">Sin datos</p>';
   const egCatItems = egCatRanking.map(([c, v]) => catItem(c, v, 'hist-day-eg')).join('') || '<p class="stats-empty">Sin datos</p>';
 
+  const fechas30 = [...new Set(movs.map(m => m.fecha))];
+  const diasActivos30 = fechas30.filter(f => movs.filter(m => m.fecha === f && m.tipo === 'ingreso').length > 0).length;
+  const prom30 = diasActivos30 > 0 ? Math.round(totalIng / diasActivos30) : 0;
+
   return '<div class="hist-totales">' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Ingresos (30d)</span><span class="hist-tot-val hist-day-ing">+' + fmt(totalIng) + '</span></div>' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Egresos (30d)</span><span class="hist-tot-val hist-day-eg">-' + fmt(totalEg) + '</span></div>' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Neto</span><span class="hist-tot-val ' + (totalIng-totalEg >= 0 ? 'neto-pos' : 'neto-neg') + '">' + fmt(totalIng-totalEg) + '</span></div>' +
+    '<div class="hist-tot-item"><span class="hist-tot-lbl">Prom. diario</span><span class="hist-tot-val">' + fmt(prom30) + '</span></div>' +
     '</div>' +
     '<h4 class="stats-section-title">Metodos de pago (ingresos)</h4>' + metItems +
     '<h4 class="stats-section-title">Categorias de ingreso</h4>' + catItems +

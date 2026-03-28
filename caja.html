@@ -53,6 +53,7 @@
       <div class="hdr-actions">
         <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
         <button class="hdr-btn" onclick="reopenArqueo()" title="Ver/editar arqueo">🧾</button>
+        <button class="hdr-btn" id="cierre-btn" onclick="openCierreModal()" title="Cerrar caja del día">🔐</button>
         <button class="hdr-btn owner-only" onclick="openCajaHistorial()" title="Historial / Stats">📊</button>
         <button class="hdr-btn owner-lock-btn" id="caja-owner-btn" onclick="openCajaOwnerPin()" title="Modo dueño">🔒</button>
       </div>
@@ -73,6 +74,30 @@
     <div class="caja-stat caja-stat--eg"><span class="caja-stat-num" id="stat-egresos">$0</span><span class="caja-stat-lbl">Egresos</span></div>
     <div class="caja-stat caja-stat--ef"><span class="caja-stat-num" id="stat-efectivo">$0</span><span class="caja-stat-lbl">Efectivo en caja</span></div>
     <div class="caja-stat caja-stat--neto"><span class="caja-stat-num" id="stat-neto">$0</span><span class="caja-stat-lbl">Neto del día</span></div>
+  </div>
+
+  <!-- Desglose del día -->
+  <div class="caja-desglose">
+    <div class="desglose-item">
+      <span class="desglose-num" id="desglose-efectivo">$0</span>
+      <span class="desglose-lbl">💵 Ef. ventas</span>
+    </div>
+    <div class="desglose-item">
+      <span class="desglose-num" id="desglose-digital">$0</span>
+      <span class="desglose-lbl">💳 Digital</span>
+    </div>
+    <div class="desglose-item">
+      <span class="desglose-num" id="desglose-reparac">$0</span>
+      <span class="desglose-lbl">🔧 Reparac.</span>
+    </div>
+    <div class="desglose-item">
+      <span class="desglose-num desglose-num--gasto" id="desglose-gastos">$0</span>
+      <span class="desglose-lbl">💸 Gastos</span>
+    </div>
+    <div class="desglose-item" id="desglose-retiros-wrap" style="display:none">
+      <span class="desglose-num desglose-num--retiro" id="desglose-retiros">$0</span>
+      <span class="desglose-lbl">🏧 Retiro</span>
+    </div>
   </div>
 
   <!-- Movement list -->
@@ -105,6 +130,34 @@
   </div>
   <div class="nota-modal-btns">
     <button class="btn-nota-save" onclick="saveArqueo()" style="width:100%">✅ Confirmar apertura</button>
+  </div>
+</div>
+
+<!-- MODAL CIERRE DE CAJA -->
+<div id="cierre-overlay" class="nota-overlay hidden" onclick="closeCierreModal()"></div>
+<div id="cierre-modal" class="arqueo-modal hidden">
+  <div class="nota-modal-hdr">
+    <span>🔐 Cierre de caja</span>
+    <button onclick="closeCierreModal()">✕</button>
+  </div>
+  <p class="arqueo-sub">Contá los billetes al cerrar el día</p>
+  <div id="cierre-billetes" class="arqueo-billetes"></div>
+  <div class="cierre-resumen">
+    <div class="cierre-resumen-row">
+      <span>💰 Efectivo esperado</span>
+      <span id="cierre-esperado-val" class="arqueo-total-num">$0</span>
+    </div>
+    <div class="cierre-resumen-row">
+      <span>🧮 Total contado</span>
+      <span id="cierre-contado-val" class="arqueo-total-num">$0</span>
+    </div>
+    <div class="cierre-resumen-row cierre-resumen-dif">
+      <span>📊 Diferencia</span>
+      <span id="cierre-dif-val" class="cierre-dif-val dif-ok">$0</span>
+    </div>
+  </div>
+  <div class="nota-modal-btns">
+    <button class="btn-nota-save" onclick="saveCierre()" style="width:100%">🔐 Confirmar cierre</button>
   </div>
 </div>
 
