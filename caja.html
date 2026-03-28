@@ -110,8 +110,21 @@
     </div>
   </div>
 
-  <!-- FAB -->
-  <button class="fab" onclick="openMovForm()" title="Nuevo movimiento">＋</button>
+  <!-- FAB Speed Dial -->
+  <div class="fab-backdrop hidden" id="fab-backdrop" onclick="closeFabMenu()"></div>
+  <div class="fab-wrap" id="fab-wrap">
+    <div class="fab-actions hidden" id="fab-actions">
+      <div class="fab-action-row">
+        <span class="fab-lbl">Egreso</span>
+        <button class="fab-sub fab-sub-eg" onclick="openMovFormType('egreso')">🔴</button>
+      </div>
+      <div class="fab-action-row">
+        <span class="fab-lbl">Ingreso</span>
+        <button class="fab-sub fab-sub-ing" onclick="openMovFormType('ingreso')">💚</button>
+      </div>
+    </div>
+    <button class="fab" id="fab-main" onclick="toggleFabMenu()" title="Nuevo movimiento">＋</button>
+  </div>
 
 </div>
 
@@ -164,25 +177,32 @@
 <!-- MODAL MOVIMIENTO -->
 <div id="mov-overlay" class="nota-overlay hidden" onclick="closeMovForm()"></div>
 <div id="mov-modal" class="modal-sheet-bottom hidden">
-  <div class="nota-modal-hdr">
-    <span id="mov-form-title">➕ Nuevo movimiento</span>
-    <button onclick="closeMovForm()">✕</button>
+  <div class="mov-drag-handle"></div>
+
+  <!-- Tipo toggle header -->
+  <div class="mov-tipo-hdr">
+    <button id="mov-btn-ingreso" class="mov-tipo-btn mov-tipo-btn--ing tipo-active" onclick="setMovTipo('ingreso')">💚 Ingreso</button>
+    <button id="mov-btn-egreso" class="mov-tipo-btn mov-tipo-btn--eg" onclick="setMovTipo('egreso')">🔴 Egreso</button>
+    <button class="mov-close-btn" onclick="closeMovForm()">✕</button>
   </div>
 
-  <!-- Tipo toggle -->
-  <div class="tipo-toggle">
-    <button id="mov-btn-ingreso" class="tipo-btn tipo-ingreso tipo-active" onclick="setMovTipo('ingreso')">💚 Ingreso</button>
-    <button id="mov-btn-egreso" class="tipo-btn tipo-egreso" onclick="setMovTipo('egreso')">🔴 Egreso</button>
+  <!-- Monto grande -->
+  <div class="mov-monto-area">
+    <span class="mov-monto-prefix">$</span>
+    <input id="mov-fi-monto" class="mov-monto-big" type="number" placeholder="0" min="0" inputmode="numeric">
   </div>
 
-  <!-- Monto -->
-  <div class="fg">
-    <label class="fl">Monto *</label>
-    <input id="mov-fi-monto" class="fi mov-monto-input" type="number" placeholder="0" min="0" inputmode="numeric">
+  <!-- Quick amounts -->
+  <div class="quick-amounts">
+    <button class="quick-amt" onclick="addQuickAmt(5000)">+5k</button>
+    <button class="quick-amt" onclick="addQuickAmt(10000)">+10k</button>
+    <button class="quick-amt" onclick="addQuickAmt(20000)">+20k</button>
+    <button class="quick-amt" onclick="addQuickAmt(50000)">+50k</button>
+    <button class="quick-amt" onclick="addQuickAmt(100000)">+100k</button>
   </div>
 
   <!-- Categorías -->
-  <div class="fg">
+  <div class="fg" style="margin-top:.6rem">
     <label class="fl">Categoría</label>
     <div id="mov-categorias" class="chip-group"></div>
     <input type="hidden" id="mov-hidden-cat">
@@ -211,9 +231,9 @@
   <div id="mov-delete-wrap" style="display:none;margin-top:4px">
     <button class="btn-danger" onclick="deleteMov()">🗑 Eliminar</button>
   </div>
-  <div style="display:flex;gap:10px;margin-top:8px">
+  <div style="display:flex;gap:10px;margin-top:12px">
     <button class="btn-secondary" onclick="closeMovForm()" style="flex:1">Cancelar</button>
-    <button class="btn-primary" onclick="saveMov()" style="flex:2">💾 Guardar</button>
+    <button class="btn-primary" id="mov-save-btn" onclick="saveMov()" style="flex:2">💾 Guardar</button>
   </div>
 </div>
 

@@ -396,3 +396,158 @@ body.dark .stats-met-bar-wrap { background: #334155; }
 body.dark .desglose-item { background: #1e293b; border-color: #334155; }
 body.dark .cierre-resumen { border-color: #334155; }
 body.dark .cierre-resumen-row { border-color: #334155; }
+
+/* ── FAB SPEED DIAL ───────────────────────────────────── */
+.fab-wrap {
+  position: fixed;
+  bottom: 24px; right: 20px;
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+.fab-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+  animation: fabIn .15s ease;
+}
+.fab-actions.hidden { display: none; }
+@keyframes fabIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fab-action-row { display: flex; align-items: center; gap: 10px; }
+.fab-lbl {
+  background: rgba(0,0,0,.62);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: .78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.fab-sub {
+  width: 48px; height: 48px;
+  border: none; border-radius: 50%;
+  font-size: 1.3rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,.22);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .12s;
+}
+.fab-sub:active { transform: scale(.92); }
+.fab-sub-ing { background: #dcfce7; }
+.fab-sub-eg  { background: #fee2e2; }
+.fab {
+  width: 58px; height: 58px;
+  border: none; border-radius: 50%;
+  background: var(--acc);
+  color: #fff;
+  font-size: 1.7rem;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0,0,0,.28);
+  transition: transform .22s;
+  display: flex; align-items: center; justify-content: center;
+  line-height: 1;
+}
+.fab.fab-open { transform: rotate(45deg); }
+.fab-backdrop {
+  position: fixed; inset: 0;
+  z-index: 899;
+  background: rgba(0,0,0,.18);
+}
+.fab-backdrop.hidden { display: none; }
+
+/* ── MODAL MOVIMIENTO (nuevo diseño) ─────────────────── */
+.mov-drag-handle {
+  width: 36px; height: 4px;
+  background: var(--brd);
+  border-radius: 2px;
+  margin: 0 auto 12px;
+}
+.mov-tipo-hdr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: .6rem;
+}
+.mov-tipo-btn {
+  flex: 1;
+  padding: .55rem;
+  border: 2px solid var(--brd);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--t2);
+  font-size: .85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+}
+.mov-tipo-btn--ing.tipo-active { background: #dcfce7; border-color: #10b981; color: #166534; }
+.mov-tipo-btn--eg.tipo-active  { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
+.mov-close-btn {
+  width: 32px; height: 32px;
+  border: none; background: var(--bg3);
+  border-radius: 50%; cursor: pointer;
+  color: var(--t2); font-size: .9rem;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.mov-monto-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: .25rem 0 .5rem;
+}
+.mov-monto-prefix {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--t2);
+  line-height: 1;
+  margin-top: 4px;
+}
+.mov-monto-big {
+  font-size: 2.6rem !important;
+  font-weight: 800 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  color: var(--t1);
+  width: 100%;
+  max-width: 220px;
+  text-align: left;
+  padding: 0 !important;
+}
+.quick-amounts {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: .25rem;
+}
+.quick-amt {
+  padding: 5px 13px;
+  border: 1.5px solid var(--brd);
+  border-radius: 20px;
+  background: var(--card);
+  color: var(--acc);
+  font-size: .8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .1s;
+}
+.quick-amt:active { background: var(--acc); color: #fff; border-color: var(--acc); }
+
+body.dark .mov-tipo-btn { background: #1e293b; border-color: #334155; color: #94a3b8; }
+body.dark .mov-tipo-btn--ing.tipo-active { background: #14532d; border-color: #10b981; color: #86efac; }
+body.dark .mov-tipo-btn--eg.tipo-active  { background: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
+body.dark .mov-close-btn { background: #334155; color: #94a3b8; }
+body.dark .quick-amt { background: #1e293b; border-color: #334155; }
+body.dark .fab-lbl { background: rgba(255,255,255,.15); color: #f1f5f9; }
+body.dark .fab-sub-ing { background: #14532d; }
+body.dark .fab-sub-eg  { background: #7f1d1d; }

@@ -25,7 +25,14 @@ const RETIRO_CAT = 'Retiro dueño';
 
 const METODOS_PAGO = ['Efectivo', 'Transferencia', 'MercadoPago', 'Tarjeta débito', 'Tarjeta crédito'];
 
+const CAT_ICONS = {
+  'Venta equipo': '📱', 'Reparación': '🔧', 'Hidrogel / Accesorio': '🛡️',
+  'Seña': '📝', 'Otro ingreso': '💰',
+  'Compra repuesto': '🛒', 'Gasto fijo': '📋', 'Retiro dueño': '🏧', 'Otro gasto': '💸'
+};
+
 let db = null;
+let _fabOpen = false;
 let MOVIMIENTOS = [];
 let ARQUEO = null;
 let currentDate = new Date().toISOString().slice(0, 10);
@@ -442,7 +449,43 @@ function renderMovimientos() {
 //  FORMULARIO MOVIMIENTO
 // ══════════════════════════════════════════
 
+// ══════════════════════════════════════════
+//  FAB SPEED DIAL
+// ══════════════════════════════════════════
+
+function toggleFabMenu() { _fabOpen ? closeFabMenu() : openFabMenu(); }
+
+function openFabMenu() {
+  _fabOpen = true;
+  document.getElementById('fab-actions').classList.remove('hidden');
+  document.getElementById('fab-backdrop').classList.remove('hidden');
+  document.getElementById('fab-main').classList.add('fab-open');
+}
+
+function closeFabMenu() {
+  _fabOpen = false;
+  const actions  = document.getElementById('fab-actions');
+  const backdrop = document.getElementById('fab-backdrop');
+  const fab      = document.getElementById('fab-main');
+  if (actions)  actions.classList.add('hidden');
+  if (backdrop) backdrop.classList.add('hidden');
+  if (fab)      fab.classList.remove('fab-open');
+}
+
+function openMovFormType(tipo) {
+  closeFabMenu();
+  openMovForm(null);
+  setMovTipo(tipo);
+}
+
+function addQuickAmt(amt) {
+  const input = document.getElementById('mov-fi-monto');
+  if (!input) return;
+  input.value = (parseFloat(input.value) || 0) + amt;
+}
+
 function openMovForm(id) {
+  closeFabMenu();
   editingMovId = id || null;
   const overlay = document.getElementById('mov-overlay');
   const modal   = document.getElementById('mov-modal');
@@ -495,9 +538,10 @@ function renderCatBtns(tipo) {
   const container = document.getElementById('mov-categorias');
   if (!container) return;
   const cats = CATEGORIAS[tipo] || [];
-  container.innerHTML = cats.map(c =>
-    `<button class="cat-btn" data-cat="${esc(c)}" onclick="selectCat('${esc(c)}')">${esc(c)}</button>`
-  ).join('');
+  container.innerHTML = cats.map(c => {
+    const icon = CAT_ICONS[c] ? CAT_ICONS[c] + ' ' : '';
+    return `<button class="cat-btn" data-cat="${esc(c)}" onclick="selectCat('${esc(c)}')">${icon}${esc(c)}</button>`;
+  }).join('');
 }
 
 function selectCat(cat) {
