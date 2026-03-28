@@ -511,6 +511,15 @@ function openMovForm(id) {
     selectMetodo('Efectivo');
   }
 
+  // Clear any previous error highlights
+  document.querySelectorAll('#mov-modal .field-error').forEach(el => el.classList.remove('field-error'));
+
+  // Auto-clear error on input
+  document.getElementById('mov-fi-monto').oninput = () =>
+    document.querySelector('.mov-monto-area')?.classList.remove('field-error');
+  document.getElementById('mov-fi-desc').oninput = () =>
+    document.getElementById('mov-fi-desc')?.closest('.fg')?.classList.remove('field-error');
+
   overlay.classList.remove('hidden');
   modal.classList.remove('hidden');
 }
@@ -557,42 +566,52 @@ function selectMetodo(metodo) {
   if (hidden) hidden.value = metodo;
 }
 
-function _shakeEl(id) {
-  const el = document.getElementById(id);
+function _markError(el, on) {
   if (!el) return;
-  el.style.animation = 'none';
-  el.offsetHeight; // reflow
-  el.style.animation = 'shake .35s ease';
-  setTimeout(() => el.style.animation = '', 400);
+  if (on) {
+    el.classList.add('field-error');
+    el.style.animation = 'none';
+    el.offsetHeight;
+    el.style.animation = 'shake .35s ease';
+    setTimeout(() => { el.style.animation = ''; }, 400);
+  } else {
+    el.classList.remove('field-error');
+  }
 }
 
 async function saveMov() {
   const montoInput = document.getElementById('mov-fi-monto');
-  const monto = parseFloat(montoInput.value);
-  if (!monto || monto <= 0) {
-    montoInput.style.color = '#ef4444';
-    setTimeout(() => montoInput.style.color = '', 1200);
-    _shakeEl('mov-fi-monto');
-    toast('Ingresá un monto', 'error');
+  const descInput  = document.getElementById('mov-fi-desc');
+  const catWrap    = document.querySelector('#mov-categorias')?.closest('.fg');
+  const metWrap    = document.querySelector('.metodos-group')?.closest('.fg');
+
+  const monto      = parseFloat(montoInput?.value);
+  const descripcion = descInput?.value.trim() || '';
+  const categoria  = document.getElementById('mov-hidden-cat')?.value || '';
+  const metodoPago = document.getElementById('mov-hidden-metodo')?.value || '';
+
+  const montoOk  = monto > 0;
+  const descOk   = descripcion.length > 0;
+  const catOk    = categoria.length > 0;
+  const metOk    = metodoPago.length > 0;
+
+  _markError(montoInput?.closest('.mov-monto-area'), !montoOk);
+  _markError(descInput?.closest('.fg'), !descOk);
+  _markError(catWrap,  !catOk);
+  _markError(metWrap,  !metOk);
+
+  if (!montoOk || !descOk || !catOk || !metOk) {
+    const faltantes = [
+      !montoOk && 'monto',
+      !descOk  && 'descripción',
+      !catOk   && 'categoría',
+      !metOk   && 'método de pago',
+    ].filter(Boolean).join(', ');
+    toast('Completá: ' + faltantes, 'error');
     return;
   }
 
-  const categoria = document.getElementById('mov-hidden-cat').value;
-  if (!categoria) {
-    _shakeEl('mov-categorias');
-    toast('Seleccioná una categoría', 'error');
-    return;
-  }
-
-  const metodoPago = document.getElementById('mov-hidden-metodo').value;
-  if (!metodoPago) {
-    _shakeEl('mov-modal');
-    toast('Seleccioná un método de pago', 'error');
-    return;
-  }
-
-  const tipo       = document.getElementById('mov-btn-ingreso').classList.contains('tipo-active') ? 'ingreso' : 'egreso';
-  const descripcion = document.getElementById('mov-fi-desc').value.trim();
+  const tipo = document.getElementById('mov-btn-ingreso').classList.contains('tipo-active') ? 'ingreso' : 'egreso';
 
   const data = { tipo, categoria, descripcion, monto, metodoPago, fecha: currentDate };
 

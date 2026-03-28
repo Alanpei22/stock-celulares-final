@@ -553,6 +553,15 @@ body.dark .cierre-resumen-row { border-color: #334155; }
 }
 .quick-amt:active { background: var(--acc); color: #fff; border-color: var(--acc); }
 
+/* ── FIELD ERROR ─────────────────────────────────────── */
+.field-error {
+  border-radius: 10px;
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+}
+.mov-monto-area.field-error .mov-monto-big,
+.mov-monto-area.field-error .mov-monto-prefix { color: #ef4444; }
+
 body.dark .mov-tipo-btn { background: #1e293b; border-color: #334155; color: #94a3b8; }
 body.dark .mov-tipo-btn--ing.tipo-active { background: #14532d; border-color: #10b981; color: #86efac; }
 body.dark .mov-tipo-btn--eg.tipo-active  { background: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
