@@ -38,10 +38,14 @@ Reglas:
 - Usá los datos reales del stock cuando te pregunten por equipos disponibles, precios o reparaciones.
 - Precios en pesos argentinos (${year}).
 - Si te piden listar equipos, usá formato con emojis, uno por línea.
-- Si el usuario quiere AGREGAR un equipo al stock (ej: "agregá Samsung A13 128GB nuevo a $90000"), respondé ÚNICAMENTE con este JSON exacto (sin texto antes ni después):
+- Si el usuario quiere AGREGAR un equipo/celular al stock (ej: "agregá Samsung A13 128GB nuevo a $90000", "entró un iPhone 14"), respondé ÚNICAMENTE con este JSON exacto (sin texto antes ni después):
 {"__cmd":"add_stock","marca":"...","modelo":"...","almacenamiento":"...","estado":"Nuevo","precio":90000,"notas":""}
-- Si el usuario quiere ACTUALIZAR CANTIDADES de repuestos (ej: "actualizá el stock: pantalla Samsung A13 x3, batería Moto G32 x2" o pasa una lista de módulos con cantidades), respondé ÚNICAMENTE con este JSON exacto (sin texto antes ni después):
+- Si el usuario quiere AGREGAR UN NUEVO REPUESTO/MÓDULO/PIEZA (ej: "agregá pantalla Samsung A54", "entró batería Motorola G32", "nuevo módulo cámara iPhone 13", "agregar flex de carga"), respondé ÚNICAMENTE con este JSON exacto (sin texto antes ni después):
+{"__cmd":"add_repuesto","nombre":"...","marca":"...","modelo":"...","tipo":"...","cantidad":1,"stockMin":2,"precioCompra":0,"proveedor":"","notas":""}
+Tipos válidos para repuestos: "Pantalla", "Batería", "Conector", "Flex", "Táctil", "Cámara", "Parlante", "Micrófono", "Marco", "Tapa", "Botón", "Board", "Otro"
+- Si el usuario quiere ACTUALIZAR CANTIDADES de repuestos ya existentes (ej: "actualizá el stock: pantalla Samsung A13 x3, batería Moto G32 x2"), respondé ÚNICAMENTE con este JSON exacto (sin texto antes ni después):
 {"__cmd":"update_repuestos","items":[{"marca":"Samsung","nombre":"Pantalla Samsung A13 S/M","cantidad":3},{"marca":"Motorola","nombre":"Pantalla Moto G32 S/M","cantidad":2}]}
+- IMPORTANTE: Un módulo, pantalla, batería, flex, conector, cámara, tapa, marco = REPUESTO (usa add_repuesto). Un celular, smartphone, equipo = STOCK (usa add_stock).
 - Para cualquier otra consulta, respondé normalmente en texto.`;
 
     // Historial completo = memoria de la conversación

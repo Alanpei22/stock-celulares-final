@@ -101,6 +101,16 @@ async function sendAiChat() {
       } catch {}
     }
 
+    // Detectar comando de agregar repuesto nuevo
+    const cmdAddRepMatch = text.match(/\{"__cmd":"add_repuesto"[\s\S]*?\}/);
+    if (cmdAddRepMatch) {
+      try {
+        const cmd = JSON.parse(cmdAddRepMatch[0]);
+        showAddRepuestoConfirm(cmd);
+        return;
+      } catch {}
+    }
+
     // Detectar comando de actualizar repuestos
     const cmdRepMatch = text.match(/\{"__cmd":"update_repuestos"[\s\S]*?\}/);
     if (cmdRepMatch) {
@@ -231,6 +241,73 @@ async function executeAddStock(cmd, actions) {
     }
     actions.innerHTML = '<span style="color:#34d399;font-size:.8rem;font-weight:700">✅ ¡Agregado al stock!</span>';
     _chatHistory.push({ role: 'assistant', content: `Equipo ${cmd.marca} ${cmd.modelo} agregado al stock correctamente.` });
+  } catch (err) {
+    actions.innerHTML = `<span style="color:#ef4444;font-size:.75rem">❌ Error: ${err.message}</span>`;
+  }
+}
+
+// ── Confirmar agregar repuesto nuevo ─────────────────────────
+function showAddRepuestoConfirm(cmd) {
+  const msgs = document.getElementById('ai-chat-messages');
+  const wrap = document.createElement('div');
+  wrap.className = 'ai-chat-bubble ai-bubble';
+
+  const precio = cmd.precioCompra ? `$${Number(cmd.precioCompra).toLocaleString('es-AR')}` : '—';
+  wrap.innerHTML = `
+    ✅ Entendido. ¿Querés agregar este repuesto?
+    <div class="ai-confirm-card">
+      <div class="ai-confirm-title">🔩 NUEVO REPUESTO</div>
+      <div class="ai-confirm-row"><span>Nombre</span><b>${cmd.nombre||'—'}</b></div>
+      <div class="ai-confirm-row"><span>Marca</span><b>${cmd.marca||'—'}</b></div>
+      ${cmd.modelo?`<div class="ai-confirm-row"><span>Modelo</span><b>${cmd.modelo}</b></div>`:''}
+      <div class="ai-confirm-row"><span>Tipo</span><b>${cmd.tipo||'—'}</b></div>
+      <div class="ai-confirm-row"><span>Cantidad</span><b>${cmd.cantidad??1}</b></div>
+      <div class="ai-confirm-row"><span>Precio compra</span><b>${precio}</b></div>
+      ${cmd.proveedor?`<div class="ai-confirm-row"><span>Proveedor</span><b>${cmd.proveedor}</b></div>`:''}
+      ${cmd.notas?`<div class="ai-confirm-row"><span>Notas</span><b>${cmd.notas}</b></div>`:''}
+    </div>
+  `;
+
+  const actions = document.createElement('div');
+  actions.className = 'ai-bubble-actions';
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'ai-add-btn';
+  addBtn.textContent = '➕ Sí, agregar';
+  addBtn.onclick = () => executeAddRepuesto(cmd, actions);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'ai-copy-btn';
+  cancelBtn.textContent = '✕ Cancelar';
+  cancelBtn.onclick = () => { actions.innerHTML = '<span style="color:#64748b;font-size:.75rem">Cancelado</span>'; };
+
+  actions.appendChild(addBtn);
+  actions.appendChild(cancelBtn);
+  wrap.appendChild(actions);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function executeAddRepuesto(cmd, actions) {
+  actions.innerHTML = '<span style="color:#94a3b8;font-size:.75rem">⏳ Guardando...</span>';
+  try {
+    if (typeof db === 'undefined') throw new Error('Sin conexión a base de datos');
+    const ref = db.collection('repuestos').doc();
+    await ref.set({
+      id:           ref.id,
+      nombre:       (cmd.nombre || '').trim(),
+      marca:        (cmd.marca  || '').trim(),
+      modelo:       (cmd.modelo || '').trim(),
+      tipo:         cmd.tipo        || 'Otro',
+      cantidad:     Number(cmd.cantidad)     || 1,
+      stockMin:     Number(cmd.stockMin)     || 2,
+      precioCompra: Number(cmd.precioCompra) || 0,
+      proveedor:    cmd.proveedor || '',
+      notas:        cmd.notas     || '',
+      fechaAlta:    new Date().toISOString()
+    });
+    actions.innerHTML = '<span style="color:#34d399;font-size:.8rem;font-weight:700">✅ ¡Repuesto agregado!</span>';
+    _chatHistory.push({ role: 'assistant', content: `Repuesto ${cmd.nombre} agregado correctamente.` });
   } catch (err) {
     actions.innerHTML = `<span style="color:#ef4444;font-size:.75rem">❌ Error: ${err.message}</span>`;
   }
