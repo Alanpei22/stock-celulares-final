@@ -557,16 +557,42 @@ function selectMetodo(metodo) {
   if (hidden) hidden.value = metodo;
 }
 
+function _shakeEl(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.animation = 'none';
+  el.offsetHeight; // reflow
+  el.style.animation = 'shake .35s ease';
+  setTimeout(() => el.style.animation = '', 400);
+}
+
 async function saveMov() {
-  const monto = parseFloat(document.getElementById('mov-fi-monto').value);
-  if (!monto || monto <= 0) { toast('Ingresá un monto válido', 'error'); return; }
+  const montoInput = document.getElementById('mov-fi-monto');
+  const monto = parseFloat(montoInput.value);
+  if (!monto || monto <= 0) {
+    montoInput.style.color = '#ef4444';
+    setTimeout(() => montoInput.style.color = '', 1200);
+    _shakeEl('mov-fi-monto');
+    toast('Ingresá un monto', 'error');
+    return;
+  }
 
   const categoria = document.getElementById('mov-hidden-cat').value;
-  if (!categoria) { toast('Seleccioná una categoría', 'error'); return; }
+  if (!categoria) {
+    _shakeEl('mov-categorias');
+    toast('Seleccioná una categoría', 'error');
+    return;
+  }
+
+  const metodoPago = document.getElementById('mov-hidden-metodo').value;
+  if (!metodoPago) {
+    _shakeEl('mov-modal');
+    toast('Seleccioná un método de pago', 'error');
+    return;
+  }
 
   const tipo       = document.getElementById('mov-btn-ingreso').classList.contains('tipo-active') ? 'ingreso' : 'egreso';
   const descripcion = document.getElementById('mov-fi-desc').value.trim();
-  const metodoPago  = document.getElementById('mov-hidden-metodo').value || 'Efectivo';
 
   const data = { tipo, categoria, descripcion, monto, metodoPago, fecha: currentDate };
 

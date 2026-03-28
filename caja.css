@@ -1,3 +1,11 @@
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%     { transform: translateX(-6px); }
+  40%     { transform: translateX(6px); }
+  60%     { transform: translateX(-4px); }
+  80%     { transform: translateX(4px); }
+}
+
 /* ── DATE NAV ──────────────────────────────────────────── */
 .caja-date-nav {
   display: flex;
@@ -260,6 +268,8 @@ body.dark .tipo-btn { background: #1e293b; border-color: #334155; color: #94a3b8
 body.dark .tipo-ingreso.tipo-active { background: #14532d; border-color: #10b981; color: #86efac; }
 body.dark .tipo-egreso.tipo-active  { background: #7f1d1d; border-color: #ef4444; color: #fca5a5; }
 body.dark .cat-btn, body.dark .metodo-btn { background: #1e293b; border-color: #334155; color: #94a3b8; }
+body.dark .cat-btn.cat-active   { background: var(--acc); border-color: var(--acc); color: #fff; }
+body.dark .metodo-btn.metodo-active { background: var(--acc); border-color: var(--acc); color: #fff; }
 body.dark .caja-date-nav { background: #1e293b; border-color: #334155; color: #f1f5f9; }
 
 /* ── HISTORIAL / STATS MODAL ── */
