@@ -1600,6 +1600,170 @@ function showAiError(msg) {
   res.innerHTML = `<span style="color:#ef4444">⚠️ ${msg || 'Error al consultar IA'}</span>`;
 }
 
+// ── IA Quick Add ──────────────────────────────────────────
+let _aiAddTipo = 'equipo';
+let _aiAddData = null;
+
+function openAIAdd(tipo) {
+  _aiAddTipo = tipo || 'equipo';
+  _aiAddData = null;
+  document.getElementById('ai-add-texto').value = '';
+  document.getElementById('ai-add-result').classList.add('hidden');
+  document.getElementById('ai-add-actions').classList.add('hidden');
+  document.getElementById('ai-add-submit-lbl').textContent = '✨ Analizar con IA';
+  document.getElementById('ai-add-submit-btn').disabled = false;
+  setAIAddTipo(_aiAddTipo);
+  document.getElementById('ai-add-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('ai-add-texto').focus(), 300);
+}
+
+function closeAIAdd() {
+  document.getElementById('ai-add-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function setAIAddTipo(tipo) {
+  _aiAddTipo = tipo;
+  document.getElementById('ai-add-btn-equipo').classList.toggle('ai-add-tipo-active', tipo === 'equipo');
+  document.getElementById('ai-add-btn-repuesto').classList.toggle('ai-add-tipo-active', tipo === 'repuesto');
+  const hint = document.getElementById('ai-add-hint');
+  const ta   = document.getElementById('ai-add-texto');
+  if (tipo === 'equipo') {
+    hint.textContent = 'Describí el equipo con todos los datos que tengas';
+    ta.placeholder   = 'Ej: iPhone 13 128GB usado buen estado $350000 IMEI 123456789012345';
+  } else {
+    hint.textContent = 'Describí el repuesto con marca, modelo y tipo';
+    ta.placeholder   = 'Ej: pantalla Samsung A54 OLED sin marco 3 unidades $15000 c/u';
+  }
+  _aiAddData = null;
+  document.getElementById('ai-add-result').classList.add('hidden');
+  document.getElementById('ai-add-actions').classList.add('hidden');
+}
+
+async function processAIAdd() {
+  const texto = (document.getElementById('ai-add-texto').value || '').trim();
+  if (!texto) { toast('Escribí una descripción primero', 'error'); return; }
+  const btn = document.getElementById('ai-add-submit-btn');
+  const lbl = document.getElementById('ai-add-submit-lbl');
+  btn.disabled = true;
+  lbl.textContent = '⏳ Analizando…';
+  document.getElementById('ai-add-result').classList.add('hidden');
+  document.getElementById('ai-add-actions').classList.add('hidden');
+  try {
+    const action = _aiAddTipo === 'equipo' ? 'extractEquipo' : 'extractRepuesto';
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action, data: { texto } })
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+    const raw = json.text.trim();
+    const start = raw.indexOf('{');
+    const end   = raw.lastIndexOf('}');
+    if (start === -1 || end === -1) throw new Error('Respuesta inválida de IA');
+    _aiAddData = JSON.parse(raw.slice(start, end + 1));
+    _renderAIAddResult(_aiAddData);
+  } catch (e) {
+    toast('Error al analizar: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    lbl.textContent = '✨ Analizar de nuevo';
+  }
+}
+
+function _renderAIAddResult(d) {
+  const el = document.getElementById('ai-add-result');
+  let html = '<div class="ai-add-fields">';
+  if (_aiAddTipo === 'equipo') {
+    const rows = [
+      ['Marca', d.marca], ['Modelo', d.modelo], ['Estado', d.estado],
+      ['Precio', d.precio ? '$' + d.precio.toLocaleString('es-AR') : '—'],
+      ['Almacenamiento', d.almacenamiento || '—'], ['RAM', d.ram || '—'],
+      ['Batería', d.bateria ? d.bateria + '%' : '—'],
+      ['IMEI', d.imei || '—'], ['Notas', d.notas || '—']
+    ];
+    rows.forEach(([k, v]) => { html += `<div class="ai-field-row"><span class="ai-field-k">${k}</span><span class="ai-field-v">${v || '—'}</span></div>`; });
+  } else {
+    const rows = [
+      ['Nombre', d.nombre], ['Marca', d.marca], ['Modelo', d.modelo || '—'],
+      ['Tipo', d.tipo], ['Cantidad', d.cantidad ?? '—'],
+      ['Stock mín.', d.stockMin ?? '—'],
+      ['Precio compra', d.precioCompra ? '$' + d.precioCompra.toLocaleString('es-AR') : '—'],
+      ['Proveedor', d.proveedor || '—'], ['Notas', d.notas || '—']
+    ];
+    rows.forEach(([k, v]) => { html += `<div class="ai-field-row"><span class="ai-field-k">${k}</span><span class="ai-field-v">${v || '—'}</span></div>`; });
+  }
+  html += '</div>';
+  el.innerHTML = html;
+  el.classList.remove('hidden');
+  document.getElementById('ai-add-actions').classList.remove('hidden');
+}
+
+function fillFormFromAI() {
+  if (!_aiAddData) return;
+  closeAIAdd();
+  if (_aiAddTipo === 'equipo') {
+    openForm(null);
+    const d = _aiAddData;
+    document.getElementById('fi-marca').value     = d.marca        || '';
+    document.getElementById('fi-modelo').value    = d.modelo       || '';
+    document.getElementById('fi-estado').value    = d.estado       || '';
+    document.getElementById('fi-precio').value    = d.precio       || '';
+    document.getElementById('fi-storage').value   = d.almacenamiento || '';
+    document.getElementById('fi-ram').value       = d.ram          || '';
+    document.getElementById('fi-imei').value      = d.imei         || '';
+    document.getElementById('fi-notas').value     = d.notas        || '';
+    if (d.bateria) document.getElementById('fi-bateria').value = d.bateria;
+    _updateBateriaVisibility(d.marca || '');
+  } else {
+    openRepuestoForm(null);
+    const d = _aiAddData;
+    document.getElementById('rep2-fi-nombre').value    = d.nombre       || '';
+    document.getElementById('rep2-fi-marca').value     = d.marca        || '';
+    document.getElementById('rep2-fi-modelo').value    = d.modelo       || '';
+    document.getElementById('rep2-fi-tipo').value      = d.tipo         || '';
+    document.getElementById('rep2-fi-cantidad').value  = d.cantidad     ?? '';
+    document.getElementById('rep2-fi-stockmin').value  = d.stockMin     ?? '';
+    document.getElementById('rep2-fi-precio').value    = d.precioCompra || '';
+    document.getElementById('rep2-fi-proveedor').value = d.proveedor    || '';
+    document.getElementById('rep2-fi-notas').value     = d.notas        || '';
+  }
+}
+
+async function saveFromAI() {
+  if (!_aiAddData) return;
+  const d = _aiAddData;
+  const btn = document.querySelector('#ai-add-actions .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando…'; }
+  try {
+    if (_aiAddTipo === 'equipo') {
+      if (!d.marca || !d.modelo) { toast('La IA no pudo extraer marca/modelo. Usá el formulario.', 'error'); return; }
+      if (!d.estado) d.estado = 'Usado';
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const doc = { id, marca: d.marca, modelo: d.modelo, estado: d.estado, precio: d.precio || 0,
+        almacenamiento: d.almacenamiento || '', ram: d.ram || '', imei: d.imei || '',
+        notas: d.notas || '', ubicacion: '', fecha: new Date().toISOString(), vendido: false };
+      if (d.bateria) doc.bateria = d.bateria;
+      await db.collection('stock').doc(id).set(doc);
+      toast('Equipo agregado al stock ✅', 'success');
+    } else {
+      if (!d.nombre || !d.marca || !d.tipo) { toast('La IA no pudo extraer todos los campos. Usá el formulario.', 'error'); return; }
+      const ref = db.collection('repuestos').doc();
+      await ref.set({ id: ref.id, nombre: d.nombre, marca: d.marca, modelo: d.modelo || '',
+        tipo: d.tipo, cantidad: d.cantidad || 1, stockMin: d.stockMin || 2,
+        precioCompra: d.precioCompra || 0, proveedor: d.proveedor || '', notas: d.notas || '',
+        fechaAlta: new Date().toISOString() });
+      toast('Repuesto agregado ✅', 'success');
+    }
+    closeAIAdd();
+  } catch (e) {
+    toast('Error al guardar', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar directo'; }
+  }
+}
+
 async function aiStockSpecs() {
   const marca  = (document.getElementById('fi-marca').value  || '').trim();
   const modelo = (document.getElementById('fi-modelo').value || '').trim();

@@ -105,7 +105,35 @@ Solo esa línea, sin texto extra. Ejemplo: 6.5" AMOLED | Snapdragon 680 | 4GB/12
 
     stockPrice:
 `Precio de venta en tienda de celulares Argentina ${year} para: ${data.marca} ${data.modelo}${data.almacenamiento ? ' ' + data.almacenamiento : ''}, estado: "${data.estado || 'Usado'}".
-Responde SOLO con el rango en pesos: "$XXX.000 - $XXX.000". Sin explicaciones adicionales.`
+Responde SOLO con el rango en pesos: "$XXX.000 - $XXX.000". Sin explicaciones adicionales.`,
+
+    extractEquipo:
+`Extraé los datos de este equipo/celular a partir de la descripción en texto libre.
+Descripción: "${data.texto}"
+Respondé ÚNICAMENTE con este JSON (sin texto antes ni después, sin markdown):
+{"marca":"","modelo":"","estado":"","precio":0,"almacenamiento":"","ram":"","bateria":0,"imei":"","notas":""}
+Reglas:
+- estado: solo "Nuevo", "Usado" o "Reacondicionado" (si no se menciona, usá "Usado")
+- precio: número entero en pesos argentinos (0 si no se menciona)
+- almacenamiento: formato "128GB", "256GB", etc. (vacío si no se menciona)
+- ram: formato "4GB", "8GB", etc. (vacío si no se menciona)
+- bateria: porcentaje de batería como número (0 si no se menciona)
+- imei: solo dígitos, 15 caracteres (vacío si no se menciona)
+- notas: detalles adicionales relevantes
+- Si la marca no es una marca conocida de celulares pero es claramente una marca, igualmente incluila`,
+
+    extractRepuesto:
+`Extraé los datos de este repuesto/accesorio a partir de la descripción en texto libre.
+Descripción: "${data.texto}"
+Respondé ÚNICAMENTE con este JSON (sin texto antes ni después, sin markdown):
+{"nombre":"","marca":"","modelo":"","tipo":"","cantidad":1,"stockMin":2,"precioCompra":0,"proveedor":"","notas":""}
+Reglas:
+- nombre: nombre descriptivo del repuesto (ej: "Pantalla Samsung A54 OLED")
+- tipo: uno de estos valores exactos: "Pantalla", "Batería", "Conector", "Flex", "Táctil", "Cámara", "Parlante", "Micrófono", "Marco", "Tapa", "Botón", "Board", "Otro"
+- cantidad: número entero de unidades (1 si no se menciona)
+- stockMin: stock mínimo sugerido (2 si no se especifica)
+- precioCompra: precio de compra en pesos (0 si no se menciona)
+- proveedor: nombre del proveedor (vacío si no se menciona)`
   };
 
   if (!prompts[action]) {

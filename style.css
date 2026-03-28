@@ -2087,3 +2087,64 @@ body.dark .lowstock-item-qty { color: #f87171; }
   cursor: pointer;
 }
 body.dark .btn-foto-add { background: #0c2d3d; border-color: #0ea5e9; color: #7dd3fc; }
+
+/* ══════════════════════════════════════════════════════════════
+   IA QUICK ADD MODAL
+══════════════════════════════════════════════════════════════ */
+
+.hdr-btn-ai { background: linear-gradient(135deg,#6366f1,#8b5cf6) !important; color: #fff !important; }
+
+.ai-add-card { max-width: 480px; width: 94%; }
+
+.ai-add-tipo-row {
+  display: flex; gap: 8px; margin-bottom: 16px;
+}
+.ai-add-tipo-btn {
+  flex: 1; padding: 10px; border: 2px solid var(--border); border-radius: 12px;
+  background: var(--card); color: var(--t2); font-size: .9rem; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.ai-add-tipo-btn.ai-add-tipo-active {
+  border-color: #6366f1; background: #f0f0ff; color: #6366f1;
+}
+body.dark .ai-add-tipo-btn { background: #1e2d3d; border-color: #2d3748; color: #94a3b8; }
+body.dark .ai-add-tipo-btn.ai-add-tipo-active { background: #312e81; border-color: #6366f1; color: #a5b4fc; }
+
+.ai-add-hint { color: var(--t2); font-size: .82rem; font-weight: 500; }
+
+.ai-add-textarea {
+  resize: vertical; min-height: 90px; font-size: .92rem; line-height: 1.5;
+}
+
+.ai-add-submit {
+  width: 100%; margin-top: 4px; margin-bottom: 0;
+  background: linear-gradient(135deg,#6366f1,#8b5cf6);
+  border: none; padding: 13px;
+}
+.ai-add-submit:disabled { opacity: .6; cursor: default; }
+
+.ai-add-result {
+  margin-top: 14px; border: 1px solid var(--border); border-radius: 12px;
+  overflow: hidden;
+}
+.ai-add-fields {}
+.ai-field-row {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 8px 14px; border-bottom: 1px solid var(--border); gap: 12px;
+}
+.ai-field-row:last-child { border-bottom: none; }
+.ai-field-k { font-size: .78rem; color: var(--t2); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+.ai-field-v { font-size: .85rem; color: var(--t1); font-weight: 500; text-align: right; word-break: break-all; }
+body.dark .ai-add-result { border-color: #2d3748; }
+body.dark .ai-field-row { border-bottom-color: #2d3748; }
+body.dark .ai-field-k { color: #94a3b8; }
+body.dark .ai-field-v { color: #e2e8f0; }
+
+.ai-add-actions {
+  display: flex; gap: 8px; margin-top: 12px;
+}
+.ai-add-actions .btn-secondary,
+.ai-add-actions .btn-primary { flex: 1; font-size: .85rem; padding: 11px; }
+.ai-add-actions .btn-primary {
+  background: linear-gradient(135deg,#10b981,#059669); border: none;
+}

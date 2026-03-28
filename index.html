@@ -81,6 +81,7 @@
               <button class="hdr-drop-item" id="export-btn">💾 Exportar stock</button>
             </div>
           </div>
+          <button class="hdr-btn hdr-btn-ai" onclick="openAIAdd('equipo')" title="Agregar con IA">✨</button>
           <button class="hdr-btn" id="add-btn" title="Agregar equipo">＋</button>
         </div>
       </div>
@@ -208,6 +209,7 @@
         <div class="hdr-actions">
           <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
           <button class="hdr-btn owner-lock-btn" onclick="toggleOwnerLock()" title="Modo dueño">🔒</button>
+          <button class="hdr-btn hdr-btn-ai" onclick="openAIAdd('repuesto')" title="Agregar con IA">✨</button>
           <button class="hdr-btn" id="rep2-add-btn" title="Agregar repuesto">＋</button>
         </div>
       </div>
@@ -470,6 +472,34 @@
           </div>
         </button>
         <input type="file" id="import-file" accept=".json" hidden>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL IA AGREGAR -->
+<div id="ai-add-modal" class="modal-overlay hidden">
+  <div class="modal-card ai-add-card">
+    <div class="modal-header">
+      <h3>✨ Agregar con IA</h3>
+      <button class="modal-close" onclick="closeAIAdd()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="ai-add-tipo-row">
+        <button id="ai-add-btn-equipo" class="ai-add-tipo-btn ai-add-tipo-active" onclick="setAIAddTipo('equipo')">📱 Equipo</button>
+        <button id="ai-add-btn-repuesto" class="ai-add-tipo-btn" onclick="setAIAddTipo('repuesto')">🔩 Repuesto</button>
+      </div>
+      <div class="fg">
+        <label class="fl ai-add-hint" id="ai-add-hint">Describí el equipo con todos los datos que tengas</label>
+        <textarea id="ai-add-texto" class="fi ai-add-textarea" placeholder="Ej: iPhone 13 128GB usado buen estado $350000 IMEI 123456789012345" rows="4"></textarea>
+      </div>
+      <button class="btn-primary ai-add-submit" onclick="processAIAdd()" id="ai-add-submit-btn">
+        <span id="ai-add-submit-lbl">✨ Analizar con IA</span>
+      </button>
+      <div id="ai-add-result" class="ai-add-result hidden"></div>
+      <div id="ai-add-actions" class="ai-add-actions hidden">
+        <button class="btn-secondary" onclick="fillFormFromAI()">✏️ Completar en formulario</button>
+        <button class="btn-primary" onclick="saveFromAI()">💾 Guardar directo</button>
       </div>
     </div>
   </div>
