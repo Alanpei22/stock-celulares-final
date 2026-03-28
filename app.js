@@ -312,6 +312,7 @@ async function syncConfigFromFirestore() {
     if (Array.isArray(d.payments) && d.payments.length) { PAYMENTS = d.payments; localStorage.setItem(PAYMENTS_KEY, JSON.stringify(PAYMENTS)); changed = true; }
     if (d.prices && typeof d.prices === 'object')        { PRICES = d.prices;     localStorage.setItem(PRICES_KEY,   JSON.stringify(PRICES));   changed = true; }
     if (d.bizImage)  { BIZ_IMAGE = d.bizImage; localStorage.setItem(BIZ_KEY, d.bizImage); applyBizImage(); changed = true; }
+    if (d.dolarManual > 0) { localStorage.setItem('dolarManual', d.dolarManual); dolarBlue = d.dolarManual; changed = true; }
     if (changed) render();
   } catch {}
 }
@@ -332,11 +333,38 @@ function savePrices() {
   db.collection('config').doc('appSettings').set({ prices: PRICES }, { merge: true }).catch(() => {});
 }
 async function fetchDolarBlue() {
+  // Si hay override manual guardado, usarlo
+  const manual = parseInt(localStorage.getItem('dolarManual')) || 0;
+  if (manual > 0) {
+    dolarBlue = manual;
+    renderSettingsPrices();
+    return;
+  }
   try {
     const r = await fetch('https://dolarapi.com/v1/dolares/blue');
     const d = await r.json();
     dolarBlue = Math.round(d.venta || d.compra || 0) + 10;
   } catch(e) { dolarBlue = null; }
+  renderSettingsPrices();
+}
+
+function saveDolarManual() {
+  const val = parseInt(document.getElementById('dolar-blue-input').value) || 0;
+  if (val <= 0) { toast('Ingresá un valor válido', 'error'); return; }
+  localStorage.setItem('dolarManual', val);
+  db.collection('config').doc('appSettings').set({ dolarManual: val }, { merge: true }).catch(() => {});
+  dolarBlue = val;
+  renderSettingsPrices();
+  render();
+  toast('💲 Cotización guardada: $' + val.toLocaleString('es-AR'), 'success');
+}
+
+function resetDolarManual() {
+  localStorage.removeItem('dolarManual');
+  db.collection('config').doc('appSettings').set({ dolarManual: 0 }, { merge: true }).catch(() => {});
+  toast('Cotización: volviendo a API…', 'info');
+  dolarBlue = null;
+  fetchDolarBlue().then(() => render());
 }
 function saveBizImage() {
   if (BIZ_IMAGE) {
@@ -373,7 +401,9 @@ function initApp() {
   document.getElementById('f-vendido').addEventListener('change', debounceRender);
   document.getElementById('f-min').addEventListener('input', debounceRender);
   document.getElementById('f-max').addEventListener('input', debounceRender);
+  document.getElementById('f-vendedor').addEventListener('change', debounceRender);
 
+  document.getElementById('fi-marca').addEventListener('input', e => _updateBateriaVisibility(e.target.value));
   document.getElementById('form-close').addEventListener('click', closeForm);
   document.getElementById('form-cancel').addEventListener('click', closeForm);
   document.getElementById('form-save').addEventListener('click', savePhone);
@@ -428,14 +458,29 @@ function render() {
   const fVend = document.getElementById('f-vendido').value;
   const fMin = parseInt(document.getElementById('f-min').value) || 0;
   const fMax = parseInt(document.getElementById('f-max').value) || 0;
+  const fVendedorEl = document.getElementById('f-vendedor');
+  const fVendedor = fVendedorEl ? fVendedorEl.value : '';
   const words = q ? q.split(/\s+/).filter(Boolean) : [];
 
+  // Populate marca filter
   const marcas = [...new Set(STOCK.map(p => p.marca))].sort();
   const selM = document.getElementById('f-marca');
-  const prev = selM.value;
+  const prevM = selM.value;
   while (selM.options.length > 1) selM.remove(1);
   marcas.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; selM.appendChild(o); });
-  selM.value = prev;
+  selM.value = prevM;
+
+  // Populate vendedor filter
+  if (fVendedorEl) {
+    const vendedores = [...new Set(STOCK.filter(p => p.vendedor).map(p => p.vendedor))].sort();
+    const prevV = fVendedorEl.value;
+    while (fVendedorEl.options.length > 1) fVendedorEl.remove(1);
+    vendedores.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; fVendedorEl.appendChild(o); });
+    fVendedorEl.value = prevV;
+  }
+
+  // Apply pending ubicacion filter (from stats bar click)
+  const fUbi = _pendingUbiFilter;
 
   const filtered = STOCK.filter(p => {
     if (fMarca && p.marca !== fMarca) return false;
@@ -444,6 +489,8 @@ function render() {
     if (fVend === '1' && !p.vendido) return false;
     if (fMin > 0 && (p.precio || 0) < fMin) return false;
     if (fMax > 0 && (p.precio || 0) > fMax) return false;
+    if (fVendedor && p.vendedor !== fVendedor) return false;
+    if (fUbi && p.ubicacion !== fUbi) return false;
     if (words.length) {
       const hay = (p.marca + ' ' + p.modelo + ' ' + (p.imei || '') + ' ' + (p.notas || '')).toLowerCase();
       return words.every(w => hay.includes(w));
@@ -451,22 +498,50 @@ function render() {
     return true;
   });
 
+  // Sort: sold items by fecha_venta desc, others by fecha desc
+  filtered.sort((a, b) => {
+    if (a.vendido && b.vendido) {
+      return (b.fecha_venta || '').localeCompare(a.fecha_venta || '');
+    }
+    return (b.fecha || '').localeCompare(a.fecha || '');
+  });
+
   const inStock = STOCK.filter(p => !p.vendido);
   const sold = STOCK.filter(p => p.vendido);
-  document.getElementById('s-stock').textContent     = inStock.length;
-  document.getElementById('s-sold').textContent      = sold.length;
+  document.getElementById('s-stock').textContent      = inStock.length;
+  document.getElementById('s-sold').textContent       = sold.length;
   document.getElementById('s-exhibicion').textContent = inStock.filter(p => p.ubicacion === 'Exhibición').length;
   document.getElementById('s-deposito').textContent   = inStock.filter(p => p.ubicacion === 'Depósito').length;
+
+  // Low qty banner (models with ≤1 unit in stock)
+  const modelCount = {};
+  inStock.forEach(p => {
+    const k = p.marca + ' ' + p.modelo;
+    modelCount[k] = (modelCount[k] || 0) + 1;
+  });
+  const lowQtyModels = Object.entries(modelCount).filter(([, c]) => c <= 1).sort((a, b) => a[0].localeCompare(b[0]));
+  const lowQtyBanner = document.getElementById('stock-lowqty-banner');
+  if (lowQtyBanner) {
+    if (lowQtyModels.length > 0) {
+      lowQtyBanner.style.display = '';
+      const listEl2 = document.getElementById('stock-lowqty-list');
+      if (listEl2) listEl2.innerHTML = lowQtyModels.map(([k]) => `<span class="lowstock-item">📱 ${esc(k)}</span>`).join('');
+    } else {
+      lowQtyBanner.style.display = 'none';
+    }
+  }
+
+  _pendingUbiFilter = null; // reset after applying
 
   const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');
   if (filtered.length === 0) { listEl.innerHTML = ''; emptyEl.style.display = ''; return; }
   emptyEl.style.display = 'none';
 
+  const today = new Date();
   const badgeCls = { Nuevo: 'bg-new', Usado: 'bg-used', Reacondicionado: 'bg-refurb' };
   listEl.innerHTML = filtered.map(p => {
     const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' · ');
-    const fecha = p.fecha ? new Date(p.fecha).toLocaleDateString('es-AR', { day:'2-digit', month:'short' }) : '';
     const usd = (!p.vendido && p.precio && dolarBlue) ? Math.round(p.precio / dolarBlue) : null;
     const ubiBadge = p.ubicacion === 'Exhibición'
       ? '<span class="badge-ubicacion">📺 Exhibición</span>'
@@ -477,13 +552,37 @@ function render() {
       : p.estado === 'Nuevo' ? 'stock-nuevo'
       : p.estado === 'Reacondicionado' ? 'stock-refurb'
       : 'stock-usado';
+
+    // Date display: sold → fecha_venta, unsold → entry date
+    let dateLabel = '';
+    if (p.vendido && p.fecha_venta) {
+      const fv = new Date(p.fecha_venta).toLocaleDateString('es-AR', { day:'2-digit', month:'short' });
+      dateLabel = `<span class="card-date">🛒 ${fv}</span>`;
+    } else if (!p.vendido && p.fecha) {
+      const fi = new Date(p.fecha);
+      const diffDays = Math.floor((today - fi) / 86400000);
+      const diasStr = diffDays === 0 ? 'hoy' : diffDays === 1 ? '1 día' : diffDays + ' días';
+      const oldCls = diffDays >= 30 ? ' card-old' : '';
+      dateLabel = `<span class="card-date${oldCls}" title="Ingresó hace ${diasStr}">📅 ${diasStr}</span>`;
+    }
+
+    // Battery badge for non-sold iPhones
+    const bateriaBadge = (!p.vendido && p.bateria && /iphone/i.test(p.marca))
+      ? `<span class="card-bateria">🔋 ${p.bateria}%</span>`
+      : '';
+
+    // Payment method for sold items
+    const pagoBadge = (p.vendido && p.forma_pago)
+      ? `<span class="card-pago">${esc(p.forma_pago)}</span>`
+      : '';
+
     return `
       <div class="card ${stCls}${p.vendido ? ' card-sold' : ''}" onclick="openDetail('${p.id}')">
         <div class="card-top">
           <div class="card-info">
             <span class="card-marca">📱 ${esc(p.marca)}</span>
             <span class="card-modelo">${esc(p.modelo)}</span>
-            ${specs ? `<span class="card-specs">${esc(specs)}</span>` : ''}
+            ${specs ? `<span class="card-specs">${esc(specs)}${bateriaBadge}</span>` : bateriaBadge}
           </div>
           <div class="card-right">
             ${ubiBadge}
@@ -495,7 +594,8 @@ function render() {
           <span class="card-price">${p.precio ? '$ ' + p.precio.toLocaleString('es-AR') : '—'}${usd ? `<span class="card-usd">U$S ${usd.toLocaleString('es-AR')}</span>` : ''}</span>
           <div class="card-meta">
             ${p.imei ? `<span class="card-imei">🔑 ${esc(p.imei)}</span>` : ''}
-            ${fecha ? `<span class="card-date">📅 ${fecha}</span>` : ''}
+            ${dateLabel}
+            ${pagoBadge}
           </div>
         </div>
       </div>`;
@@ -523,6 +623,8 @@ function openForm(id) {
     document.getElementById('fi-imei').value      = p.imei          || '';
     document.getElementById('fi-notas').value     = p.notas         || '';
     document.getElementById('fi-ubicacion').value = p.ubicacion     || '';
+    document.getElementById('fi-bateria').value   = p.bateria       || '';
+    _updateBateriaVisibility(p.marca || '');
   } else {
     t.textContent = '📱 Agregar Equipo';
     ['fi-marca','fi-modelo','fi-precio','fi-imei','fi-notas'].forEach(id => { document.getElementById(id).value = ''; });
@@ -530,6 +632,8 @@ function openForm(id) {
     document.getElementById('fi-storage').value   = '';
     document.getElementById('fi-ram').value       = '';
     document.getElementById('fi-ubicacion').value = '';
+    document.getElementById('fi-bateria').value   = '';
+    _updateBateriaVisibility('');
   }
   // Reset moneda toggle to ARS
   const btnM = document.getElementById('btn-moneda');
@@ -568,19 +672,20 @@ function savePhone() {
     if (dup) { toast('Ya existe un equipo con ese IMEI', 'error'); return; }
   }
 
+  const bateria = parseInt(document.getElementById('fi-bateria').value) || null;
+
   if (editingId) {
         const existing = STOCK.find(x => x.id === editingId);
         if (!existing) { closeForm(); return; }
-        db.collection('stock').doc(editingId).set({
-                ...existing, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion
-        });
+        const upd = { ...existing, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion };
+        if (bateria) upd.bateria = bateria; else delete upd.bateria;
+        db.collection('stock').doc(editingId).set(upd);
         toast('Equipo actualizado', 'success');
   } else {
         const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        db.collection('stock').doc(id).set({
-                id, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion,
-                fecha: new Date().toISOString(), vendido: false
-        });
+        const newDoc = { id, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion, fecha: new Date().toISOString(), vendido: false };
+        if (bateria) newDoc.bateria = bateria;
+        db.collection('stock').doc(id).set(newDoc);
         toast('Equipo agregado al stock', 'success');
   }
     closeForm();
@@ -608,6 +713,7 @@ function openDetail(id) {
       <span class="det-val det-price">$ ${p.precio ? p.precio.toLocaleString('es-AR') : '—'}</span>
     </div>
     ${specs ? `<div class="det-row"><span class="det-label">Specs</span><span class="det-val">${esc(specs)}</span></div>` : ''}
+    ${p.bateria ? `<div class="det-row"><span class="det-label">Batería</span><span class="det-val">🔋 ${p.bateria}%</span></div>` : ''}
     ${p.imei ? `<div class="det-row"><span class="det-label">IMEI</span><span class="det-val det-imei">${esc(p.imei)}</span></div>` : ''}
     <div class="det-row">
       <span class="det-label">Ingreso</span>
@@ -636,6 +742,43 @@ function openDetail(id) {
 function closeDetail() {
   document.getElementById('detail-modal').classList.add('hidden');
   document.body.style.overflow = '';
+}
+
+// ── Filter shortcuts (stats bar clicks) ──────────────────
+function filterToInStock() {
+  document.getElementById('f-vendido').value = '0';
+  debounceRender();
+}
+function filterToSold() {
+  document.getElementById('f-vendido').value = '1';
+  debounceRender();
+}
+function filterToUbicacion(ubi) {
+  document.getElementById('f-vendido').value = '0';
+  // use search box to filter by ubicacion via keyword isn't ideal;
+  // instead set a known-safe text search — but we don't have a ubicacion filter.
+  // Workaround: trigger a custom render with ubicacion override via search text:
+  // Actually let's just scroll and highlight. Simple: filter by marca reset + set f-marca
+  // Best option: store pending ubicacion override and apply in render.
+  // For now: use fMarca to filter is wrong. Let's do a quick f-marca='' + search fill:
+  _pendingUbiFilter = ubi;
+  debounceRender();
+}
+let _pendingUbiFilter = null;
+
+function toggleStockLowBanner() {
+  const list = document.getElementById('stock-lowqty-list');
+  const chevron = document.getElementById('stock-lowqty-chevron');
+  if (!list) return;
+  const isOpen = !list.classList.contains('hidden');
+  list.classList.toggle('hidden', isOpen);
+  if (chevron) chevron.classList.toggle('open', !isOpen);
+}
+
+function _updateBateriaVisibility(marca) {
+  const wrap = document.getElementById('fi-bateria-wrap');
+  if (!wrap) return;
+  wrap.style.display = /iphone/i.test(marca) ? '' : 'none';
 }
 
 function buildPriceTable(precio) {
@@ -1071,8 +1214,20 @@ function renderSettingsPrices() {
   if (inp3) inp3.value = PRICES.c3 ?? 15;
   const inp6 = document.getElementById('price-c6');
   if (inp6) inp6.value = PRICES.c6 ?? 25;
-  const dolarEl = document.getElementById('dolar-blue-display');
-  if (dolarEl) dolarEl.textContent = dolarBlue !== null ? '$ ' + dolarBlue.toLocaleString('es-AR') + ' (blue + $10)' : 'No disponible';
+
+  const dolarInput  = document.getElementById('dolar-blue-input');
+  const dolarStatus = document.getElementById('dolar-blue-status');
+  const dolarApiLbl = document.getElementById('dolar-blue-api-label');
+  const resetBtn    = document.getElementById('dolar-reset-btn');
+  const manual      = parseInt(localStorage.getItem('dolarManual')) || 0;
+  if (dolarInput)  dolarInput.value = dolarBlue || '';
+  if (dolarApiLbl) dolarApiLbl.textContent = manual > 0
+    ? 'Manual (API ignorada)'
+    : dolarBlue ? 'API: $' + dolarBlue.toLocaleString('es-AR') : 'API: no disponible';
+  if (dolarStatus) dolarStatus.textContent = manual > 0
+    ? '✏️ Usando cotización manual: $' + manual.toLocaleString('es-AR')
+    : dolarBlue ? '🌐 Cotización automática desde dolarapi.com' : '';
+  if (resetBtn)    resetBtn.style.display = manual > 0 ? '' : 'none';
 }
 
 function savePriceSettings() {

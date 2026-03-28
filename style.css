@@ -359,6 +359,9 @@ header {
   max-width: 120px; overflow: hidden; text-overflow: ellipsis;
 }
 .card-date { font-size: .65rem; color: #64748b; white-space: nowrap; font-weight: 800; }
+.card-date.card-old { color: #ef4444; font-weight: 900; }
+.card-bateria { font-size: .65rem; color: #16a34a; font-weight: 700; margin-left: 6px; }
+.card-pago { font-size: .65rem; color: #6366f1; font-weight: 700; background: #ede9fe; padding: 1px 6px; border-radius: 99px; }
 
 /* ── EMPTY STATE ── */
 .empty-state {
@@ -1852,7 +1855,10 @@ body.dark .card-price  { color: #34d399; }
 body.dark .card-imei,
 body.dark .card-date,
 body.dark .card-time-ago { color: #475569; }
+body.dark .card-date.card-old { color: #f87171; }
 body.dark .card-usd { color: #475569; }
+body.dark .card-bateria { color: #4ade80; }
+body.dark .card-pago { color: #a5b4fc; background: #1e1b4b; }
 
 /* Repair cards en dark: fondo uniforme, estado solo por borde izquierdo de color */
 body.dark .rep-card--reparando,

@@ -91,6 +91,7 @@
           <option value="1">Vendidos</option>
           <option value="">Todos</option>
         </select>
+        <select class="pill" id="f-vendedor"><option value="">Todos los vendedores</option></select>
       </div>
       <div class="price-filter">
         <span class="price-filter-lbl">💰 Precio:</span>
@@ -101,10 +102,17 @@
     </header>
 
     <div class="stats-bar">
-      <div class="stat"><span class="stat-num" id="s-stock">0</span><span class="stat-lbl">En stock</span></div>
-      <div class="stat"><span class="stat-num" id="s-sold">0</span><span class="stat-lbl">Vendidos</span></div>
-      <div class="stat"><span class="stat-num" id="s-exhibicion">0</span><span class="stat-lbl">Exhibición</span></div>
-      <div class="stat"><span class="stat-num" id="s-deposito">0</span><span class="stat-lbl">Depósito</span></div>
+      <div class="stat" onclick="filterToInStock()" style="cursor:pointer"><span class="stat-num" id="s-stock">0</span><span class="stat-lbl">En stock</span></div>
+      <div class="stat stat--vendidos" onclick="filterToSold()" style="cursor:pointer"><span class="stat-num" id="s-sold">0</span><span class="stat-lbl">Vendidos</span></div>
+      <div class="stat" onclick="filterToUbicacion('Exhibición')" style="cursor:pointer"><span class="stat-num" id="s-exhibicion">0</span><span class="stat-lbl">Exhibición</span></div>
+      <div class="stat" onclick="filterToUbicacion('Depósito')" style="cursor:pointer"><span class="stat-num" id="s-deposito">0</span><span class="stat-lbl">Depósito</span></div>
+    </div>
+    <div id="stock-lowqty-banner" class="lowstock-banner" style="display:none">
+      <div class="lowstock-banner-hdr" onclick="toggleStockLowBanner()">
+        <span>⚠️ Stock bajo — <span id="stock-lowqty-count">0</span> modelo(s) con 1 unidad</span>
+        <span id="stock-lowqty-chevron" class="lowstock-chevron">▼</span>
+      </div>
+      <div id="stock-lowqty-list" class="lowstock-list hidden"></div>
     </div>
 
     <div class="list-wrap">
@@ -345,6 +353,10 @@
             <option value="Depósito">📦 Depósito</option>
           </select>
         </div>
+        <div class="fg" id="fi-bateria-wrap" style="display:none">
+          <label class="fl">🔋 Batería (%)</label>
+          <input id="fi-bateria" class="fi" type="number" placeholder="85" min="1" max="100" inputmode="numeric">
+        </div>
         <div class="fg fg--full">
           <label class="fl">IMEI</label>
           <input id="fi-imei" class="fi" type="text" placeholder="123456789012345" maxlength="15" inputmode="numeric">
@@ -496,9 +508,17 @@
 
       <div class="settings-section">
         <h4 class="settings-title">💲 Precios Diferenciados</h4>
-        <div class="settings-item" style="justify-content:space-between">
-          <span class="settings-item-name">Dólar blue hoy:</span>
-          <span id="dolar-blue-display" style="font-weight:600;color:var(--grn);font-size:.9rem">Cargando...</span>
+        <div class="settings-item" style="flex-direction:column;align-items:stretch;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="settings-item-name">💲 Dólar blue</span>
+            <span id="dolar-blue-api-label" style="font-size:.75rem;color:var(--t2)">API: cargando…</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input id="dolar-blue-input" class="fi" type="number" placeholder="Ej: 1350" min="1" inputmode="numeric" style="flex:1">
+            <button class="btn-primary" onclick="saveDolarManual()" style="padding:8px 12px;font-size:.82rem">💾</button>
+            <button class="btn-secondary" id="dolar-reset-btn" onclick="resetDolarManual()" style="padding:8px 10px;font-size:.82rem;display:none">↺</button>
+          </div>
+          <small id="dolar-blue-status" style="font-size:.73rem;color:var(--grn)"></small>
         </div>
         <div class="price-settings-grid">
           <div class="price-settings-row">
