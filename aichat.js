@@ -1,6 +1,28 @@
 // ── AI CHAT FLOTANTE ─────────────────────────────────────────
 let _aiChatOpen = false;
 let _chatHistory = []; // historial de la conversación (memoria)
+let _chatImage = null; // { base64, mediaType, dataUrl }
+
+function onChatImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    const comma = dataUrl.indexOf(',');
+    _chatImage = { base64: dataUrl.slice(comma + 1), mediaType: file.type || 'image/jpeg', dataUrl };
+    document.getElementById('ai-chat-img-thumb').src = dataUrl;
+    document.getElementById('ai-chat-img-preview').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearChatImage() {
+  _chatImage = null;
+  document.getElementById('ai-chat-img-input').value = '';
+  document.getElementById('ai-chat-img-thumb').src = '';
+  document.getElementById('ai-chat-img-preview').classList.add('hidden');
+}
 
 function toggleAiChat() {
   _aiChatOpen ? closeAiChat() : openAiChat();
@@ -49,31 +71,33 @@ function buildStockContext() {
 async function sendAiChat() {
   const input = document.getElementById('ai-chat-input');
   const msg = input.value.trim();
-  if (!msg) return;
+  if (!msg && !_chatImage) return;
 
   input.value = '';
   input.style.height = 'auto';
 
-  addChatBubble(msg, 'user');
+  // Mostrar burbuja del usuario (con imagen si hay)
+  const imgSnap = _chatImage ? _chatImage.dataUrl : null;
+  addChatBubble(msg, 'user', false, imgSnap);
+
+  // Guardar imagen y limpiar antes del envío
+  const sendImage = _chatImage ? { base64: _chatImage.base64, mediaType: _chatImage.mediaType } : null;
+  clearChatImage();
 
   // Agregar al historial
-  _chatHistory.push({ role: 'user', content: msg });
+  _chatHistory.push({ role: 'user', content: msg || 'Analizá esta imagen.' });
 
   const typingEl = addTyping();
   const btn = document.getElementById('ai-chat-send');
   btn.disabled = true;
 
   try {
+    const chatData = { messages: _chatHistory, stockContext: buildStockContext() };
+    if (sendImage) { chatData.imageBase64 = sendImage.base64; chatData.imageMediaType = sendImage.mediaType; }
     const res = await fetch('/api/ai', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        action: 'chat',
-        data: {
-          messages: _chatHistory,          // historial completo = memoria
-          stockContext: buildStockContext() // datos reales del negocio
-        }
-      })
+      body: JSON.stringify({ action: 'chat', data: chatData })
     });
     const json = await res.json();
     typingEl.remove();
@@ -132,15 +156,14 @@ async function sendAiChat() {
 }
 
 // ── Renderizar burbujas ───────────────────────────────────
-function addChatBubble(text, who, withCopy = false) {
+function addChatBubble(text, who, withCopy = false, imgDataUrl = null) {
   const msgs = document.getElementById('ai-chat-messages');
   const wrap = document.createElement('div');
   wrap.className = `ai-chat-bubble ${who === 'ai' ? 'ai-bubble' : 'user-bubble'}`;
 
-  const html = text
-    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-    .replace(/\*(.*?)\*/g, '<i>$1</i>')
-    .replace(/\n/g, '<br>');
+  let html = '';
+  if (imgDataUrl) html += `<img src="${imgDataUrl}" class="ai-bubble-img" alt="imagen adjunta">`;
+  if (text) html += text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\*(.*?)\*/g, '<i>$1</i>').replace(/\n/g, '<br>');
   wrap.innerHTML = html;
 
   if (who === 'ai' && withCopy) {

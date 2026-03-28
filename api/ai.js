@@ -49,9 +49,26 @@ Tipos válidos para repuestos: "Pantalla", "Batería", "Conector", "Flex", "Tác
 - Para cualquier otra consulta, respondé normalmente en texto.`;
 
     // Historial completo = memoria de la conversación
-    const messages = Array.isArray(data.messages) && data.messages.length
+    let messages = Array.isArray(data.messages) && data.messages.length
       ? data.messages
       : [{ role: 'user', content: data.message || '' }];
+
+    // Si el último mensaje tiene imagen adjunta, convertirlo a content array con visión
+    if (data.imageBase64 && messages.length > 0) {
+      const last = messages[messages.length - 1];
+      if (last.role === 'user' && typeof last.content === 'string') {
+        messages = [
+          ...messages.slice(0, -1),
+          {
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: data.imageMediaType || 'image/jpeg', data: data.imageBase64 } },
+              { type: 'text', text: last.content || 'Analizá esta imagen y extraé toda la información relevante sobre el repuesto o equipo.' }
+            ]
+          }
+        ];
+      }
+    }
 
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -112,8 +129,7 @@ Solo esa línea, sin texto extra. Ejemplo: 6.5" AMOLED | Snapdragon 680 | 4GB/12
 Responde SOLO con el rango en pesos: "$XXX.000 - $XXX.000". Sin explicaciones adicionales.`,
 
     extractEquipo:
-`Extraé los datos de este equipo/celular a partir de la descripción en texto libre.
-Descripción: "${data.texto}"
+`Extraé los datos de este equipo/celular.${data.imageBase64 ? ' Analizá la imagen adjunta.' : ''}${data.texto ? ` Descripción adicional: "${data.texto}"` : ''}
 Respondé ÚNICAMENTE con este JSON (sin texto antes ni después, sin markdown):
 {"marca":"","modelo":"","estado":"","precio":0,"almacenamiento":"","ram":"","bateria":0,"imei":"","notas":""}
 Reglas:
@@ -123,12 +139,10 @@ Reglas:
 - ram: formato "4GB", "8GB", etc. (vacío si no se menciona)
 - bateria: porcentaje de batería como número (0 si no se menciona)
 - imei: solo dígitos, 15 caracteres (vacío si no se menciona)
-- notas: detalles adicionales relevantes
-- Si la marca no es una marca conocida de celulares pero es claramente una marca, igualmente incluila`,
+- notas: detalles adicionales relevantes`,
 
     extractRepuesto:
-`Extraé los datos de este repuesto/accesorio a partir de la descripción en texto libre.
-Descripción: "${data.texto}"
+`Extraé los datos de este repuesto/accesorio.${data.imageBase64 ? ' Analizá la imagen adjunta (puede ser foto del repuesto, caja, etiqueta o factura).' : ''}${data.texto ? ` Descripción adicional: "${data.texto}"` : ''}
 Respondé ÚNICAMENTE con este JSON (sin texto antes ni después, sin markdown):
 {"nombre":"","marca":"","modelo":"","tipo":"","cantidad":1,"stockMin":2,"precioCompra":0,"proveedor":"","notas":""}
 Reglas:
@@ -137,7 +151,7 @@ Reglas:
 - cantidad: número entero de unidades (1 si no se menciona)
 - stockMin: stock mínimo sugerido (2 si no se especifica)
 - precioCompra: precio de compra en pesos (0 si no se menciona)
-- proveedor: nombre del proveedor (vacío si no se menciona)`
+- proveedor: nombre del proveedor o negocio si aparece (vacío si no se menciona)`
   };
 
   if (!prompts[action]) {
@@ -145,6 +159,18 @@ Reglas:
       status: 400, headers: { 'content-type': 'application/json' }
     });
   }
+
+  // Construir mensaje con o sin imagen
+  const buildUserMsg = (text, imageBase64, imageMediaType) => {
+    if (!imageBase64) return [{ role: 'user', content: text }];
+    return [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: imageMediaType || 'image/jpeg', data: imageBase64 } },
+        { type: 'text', text }
+      ]
+    }];
+  };
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -156,8 +182,8 @@ Reglas:
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 350,
-        messages: [{ role: 'user', content: prompts[action] }]
+        max_tokens: 400,
+        messages: buildUserMsg(prompts[action], data.imageBase64, data.imageMediaType)
       })
     });
 

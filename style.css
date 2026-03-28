@@ -2148,3 +2148,60 @@ body.dark .ai-field-v { color: #e2e8f0; }
 .ai-add-actions .btn-primary {
   background: linear-gradient(135deg,#10b981,#059669); border: none;
 }
+
+/* ── IA: imagen adjunta en modal ✨ ── */
+.ai-add-img-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 4px;
+}
+.ai-add-img-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 8px 14px; border-radius: 10px; font-size: .82rem; font-weight: 600;
+  border: 1.5px dashed var(--border); background: var(--card); color: var(--t2);
+  cursor: pointer; transition: border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.ai-add-img-btn:hover { border-color: #6366f1; color: #6366f1; }
+body.dark .ai-add-img-btn { background: #1e2d3d; border-color: #2d3748; color: #94a3b8; }
+body.dark .ai-add-img-btn:hover { border-color: #6366f1; color: #a5b4fc; }
+
+.ai-add-img-preview {
+  display: flex; align-items: center; gap: 6px; flex: 1;
+}
+.ai-add-img-preview img {
+  height: 48px; width: 48px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border);
+}
+.ai-add-img-clear {
+  background: #ef4444; color: #fff; border: none; border-radius: 50%;
+  width: 22px; height: 22px; font-size: .75rem; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── IA: imagen adjunta en chat ── */
+.ai-chat-img-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+  border: 1.5px dashed var(--border); background: transparent; color: var(--t2);
+  cursor: pointer; font-size: 1rem; transition: border-color .15s;
+}
+.ai-chat-img-btn:hover { border-color: #6366f1; }
+
+.ai-chat-img-preview {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border-top: 1px solid var(--border);
+}
+.ai-chat-img-preview img {
+  height: 44px; width: 44px; object-fit: cover; border-radius: 7px;
+}
+.ai-chat-img-clear {
+  background: #ef4444; color: #fff; border: none; border-radius: 50%;
+  width: 20px; height: 20px; font-size: .7rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+body.dark .ai-chat-img-preview { border-color: #2d3748; }
+body.dark .ai-chat-img-btn { border-color: #2d3748; }
+
+/* ── Imagen en burbuja del chat ── */
+.ai-bubble-img {
+  display: block; max-width: 180px; max-height: 140px;
+  object-fit: cover; border-radius: 8px; margin-bottom: 6px;
+}

@@ -491,7 +491,15 @@
       </div>
       <div class="fg">
         <label class="fl ai-add-hint" id="ai-add-hint">Describí el equipo con todos los datos que tengas</label>
-        <textarea id="ai-add-texto" class="fi ai-add-textarea" placeholder="Ej: iPhone 13 128GB usado buen estado $350000 IMEI 123456789012345" rows="4"></textarea>
+        <textarea id="ai-add-texto" class="fi ai-add-textarea" placeholder="Ej: iPhone 13 128GB usado buen estado $350000 IMEI 123456789012345" rows="3"></textarea>
+      </div>
+      <div class="ai-add-img-row">
+        <label class="ai-add-img-btn" for="ai-add-img-input">📷 Adjuntar imagen</label>
+        <input type="file" id="ai-add-img-input" accept="image/*" hidden onchange="onAIAddImage(this)">
+        <div id="ai-add-img-preview" class="ai-add-img-preview hidden">
+          <img id="ai-add-img-thumb" src="" alt="">
+          <button class="ai-add-img-clear" onclick="clearAIAddImage()">✕</button>
+        </div>
       </div>
       <button class="btn-primary ai-add-submit" onclick="processAIAdd()" id="ai-add-submit-btn">
         <span id="ai-add-submit-lbl">✨ Analizar con IA</span>
@@ -1141,7 +1149,13 @@
       💡 <b>Precios:</b> "¿Cuánto vale un iPhone 13 usado?"
     </div>
   </div>
+  <div id="ai-chat-img-preview" class="ai-chat-img-preview hidden">
+    <img id="ai-chat-img-thumb" src="" alt="">
+    <button class="ai-chat-img-clear" onclick="clearChatImage()">✕</button>
+  </div>
   <div class="ai-chat-input-row">
+    <label class="ai-chat-img-btn" for="ai-chat-img-input" title="Adjuntar imagen">📷</label>
+    <input type="file" id="ai-chat-img-input" accept="image/*" hidden onchange="onChatImage(this)">
     <textarea class="ai-chat-input" id="ai-chat-input" placeholder="Escribí tu consulta..." rows="1" onkeydown="aiChatKeydown(event)"></textarea>
     <button class="ai-chat-send" id="ai-chat-send" onclick="sendAiChat()">➤</button>
   </div>

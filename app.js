@@ -1603,6 +1603,28 @@ function showAiError(msg) {
 // ── IA Quick Add ──────────────────────────────────────────
 let _aiAddTipo = 'equipo';
 let _aiAddData = null;
+let _aiAddImage = null; // { base64, mediaType }
+
+function onAIAddImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    const comma = dataUrl.indexOf(',');
+    _aiAddImage = { base64: dataUrl.slice(comma + 1), mediaType: file.type || 'image/jpeg' };
+    document.getElementById('ai-add-img-thumb').src = dataUrl;
+    document.getElementById('ai-add-img-preview').classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearAIAddImage() {
+  _aiAddImage = null;
+  document.getElementById('ai-add-img-input').value = '';
+  document.getElementById('ai-add-img-thumb').src = '';
+  document.getElementById('ai-add-img-preview').classList.add('hidden');
+}
 
 function openAIAdd(tipo) {
   _aiAddTipo = tipo || 'equipo';
@@ -1612,6 +1634,7 @@ function openAIAdd(tipo) {
   document.getElementById('ai-add-actions').classList.add('hidden');
   document.getElementById('ai-add-submit-lbl').textContent = '✨ Analizar con IA';
   document.getElementById('ai-add-submit-btn').disabled = false;
+  clearAIAddImage();
   setAIAddTipo(_aiAddTipo);
   document.getElementById('ai-add-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -1643,7 +1666,7 @@ function setAIAddTipo(tipo) {
 
 async function processAIAdd() {
   const texto = (document.getElementById('ai-add-texto').value || '').trim();
-  if (!texto) { toast('Escribí una descripción primero', 'error'); return; }
+  if (!texto && !_aiAddImage) { toast('Escribí una descripción o adjuntá una imagen', 'error'); return; }
   const btn = document.getElementById('ai-add-submit-btn');
   const lbl = document.getElementById('ai-add-submit-lbl');
   btn.disabled = true;
@@ -1652,10 +1675,12 @@ async function processAIAdd() {
   document.getElementById('ai-add-actions').classList.add('hidden');
   try {
     const action = _aiAddTipo === 'equipo' ? 'extractEquipo' : 'extractRepuesto';
+    const payload = { texto };
+    if (_aiAddImage) { payload.imageBase64 = _aiAddImage.base64; payload.imageMediaType = _aiAddImage.mediaType; }
     const res = await fetch('/api/ai', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action, data: { texto } })
+      body: JSON.stringify({ action, data: payload })
     });
     const json = await res.json();
     if (json.error) throw new Error(json.error);
