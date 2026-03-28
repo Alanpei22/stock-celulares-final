@@ -489,13 +489,11 @@ function openMovForm(id) {
   editingMovId = id || null;
   const overlay = document.getElementById('mov-overlay');
   const modal   = document.getElementById('mov-modal');
-  const title   = document.getElementById('mov-form-title');
   const deleteWrap = document.getElementById('mov-delete-wrap');
 
   if (id) {
     const m = MOVIMIENTOS.find(x => x.id === id);
     if (!m) return;
-    title.textContent = '✏️ Editar movimiento';
     deleteWrap.style.display = '';
     setMovTipo(m.tipo || 'ingreso');
     document.getElementById('mov-fi-monto').value = m.monto || '';
@@ -506,7 +504,6 @@ function openMovForm(id) {
     // select method
     selectMetodo(m.metodoPago || 'Efectivo');
   } else {
-    title.textContent = '➕ Nuevo movimiento';
     deleteWrap.style.display = 'none';
     setMovTipo('ingreso');
     document.getElementById('mov-fi-monto').value = '';
