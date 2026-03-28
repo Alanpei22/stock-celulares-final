@@ -66,11 +66,21 @@
           <h1>📱 Stock de Celulares</h1>
         </div>
         <div class="hdr-actions">
-          <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
-          <button class="hdr-btn owner-lock-btn" onclick="toggleOwnerLock()" title="Modo dueño">🔒</button>
-          <button class="hdr-btn" id="settings-btn" title="Configuración">⚙️</button>
-          <button class="hdr-btn" id="stats-btn" title="Estadísticas y historial">📊</button>
-          <button class="hdr-btn" id="export-btn" title="Exportar stock">💾</button>
+          <div class="hdr-menu-wrap">
+            <button class="hdr-btn hdr-menu-btn" id="hdr-menu-btn" onclick="toggleHdrMenu()" title="Opciones">⋮</button>
+            <div id="hdr-menu-dropdown" class="hdr-dropdown hidden">
+              <button class="hdr-drop-item dark-toggle-btn" onclick="toggleDarkMode();closeHdrMenu()">
+                <span class="dark-icon">🌙</span> Modo oscuro/claro
+              </button>
+              <button class="hdr-drop-item owner-lock-btn" onclick="toggleOwnerLock();closeHdrMenu()">
+                <span class="lock-icon">🔒</span> Modo dueño
+              </button>
+              <div class="hdr-drop-sep"></div>
+              <button class="hdr-drop-item" id="stats-btn">📊 Estadísticas</button>
+              <button class="hdr-drop-item" id="settings-btn">⚙️ Configuración</button>
+              <button class="hdr-drop-item" id="export-btn">💾 Exportar stock</button>
+            </div>
+          </div>
           <button class="hdr-btn" id="add-btn" title="Agregar equipo">＋</button>
         </div>
       </div>

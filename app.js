@@ -66,7 +66,9 @@ function toggleDarkMode() {
 function _updateDarkIcon() {
   const isDark = document.body.classList.contains('dark');
   document.querySelectorAll('.dark-toggle-btn').forEach(btn => {
-    btn.textContent = isDark ? '☀️' : '🌙';
+    const iconEl = btn.querySelector('.dark-icon');
+    if (iconEl) iconEl.textContent = isDark ? '☀️' : '🌙';
+    else btn.textContent = isDark ? '☀️' : '🌙';
     btn.title = isDark ? 'Modo claro' : 'Modo oscuro';
   });
 }
@@ -184,7 +186,9 @@ function unlockOwnerMode() {
   OWNER_MODE = true;
   document.body.classList.add('owner-mode');
   document.querySelectorAll('.owner-lock-btn').forEach(b => {
-    b.textContent = '🔓'; b.title = 'Bloquear';
+    const iconEl = b.querySelector('.lock-icon');
+    if (iconEl) iconEl.textContent = '🔓'; else b.textContent = '🔓';
+    b.title = 'Bloquear';
   });
   clearTimeout(_ownerLockTimer);
   _ownerLockTimer = setTimeout(lockOwnerMode, 15 * 60 * 1000);
@@ -196,7 +200,9 @@ function lockOwnerMode() {
   document.body.classList.remove('owner-mode');
   clearTimeout(_ownerLockTimer);
   document.querySelectorAll('.owner-lock-btn').forEach(b => {
-    b.textContent = '🔒'; b.title = 'Modo dueño';
+    const iconEl = b.querySelector('.lock-icon');
+    if (iconEl) iconEl.textContent = '🔒'; else b.textContent = '🔒';
+    b.title = 'Modo dueño';
   });
   toast('🔒 Vista bloqueada', 'info');
 }
@@ -392,9 +398,9 @@ function initApp() {
   if (justLoggedIn) { justLoggedIn = false; setTimeout(logAccess, 800); }
 
   document.getElementById('add-btn').addEventListener('click', () => openForm());
-  document.getElementById('stats-btn').addEventListener('click', openStats);
-  document.getElementById('export-btn').addEventListener('click', openExport);
-  document.getElementById('settings-btn').addEventListener('click', openSettings);
+  document.getElementById('stats-btn').addEventListener('click', () => { closeHdrMenu(); openStats(); });
+  document.getElementById('export-btn').addEventListener('click', () => { closeHdrMenu(); openExport(); });
+  document.getElementById('settings-btn').addEventListener('click', () => { closeHdrMenu(); openSettings(); });
   document.getElementById('search').addEventListener('input', debounceRender);
   document.getElementById('f-marca').addEventListener('change', debounceRender);
   document.getElementById('f-estado').addEventListener('change', debounceRender);
@@ -435,6 +441,28 @@ function initApp() {
   listenStock();
   initRepairs();
   initRepuestos();
+}
+
+// ── Menú desplegable header ───────────────────────────────
+function toggleHdrMenu() {
+  const menu = document.getElementById('hdr-menu-dropdown');
+  if (!menu) return;
+  const isOpen = !menu.classList.contains('hidden');
+  menu.classList.toggle('hidden', isOpen);
+  if (!isOpen) {
+    setTimeout(() => document.addEventListener('click', _closeHdrMenuOutside, { once: true }), 0);
+  }
+}
+function closeHdrMenu() {
+  const menu = document.getElementById('hdr-menu-dropdown');
+  if (menu) menu.classList.add('hidden');
+}
+function _closeHdrMenuOutside(e) {
+  const menu = document.getElementById('hdr-menu-dropdown');
+  const btn  = document.getElementById('hdr-menu-btn');
+  if (menu && !menu.contains(e.target) && e.target !== btn) {
+    menu.classList.add('hidden');
+  }
 }
 
 // ── Secciones ─────────────────────────────────────────────
@@ -566,8 +594,8 @@ function render() {
       dateLabel = `<span class="card-date${oldCls}" title="Ingresó hace ${diasStr}">📅 ${diasStr}</span>`;
     }
 
-    // Battery badge for non-sold iPhones
-    const bateriaBadge = (!p.vendido && p.bateria && /iphone/i.test(p.marca))
+    // Battery badge for non-sold iPhones (marca "Apple" or contains "iPhone")
+    const bateriaBadge = (!p.vendido && p.bateria && (/iphone/i.test(p.marca) || /apple/i.test(p.marca)))
       ? `<span class="card-bateria">🔋 ${p.bateria}%</span>`
       : '';
 
@@ -778,7 +806,7 @@ function toggleStockLowBanner() {
 function _updateBateriaVisibility(marca) {
   const wrap = document.getElementById('fi-bateria-wrap');
   if (!wrap) return;
-  wrap.style.display = /iphone/i.test(marca) ? '' : 'none';
+  wrap.style.display = (/iphone/i.test(marca) || /apple/i.test(marca)) ? '' : 'none';
 }
 
 function buildPriceTable(precio) {
