@@ -244,7 +244,7 @@ header {
 }
 
 .search-wrap { position: relative; }
-#search {
+#search, #rep-search, #rep2-search {
   width: 100%; padding: 10px 14px 10px 38px;
   border: none; border-radius: 12px;
   font-size: .92rem;
@@ -253,8 +253,8 @@ header {
   -webkit-appearance: none;
   transition: background .2s;
 }
-#search::placeholder { color: rgba(255,255,255,.5); }
-#search:focus { background: rgba(255,255,255,.22); }
+#search::placeholder, #rep-search::placeholder, #rep2-search::placeholder { color: rgba(255,255,255,.5); }
+#search:focus, #rep-search:focus, #rep2-search:focus { background: rgba(255,255,255,.22); }
 .search-icon {
   position: absolute; left: 12px; top: 50%;
   transform: translateY(-50%);
