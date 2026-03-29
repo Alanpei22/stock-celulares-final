@@ -197,9 +197,9 @@
     </header>
 
     <div class="stats-bar">
-      <div class="stat"><span class="stat-num" id="rs-reparando">0</span><span class="stat-lbl">Reparando</span></div>
-      <div class="stat"><span class="stat-num" id="rs-listo">0</span><span class="stat-lbl">Listos</span></div>
-      <div class="stat"><span class="stat-num rep-demorado-num" id="rs-demorados">0</span><span class="stat-lbl">Demorados</span></div>
+      <div class="stat stat--clickable" onclick="(function(s){var el=document.getElementById('rep-f-estado');el.value=el.value===s?'':s;renderRepairs();}('reparando'))"><span class="stat-num" id="rs-reparando">0</span><span class="stat-lbl">Reparando</span></div>
+      <div class="stat stat--clickable" onclick="(function(s){var el=document.getElementById('rep-f-estado');el.value=el.value===s?'':s;renderRepairs();}('listo'))"><span class="stat-num" id="rs-listo">0</span><span class="stat-lbl">Listos</span></div>
+      <div class="stat stat--clickable" onclick="(function(s){var el=document.getElementById('rep-f-estado');el.value=el.value===s?'':s;renderRepairs();}('demorado'))"><span class="stat-num rep-demorado-num" id="rs-demorados">0</span><span class="stat-lbl">Demorados</span></div>
     </div>
 
     <div class="list-wrap">
@@ -229,6 +229,7 @@
               </button>
             </div>
           </div>
+          <button class="hdr-btn" onclick="openBulkImport()" title="Carga masiva">📦</button>
           <button class="hdr-btn hdr-btn-ai" onclick="openAIAdd('repuesto')" title="Agregar con IA">✨</button>
           <button class="hdr-btn" id="rep2-add-btn" title="Agregar repuesto">＋</button>
         </div>
@@ -1064,6 +1065,63 @@
   <div class="nota-modal-btns">
     <button type="button" class="btn-nota-clear" onclick="clearNota()">🗑 Borrar nota</button>
     <button type="button" class="btn-nota-save" onclick="saveNota()">✅ Guardar</button>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL CARGA MASIVA ═══════════ -->
+<div id="bulk-modal" class="modal-overlay hidden">
+  <div class="modal-card bulk-card">
+    <div class="modal-header">
+      <h3>📦 Carga Masiva de Repuestos</h3>
+      <button class="modal-close" onclick="closeBulkImport()">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- PASO 1: ENTRADA -->
+      <div id="bulk-step1">
+        <div class="bulk-opts-row">
+          <div class="fg" style="flex:1">
+            <label class="fl">Tipo *</label>
+            <select id="bulk-tipo" class="fi">
+              <option value="Pantalla">Pantalla</option>
+              <option value="Batería">Batería</option>
+              <option value="Conector">Conector</option>
+              <option value="Flex">Flex</option>
+              <option value="Táctil">Táctil</option>
+              <option value="Cámara">Cámara</option>
+              <option value="Batería">Batería</option>
+              <option value="Marco">Marco</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="fg" style="flex:1">
+            <label class="fl">Proveedor</label>
+            <input id="bulk-proveedor" class="fi" type="text" placeholder="Opcional">
+          </div>
+        </div>
+        <div class="fg">
+          <label class="fl">Lista · un ítem por línea: <code>marca modelo cantidad</code></label>
+          <textarea id="bulk-texto" class="fi bulk-textarea" rows="10"
+            placeholder="moto g60s 4&#10;samsung a04 5&#10;redmi 14c 2&#10;iphone 8 c/marco 3"></textarea>
+        </div>
+        <button class="btn-primary" onclick="previewBulk()" style="width:100%">→ Previsualizar</button>
+      </div>
+      <!-- PASO 2: PREVISUALIZACIÓN -->
+      <div id="bulk-step2" class="hidden">
+        <div class="bulk-preview-hdr">
+          <span id="bulk-count-lbl" class="bulk-count-lbl">0 repuestos</span>
+          <button class="btn-secondary bulk-back-btn" onclick="backToBulkInput()">← Editar lista</button>
+        </div>
+        <div class="bulk-table-wrap">
+          <table class="bulk-table">
+            <thead><tr><th>Nombre</th><th>Marca</th><th>Modelo</th><th>Cant.</th><th></th></tr></thead>
+            <tbody id="bulk-tbody"></tbody>
+          </table>
+        </div>
+        <button class="btn-primary bulk-save-btn" id="bulk-save-btn" onclick="saveBulk()" style="width:100%;margin-top:10px">
+          <span id="bulk-save-lbl">💾 Guardar todos</span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 

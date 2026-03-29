@@ -6,6 +6,142 @@ let REPUESTOS         = [];
 let editingRepuestoId = null;
 let rep2RenderTimer;
 
+// ── Carga Masiva ──────────────────────────
+const _BULK_BRANDS = {
+  'moto':'Motorola','motorola':'Motorola',
+  'samsung':'Samsung',
+  'redmi':'Xiaomi','xiaomi':'Xiaomi',
+  'zte':'ZTE',
+  'iphone':'Apple','apple':'Apple',
+  'nokia':'Nokia','tcl':'TCL',
+  'huawei':'Huawei','lg':'LG',
+  'alcatel':'Alcatel','lenovo':'Lenovo',
+  'oppo':'OPPO','realme':'Realme','vivo':'Vivo',
+  'note':'Xiaomi', // Redmi Note series
+};
+
+function _bulkDetectBrand(parts) {
+  const fw = parts[0].toLowerCase();
+  if (_BULK_BRANDS[fw])        return { marca: _BULK_BRANDS[fw], modelParts: parts.slice(1) };
+  if (/^[ajs]\d/.test(fw))     return { marca: 'Samsung',       modelParts: parts };          // a04, j7...
+  if (/^\d+[a-z]/i.test(fw))   return { marca: 'TCL',           modelParts: parts };          // 3h, 20e...
+  return { marca: fw.charAt(0).toUpperCase() + fw.slice(1), modelParts: parts.slice(1) };
+}
+
+function _parseBulkLine(line, tipo) {
+  line = line.trim(); if (!line) return null;
+  const parts = line.split(/\s+/);
+  let cantidad = 0, nameParts = [...parts];
+  if (/^\d+$/.test(parts[parts.length - 1])) {
+    cantidad = parseInt(parts[parts.length - 1]);
+    nameParts = parts.slice(0, -1);
+  }
+  if (!nameParts.length) return null;
+  const { marca, modelParts } = _bulkDetectBrand(nameParts);
+  const modelo = modelParts.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  const nombre = [tipo, marca, modelo].filter(Boolean).join(' ');
+  return { nombre, marca, modelo, tipo, cantidad };
+}
+
+function openBulkImport() {
+  document.getElementById('bulk-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('bulk-step1').classList.remove('hidden');
+  document.getElementById('bulk-step2').classList.add('hidden');
+}
+function closeBulkImport() {
+  document.getElementById('bulk-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+function backToBulkInput() {
+  document.getElementById('bulk-step1').classList.remove('hidden');
+  document.getElementById('bulk-step2').classList.add('hidden');
+}
+
+function previewBulk() {
+  const texto = document.getElementById('bulk-texto').value;
+  const tipo  = document.getElementById('bulk-tipo').value;
+  const lines = texto.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) { toast('Pegá una lista primero', 'error'); return; }
+
+  const items = lines.map(l => _parseBulkLine(l, tipo)).filter(Boolean);
+  if (!items.length) { toast('No se pudieron parsear los ítems', 'error'); return; }
+
+  document.getElementById('bulk-count-lbl').textContent = `${items.length} repuesto${items.length !== 1 ? 's' : ''}`;
+  document.getElementById('bulk-save-lbl').textContent = `💾 Guardar ${items.length} repuestos`;
+
+  const tbody = document.getElementById('bulk-tbody');
+  tbody.innerHTML = items.map((it, i) => `
+    <tr id="brow-${i}">
+      <td><input class="bulk-inp" value="${_esc(it.nombre)}" data-f="nombre" data-i="${i}"></td>
+      <td><input class="bulk-inp bulk-inp-sm" value="${_esc(it.marca)}" data-f="marca" data-i="${i}"></td>
+      <td><input class="bulk-inp bulk-inp-sm" value="${_esc(it.modelo)}" data-f="modelo" data-i="${i}"></td>
+      <td><input class="bulk-inp bulk-inp-qty" type="number" min="0" value="${it.cantidad}" data-f="cantidad" data-i="${i}"></td>
+      <td><button class="bulk-del-btn" onclick="removeBulkRow(${i})">✕</button></td>
+    </tr>`).join('');
+
+  document.getElementById('bulk-step1').classList.add('hidden');
+  document.getElementById('bulk-step2').classList.remove('hidden');
+}
+
+function removeBulkRow(i) {
+  const row = document.getElementById('brow-' + i);
+  if (row) row.remove();
+  const rem = document.getElementById('bulk-tbody').querySelectorAll('tr').length;
+  document.getElementById('bulk-count-lbl').textContent = `${rem} repuesto${rem !== 1 ? 's' : ''}`;
+  document.getElementById('bulk-save-lbl').textContent = `💾 Guardar ${rem} repuestos`;
+}
+
+async function saveBulk() {
+  const proveedor = document.getElementById('bulk-proveedor').value.trim();
+  const tipo      = document.getElementById('bulk-tipo').value;
+  const rows = document.getElementById('bulk-tbody').querySelectorAll('tr');
+  if (!rows.length) { toast('No hay ítems para guardar', 'error'); return; }
+
+  // Leer valores actuales de los inputs
+  const items = [];
+  rows.forEach(row => {
+    const get = f => row.querySelector(`[data-f="${f}"]`)?.value?.trim() || '';
+    const nombre = get('nombre'), marca = get('marca');
+    if (!nombre || !marca) return;
+    items.push({
+      nombre, marca,
+      modelo:      get('modelo'),
+      tipo:        tipo,
+      cantidad:    parseInt(row.querySelector('[data-f="cantidad"]')?.value) || 0,
+      stockMin:    2,
+      precioCompra:0,
+      proveedor,
+      notas:       '',
+      fechaAlta:   new Date().toISOString()
+    });
+  });
+
+  const btn = document.getElementById('bulk-save-btn');
+  btn.disabled = true;
+  document.getElementById('bulk-save-lbl').textContent = '⏳ Guardando...';
+
+  try {
+    const CHUNK = 400; // Firestore batch limit 500, usamos 400 para seguridad
+    for (let i = 0; i < items.length; i += CHUNK) {
+      const batch = db.batch();
+      items.slice(i, i + CHUNK).forEach(item => {
+        const ref = db.collection('repuestos').doc();
+        batch.set(ref, { id: ref.id, ...item });
+      });
+      await batch.commit();
+    }
+    toast(`✅ ${items.length} repuestos guardados`, 'success');
+    closeBulkImport();
+  } catch(e) {
+    toast('Error al guardar: ' + e.message, 'error');
+    btn.disabled = false;
+    document.getElementById('bulk-save-lbl').textContent = `💾 Guardar ${items.length} repuestos`;
+  }
+}
+
+function _esc(s) { return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
 // ── Firebase ──────────────────────────────
 function listenRepuestos() {
   db.collection('repuestos').onSnapshot(snap => {

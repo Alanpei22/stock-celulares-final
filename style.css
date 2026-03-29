@@ -321,6 +321,11 @@ header {
   display: flex; flex-direction: column; align-items: center;
   gap: 1px; flex: 1;
 }
+.stat--clickable {
+  cursor: pointer; border-radius: 8px; padding: 4px 8px;
+  transition: background .15s;
+}
+.stat--clickable:active { background: rgba(0,0,0,.06); }
 .stat-val { flex: 1.5; }
 .stat-num {
   font-size: 1.1rem; font-weight: 800; color: var(--pri);
@@ -2221,3 +2226,24 @@ body.dark .ai-chat-img-btn { border-color: #2d3748; }
 }
 .det-close-footer:active { opacity: .7; }
 body.dark .det-close-footer { background: #1e2d3d; border-color: #2d3748; color: #94a3b8; }
+
+/* ── CARGA MASIVA ─────────────────────────────────────── */
+.bulk-card { max-width: 700px; width: 96vw; max-height: 90vh; display:flex; flex-direction:column; }
+.bulk-card .modal-body { overflow-y:auto; flex:1; }
+.bulk-opts-row { display:flex; gap:10px; margin-bottom:2px; }
+.bulk-textarea { min-height:180px; font-family:monospace; font-size:.82rem; resize:vertical; }
+.bulk-preview-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.bulk-count-lbl { font-weight:700; font-size:.95rem; color:var(--pri); }
+.bulk-back-btn { font-size:.8rem; padding:5px 12px; }
+.bulk-table-wrap { overflow-x:auto; max-height:50vh; overflow-y:auto; border:1px solid var(--border); border-radius:10px; }
+.bulk-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.bulk-table thead th { position:sticky; top:0; background:var(--card); padding:8px 6px; text-align:left; font-weight:700; color:var(--t2); border-bottom:1px solid var(--border); }
+.bulk-table tbody tr:nth-child(even) { background:rgba(0,0,0,.02); }
+body.dark .bulk-table tbody tr:nth-child(even) { background:rgba(255,255,255,.03); }
+.bulk-table td { padding:3px 4px; vertical-align:middle; }
+.bulk-inp { border:1px solid var(--border); border-radius:6px; padding:4px 6px; font-size:.8rem; width:100%; min-width:80px; background:var(--bg); color:var(--t1); }
+.bulk-inp-sm  { min-width:70px; }
+.bulk-inp-qty { min-width:50px; max-width:60px; text-align:center; }
+.bulk-inp:focus { outline:2px solid var(--acc); border-color:var(--acc); }
+.bulk-del-btn { background:#ef4444; color:#fff; border:none; border-radius:5px; width:22px; height:22px; font-size:.7rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.bulk-save-btn { margin-top:10px; }
