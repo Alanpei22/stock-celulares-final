@@ -695,11 +695,20 @@ function openForm(id) {
     document.getElementById('fi-bateria').value   = '';
     _updateBateriaVisibility('');
   }
-  // Reset moneda toggle to ARS
+  // Reset moneda toggle
+  monedaMode = 'ars';
   const btnM = document.getElementById('btn-moneda');
-  if (btnM) { btnM.textContent = 'ARS $'; btnM.classList.remove('btn-moneda--usd'); btnM.dataset.mode = 'ars'; }
   const helper = document.getElementById('fi-precio-helper');
-  if (helper) helper.textContent = '';
+  if (p && p.moneda === 'usd' && p.precioUSD) {
+    // Restaurar modo USD con el precio original en USD
+    monedaMode = 'usd';
+    if (btnM) { btnM.textContent = 'USD $'; btnM.classList.add('btn-moneda--usd'); }
+    document.getElementById('fi-precio').value = p.precioUSD;
+    if (helper) helper.textContent = dolarBlue ? `Cotización: $${dolarBlue.toLocaleString('es-AR')} (blue)` : 'Cotización no disponible';
+  } else {
+    if (btnM) { btnM.textContent = 'ARS $'; btnM.classList.remove('btn-moneda--usd'); }
+    if (helper) helper.textContent = '';
+  }
   document.getElementById('form-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   setTimeout(() => document.getElementById('fi-marca').focus(), 300);
@@ -734,17 +743,23 @@ function savePhone() {
 
   const bateria = parseInt(document.getElementById('fi-bateria').value) || null;
 
+  const usdExtra = window._pendingUSD || null;
+  window._pendingUSD = null;
+
   if (editingId) {
         const existing = STOCK.find(x => x.id === editingId);
         if (!existing) { closeForm(); return; }
         const upd = { ...existing, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion };
         if (bateria) upd.bateria = bateria; else delete upd.bateria;
+        if (usdExtra) { upd.precioUSD = usdExtra.precioUSD; upd.moneda = 'usd'; }
+        else { delete upd.precioUSD; upd.moneda = 'ars'; }
         db.collection('stock').doc(editingId).set(upd);
         toast('Equipo actualizado', 'success');
   } else {
         const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         const newDoc = { id, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion, fecha: new Date().toISOString(), vendido: false };
         if (bateria) newDoc.bateria = bateria;
+        if (usdExtra) { newDoc.precioUSD = usdExtra.precioUSD; newDoc.moneda = 'usd'; }
         db.collection('stock').doc(id).set(newDoc);
         toast('Equipo agregado al stock', 'success');
   }
@@ -1448,15 +1463,23 @@ const _origSavePhone = window.savePhone;
 (function () {
   const orig = savePhone;
   window.savePhone = function () {
-    if (monedaMode === 'usd' && dolarBlue) {
+    if (monedaMode === 'usd') {
+      if (!dolarBlue) {
+        toast('No hay cotización del dólar disponible. Ingresala en Configuración.', 'error');
+        return;
+      }
       const usdVal = parseFloat(document.getElementById('fi-precio').value) || 0;
       const arsVal = Math.round(usdVal * dolarBlue);
+      // Guardar precio USD original para restaurar al editar
+      window._pendingUSD = { precioUSD: usdVal, moneda: 'usd' };
       document.getElementById('fi-precio').value = arsVal;
-      monedaMode = 'ars'; // reset after conversion
+      monedaMode = 'ars';
       const btn = document.getElementById('btn-moneda');
       if (btn) { btn.textContent = 'ARS $'; btn.classList.remove('btn-moneda--usd'); }
       const h = document.getElementById('fi-precio-helper');
       if (h) h.textContent = '';
+    } else {
+      window._pendingUSD = null;
     }
     orig.apply(this, arguments);
   };
