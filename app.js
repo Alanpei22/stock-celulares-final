@@ -726,6 +726,17 @@ function closeForm() {
 }
 
 function savePhone() {
+  // Conversión USD→ARS si corresponde
+  if (monedaMode === 'usd') {
+    if (!dolarBlue) { toast('No hay cotización del dólar disponible. Ingresala en Configuración.', 'error'); return; }
+    const usdVal = parseFloat(document.getElementById('fi-precio').value) || 0;
+    if (!usdVal) { toast('Ingresá un precio en dólares', 'error'); return; }
+    window._precioUSD = usdVal;
+    document.getElementById('fi-precio').value = Math.round(usdVal * dolarBlue);
+  } else {
+    window._precioUSD = null;
+  }
+
   const marca     = document.getElementById('fi-marca').value.trim();
   const modelo    = document.getElementById('fi-modelo').value.trim();
   const estado    = document.getElementById('fi-estado').value;
@@ -746,29 +757,30 @@ function savePhone() {
     if (dup) { toast('Ya existe un equipo con ese IMEI', 'error'); return; }
   }
 
-  const bateria = parseInt(document.getElementById('fi-bateria').value) || null;
-
-  const usdExtra = window._pendingUSD || null;
-  window._pendingUSD = null;
+  const bateria  = parseInt(document.getElementById('fi-bateria').value) || null;
+  const esUSD    = window._precioUSD !== null;
+  const precioUSD = window._precioUSD;
+  window._precioUSD = null;
+  monedaMode = 'ars';
 
   if (editingId) {
-        const existing = STOCK.find(x => x.id === editingId);
-        if (!existing) { closeForm(); return; }
-        const upd = { ...existing, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion };
-        if (bateria) upd.bateria = bateria; else delete upd.bateria;
-        if (usdExtra) { upd.precioUSD = usdExtra.precioUSD; upd.moneda = 'usd'; }
-        else { delete upd.precioUSD; upd.moneda = 'ars'; }
-        db.collection('stock').doc(editingId).set(upd);
-        toast('Equipo actualizado', 'success');
+    const existing = STOCK.find(x => x.id === editingId);
+    if (!existing) { closeForm(); return; }
+    const upd = { ...existing, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion };
+    if (bateria) upd.bateria = bateria; else delete upd.bateria;
+    if (esUSD) { upd.precioUSD = precioUSD; upd.moneda = 'usd'; }
+    else { delete upd.precioUSD; upd.moneda = 'ars'; }
+    db.collection('stock').doc(editingId).set(upd);
+    toast('Equipo actualizado', 'success');
   } else {
-        const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        const newDoc = { id, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion, fecha: new Date().toISOString(), vendido: false };
-        if (bateria) newDoc.bateria = bateria;
-        if (usdExtra) { newDoc.precioUSD = usdExtra.precioUSD; newDoc.moneda = 'usd'; }
-        db.collection('stock').doc(id).set(newDoc);
-        toast('Equipo agregado al stock', 'success');
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const newDoc = { id, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion, fecha: new Date().toISOString(), vendido: false };
+    if (bateria) newDoc.bateria = bateria;
+    if (esUSD) { newDoc.precioUSD = precioUSD; newDoc.moneda = 'usd'; }
+    db.collection('stock').doc(id).set(newDoc);
+    toast('Equipo agregado al stock', 'success');
   }
-    closeForm();
+  closeForm();
 }
 
 // ── Detalle ───────────────────────────────────────────────
@@ -1460,37 +1472,6 @@ function toggleMoneda() {
   }
 }
 
-// Al guardar, convertir USD→ARS si corresponde (se llama desde savePhone)
-// La conversión se hace leyendo monedaMode en savePhone():
-// En app.js savePhone, el precio ya usa fi-precio pero hay que convertir
-// Inyectar el override aquí para no romper savePhone:
-const _origSavePhone = window.savePhone;
-
-// Wrap savePhone to handle USD conversion
-(function () {
-  const orig = savePhone;
-  window.savePhone = function () {
-    if (monedaMode === 'usd') {
-      if (!dolarBlue) {
-        toast('No hay cotización del dólar disponible. Ingresala en Configuración.', 'error');
-        return;
-      }
-      const usdVal = parseFloat(document.getElementById('fi-precio').value) || 0;
-      const arsVal = Math.round(usdVal * dolarBlue);
-      // Guardar precio USD original para restaurar al editar
-      window._pendingUSD = { precioUSD: usdVal, moneda: 'usd' };
-      document.getElementById('fi-precio').value = arsVal;
-      monedaMode = 'ars';
-      const btn = document.getElementById('btn-moneda');
-      if (btn) { btn.textContent = 'ARS $'; btn.classList.remove('btn-moneda--usd'); }
-      const h = document.getElementById('fi-precio-helper');
-      if (h) h.textContent = '';
-    } else {
-      window._pendingUSD = null;
-    }
-    orig.apply(this, arguments);
-  };
-})();
 
 // WA_TEMPLATES declared at top of file (see top of app.js)
 
