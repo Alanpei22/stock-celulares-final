@@ -670,6 +670,9 @@ function esc(s) {
 function openForm(id) {
   editingId = id || null;
   const t = document.getElementById('form-title');
+  const btnM = document.getElementById('btn-moneda');
+  const helper = document.getElementById('fi-precio-helper');
+  monedaMode = 'ars';
   if (id) {
     const p = STOCK.find(x => x.id === id);
     if (!p) return;
@@ -677,7 +680,6 @@ function openForm(id) {
     document.getElementById('fi-marca').value     = p.marca         || '';
     document.getElementById('fi-modelo').value    = p.modelo        || '';
     document.getElementById('fi-estado').value    = p.estado        || '';
-    document.getElementById('fi-precio').value    = p.precio        || '';
     document.getElementById('fi-storage').value   = p.almacenamiento|| '';
     document.getElementById('fi-ram').value       = p.ram           || '';
     document.getElementById('fi-imei').value      = p.imei          || '';
@@ -685,27 +687,26 @@ function openForm(id) {
     document.getElementById('fi-ubicacion').value = p.ubicacion     || '';
     document.getElementById('fi-bateria').value   = p.bateria       || '';
     _updateBateriaVisibility(p.marca || '');
+    // Restaurar modo USD si el equipo fue cargado en dólares
+    if (p.moneda === 'usd' && p.precioUSD) {
+      monedaMode = 'usd';
+      document.getElementById('fi-precio').value = p.precioUSD;
+      if (btnM) { btnM.textContent = 'USD $'; btnM.classList.add('btn-moneda--usd'); }
+      if (helper) helper.textContent = dolarBlue ? `Cotización: $${dolarBlue.toLocaleString('es-AR')} (blue)` : 'Cotización no disponible';
+    } else {
+      document.getElementById('fi-precio').value = p.precio || '';
+      if (btnM) { btnM.textContent = 'ARS $'; btnM.classList.remove('btn-moneda--usd'); }
+      if (helper) helper.textContent = '';
+    }
   } else {
     t.textContent = '📱 Agregar Equipo';
-    ['fi-marca','fi-modelo','fi-precio','fi-imei','fi-notas'].forEach(id => { document.getElementById(id).value = ''; });
+    ['fi-marca','fi-modelo','fi-precio','fi-imei','fi-notas'].forEach(fid => { document.getElementById(fid).value = ''; });
     document.getElementById('fi-estado').value    = '';
     document.getElementById('fi-storage').value   = '';
     document.getElementById('fi-ram').value       = '';
     document.getElementById('fi-ubicacion').value = '';
     document.getElementById('fi-bateria').value   = '';
     _updateBateriaVisibility('');
-  }
-  // Reset moneda toggle
-  monedaMode = 'ars';
-  const btnM = document.getElementById('btn-moneda');
-  const helper = document.getElementById('fi-precio-helper');
-  if (p && p.moneda === 'usd' && p.precioUSD) {
-    // Restaurar modo USD con el precio original en USD
-    monedaMode = 'usd';
-    if (btnM) { btnM.textContent = 'USD $'; btnM.classList.add('btn-moneda--usd'); }
-    document.getElementById('fi-precio').value = p.precioUSD;
-    if (helper) helper.textContent = dolarBlue ? `Cotización: $${dolarBlue.toLocaleString('es-AR')} (blue)` : 'Cotización no disponible';
-  } else {
     if (btnM) { btnM.textContent = 'ARS $'; btnM.classList.remove('btn-moneda--usd'); }
     if (helper) helper.textContent = '';
   }
