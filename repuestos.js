@@ -22,9 +22,10 @@ const _BULK_BRANDS = {
 
 function _bulkDetectBrand(parts) {
   const fw = parts[0].toLowerCase();
+  if (fw === 'note')           return { marca: 'Xiaomi',        modelParts: ['Note', ...parts.slice(1)] };
   if (_BULK_BRANDS[fw])        return { marca: _BULK_BRANDS[fw], modelParts: parts.slice(1) };
-  if (/^[ajs]\d/.test(fw))     return { marca: 'Samsung',       modelParts: parts };          // a04, j7...
-  if (/^\d+[a-z]/i.test(fw))   return { marca: 'TCL',           modelParts: parts };          // 3h, 20e...
+  if (/^[ajs]\d/.test(fw))     return { marca: 'Samsung',       modelParts: parts };
+  if (/^\d+[a-z]/i.test(fw))   return { marca: 'TCL',           modelParts: parts };
   return { marca: fw.charAt(0).toUpperCase() + fw.slice(1), modelParts: parts.slice(1) };
 }
 
@@ -38,7 +39,9 @@ function _parseBulkLine(line, tipo) {
   }
   if (!nameParts.length) return null;
   const { marca, modelParts } = _bulkDetectBrand(nameParts);
-  const modelo = modelParts.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  const modelo = modelParts.map(w =>
+    w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)
+  ).join(' ');
   const nombre = [tipo, marca, modelo].filter(Boolean).join(' ');
   return { nombre, marca, modelo, tipo, cantidad };
 }
