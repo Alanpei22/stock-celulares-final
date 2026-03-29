@@ -15,7 +15,7 @@ const FB_CONFIG = {
   appId: "1:140592485004:web:29f6b0aa0f02fdf99ba1a9"
 };
 
-const DENOMINACIONES = [500000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
+const DENOMINACIONES = [20000, 10000, 2000, 1000, 500, 200, 100];
 
 const CATEGORIAS = {
   ingreso: ['Venta equipo', 'Reparación', 'Hidrogel / Accesorio', 'Seña', 'Otro ingreso'],
