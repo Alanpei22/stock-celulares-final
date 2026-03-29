@@ -51,11 +51,21 @@
         <h1>💰 Caja Diaria</h1>
       </div>
       <div class="hdr-actions">
-        <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
-        <button class="hdr-btn" onclick="reopenArqueo()" title="Ver/editar arqueo">🧾</button>
-        <button class="hdr-btn" id="cierre-btn" onclick="openCierreModal()" title="Cerrar caja del día">🔐</button>
-        <button class="hdr-btn owner-only" onclick="openCajaHistorial()" title="Historial / Stats">📊</button>
-        <button class="hdr-btn owner-lock-btn" id="caja-owner-btn" onclick="openCajaOwnerPin()" title="Modo dueño">🔒</button>
+        <div class="hdr-menu-wrap">
+          <button class="hdr-btn hdr-menu-btn" id="caja-menu-btn" onclick="toggleCajaMenu()" title="Opciones">⋮</button>
+          <div id="caja-menu-dropdown" class="hdr-dropdown hidden">
+            <button class="hdr-drop-item dark-toggle-btn" onclick="toggleDarkMode();closeCajaMenu()">
+              <span class="dark-icon">🌙</span> Modo oscuro/claro
+            </button>
+            <button class="hdr-drop-item owner-lock-btn" onclick="openCajaOwnerPin();closeCajaMenu()">
+              <span class="lock-icon">🔒</span> Modo dueño
+            </button>
+            <div class="hdr-drop-sep"></div>
+            <button class="hdr-drop-item" onclick="reopenArqueo();closeCajaMenu()">🧾 Arqueo de caja</button>
+            <button class="hdr-drop-item" id="cierre-btn" onclick="openCierreModal();closeCajaMenu()">🔐 Cerrar caja del día</button>
+            <button class="hdr-drop-item owner-only" onclick="openCajaHistorial();closeCajaMenu()">📊 Historial / Stats</button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -116,11 +126,11 @@
     <div class="fab-actions hidden" id="fab-actions">
       <div class="fab-action-row">
         <span class="fab-lbl">Egreso</span>
-        <button class="fab-sub fab-sub-eg" onclick="openMovFormType('egreso')">🔴</button>
+        <button class="fab-sub fab-sub-eg" onclick="openMovFormType('egreso')">➖</button>
       </div>
       <div class="fab-action-row">
         <span class="fab-lbl">Ingreso</span>
-        <button class="fab-sub fab-sub-ing" onclick="openMovFormType('ingreso')">💚</button>
+        <button class="fab-sub fab-sub-ing" onclick="openMovFormType('ingreso')">➕</button>
       </div>
     </div>
     <button class="fab" id="fab-main" onclick="toggleFabMenu()" title="Nuevo movimiento">＋</button>
@@ -135,6 +145,10 @@
     <span>🧾 Arqueo de apertura</span>
     <button onclick="closeArqueoModal()">✕</button>
   </div>
+  <div id="arqueo-ya-hecho" class="arqueo-ya-hecho hidden"></div>
+  <div class="arqueo-vendedor-row">
+    <input id="arqueo-vendedor-input" class="fi arqueo-vendedor-input" type="text" placeholder="Tu nombre (quién abre la caja)" maxlength="40">
+  </div>
   <p class="arqueo-sub">Contá los billetes en caja ahora</p>
   <div id="arqueo-billetes" class="arqueo-billetes"></div>
   <div class="arqueo-total-row">
@@ -142,7 +156,7 @@
     <span id="arqueo-total" class="arqueo-total-num">$0</span>
   </div>
   <div class="nota-modal-btns">
-    <button class="btn-nota-save" onclick="saveArqueo()" style="width:100%">✅ Confirmar apertura</button>
+    <button class="btn-nota-save" onclick="saveArqueo()" style="width:100%" id="arqueo-save-btn">✅ Confirmar apertura</button>
   </div>
 </div>
 
@@ -181,8 +195,8 @@
 
   <!-- Tipo toggle header -->
   <div class="mov-tipo-hdr">
-    <button id="mov-btn-ingreso" class="mov-tipo-btn mov-tipo-btn--ing tipo-active" onclick="setMovTipo('ingreso')">💚 Ingreso</button>
-    <button id="mov-btn-egreso" class="mov-tipo-btn mov-tipo-btn--eg" onclick="setMovTipo('egreso')">🔴 Egreso</button>
+    <button id="mov-btn-ingreso" class="mov-tipo-btn mov-tipo-btn--ing tipo-active" onclick="setMovTipo('ingreso')">➕ Ingreso</button>
+    <button id="mov-btn-egreso" class="mov-tipo-btn mov-tipo-btn--eg" onclick="setMovTipo('egreso')">➖ Egreso</button>
     <button class="mov-close-btn" onclick="closeMovForm()">✕</button>
   </div>
 
@@ -250,6 +264,20 @@
     </div>
     <input type="hidden" id="mov-hidden-metodo">
     <input type="hidden" id="mov-hidden-metodo2">
+    <!-- Vuelto (solo efectivo) -->
+    <div id="vuelto-section" class="vuelto-section hidden">
+      <div class="vuelto-row">
+        <span class="vuelto-lbl">Recibido</span>
+        <div class="vuelto-input-wrap">
+          <span class="vuelto-prefix">$</span>
+          <input id="mov-recibido" class="vuelto-input" type="number" placeholder="0" min="0" inputmode="numeric" oninput="calcVuelto()">
+        </div>
+      </div>
+      <div class="vuelto-row vuelto-result-row">
+        <span class="vuelto-lbl">Vuelto</span>
+        <span id="vuelto-val" class="vuelto-val">$0</span>
+      </div>
+    </div>
   </div>
 
   <!-- Actions -->

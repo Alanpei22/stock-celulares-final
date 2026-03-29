@@ -623,3 +623,48 @@ body.dark .quick-amt { background: #1e293b; border-color: #334155; }
 body.dark .fab-lbl { background: rgba(255,255,255,.15); color: #f1f5f9; }
 body.dark .fab-sub-ing { background: #14532d; }
 body.dark .fab-sub-eg  { background: #7f1d1d; }
+
+/* ── Vuelto efectivo ── */
+.vuelto-section {
+  margin-top: 8px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(16,185,129,.07); border: 1px solid rgba(16,185,129,.2);
+}
+body.dark .vuelto-section { background: rgba(16,185,129,.06); border-color: rgba(16,185,129,.15); }
+
+.vuelto-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 3px 0;
+}
+.vuelto-lbl { font-size: .8rem; color: var(--t2); font-weight: 500; }
+.vuelto-input-wrap {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  padding: 4px 8px;
+}
+.vuelto-prefix { font-size: .85rem; color: var(--t2); }
+.vuelto-input {
+  width: 90px; border: none; background: transparent; font-size: .95rem;
+  font-weight: 600; color: var(--text); text-align: right; outline: none;
+}
+.vuelto-val { font-size: 1.05rem; font-weight: 700; color: var(--text); min-width: 70px; text-align: right; }
+.vuelto-val.vuelto-ok   { color: #10b981; }
+.vuelto-val.vuelto-falta { color: #ef4444; }
+.vuelto-result-row { margin-top: 4px; }
+
+/* ── Arqueo: ya hecho hoy ── */
+.arqueo-ya-hecho {
+  margin: 0 0 8px;
+  padding: 8px 12px; border-radius: 10px;
+  background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.25);
+  font-size: .82rem; color: #065f46; text-align: center; line-height: 1.4;
+}
+body.dark .arqueo-ya-hecho { color: #6ee7b7; background: rgba(16,185,129,.08); border-color: rgba(16,185,129,.18); }
+
+/* ── Arqueo: campo vendedor ── */
+.arqueo-vendedor-row { margin-bottom: 10px; }
+.arqueo-vendedor-input {
+  width: 100%; padding: 9px 12px; border-radius: 10px; font-size: .88rem;
+  border: 1.5px solid var(--border); background: var(--card); color: var(--text);
+  box-sizing: border-box;
+}
+.arqueo-vendedor-input:focus { outline: none; border-color: var(--acc); }

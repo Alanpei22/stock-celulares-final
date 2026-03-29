@@ -15,7 +15,7 @@ const FB_CONFIG = {
   appId: "1:140592485004:web:29f6b0aa0f02fdf99ba1a9"
 };
 
-const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
+const DENOMINACIONES = [500000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
 
 const CATEGORIAS = {
   ingreso: ['Venta equipo', 'Reparación', 'Hidrogel / Accesorio', 'Seña', 'Otro ingreso'],
@@ -35,7 +35,9 @@ let db = null;
 let _fabOpen = false;
 let MOVIMIENTOS = [];
 let ARQUEO = null;
-let currentDate = new Date().toISOString().slice(0, 10);
+// Fecha en horario Argentina (UTC-3)
+const _todayAR = () => new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
+let currentDate = _todayAR();
 let movListener = null;
 let editingMovId = null;
 let CIERRE = null;
@@ -177,7 +179,7 @@ function prevDay() {
 }
 
 function nextDay() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = _todayAR();
   if (currentDate >= today) return;
   const d = new Date(currentDate + 'T12:00:00');
   d.setDate(d.getDate() + 1);
@@ -200,8 +202,10 @@ function setDate(date) {
 }
 
 function updateDateLabel() {
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = _todayAR();
+  const yDate = new Date(today + 'T12:00:00');
+  yDate.setDate(yDate.getDate() - 1);
+  const yesterday = yDate.toISOString().slice(0, 10);
   const label = document.getElementById('caja-date-label');
   const nextBtn = document.getElementById('next-day-btn');
 
@@ -301,14 +305,22 @@ async function saveArqueo() {
     total += cantidad * denom;
   });
 
+  const ahora = new Date();
+  const horaAR = ahora.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
+  const inputVend = document.getElementById('arqueo-vendedor-input');
+  const vendedor = (inputVend && inputVend.value.trim()) || localStorage.getItem('cajaVendedor') || '';
+  if (inputVend && inputVend.value.trim()) localStorage.setItem('cajaVendedor', inputVend.value.trim());
+
   try {
     await db.collection('caja_arqueos').doc(currentDate).set({
       billetes,
       total,
       fecha: currentDate,
-      savedAt: new Date().toISOString()
+      savedAt: ahora.toISOString(),
+      horaAR,
+      vendedor
     });
-    ARQUEO = { billetes, total, fecha: currentDate };
+    ARQUEO = { billetes, total, fecha: currentDate, savedAt: ahora.toISOString(), horaAR, vendedor };
     closeArqueoModal();
     renderStats();
     toast('✅ Arqueo guardado: $' + total.toLocaleString('es-AR'), 'success');
@@ -324,18 +336,37 @@ function closeArqueoModal() {
 }
 
 function reopenArqueo() {
-  // Pre-fill existing ARQUEO values if available
   if (!document.getElementById('arqueo-billetes')) return;
+  // Pre-llenar nombre guardado
+  const inputVend = document.getElementById('arqueo-vendedor-input');
+  if (inputVend) {
+    const saved = ARQUEO?.vendedor || localStorage.getItem('cajaVendedor') || '';
+    inputVend.value = saved;
+  }
   document.getElementById('arqueo-billetes').innerHTML = renderArqueoRows();
   if (ARQUEO && ARQUEO.billetes) {
     DENOMINACIONES.forEach(denom => {
       const input = document.getElementById('billete-' + denom);
-      if (input && ARQUEO.billetes[denom] !== undefined) {
-        input.value = ARQUEO.billetes[denom];
-      }
+      if (input && ARQUEO.billetes[denom] !== undefined) input.value = ARQUEO.billetes[denom];
     });
   }
   updateArqueoTotal();
+
+  // Mostrar aviso si ya fue hecho hoy
+  const yaHechoEl = document.getElementById('arqueo-ya-hecho');
+  if (yaHechoEl) {
+    if (ARQUEO && ARQUEO.savedAt && currentDate === _todayAR()) {
+      const hora = ARQUEO.horaAR || new Date(ARQUEO.savedAt).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
+      const quien = ARQUEO.vendedor || '';
+      yaHechoEl.innerHTML = `✅ Arqueo realizado a las <b>${hora}</b>${quien ? ` por <b>${quien}</b>` : ''}`;
+      yaHechoEl.classList.remove('hidden');
+      document.getElementById('arqueo-save-btn').textContent = '✏️ Actualizar arqueo';
+    } else {
+      yaHechoEl.classList.add('hidden');
+      document.getElementById('arqueo-save-btn').textContent = '✅ Confirmar apertura';
+    }
+  }
+
   document.getElementById('arqueo-overlay').classList.remove('hidden');
   document.getElementById('arqueo-modal').classList.remove('hidden');
 }
@@ -464,6 +495,22 @@ function renderMovimientos() {
 //  FAB SPEED DIAL
 // ══════════════════════════════════════════
 
+// ── Menú dropdown header ──
+function toggleCajaMenu() {
+  const dd = document.getElementById('caja-menu-dropdown');
+  if (!dd) return;
+  dd.classList.toggle('hidden');
+}
+function closeCajaMenu() {
+  const dd = document.getElementById('caja-menu-dropdown');
+  if (dd) dd.classList.add('hidden');
+}
+document.addEventListener('click', e => {
+  const btn = document.getElementById('caja-menu-btn');
+  const dd  = document.getElementById('caja-menu-dropdown');
+  if (dd && btn && !btn.contains(e.target) && !dd.contains(e.target)) dd.classList.add('hidden');
+});
+
 function toggleFabMenu() { _fabOpen ? closeFabMenu() : openFabMenu(); }
 
 function openFabMenu() {
@@ -536,6 +583,13 @@ function openMovForm(id) {
   // Clear any previous error highlights and split state
   document.querySelectorAll('#mov-modal .field-error').forEach(el => el.classList.remove('field-error'));
   resetSplit();
+  // Reset vuelto
+  const vueltoSec = document.getElementById('vuelto-section');
+  if (vueltoSec) vueltoSec.classList.add('hidden');
+  const recibidoEl = document.getElementById('mov-recibido');
+  if (recibidoEl) recibidoEl.value = '';
+  const vueltoVal = document.getElementById('vuelto-val');
+  if (vueltoVal) { vueltoVal.textContent = '$0'; vueltoVal.className = 'vuelto-val'; }
 
   // Auto-clear error on input
   document.getElementById('mov-fi-monto').oninput = () =>
@@ -588,6 +642,25 @@ function selectMetodo(metodo) {
   const hidden = document.getElementById('mov-hidden-metodo');
   if (hidden) hidden.value = metodo;
   updateSplitRemainder();
+  // Mostrar calculadora de vuelto solo si es efectivo y no hay split
+  const vueltoSec = document.getElementById('vuelto-section');
+  if (vueltoSec) {
+    const splitActivo = document.getElementById('split-section') && !document.getElementById('split-section').classList.contains('hidden');
+    vueltoSec.classList.toggle('hidden', metodo !== 'Efectivo' || splitActivo);
+    if (metodo !== 'Efectivo') { document.getElementById('mov-recibido').value = ''; document.getElementById('vuelto-val').textContent = '$0'; }
+  }
+}
+
+function calcVuelto() {
+  const monto = parseFloat(document.getElementById('mov-fi-monto').value) || 0;
+  const recibido = parseFloat(document.getElementById('mov-recibido').value) || 0;
+  const vuelto = recibido >= monto ? recibido - monto : 0;
+  const el = document.getElementById('vuelto-val');
+  if (el) {
+    el.textContent = '$' + vuelto.toLocaleString('es-AR');
+    el.classList.toggle('vuelto-ok', recibido >= monto && monto > 0);
+    el.classList.toggle('vuelto-falta', recibido > 0 && recibido < monto);
+  }
 }
 
 function selectMetodo2(metodo) {

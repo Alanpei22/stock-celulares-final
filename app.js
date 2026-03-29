@@ -465,6 +465,38 @@ function _closeHdrMenuOutside(e) {
   }
 }
 
+// ── Menú reparaciones ─────────────────────────────────────
+function toggleRepMenu() {
+  const dd = document.getElementById('rep-menu-dropdown');
+  if (!dd) return;
+  dd.classList.toggle('hidden');
+  if (!dd.classList.contains('hidden')) {
+    setTimeout(() => document.addEventListener('click', _closeRepMenuOutside, { once: true }), 0);
+  }
+}
+function closeRepMenu() { document.getElementById('rep-menu-dropdown')?.classList.add('hidden'); }
+function _closeRepMenuOutside(e) {
+  const dd = document.getElementById('rep-menu-dropdown');
+  const btn = document.getElementById('rep-menu-btn');
+  if (dd && !dd.contains(e.target) && e.target !== btn) dd.classList.add('hidden');
+}
+
+// ── Menú repuestos ────────────────────────────────────────
+function toggleRep2Menu() {
+  const dd = document.getElementById('rep2-menu-dropdown');
+  if (!dd) return;
+  dd.classList.toggle('hidden');
+  if (!dd.classList.contains('hidden')) {
+    setTimeout(() => document.addEventListener('click', _closeRep2MenuOutside, { once: true }), 0);
+  }
+}
+function closeRep2Menu() { document.getElementById('rep2-menu-dropdown')?.classList.add('hidden'); }
+function _closeRep2MenuOutside(e) {
+  const dd = document.getElementById('rep2-menu-dropdown');
+  const btn = document.getElementById('rep2-menu-btn');
+  if (dd && !dd.contains(e.target) && e.target !== btn) dd.classList.add('hidden');
+}
+
 // ── Secciones ─────────────────────────────────────────────
 function switchSection(section) {
   ['stock', 'repairs', 'repuestos'].forEach(s => {
