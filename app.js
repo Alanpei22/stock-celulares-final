@@ -602,7 +602,8 @@ function render() {
   const badgeCls = { Nuevo: 'bg-new', Usado: 'bg-used', Reacondicionado: 'bg-refurb' };
   listEl.innerHTML = filtered.map(p => {
     const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' · ');
-    const usd = (!p.vendido && p.precio && dolarBlue) ? Math.round(p.precio / dolarBlue) : null;
+    const usdVal = p.precioUSD || ((!p.vendido && p.precio && dolarBlue) ? Math.round(p.precio / dolarBlue) : null);
+    const isUSD = p.moneda === 'usd' && p.precioUSD;
     const ubiBadge = p.ubicacion === 'Exhibición'
       ? '<span class="badge-ubicacion">📺 Exhibición</span>'
       : p.ubicacion === 'Depósito'
@@ -651,7 +652,10 @@ function render() {
           </div>
         </div>
         <div class="card-bottom">
-          <span class="card-price">${p.precio ? '$ ' + p.precio.toLocaleString('es-AR') : '—'}${usd ? `<span class="card-usd">U$S ${usd.toLocaleString('es-AR')}</span>` : ''}</span>
+          <span class="card-price">${isUSD
+            ? `U$D ${p.precioUSD.toLocaleString('es-AR')}${p.precio ? `<span class="card-usd">≈ $${p.precio.toLocaleString('es-AR')}</span>` : ''}`
+            : p.precio ? '$ ' + p.precio.toLocaleString('es-AR') + (usdVal ? `<span class="card-usd">U$D ${usdVal.toLocaleString('es-AR')}</span>` : '') : '—'
+          }</span>
           <div class="card-meta">
             ${p.imei ? `<span class="card-imei">🔑 ${esc(p.imei)}</span>` : ''}
             ${dateLabel}
@@ -786,7 +790,9 @@ function openDetail(id) {
     </div>
     <div class="det-row">
       <span class="det-label">Precio efectivo</span>
-      <span class="det-val det-price">$ ${p.precio ? p.precio.toLocaleString('es-AR') : '—'}</span>
+      <span class="det-val det-price">${p.moneda === 'usd' && p.precioUSD
+        ? `U$D ${p.precioUSD.toLocaleString('es-AR')}${p.precio ? ` <small style="color:var(--t2);font-weight:400">(≈ $${p.precio.toLocaleString('es-AR')})</small>` : ''}`
+        : '$ ' + (p.precio ? p.precio.toLocaleString('es-AR') : '—')}</span>
     </div>
     ${specs ? `<div class="det-row"><span class="det-label">Specs</span><span class="det-val">${esc(specs)}</span></div>` : ''}
     ${p.bateria ? `<div class="det-row"><span class="det-label">Batería</span><span class="det-val">🔋 ${p.bateria}%</span></div>` : ''}
