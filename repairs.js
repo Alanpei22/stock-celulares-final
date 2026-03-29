@@ -18,14 +18,27 @@ let repRenderTimer;
 
 // ── Firebase ──────────────────────────────
 function listenRepairs() {
-  db.collection('repairs').onSnapshot(snap => {
-    REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
-    renderRepairs();
-  }, err => {
-    console.error('Repairs:', err);
-    toast('Error cargando reparaciones', 'error');
-  });
+  // Limitar a 365 días: cubre estadísticas anuales y no lee toda la historia
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 365);
+  const cutoffISO = cutoff.toISOString();
+
+  db.collection('repairs')
+    .where('fechaIngreso', '>=', cutoffISO)
+    .onSnapshot(snap => {
+      REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
+      renderRepairs();
+    }, err => {
+      console.error('Repairs:', err);
+      toast('Error cargando reparaciones', 'error');
+    });
+}
+
+// Carga histórico completo (solo cuando se pide explícitamente, ej: estadísticas anuales)
+async function loadAllRepairsHistory() {
+  const snap = await db.collection('repairs').orderBy('fechaIngreso', 'desc').get();
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 // ── Init ──────────────────────────────────

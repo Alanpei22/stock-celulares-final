@@ -1,0 +1,12 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "repairs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fechaIngreso", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
