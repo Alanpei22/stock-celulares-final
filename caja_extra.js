@@ -173,34 +173,39 @@ function switchHistTab(tab) {
   loadHistorialData(tab);
 }
 
+// Devuelve fecha Argentina + offset de días como 'YYYY-MM-DD'
+function _arOffset(days) {
+  const today = _todayAR();
+  const d = new Date(today + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 async function loadHistorialData(tab) {
   const body = document.getElementById('caja-hist-body');
   body.innerHTML = '<p style="text-align:center;padding:20px;color:var(--t2)">Cargando...</p>';
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = _todayAR();
   let desde;
   if (tab === 'sem') {
-    const d = new Date(); d.setDate(d.getDate() - 6);
-    desde = d.toISOString().slice(0, 10);
+    desde = _arOffset(-6);
   } else if (tab === 'mes') {
-    const d = new Date(); d.setDate(1);
-    desde = d.toISOString().slice(0, 10);
+    // Primer día del mes actual en horario AR
+    desde = today.slice(0, 7) + '-01';
   }
 
   try {
     if (tab === 'anual') {
-      const d365 = new Date(); d365.setDate(d365.getDate() - 364);
       const snap = await db.collection('caja_movimientos')
-        .where('fecha', '>=', d365.toISOString().slice(0, 10))
+        .where('fecha', '>=', _arOffset(-364))
         .where('fecha', '<=', today).get();
       const movs = snap.docs.map(d => d.data());
       body.innerHTML = buildCajaAnualHTML(movs);
       return;
     }
     if (tab === 'stats') {
-      const d30 = new Date(); d30.setDate(d30.getDate() - 29);
       const snap = await db.collection('caja_movimientos')
-        .where('fecha', '>=', d30.toISOString().slice(0, 10))
+        .where('fecha', '>=', _arOffset(-29))
         .where('fecha', '<=', today).get();
       const movs = snap.docs.map(d => d.data());
       body.innerHTML = buildCajaStatsHTML(movs);
@@ -217,11 +222,11 @@ async function loadHistorialData(tab) {
       // Período anterior (misma cantidad de días)
       let prevMovs = [];
       if (tab === 'mes') {
-        const dPrevEnd = new Date(desde + 'T12:00:00');
-        dPrevEnd.setDate(0); // último día del mes anterior
-        const dPrevStart = new Date(dPrevEnd.getFullYear(), dPrevEnd.getMonth(), 1);
-        const prevDesde = dPrevStart.toISOString().slice(0, 10);
+        // Mes anterior: del 1 al último día del mes previo
+        const dPrevEnd = new Date(desde + 'T12:00:00Z');
+        dPrevEnd.setUTCDate(0); // último día del mes anterior
         const prevHasta = dPrevEnd.toISOString().slice(0, 10);
+        const prevDesde = prevHasta.slice(0, 7) + '-01';
         const prevSnap = await db.collection('caja_movimientos')
           .where('fecha', '>=', prevDesde).where('fecha', '<=', prevHasta).get();
         prevMovs = prevSnap.docs.map(d => d.data());
