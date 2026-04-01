@@ -5,14 +5,30 @@
 let _cajaOwnerBuf = '';
 let _cajaOwnerTimer = null;
 let _cajaIsOwner   = false;
+let _cajaOwnerCallback = null; // callback para acciones protegidas (borrar mov, etc.)
 
 function openCajaOwnerPin() {
   if (_cajaIsOwner) {
     lockCajaOwner(); return;
   }
+  _cajaOwnerCallback = null;
   _cajaOwnerBuf = '';
   _updateCajaOwnerDots();
   document.getElementById('caja-owner-error').textContent = '';
+  const sub = document.getElementById('caja-owner-sub');
+  if (sub) sub.textContent = 'Ingresá el PIN de dueño';
+  document.getElementById('caja-owner-overlay').classList.remove('hidden');
+  document.getElementById('caja-owner-modal').classList.remove('hidden');
+}
+
+// Usar cuando se necesita PIN para una acción puntual (sin entrar en modo dueño)
+function requireCajaOwnerPin(onSuccess, msg) {
+  _cajaOwnerCallback = onSuccess;
+  _cajaOwnerBuf = '';
+  _updateCajaOwnerDots();
+  document.getElementById('caja-owner-error').textContent = '';
+  const sub = document.getElementById('caja-owner-sub');
+  if (sub) { sub.textContent = msg || 'Ingresá el PIN de dueño para continuar'; }
   document.getElementById('caja-owner-overlay').classList.remove('hidden');
   document.getElementById('caja-owner-modal').classList.remove('hidden');
 }
@@ -21,6 +37,8 @@ function closeCajaOwnerPin() {
   document.getElementById('caja-owner-overlay').classList.add('hidden');
   document.getElementById('caja-owner-modal').classList.add('hidden');
   _cajaOwnerBuf = '';
+  _cajaOwnerCallback = null;
+  hidePinResetConfirm('caja');
 }
 
 function cajaOwnerPin(d) {
@@ -49,13 +67,33 @@ function _updateCajaOwnerDots() {
 async function submitCajaOwnerPin() {
   const pin = _cajaOwnerBuf;
   try {
-    const doc = await db.collection('config').doc('owner').get();
-    let storedPin = doc.exists ? doc.data().pin : null;
-    if (!storedPin) {
+    const snap = await db.collection('config').doc('owner').get();
+    let storedPin = snap.exists ? snap.data().pin : null;
+
+    // Solo crear PIN si el documento no existe aún (primera vez)
+    if (!snap.exists) {
       await db.collection('config').doc('owner').set({ pin });
       storedPin = pin;
     }
+
+    if (!storedPin) {
+      // Doc existe pero sin campo pin → no resetear, mostrar error
+      document.getElementById('caja-owner-error').textContent = 'PIN no configurado. Configuralo desde la app principal.';
+      _cajaOwnerBuf = '';
+      _updateCajaOwnerDots();
+      return;
+    }
+
     if (pin === storedPin) {
+      // ¿Hay una acción puntual esperando PIN?
+      if (_cajaOwnerCallback) {
+        const cb = _cajaOwnerCallback;
+        _cajaOwnerCallback = null;
+        closeCajaOwnerPin();
+        cb();
+        return;
+      }
+      // Entrar a modo dueño normal
       _cajaIsOwner = true;
       document.body.classList.add('owner-mode');
       document.getElementById('caja-owner-btn').textContent = '🔓';
@@ -69,9 +107,29 @@ async function submitCajaOwnerPin() {
       _updateCajaOwnerDots();
     }
   } catch (e) {
-    document.getElementById('caja-owner-error').textContent = 'Error de conexion';
+    console.error('submitCajaOwnerPin error:', e);
+    document.getElementById('caja-owner-error').textContent = 'Error: ' + (e.message || e.code || e);
     _cajaOwnerBuf = '';
     _updateCajaOwnerDots();
+  }
+}
+
+function showPinResetConfirm(ctx) {
+  const el = document.getElementById(ctx + '-pin-reset-confirm');
+  if (el) el.classList.remove('hidden');
+}
+function hidePinResetConfirm(ctx) {
+  const el = document.getElementById(ctx + '-pin-reset-confirm');
+  if (el) el.classList.add('hidden');
+}
+async function doResetOwnerPin(ctx) {
+  try {
+    await db.collection('config').doc('owner').delete();
+    hidePinResetConfirm(ctx);
+    closeCajaOwnerPin();
+    toast('PIN reseteado. El próximo PIN que ingreses quedará guardado.', 'success');
+  } catch(e) {
+    toast('Error al resetear PIN', 'error');
   }
 }
 
@@ -109,7 +167,7 @@ function closeCajaHistorial() {
 
 function switchHistTab(tab) {
   _cajHistTab = tab;
-  ['sem','mes','stats'].forEach(t => {
+  ['sem','mes','anual','stats'].forEach(t => {
     document.getElementById('cht-' + t).classList.toggle('caja-hist-tab--active', t === tab);
   });
   loadHistorialData(tab);
@@ -130,6 +188,15 @@ async function loadHistorialData(tab) {
   }
 
   try {
+    if (tab === 'anual') {
+      const d365 = new Date(); d365.setDate(d365.getDate() - 364);
+      const snap = await db.collection('caja_movimientos')
+        .where('fecha', '>=', d365.toISOString().slice(0, 10))
+        .where('fecha', '<=', today).get();
+      const movs = snap.docs.map(d => d.data());
+      body.innerHTML = buildCajaAnualHTML(movs);
+      return;
+    }
     if (tab === 'stats') {
       const d30 = new Date(); d30.setDate(d30.getDate() - 29);
       const snap = await db.collection('caja_movimientos')
@@ -294,4 +361,67 @@ function buildCajaStatsHTML(movs) {
 function goToDate(fecha) {
   closeCajaHistorial();
   setDate(fecha);
+}
+
+function buildCajaAnualHTML(movs) {
+  // Group by YYYY-MM
+  const byMonth = {};
+  movs.forEach(m => {
+    const ym = m.fecha ? m.fecha.slice(0, 7) : null;
+    if (!ym) return;
+    if (!byMonth[ym]) byMonth[ym] = [];
+    byMonth[ym].push(m);
+  });
+
+  // Build sorted list of months (descending)
+  const months = Object.keys(byMonth).sort().reverse();
+
+  let totalIng = 0, totalEg = 0;
+  const rows = months.map((ym, idx) => {
+    const ms = byMonth[ym];
+    const ing = ms.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const eg  = ms.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const neto = ing - eg;
+    totalIng += ing; totalEg += eg;
+
+    // Compare with previous month in array (idx+1 is the prior month)
+    let compHTML = '';
+    const prevYm = months[idx + 1];
+    if (prevYm) {
+      const prevMs = byMonth[prevYm];
+      const prevIng = prevMs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+      if (prevIng > 0 && ing > 0) {
+        const pct = Math.round(((ing - prevIng) / prevIng) * 100);
+        const cls = pct >= 0 ? 'neto-pos' : 'neto-neg';
+        compHTML = '<span class="hist-anual-cmp ' + cls + '">' + (pct >= 0 ? '▲' : '▼') + Math.abs(pct) + '%</span>';
+      }
+    }
+
+    const label = new Date(ym + '-15').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+
+    return '<div class="hist-day-row">' +
+      '<div class="hist-day-info">' +
+      '<span class="hist-day-lbl">' + labelCap + '</span>' +
+      compHTML +
+      '</div>' +
+      '<div class="hist-day-nums">' +
+      '<span class="hist-day-ing">+' + fmt(ing) + '</span>' +
+      '<span class="hist-day-eg">-' + fmt(eg) + '</span>' +
+      '<span class="hist-day-neto ' + (neto >= 0 ? 'neto-pos' : 'neto-neg') + '">' + (neto >= 0 ? '+' : '') + fmt(neto) + '</span>' +
+      '</div></div>';
+  }).join('');
+
+  const totalNeto = totalIng - totalEg;
+
+  if (months.length === 0) {
+    return '<p style="text-align:center;padding:20px;color:var(--t2)">Sin movimientos en el último año</p>';
+  }
+
+  return '<div class="hist-totales">' +
+    '<div class="hist-tot-item"><span class="hist-tot-lbl">Total ingresos</span><span class="hist-tot-val hist-day-ing">+' + fmt(totalIng) + '</span></div>' +
+    '<div class="hist-tot-item"><span class="hist-tot-lbl">Total egresos</span><span class="hist-tot-val hist-day-eg">-' + fmt(totalEg) + '</span></div>' +
+    '<div class="hist-tot-item"><span class="hist-tot-lbl">Neto anual</span><span class="hist-tot-val ' + (totalNeto >= 0 ? 'neto-pos' : 'neto-neg') + '">' + (totalNeto >= 0 ? '+' : '') + fmt(totalNeto) + '</span></div>' +
+    '<div class="hist-tot-item"><span class="hist-tot-lbl">Prom. mensual</span><span class="hist-tot-val">' + fmt(months.length > 0 ? Math.round(totalIng / months.length) : 0) + '</span></div>' +
+    '</div>' + rows;
 }

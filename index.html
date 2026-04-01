@@ -715,7 +715,7 @@
         </div>
 
         <div class="fg">
-          <label class="fl">Monto cobrado ($)</label>
+          <label class="fl">Precio cobrado ($) <small style="color:var(--t2);font-weight:400">— lo que paga el cliente</small></label>
           <input id="rep-fi-monto" class="fi" type="number" placeholder="28000" min="0" inputmode="numeric">
         </div>
         <div class="fg">
@@ -723,12 +723,8 @@
           <input id="rep-fi-sena" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
         </div>
         <div class="fg">
-          <label class="fl">Costo del repuesto ($)</label>
+          <label class="fl">Costo ($) <small id="rep-costo-lbl" style="color:var(--t2);font-weight:400">— se completa al usar repuesto</small></label>
           <input id="rep-fi-costo" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
-        </div>
-        <div class="fg">
-          <label class="fl">Presupuesto previo ($)</label>
-          <input id="rep-fi-presupuesto" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
         </div>
 
         <div class="fg fg--full">
@@ -1034,6 +1030,14 @@
     <button class="pin-btn pin-clear" onclick="clearOwnerPin()">✕</button>
     <button class="pin-btn" onclick="addOwnerPin('0')">0</button>
     <button class="pin-btn pin-back" onclick="backOwnerPin()">⌫</button>
+  </div>
+  <button class="pin-reset-link" onclick="showPinResetConfirm('owner')">Olvidé mi PIN — resetear</button>
+  <div id="owner-pin-reset-confirm" class="pin-reset-confirm hidden">
+    <p class="pin-reset-warn">¿Borrar el PIN actual y crear uno nuevo?</p>
+    <div class="pin-reset-btns">
+      <button class="pin-reset-cancel" onclick="hidePinResetConfirm('owner')">Cancelar</button>
+      <button class="pin-reset-ok" onclick="doResetOwnerPin('owner')">Sí, resetear</button>
+    </div>
   </div>
 </div>
 

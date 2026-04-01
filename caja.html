@@ -126,11 +126,11 @@
     <div class="fab-actions hidden" id="fab-actions">
       <div class="fab-action-row">
         <span class="fab-lbl">Egreso</span>
-        <button class="fab-sub fab-sub-eg" onclick="openMovFormType('egreso')">➖</button>
+        <button class="fab-sub fab-sub-eg" onclick="openMovFormType('egreso')">−</button>
       </div>
       <div class="fab-action-row">
         <span class="fab-lbl">Ingreso</span>
-        <button class="fab-sub fab-sub-ing" onclick="openMovFormType('ingreso')">➕</button>
+        <button class="fab-sub fab-sub-ing" onclick="openMovFormType('ingreso')">+</button>
       </div>
     </div>
     <button class="fab" id="fab-main" onclick="toggleFabMenu()" title="Nuevo movimiento">＋</button>
@@ -195,8 +195,8 @@
 
   <!-- Tipo toggle header -->
   <div class="mov-tipo-hdr">
-    <button id="mov-btn-ingreso" class="mov-tipo-btn mov-tipo-btn--ing tipo-active" onclick="setMovTipo('ingreso')">➕ Ingreso</button>
-    <button id="mov-btn-egreso" class="mov-tipo-btn mov-tipo-btn--eg" onclick="setMovTipo('egreso')">➖ Egreso</button>
+    <button id="mov-btn-ingreso" class="mov-tipo-btn mov-tipo-btn--ing tipo-active" onclick="setMovTipo('ingreso')">+ Ingreso</button>
+    <button id="mov-btn-egreso" class="mov-tipo-btn mov-tipo-btn--eg" onclick="setMovTipo('egreso')">− Egreso</button>
     <button class="mov-close-btn" onclick="closeMovForm()">✕</button>
   </div>
 
@@ -316,6 +316,14 @@
     <button class="pin-btn pin-back" onclick="cajaOwnerPinBack()">⌫</button>
   </div>
   <p class="pin-error" id="caja-owner-error"></p>
+  <button class="pin-reset-link" onclick="showPinResetConfirm('caja')">Olvidé mi PIN — resetear</button>
+  <div id="caja-pin-reset-confirm" class="pin-reset-confirm hidden">
+    <p class="pin-reset-warn">¿Borrar el PIN actual y crear uno nuevo?</p>
+    <div class="pin-reset-btns">
+      <button class="pin-reset-cancel" onclick="hidePinResetConfirm('caja')">Cancelar</button>
+      <button class="pin-reset-ok" onclick="doResetOwnerPin('caja')">Sí, resetear</button>
+    </div>
+  </div>
 </div>
 
 <!-- HISTORIAL + STATS MODAL (owner) -->
@@ -328,6 +336,7 @@
   <div class="caja-hist-tabs">
     <button class="caja-hist-tab caja-hist-tab--active" id="cht-sem" onclick="switchHistTab('sem')">Semana</button>
     <button class="caja-hist-tab" id="cht-mes" onclick="switchHistTab('mes')">Mes</button>
+    <button class="caja-hist-tab" id="cht-anual" onclick="switchHistTab('anual')">Anual</button>
     <button class="caja-hist-tab" id="cht-stats" onclick="switchHistTab('stats')">📈 Stats</button>
   </div>
   <div id="caja-hist-body" class="caja-hist-body"></div>
@@ -335,7 +344,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="caja.js"></script>
-<script src="caja_extra.js"></script>
+<script src="caja.js?v=9"></script>
+<script src="caja_extra.js?v=9"></script>
 </body>
 </html>

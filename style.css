@@ -426,6 +426,7 @@ header {
   border-radius: 24px 24px 0 0;
   width: 100%; max-width: 520px;
   max-height: 90vh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 -10px 50px rgba(0,0,0,.2);
   animation: slideUp .3s ease;
 }
@@ -438,7 +439,7 @@ header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 20px 20px 14px;
   border-bottom: 1px solid var(--border);
-  position: sticky; top: 0; background: #fff; z-index: 1;
+  position: sticky; top: 0; background: var(--card); z-index: 1;
 }
 .modal-header h3 { font-size: 1rem; font-weight: 700; color: var(--pri); }
 .modal-close {
@@ -1848,6 +1849,57 @@ body.dark .owner-pin-modal {
   background: #1e293b;
 }
 
+/* ── PIN buttons dentro de modales (fondo claro) ── */
+/* En modales light mode los botones necesitan texto oscuro */
+.owner-pin-modal .pin-btn,
+.arqueo-modal .pin-btn {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+.owner-pin-modal .pin-btn:active,
+.arqueo-modal .pin-btn:active {
+  background: #e2e8f0;
+}
+body.dark .owner-pin-modal .pin-btn,
+body.dark .arqueo-modal .pin-btn {
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.14);
+  color: #f1f5f9;
+}
+body.dark .owner-pin-modal .pin-btn:active,
+body.dark .arqueo-modal .pin-btn:active {
+  background: rgba(255,255,255,.18);
+}
+
+/* ── Botón reset PIN ── */
+.pin-reset-link {
+  display: block; text-align: center; margin-top: 10px;
+  font-size: .75rem; color: var(--t2); background: none; border: none;
+  cursor: pointer; text-decoration: underline; padding: 4px;
+}
+.pin-reset-link:hover { color: #ef4444; }
+
+/* ── Confirmación inline de reset ── */
+.pin-reset-confirm {
+  margin-top: 10px; padding: 10px 12px; border-radius: 12px;
+  background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.25);
+  text-align: center;
+}
+.pin-reset-warn {
+  font-size: .8rem; color: #dc2626; margin: 0 0 8px; font-weight: 600;
+}
+body.dark .pin-reset-warn { color: #fca5a5; }
+.pin-reset-btns { display: flex; gap: 8px; justify-content: center; }
+.pin-reset-cancel {
+  flex: 1; padding: 7px 0; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--card); color: var(--text); font-size: .82rem; cursor: pointer;
+}
+.pin-reset-ok {
+  flex: 1; padding: 7px 0; border-radius: 10px; border: none;
+  background: #ef4444; color: #fff; font-size: .82rem; font-weight: 700; cursor: pointer;
+}
+
 /* ── STOCK CARDS — accent por estado ──────────────────────── */
 .stock-nuevo   { border-left: 4px solid #10b981 !important; }
 .stock-usado   { border-left: 4px solid #f59e0b !important; }
@@ -2220,9 +2272,10 @@ body.dark .ai-chat-img-btn { border-color: #2d3748; }
 /* ── Botón cerrar footer en detalle reparación ── */
 .det-close-footer {
   display: block; width: 100%; margin-top: 12px;
-  padding: 12px; border-radius: 12px; font-size: .93rem; font-weight: 600;
-  background: var(--card); border: 1.5px solid var(--border); color: var(--t2);
+  padding: 14px; border-radius: 12px; font-size: 1rem; font-weight: 700;
+  background: var(--bg); border: 2px solid var(--border); color: var(--t1);
   cursor: pointer; text-align: center;
+  position: sticky; bottom: 0;
 }
 .det-close-footer:active { opacity: .7; }
 body.dark .det-close-footer { background: #1e2d3d; border-color: #2d3748; color: #94a3b8; }

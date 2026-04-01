@@ -112,6 +112,14 @@ function initRepairs() {
   listenRepairs();
 }
 
+// ── Filtro rápido desde stat bar ──────────
+function filterRepsByStatus(status) {
+  const sel = document.getElementById('rep-f-estado');
+  if (!sel) return;
+  sel.value = sel.value === status ? '' : status;
+  renderRepairs();
+}
+
 // ── Render ────────────────────────────────
 function renderRepairs() {
   const q       = (document.getElementById('rep-search').value || '').trim().toLowerCase();
@@ -199,7 +207,7 @@ function renderRepairs() {
   listEl.innerHTML = filtered.map(r => {
     const st   = REPAIR_STATES[r.estado] || { label: r.estado || '—', cls: '' };
     const fecha = r.fechaIngreso
-      ? new Date(r.fechaIngreso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+      ? new Date(r.fechaIngreso).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: 'short' })
       : '';
     const monto = r.monto ? '$ ' + r.monto.toLocaleString('es-AR') : '—';
     const ganancia = (r.monto != null && r.costoRepuesto != null)
@@ -699,7 +707,7 @@ function openRepairDetail(id) {
           .map(h => {
             const hs   = REPAIR_STATES[h.estado] || { label: h.estado || '?' };
             const hFec = h.fecha
-              ? new Date(h.fecha).toLocaleString('es-AR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
+              ? new Date(h.fecha).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })
               : '—';
             return `<li class="state-tl-item">
               <span class="state-tl-dot state-tl-dot--${h.estado}"></span>

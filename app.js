@@ -101,6 +101,20 @@ async function autoBackup() {
 let OWNER_MODE = false;
 let _ownerPinBuf = '';
 let _ownerLockTimer = null;
+let _ownerPinCallback = null; // función a ejecutar tras PIN correcto
+
+// Verificar PIN sin entrar a modo dueño — para acciones puntuales
+function requireOwnerPin(onSuccess, mensaje) {
+  _ownerPinCallback = onSuccess;
+  _ownerPinBuf = '';
+  _updateOwnerDots();
+  document.getElementById('owner-pin-error').textContent = '';
+  const sub = document.getElementById('owner-pin-sub');
+  sub.textContent = mensaje || 'Ingresá el PIN de dueño para continuar';
+  sub.style.color = '#f59e0b';
+  document.getElementById('owner-pin-overlay').classList.remove('hidden');
+  document.getElementById('owner-pin-modal').classList.remove('hidden');
+}
 
 function toggleOwnerLock() {
   if (OWNER_MODE) { lockOwnerMode(); } else { openOwnerPinModal(); }
@@ -130,6 +144,8 @@ function closeOwnerPinModal() {
   document.getElementById('owner-pin-overlay').classList.add('hidden');
   document.getElementById('owner-pin-modal').classList.add('hidden');
   _ownerPinBuf = '';
+  _ownerPinCallback = null;
+  hidePinResetConfirm('owner');
 }
 
 function addOwnerPin(d) {
@@ -147,6 +163,25 @@ function backOwnerPin() {
 function clearOwnerPin() {
   _ownerPinBuf = '';
   _updateOwnerDots();
+}
+
+function showPinResetConfirm(ctx) {
+  const el = document.getElementById(ctx + '-pin-reset-confirm');
+  if (el) el.classList.remove('hidden');
+}
+function hidePinResetConfirm(ctx) {
+  const el = document.getElementById(ctx + '-pin-reset-confirm');
+  if (el) el.classList.add('hidden');
+}
+async function doResetOwnerPin(ctx) {
+  try {
+    await db.collection('config').doc('owner').delete();
+    hidePinResetConfirm(ctx);
+    closeOwnerPinModal();
+    toast('PIN reseteado. El próximo PIN que ingreses quedará guardado.', 'success');
+  } catch(e) {
+    toast('Error al resetear PIN', 'error');
+  }
 }
 
 function _updateOwnerDots() {
@@ -169,7 +204,13 @@ async function submitOwnerPin() {
     }
     if (pin === doc.data().pin) {
       closeOwnerPinModal();
-      unlockOwnerMode();
+      if (_ownerPinCallback) {
+        const cb = _ownerPinCallback;
+        _ownerPinCallback = null;
+        cb();
+      } else {
+        unlockOwnerMode();
+      }
     } else {
       document.getElementById('owner-pin-error').textContent = 'PIN incorrecto';
       _ownerPinBuf = '';
@@ -413,7 +454,7 @@ function initApp() {
   document.getElementById('form-close').addEventListener('click', closeForm);
   document.getElementById('form-cancel').addEventListener('click', closeForm);
   document.getElementById('form-save').addEventListener('click', savePhone);
-  document.getElementById('form-modal').addEventListener('click', e => { if (e.target.id === 'form-modal') closeForm(); });
+  document.getElementById('form-modal').addEventListener('click', e => { if (_blockFormClose) return; if (e.target.id === 'form-modal') closeForm(); });
 
   document.getElementById('sell-close').addEventListener('click', closeSellModal);
   document.getElementById('sell-cancel').addEventListener('click', closeSellModal);
@@ -716,6 +757,8 @@ function openForm(id) {
   }
   document.getElementById('form-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  _blockFormClose = true;
+  setTimeout(() => { _blockFormClose = false; }, 400);
   setTimeout(() => document.getElementById('fi-marca').focus(), 300);
 }
 
@@ -728,11 +771,10 @@ function closeForm() {
 function savePhone() {
   // Conversión USD→ARS si corresponde
   if (monedaMode === 'usd') {
-    if (!dolarBlue) { toast('No hay cotización del dólar disponible. Ingresala en Configuración.', 'error'); return; }
     const usdVal = parseFloat(document.getElementById('fi-precio').value) || 0;
     if (!usdVal) { toast('Ingresá un precio en dólares', 'error'); return; }
     window._precioUSD = usdVal;
-    document.getElementById('fi-precio').value = Math.round(usdVal * dolarBlue);
+    document.getElementById('fi-precio').value = dolarBlue ? Math.round(usdVal * dolarBlue) : 0;
   } else {
     window._precioUSD = null;
   }
@@ -910,11 +952,27 @@ function buildPriceTable(precio) {
     </div>`;
 }
 
+const TZ = 'America/Argentina/Buenos_Aires';
 function fmtDateTime(iso) {
   return new Date(iso).toLocaleString('es-AR', {
+    timeZone: TZ,
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   });
+}
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('es-AR', {
+    timeZone: TZ, day: '2-digit', month: 'short', year: 'numeric'
+  });
+}
+function fmtTime(iso) {
+  return new Date(iso).toLocaleTimeString('es-AR', {
+    timeZone: TZ, hour: '2-digit', minute: '2-digit'
+  });
+}
+function nowAR() {
+  // Retorna string ISO en hora AR (para guardar en Firestore)
+  return new Date().toLocaleString('sv-SE', { timeZone: TZ }).replace(' ', 'T') + ':00.000Z';
 }
 
 // ── WhatsApp ──────────────────────────────────────────────
@@ -1447,6 +1505,7 @@ checkAuth();
 
 // ── Toggle moneda (USD/ARS en formulario stock) ───────────
 let monedaMode = 'ars';
+let _blockFormClose = false;
 function toggleMoneda() {
   const btn = document.getElementById('btn-moneda');
   const input = document.getElementById('fi-precio');

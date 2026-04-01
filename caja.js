@@ -791,17 +791,18 @@ async function saveMov() {
   }
 }
 
-async function deleteMov() {
+function deleteMov() {
   if (!editingMovId) return;
-  if (!confirm('¿Eliminar este movimiento?')) return;
-  try {
-    await db.collection('caja_movimientos').doc(editingMovId).delete();
-    toast('Movimiento eliminado', 'success');
-    closeMovForm();
-  } catch (e) {
-    console.error('deleteMov:', e);
-    toast('Error al eliminar', 'error');
-  }
+  const id = editingMovId;
+  requireCajaOwnerPin(async () => {
+    try {
+      await db.collection('caja_movimientos').doc(id).delete();
+      toast('Movimiento eliminado', 'success');
+      closeMovForm();
+    } catch (e) {
+      toast('Error al eliminar', 'error');
+    }
+  }, 'PIN de dueño para eliminar el movimiento');
 }
 
 // ══════════════════════════════════════════

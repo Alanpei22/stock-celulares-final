@@ -402,6 +402,7 @@ body.dark .stats-met-bar-wrap { background: #334155; }
 .hist-comp-lbl { color: var(--t2); flex: 1; }
 .hist-comp-val { font-weight: 800; font-size: .95rem; }
 .hist-comp-prev { color: var(--t2); font-size: .78rem; }
+.hist-anual-cmp { font-size: .72rem; font-weight: 700; padding: 1px 5px; border-radius: 8px; background: rgba(0,0,0,.06); }
 
 body.dark .desglose-item { background: #1e293b; border-color: #334155; }
 body.dark .cierre-resumen { border-color: #334155; }
