@@ -430,3 +430,143 @@ function buildCajaAnualHTML(movs) {
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Prom. mensual</span><span class="hist-tot-val">' + fmt(months.length > 0 ? Math.round(totalIng / months.length) : 0) + '</span></div>' +
     '</div>' + rows;
 }
+
+// ══════════════════════════════════════════
+//  CAJA DUEÑO
+// ══════════════════════════════════════════
+
+// -- Prompt post-cierre --
+
+function openCajaDuenoPrompt(suggestedAmount) {
+  const inp = document.getElementById('cd-prompt-monto');
+  if (inp) inp.value = suggestedAmount > 0 ? suggestedAmount : '';
+  const descEl = document.getElementById('cd-prompt-desc');
+  if (descEl) descEl.value = '';
+  document.getElementById('cd-prompt-overlay').classList.remove('hidden');
+  document.getElementById('cd-prompt-modal').classList.remove('hidden');
+  if (inp) setTimeout(() => inp.select(), 150);
+}
+
+function closeCajaDuenoPrompt() {
+  document.getElementById('cd-prompt-overlay').classList.add('hidden');
+  document.getElementById('cd-prompt-modal').classList.add('hidden');
+}
+
+async function saveCajaDuenoFromCierre() {
+  const monto = parseInt(document.getElementById('cd-prompt-monto').value) || 0;
+  if (monto <= 0) { closeCajaDuenoPrompt(); return; }
+  const desc = (document.getElementById('cd-prompt-desc').value || '').trim()
+    || ('Cierre ' + _todayAR());
+  try {
+    await db.collection('caja_dueno_movimientos').add({
+      fecha: _todayAR(), tipo: 'ingreso', monto, desc,
+      ts: new Date().toISOString()
+    });
+    closeCajaDuenoPrompt();
+    toast('📦 ' + fmt(monto) + ' guardado en caja dueño', 'success');
+  } catch(e) { toast('Error al guardar en caja dueño', 'error'); }
+}
+
+// -- Modal gestión --
+
+function openCajaDueno() {
+  if (!_cajaIsOwner) {
+    requireCajaOwnerPin(() => openCajaDueno(), 'PIN de dueño para acceder');
+    return;
+  }
+  document.getElementById('cd-mgmt-overlay').classList.remove('hidden');
+  document.getElementById('cd-mgmt-modal').classList.remove('hidden');
+  closeCajaDuenoMovForm();
+  _loadCajaDueno();
+}
+
+function closeCajaDueno() {
+  document.getElementById('cd-mgmt-overlay').classList.add('hidden');
+  document.getElementById('cd-mgmt-modal').classList.add('hidden');
+}
+
+async function _loadCajaDueno() {
+  const list = document.getElementById('cd-movs-list');
+  list.innerHTML = '<p style="text-align:center;padding:16px;color:var(--t2)">Cargando...</p>';
+  try {
+    const snap = await db.collection('caja_dueno_movimientos')
+      .orderBy('ts', 'desc').limit(80).get();
+    const movs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const totalIng = movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const totalEg  = movs.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const saldo = totalIng - totalEg;
+
+    const saldoEl = document.getElementById('cd-saldo-val');
+    if (saldoEl) {
+      saldoEl.textContent = fmt(saldo);
+      saldoEl.className = 'cd-saldo-val ' + (saldo >= 0 ? 'cd-pos' : 'cd-neg');
+    }
+    const subEl = document.getElementById('cd-saldo-sub');
+    if (subEl) subEl.textContent = '+' + fmt(totalIng) + '  −' + fmt(totalEg);
+
+    if (movs.length === 0) {
+      list.innerHTML = '<p style="text-align:center;padding:24px;color:var(--t2)">Sin movimientos aún</p>';
+      return;
+    }
+
+    list.innerHTML = movs.map(m => {
+      const isIng = m.tipo === 'ingreso';
+      return '<div class="cd-mov-row">' +
+        '<div class="cd-mov-info">' +
+        '<span class="cd-mov-fecha">' + esc(m.fecha || '') + '</span>' +
+        '<span class="cd-mov-desc">' + esc(m.desc || (isIng ? 'Ingreso' : 'Egreso')) + '</span>' +
+        '</div>' +
+        '<div class="cd-mov-right">' +
+        '<span class="cd-mov-monto ' + (isIng ? 'cd-pos' : 'cd-neg') + '">' +
+          (isIng ? '+' : '−') + fmt(m.monto) +
+        '</span>' +
+        '<button class="cd-del-btn" onclick="deleteCajaDueno(\'' + m.id + '\')">🗑</button>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<p style="text-align:center;padding:16px;color:#ef4444">Error al cargar</p>';
+  }
+}
+
+async function deleteCajaDueno(id) {
+  requireCajaOwnerPin(async () => {
+    try {
+      await db.collection('caja_dueno_movimientos').doc(id).delete();
+      toast('Movimiento eliminado', 'success');
+      _loadCajaDueno();
+    } catch(e) { toast('Error al eliminar', 'error'); }
+  }, 'PIN de dueño para eliminar');
+}
+
+function openCajaDuenoMovForm(tipo) {
+  document.getElementById('cd-add-tipo').value = tipo;
+  document.getElementById('cd-add-monto').value = '';
+  document.getElementById('cd-add-desc').value = '';
+  const title = document.getElementById('cd-add-title');
+  if (title) title.textContent = tipo === 'egreso' ? 'Nuevo egreso' : 'Nuevo ingreso';
+  document.getElementById('cd-add-section').classList.remove('hidden');
+  setTimeout(() => document.getElementById('cd-add-monto').focus(), 80);
+}
+
+function closeCajaDuenoMovForm() {
+  const s = document.getElementById('cd-add-section');
+  if (s) s.classList.add('hidden');
+}
+
+async function saveCajaDuenoMov() {
+  const tipo  = document.getElementById('cd-add-tipo').value;
+  const monto = parseInt(document.getElementById('cd-add-monto').value) || 0;
+  const desc  = document.getElementById('cd-add-desc').value.trim();
+  if (monto <= 0) { toast('Ingresá un monto válido', 'error'); return; }
+  try {
+    await db.collection('caja_dueno_movimientos').add({
+      fecha: _todayAR(), tipo, monto,
+      desc: desc || (tipo === 'egreso' ? 'Egreso' : 'Ingreso'),
+      ts: new Date().toISOString()
+    });
+    closeCajaDuenoMovForm();
+    _loadCajaDueno();
+    toast((tipo === 'ingreso' ? '📦 Ingreso' : '💸 Egreso') + ' guardado', 'success');
+  } catch(e) { toast('Error al guardar', 'error'); }
+}

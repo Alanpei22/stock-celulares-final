@@ -915,6 +915,7 @@ async function saveCierre() {
       ? 'sin diferencia ✅'
       : (diferencia > 0 ? '+' : '') + '$' + diferencia.toLocaleString('es-AR');
     toast('🔐 Cierre guardado — ' + difStr, Math.abs(diferencia) <= 500 ? 'success' : 'info');
+    setTimeout(() => openCajaDuenoPrompt(esperado), 600);
   } catch(e) { toast('Error al guardar cierre', 'error'); }
 }
 

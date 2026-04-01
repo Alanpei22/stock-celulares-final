@@ -64,6 +64,7 @@
             <button class="hdr-drop-item" onclick="reopenArqueo();closeCajaMenu()">🧾 Arqueo de caja</button>
             <button class="hdr-drop-item" id="cierre-btn" onclick="openCierreModal();closeCajaMenu()">🔐 Cerrar caja del día</button>
             <button class="hdr-drop-item owner-only" onclick="openCajaHistorial();closeCajaMenu()">📊 Historial / Stats</button>
+            <button class="hdr-drop-item owner-only" onclick="openCajaDueno();closeCajaMenu()">📦 Caja Dueño</button>
           </div>
         </div>
       </div>
@@ -324,6 +325,65 @@
       <button class="pin-reset-ok" onclick="doResetOwnerPin('caja')">Sí, resetear</button>
     </div>
   </div>
+</div>
+
+<!-- CAJA DUEÑO: PROMPT POST-CIERRE -->
+<div id="cd-prompt-overlay" class="nota-overlay hidden"></div>
+<div id="cd-prompt-modal" class="arqueo-modal hidden" style="max-width:380px">
+  <div class="nota-modal-hdr">
+    <span>📦 Caja del Dueño</span>
+    <button onclick="closeCajaDuenoPrompt()">✕</button>
+  </div>
+  <p class="arqueo-sub">¿Cuánto efectivo apartás hoy para la caja personal?</p>
+  <div class="mov-monto-area" style="margin:.75rem 0 .5rem">
+    <span class="mov-monto-prefix">$</span>
+    <input id="cd-prompt-monto" class="mov-monto-big" type="number" placeholder="0" min="0" inputmode="numeric">
+  </div>
+  <div class="fg">
+    <input id="cd-prompt-desc" class="fi" type="text" placeholder="Nota opcional (ej: ganancia lunes...)" maxlength="60">
+  </div>
+  <div style="display:flex;gap:10px;margin-top:12px">
+    <button class="btn-secondary" onclick="closeCajaDuenoPrompt()" style="flex:1">Omitir</button>
+    <button class="btn-primary" onclick="saveCajaDuenoFromCierre()" style="flex:2">📦 Guardar</button>
+  </div>
+</div>
+
+<!-- CAJA DUEÑO: GESTIÓN (owner) -->
+<div id="cd-mgmt-overlay" class="nota-overlay hidden" onclick="closeCajaDueno()"></div>
+<div id="cd-mgmt-modal" class="arqueo-modal hidden" style="max-width:420px;max-height:88vh;overflow-y:auto">
+  <div class="nota-modal-hdr" style="position:sticky;top:0;background:var(--card);z-index:1">
+    <span>📦 Caja del Dueño</span>
+    <button onclick="closeCajaDueno()">✕</button>
+  </div>
+  <!-- Saldo -->
+  <div class="cd-saldo-card">
+    <span class="cd-saldo-lbl">Saldo acumulado</span>
+    <span class="cd-saldo-val" id="cd-saldo-val">$0</span>
+    <span class="cd-saldo-sub" id="cd-saldo-sub"></span>
+  </div>
+  <!-- Botones acción -->
+  <div class="cd-acciones">
+    <button class="cd-btn-eg" onclick="openCajaDuenoMovForm('egreso')">− Egreso</button>
+    <button class="cd-btn-ing" onclick="openCajaDuenoMovForm('ingreso')">+ Ingreso</button>
+  </div>
+  <!-- Formulario inline agregar movimiento -->
+  <div id="cd-add-section" class="cd-add-section hidden">
+    <input type="hidden" id="cd-add-tipo" value="egreso">
+    <p class="cd-add-title" id="cd-add-title">Nuevo egreso</p>
+    <div class="mov-monto-area" style="margin:.4rem 0 .3rem">
+      <span class="mov-monto-prefix">$</span>
+      <input id="cd-add-monto" class="mov-monto-big" type="number" placeholder="0" min="0" inputmode="numeric">
+    </div>
+    <div class="fg" style="margin-bottom:8px">
+      <input id="cd-add-desc" class="fi" type="text" placeholder="Descripción..." maxlength="60">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-secondary" onclick="closeCajaDuenoMovForm()" style="flex:1">Cancelar</button>
+      <button class="btn-primary" onclick="saveCajaDuenoMov()" style="flex:2">💾 Guardar</button>
+    </div>
+  </div>
+  <!-- Lista movimientos -->
+  <div id="cd-movs-list"></div>
 </div>
 
 <!-- HISTORIAL + STATS MODAL (owner) -->

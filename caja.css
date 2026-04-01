@@ -661,6 +661,128 @@ body.dark .vuelto-section { background: rgba(16,185,129,.06); border-color: rgba
 }
 body.dark .arqueo-ya-hecho { color: #6ee7b7; background: rgba(16,185,129,.08); border-color: rgba(16,185,129,.18); }
 
+/* ── CAJA DUEÑO ───────────────────────────────────────── */
+.cd-saldo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 1.1rem 1rem .9rem;
+  background: var(--bg2);
+  border-radius: 14px;
+  margin: .75rem 0 .6rem;
+}
+.cd-saldo-lbl {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--t3);
+}
+.cd-saldo-val {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--t1);
+  line-height: 1.1;
+}
+.cd-saldo-val.cd-pos { color: #10b981; }
+.cd-saldo-val.cd-neg { color: #ef4444; }
+.cd-saldo-sub {
+  font-size: .72rem;
+  color: var(--t3);
+  font-weight: 500;
+}
+.cd-acciones {
+  display: flex;
+  gap: 10px;
+  margin-bottom: .5rem;
+}
+.cd-btn-eg, .cd-btn-ing {
+  flex: 1;
+  padding: .6rem;
+  border: none;
+  border-radius: 12px;
+  font-size: .88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .12s;
+}
+.cd-btn-eg  { background: #fee2e2; color: #991b1b; }
+.cd-btn-ing { background: #dcfce7; color: #166534; }
+.cd-btn-eg:active, .cd-btn-ing:active { opacity: .75; }
+.cd-add-section {
+  padding: .75rem;
+  background: var(--bg2);
+  border-radius: 12px;
+  margin-bottom: .75rem;
+}
+.cd-add-section.hidden { display: none; }
+.cd-add-title {
+  font-size: .8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--t2);
+  margin: 0 0 .3rem;
+}
+.cd-mov-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--brd);
+  gap: 8px;
+}
+.cd-mov-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.cd-mov-fecha {
+  font-size: .68rem;
+  color: var(--t3);
+  font-weight: 600;
+}
+.cd-mov-desc {
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cd-mov-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.cd-mov-monto {
+  font-size: .95rem;
+  font-weight: 800;
+}
+.cd-mov-monto.cd-pos { color: #10b981; }
+.cd-mov-monto.cd-neg { color: #ef4444; }
+.cd-del-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: .85rem;
+  opacity: .5;
+  padding: 4px;
+  border-radius: 6px;
+  transition: opacity .1s;
+}
+.cd-del-btn:hover { opacity: 1; background: var(--bg3); }
+
+body.dark .cd-saldo-card { background: #1e293b; }
+body.dark .cd-add-section { background: #1e293b; }
+body.dark .cd-btn-eg  { background: #7f1d1d; color: #fca5a5; }
+body.dark .cd-btn-ing { background: #14532d; color: #86efac; }
+body.dark .cd-mov-row { border-color: #334155; }
+
 /* ── Arqueo: campo vendedor ── */
 .arqueo-vendedor-row { margin-bottom: 10px; }
 .arqueo-vendedor-input {
