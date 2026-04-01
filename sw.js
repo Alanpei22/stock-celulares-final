@@ -1,5 +1,4 @@
-const CACHE = 'cel-v10';
-// Solo cacheamos el shell mínimo para que la app cargue offline
+const CACHE = 'cel-v11';
 const SHELL = ['manifest.json', 'icon.svg'];
 
 self.addEventListener('install', e => {
@@ -18,18 +17,20 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   const ext = url.pathname.split('.').pop();
 
-  // JS, CSS y HTML: network-first → siempre baja la versión más nueva
-  // Solo usa el caché si no hay red (offline)
+  // JS, CSS y HTML: stale-while-revalidate
+  // Sirve del caché al instante; actualiza en segundo plano para la próxima visita
   if (['js', 'css', 'html'].includes(ext) || url.pathname.endsWith('/')) {
     e.respondWith(
-      fetch(e.request)
-        .then(res => {
-          // Guardar en caché para uso offline
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-          return res;
+      caches.open(CACHE).then(cache =>
+        cache.match(e.request).then(cached => {
+          const networkFetch = fetch(e.request).then(res => {
+            cache.put(e.request, res.clone());
+            return res;
+          });
+          // Si hay versión cacheada la sirve al instante y actualiza en fondo
+          return cached || networkFetch;
         })
-        .catch(() => caches.match(e.request))
+      )
     );
     return;
   }
