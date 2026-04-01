@@ -727,9 +727,22 @@
           <input id="rep-fi-costo" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
         </div>
 
-        <div class="fg fg--full">
+        <div class="fg">
           <label class="fl">Fecha estimada de entrega</label>
           <input id="rep-fi-fecha-est" class="fi" type="date">
+        </div>
+        <div class="fg">
+          <label class="fl">Garantía del arreglo</label>
+          <select id="rep-fi-garantia" class="fs" onchange="onGarantiaChange()">
+            <option value="0">Sin garantía</option>
+            <option value="30">30 días</option>
+            <option value="60">60 días</option>
+            <option value="90">90 días</option>
+            <option value="180">6 meses</option>
+            <option value="365">1 año</option>
+            <option value="custom">Otro...</option>
+          </select>
+          <input id="rep-fi-garantia-custom" class="fi" type="number" min="1" max="730" placeholder="Días" inputmode="numeric" style="margin-top:6px;display:none">
         </div>
 
         <div class="fg fg--full">
@@ -755,6 +768,32 @@
           <select id="rep-fi-tecnico" class="fi fs">
             <option value="">— Sin asignar —</option>
           </select>
+        </div>
+
+        <!-- Checklist de recepción -->
+        <div class="fg fg--full">
+          <button type="button" class="cl-toggle-btn" onclick="toggleChecklistForm()">
+            <span>📋 Checklist de recepción</span>
+            <span id="cl-form-summary" class="cl-summary-badge"></span>
+            <span class="cl-arrow" id="cl-form-arrow">▼</span>
+          </button>
+          <div id="cl-form-body" class="cl-form-body hidden">
+            <div class="cl-grid">
+              <div class="cl-item" data-key="pantalla"      onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Pantalla</span></div>
+              <div class="cl-item" data-key="tactil"        onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Táctil</span></div>
+              <div class="cl-item" data-key="pixels"        onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Sin píxeles muertos</span></div>
+              <div class="cl-item" data-key="cam_trasera"   onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Cámara trasera</span></div>
+              <div class="cl-item" data-key="cam_delantera" onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Cámara delantera</span></div>
+              <div class="cl-item" data-key="botones"       onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Botones físicos</span></div>
+              <div class="cl-item" data-key="altavoz"       onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Altavoz</span></div>
+              <div class="cl-item" data-key="microfono"     onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Micrófono</span></div>
+              <div class="cl-item" data-key="wifi"          onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>WiFi</span></div>
+              <div class="cl-item" data-key="bluetooth"     onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Bluetooth</span></div>
+              <div class="cl-item" data-key="carga"         onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Puerto de carga</span></div>
+              <div class="cl-item" data-key="bateria"       onclick="cycleClItem(this)"><span class="cl-dot na">−</span><span>Batería</span></div>
+            </div>
+            <p class="cl-hint">Tocá cada ítem: − sin verificar · ✓ OK · ✗ Falla</p>
+          </div>
         </div>
 
         <div class="fg fg--full">

@@ -241,6 +241,26 @@ function renderRepairs() {
       ? `<div class="card-nota" onclick="event.stopPropagation();openNotaModal('${r.id}')">📝 ${esc(r.notaRapida)}</div>`
       : '';
 
+    // Días en taller / garantía
+    let diasBadgeHTML = '';
+    if (r.fechaIngreso) {
+      const diasEnTaller = Math.floor((now - new Date(r.fechaIngreso)) / 86400000);
+      if (r.diasGarantia > 0) {
+        const pct = diasEnTaller / r.diasGarantia;
+        const diasCls = pct >= 1 ? 'rep-dias-venc' : pct >= 0.7 ? 'rep-dias-warn' : 'rep-dias-ok';
+        const label = pct >= 1 ? `⚠️ Gtía vencida (${diasEnTaller}d)` : `📅 Día ${diasEnTaller}/${r.diasGarantia}d garantía`;
+        diasBadgeHTML = `<span class="rep-dias-badge ${diasCls}">${label}</span>`;
+      } else {
+        diasBadgeHTML = `<span class="rep-dias-badge rep-dias-neutral">📅 Día ${diasEnTaller} en taller</span>`;
+      }
+    }
+
+    // Checklist fallas
+    const clFallas = r.checklist ? Object.values(r.checklist).filter(v => v === 'falla').length : 0;
+    const clHTML = clFallas > 0
+      ? `<span class="rep-cl-badge">${clFallas} falla${clFallas > 1 ? 's' : ''} al ingreso</span>`
+      : '';
+
     // Quick action chips
     const CHIP_CFG = {
       listo:     { ico: '✅', label: 'LISTO',      cls: 'chip-listo'     },
@@ -291,6 +311,7 @@ function renderRepairs() {
           </div>
         </div>
         ${saldoVal ? `<div class="card-saldo-row">${saldoHTML}</div>` : ''}
+        ${diasBadgeHTML || clHTML ? `<div class="card-extras-row">${diasBadgeHTML}${clHTML}</div>` : ''}
         ${notaHTML}
         <div class="card-quick-actions" onclick="event.stopPropagation()">
           ${chipsHTML}${garantiaChip}
@@ -298,6 +319,120 @@ function renderRepairs() {
         </div>
       </div>`;
   }).join('');
+}
+
+// ── Checklist helpers ─────────────────────
+const _CL_ITEMS = [
+  { key: 'pantalla',      label: 'Pantalla' },
+  { key: 'tactil',        label: 'Táctil' },
+  { key: 'pixels',        label: 'Sin píxeles muertos' },
+  { key: 'cam_trasera',   label: 'Cámara trasera' },
+  { key: 'cam_delantera', label: 'Cámara delantera' },
+  { key: 'botones',       label: 'Botones físicos' },
+  { key: 'altavoz',       label: 'Altavoz' },
+  { key: 'microfono',     label: 'Micrófono' },
+  { key: 'wifi',          label: 'WiFi' },
+  { key: 'bluetooth',     label: 'Bluetooth' },
+  { key: 'carga',         label: 'Puerto de carga' },
+  { key: 'bateria',       label: 'Batería' },
+];
+
+function toggleChecklistForm() {
+  const body = document.getElementById('cl-form-body');
+  const arrow = document.getElementById('cl-form-arrow');
+  const hidden = body.classList.toggle('hidden');
+  arrow.textContent = hidden ? '▼' : '▲';
+}
+
+function cycleClItem(el) {
+  const states = ['na', 'ok', 'falla'];
+  const dot = el.querySelector('.cl-dot');
+  const cur = states.find(s => dot.classList.contains(s)) || 'na';
+  const next = states[(states.indexOf(cur) + 1) % states.length];
+  dot.className = 'cl-dot ' + next;
+  dot.textContent = next === 'ok' ? '✓' : next === 'falla' ? '✗' : '−';
+  _updateClFormSummary();
+}
+
+function _updateClFormSummary() {
+  const items = document.querySelectorAll('#cl-form-body .cl-item');
+  let fallas = 0, oks = 0;
+  items.forEach(item => {
+    const dot = item.querySelector('.cl-dot');
+    if (dot.classList.contains('falla')) fallas++;
+    else if (dot.classList.contains('ok')) oks++;
+  });
+  const badge = document.getElementById('cl-form-summary');
+  if (!badge) return;
+  if (fallas > 0) {
+    badge.textContent = fallas + ' falla' + (fallas > 1 ? 's' : '');
+    badge.className = 'cl-summary-badge cl-badge-falla';
+  } else if (oks > 0) {
+    badge.textContent = oks + ' OK';
+    badge.className = 'cl-summary-badge cl-badge-ok';
+  } else {
+    badge.textContent = '';
+    badge.className = 'cl-summary-badge';
+  }
+}
+
+function readChecklist() {
+  const result = {};
+  document.querySelectorAll('#cl-form-body .cl-item').forEach(item => {
+    const dot = item.querySelector('.cl-dot');
+    result[item.dataset.key] = dot.classList.contains('ok') ? 'ok'
+      : dot.classList.contains('falla') ? 'falla' : 'na';
+  });
+  return result;
+}
+
+function loadChecklist(data) {
+  document.querySelectorAll('#cl-form-body .cl-item').forEach(item => {
+    const dot = item.querySelector('.cl-dot');
+    const state = (data || {})[item.dataset.key] || 'na';
+    dot.className = 'cl-dot ' + state;
+    dot.textContent = state === 'ok' ? '✓' : state === 'falla' ? '✗' : '−';
+  });
+  _updateClFormSummary();
+}
+
+function resetChecklist() {
+  document.querySelectorAll('#cl-form-body .cl-item').forEach(item => {
+    const dot = item.querySelector('.cl-dot');
+    dot.className = 'cl-dot na';
+    dot.textContent = '−';
+  });
+  _updateClFormSummary();
+}
+
+// ── Garantía helpers ──────────────────────
+function onGarantiaChange() {
+  const sel = document.getElementById('rep-fi-garantia');
+  const inp = document.getElementById('rep-fi-garantia-custom');
+  inp.style.display = sel.value === 'custom' ? '' : 'none';
+}
+
+function _setGarantiaForm(dias) {
+  const sel = document.getElementById('rep-fi-garantia');
+  const inp = document.getElementById('rep-fi-garantia-custom');
+  const presets = ['0', '30', '60', '90', '180', '365'];
+  if (presets.includes(String(dias))) {
+    sel.value = String(dias);
+    inp.style.display = 'none';
+  } else if (dias > 0) {
+    sel.value = 'custom';
+    inp.value = dias;
+    inp.style.display = '';
+  } else {
+    sel.value = '0';
+    inp.style.display = 'none';
+  }
+}
+
+function _readGarantiaForm() {
+  const sel = document.getElementById('rep-fi-garantia');
+  if (sel.value === 'custom') return parseInt(document.getElementById('rep-fi-garantia-custom').value) || 0;
+  return parseInt(sel.value) || 0;
 }
 
 // ── Form ──────────────────────────────────
@@ -340,6 +475,8 @@ function openRepairForm(id) {
     document.getElementById('rep-fi-costo').value       = r.costo         || '';
     document.getElementById('rep-fi-presupuesto').value = r.presupuesto   || '';
     refreshStaffSelect(r.tecnico || '');
+    _setGarantiaForm(r.diasGarantia || 0);
+    loadChecklist(r.checklist || {});
 
     const accs = r.accesorios || [];
     document.getElementById('acc-cargador').checked    = accs.includes('cargador');
@@ -397,6 +534,8 @@ function openRepairForm(id) {
     ['acc-cargador','acc-funda','acc-caja','acc-auriculares'].forEach(fid => {
       document.getElementById(fid).checked = false;
     });
+    _setGarantiaForm(0);
+    resetChecklist();
     window._currentPatronDots = null;
     window._currentPatronImg  = null;
     const patronPrevNew = document.getElementById('patron-preview');
@@ -501,6 +640,9 @@ async function saveRepair() {
   if (document.getElementById('acc-caja').checked)        accesorios.push('caja');
   if (document.getElementById('acc-auriculares').checked) accesorios.push('auriculares');
 
+  const diasGarantia = _readGarantiaForm();
+  const checklist    = readChecklist();
+
   if (!marca)   { toast('Ingresá la marca', 'error'); return; }
   if (!modelo)  { toast('Ingresá el modelo', 'error'); return; }
   if (!arreglo) { toast('Seleccioná el tipo de arreglo', 'error'); return; }
@@ -515,7 +657,7 @@ async function saveRepair() {
       const updateData = {
         ...existing,
         marca, modelo, arreglo, condicion, codigo, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
-        fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs
+        fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs, diasGarantia, checklist
       };
       if (foto) updateData.foto = foto;
       await db.collection('repairs').doc(editingRepairId).set(updateData);
@@ -550,7 +692,8 @@ async function saveRepair() {
         estado: 'reparando',
         fechaIngreso: ahora,
         estadoHistorial: [{ estado: 'reparando', fecha: ahora }],
-        esGarantia: false
+        esGarantia: false,
+        diasGarantia, checklist
       };
       if (foto) newDoc.foto = foto;
       await db.collection('repairs').doc(id).set(newDoc);
@@ -1963,30 +2106,61 @@ function openTicket(id) {
   const accs  = (r.accesorios || []).map(a => accsMap[a] || a).join(', ');
   const saldo = (r.monto && r.sena) ? r.monto - r.sena : null;
   const fechaIng = r.fechaIngreso
-    ? new Date(r.fechaIngreso).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' })
+    ? new Date(r.fechaIngreso).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
     : '—';
-  const st = REPAIR_STATES[r.estado] || { label: r.estado || '—' };
+
+  // Checklist HTML para ticket
+  const clData = r.checklist || {};
+  const clRows = _CL_ITEMS.map(item => {
+    const st = clData[item.key] || 'na';
+    const icon = st === 'ok' ? '✓' : st === 'falla' ? '✗' : '−';
+    const cls  = st === 'ok' ? 'tk-cl-ok' : st === 'falla' ? 'tk-cl-falla' : 'tk-cl-na';
+    return `<div class="tk-cl-row"><span class="tk-cl-icon ${cls}">${icon}</span><span class="tk-cl-lbl">${item.label}</span></div>`;
+  }).join('');
+  const hasClData = Object.values(clData).some(v => v !== 'na');
+
+  // Garantía
+  const garantiaHTML = r.diasGarantia > 0
+    ? `<div class="ticket-row"><span class="ticket-lbl">Garantía</span><span class="ticket-val">${r.diasGarantia} días</span></div>`
+    : '';
 
   document.getElementById('ticket-body').innerHTML = `
-    <div class="ticket-section">Equipo</div>
-    <div class="ticket-row"><span class="ticket-lbl">N° Orden</span><span class="ticket-val">N°${r.nOrden}</span></div>
+    <div class="tk-sep">— — — — — — — — — — — — — — —</div>
+    <div class="tk-center tk-title">ORDEN DE REPARACIÓN</div>
+    <div class="tk-center tk-orden">N° ${r.nOrden}</div>
+    <div class="tk-sep">— — — — — — — — — — — — — — —</div>
+
+    <div class="ticket-section">EQUIPO</div>
     <div class="ticket-row"><span class="ticket-lbl">Equipo</span><span class="ticket-val">${esc(r.marca)} ${esc(r.modelo)}</span></div>
     <div class="ticket-row"><span class="ticket-lbl">Arreglo</span><span class="ticket-val">${esc(r.arreglo || '—')}</span></div>
-    ${r.condicion ? `<div class="ticket-row"><span class="ticket-lbl">Condición</span><span class="ticket-val">${esc(r.condicion)}</span></div>` : ''}
-    ${accs ? `<div class="ticket-row"><span class="ticket-lbl">Accesorios</span><span class="ticket-val">${accs}</span></div>` : ''}
-    <div class="ticket-section">Cliente</div>
+    ${r.condicion ? `<div class="ticket-row tk-wrap"><span class="ticket-lbl">Condición</span><span class="ticket-val">${esc(r.condicion)}</span></div>` : ''}
+    ${accs ? `<div class="ticket-row tk-wrap"><span class="ticket-lbl">Accesorios</span><span class="ticket-val">${accs}</span></div>` : ''}
+
+    <div class="ticket-section">CLIENTE</div>
     ${r.nombre ? `<div class="ticket-row"><span class="ticket-lbl">Nombre</span><span class="ticket-val">${esc(r.nombre)}</span></div>` : ''}
     ${r.tlf    ? `<div class="ticket-row"><span class="ticket-lbl">Teléfono</span><span class="ticket-val">${esc(r.tlf)}</span></div>` : ''}
     ${r.dni    ? `<div class="ticket-row"><span class="ticket-lbl">DNI</span><span class="ticket-val">${esc(r.dni)}</span></div>` : ''}
-    <div class="ticket-section">Pago</div>
-    ${r.monto  ? `<div class="ticket-row"><span class="ticket-lbl">Monto</span><span class="ticket-val">$ ${r.monto.toLocaleString('es-AR')}</span></div>` : ''}
+
+    <div class="ticket-section">PAGO</div>
+    ${r.monto  ? `<div class="ticket-row"><span class="ticket-lbl">Presupuesto</span><span class="ticket-val">$ ${r.monto.toLocaleString('es-AR')}</span></div>` : ''}
     ${r.sena   ? `<div class="ticket-row"><span class="ticket-lbl">Seña</span><span class="ticket-val">$ ${r.sena.toLocaleString('es-AR')}</span></div>` : ''}
-    ${saldo !== null ? `<div class="ticket-row"><span class="ticket-lbl">Saldo</span><span class="ticket-val" style="color:#f59e0b;font-weight:800">$ ${saldo.toLocaleString('es-AR')}</span></div>` : ''}
-    <div class="ticket-section">Información</div>
-    <div class="ticket-row"><span class="ticket-lbl">Estado</span><span class="ticket-val">${st.label}</span></div>
+    ${saldo    ? `<div class="ticket-row"><span class="ticket-lbl">Saldo</span><span class="ticket-val tk-saldo">$ ${saldo.toLocaleString('es-AR')}</span></div>` : ''}
+    ${garantiaHTML}
+
+    <div class="ticket-section">INFORMACIÓN</div>
     <div class="ticket-row"><span class="ticket-lbl">Ingreso</span><span class="ticket-val">${fechaIng}</span></div>
     ${r.fechaEstimada ? `<div class="ticket-row"><span class="ticket-lbl">Entrega est.</span><span class="ticket-val">${fmtDate(r.fechaEstimada)}</span></div>` : ''}
-    ${r.observaciones ? `<div class="ticket-row" style="flex-direction:column;gap:2px"><span class="ticket-lbl">Observaciones</span><span class="ticket-val" style="text-align:left;font-weight:400">${esc(r.observaciones)}</span></div>` : ''}
+    ${r.tecnico ? `<div class="ticket-row"><span class="ticket-lbl">Técnico</span><span class="ticket-val">${esc(r.tecnico)}</span></div>` : ''}
+    ${r.observaciones ? `<div class="ticket-row tk-wrap"><span class="ticket-lbl">Obs.</span><span class="ticket-val">${esc(r.observaciones)}</span></div>` : ''}
+
+    ${hasClData ? `
+    <div class="ticket-section">CHECKLIST DE RECEPCIÓN</div>
+    <div class="tk-cl-grid">${clRows}</div>` : ''}
+
+    <div class="tk-sep">— — — — — — — — — — — — — — —</div>
+    <div class="tk-center tk-thanks">¡Gracias por su confianza!</div>
+    <div class="tk-center tk-firma">Firma cliente: ________________</div>
+    <div class="tk-sep">— — — — — — — — — — — — — — —</div>
   `;
 
   document.getElementById('rep-ticket-modal').classList.remove('hidden');

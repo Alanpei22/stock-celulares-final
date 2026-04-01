@@ -1375,6 +1375,72 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
   justify-content: flex-end;
 }
 
+/* ── Ticket térmico ── */
+.ticket-card { max-width: 320px !important; font-family: 'Courier New', monospace; }
+.tk-sep { text-align: center; color: var(--t3); font-size: .72rem; margin: 6px 0; letter-spacing: .05em; }
+.tk-center { text-align: center; }
+.tk-title { font-size: .85rem; font-weight: 800; letter-spacing: .1em; color: var(--text); margin: 4px 0 2px; }
+.tk-orden { font-size: 1.3rem; font-weight: 900; color: var(--acc); margin-bottom: 4px; }
+.tk-wrap { flex-direction: column; align-items: flex-start; gap: 2px; }
+.tk-wrap .ticket-val { text-align: left; font-weight: 400; }
+.tk-saldo { color: #f59e0b !important; font-weight: 800 !important; }
+.tk-thanks { font-size: .78rem; color: var(--t2); margin: 6px 0 4px; }
+.tk-firma { font-size: .75rem; color: var(--t2); margin-bottom: 4px; }
+
+/* Checklist en ticket */
+.tk-cl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; margin: 4px 0; }
+.tk-cl-row { display: flex; align-items: center; gap: 5px; font-size: .75rem; }
+.tk-cl-icon { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .65rem; font-weight: 800; flex-shrink: 0; }
+.tk-cl-ok    { background: #dcfce7; color: #16a34a; }
+.tk-cl-falla { background: #fee2e2; color: #dc2626; }
+.tk-cl-na    { background: #e2e8f0; color: #94a3b8; }
+.tk-cl-lbl   { color: var(--t1); }
+
+/* ── Checklist en formulario ── */
+.cl-toggle-btn {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  background: none; border: 1.5px solid var(--border); border-radius: 12px;
+  padding: 10px 14px; font-size: .88rem; font-weight: 600; color: var(--text);
+  cursor: pointer; text-align: left;
+}
+.cl-arrow { margin-left: auto; font-size: .75rem; color: var(--t2); }
+.cl-summary-badge { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.cl-badge-falla { background: #fee2e2; color: #dc2626; }
+.cl-badge-ok { background: #dcfce7; color: #16a34a; }
+.cl-form-body { margin-top: 8px; }
+.cl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cl-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 10px; border: 1.5px solid var(--border);
+  cursor: pointer; font-size: .82rem; user-select: none; transition: .12s;
+}
+.cl-item:active { transform: scale(.97); }
+.cl-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .8rem; font-weight: 800; flex-shrink: 0;
+}
+.cl-dot.na    { background: #e2e8f0; color: #64748b; }
+.cl-dot.ok    { background: #dcfce7; color: #16a34a; }
+.cl-dot.falla { background: #fee2e2; color: #dc2626; }
+.cl-hint { font-size: .72rem; color: var(--t2); text-align: center; margin-top: 6px; }
+body.dark .cl-item { border-color: #334155; }
+body.dark .cl-dot.na { background: #334155; color: #94a3b8; }
+
+/* ── Días en taller / garantía (card) ── */
+.card-extras-row { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 0 2px; }
+.rep-dias-badge { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.rep-dias-ok      { background: #dcfce7; color: #15803d; }
+.rep-dias-warn    { background: #fef3c7; color: #d97706; }
+.rep-dias-venc    { background: #fee2e2; color: #dc2626; }
+.rep-dias-neutral { background: #f1f5f9; color: #64748b; }
+.rep-cl-badge { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: #fee2e2; color: #dc2626; }
+body.dark .rep-dias-ok      { background: #14532d; color: #86efac; }
+body.dark .rep-dias-warn    { background: #451a03; color: #fcd34d; }
+body.dark .rep-dias-venc    { background: #7f1d1d; color: #fca5a5; }
+body.dark .rep-dias-neutral { background: #1e293b; color: #94a3b8; }
+body.dark .rep-cl-badge     { background: #7f1d1d; color: #fca5a5; }
+
 @media print {
   body > *:not(#rep-ticket-modal) { display: none !important; }
   #rep-ticket-modal {
@@ -1383,12 +1449,13 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
     display: block !important;
   }
   #rep-ticket-modal .modal-card {
-    box-shadow: none;
-    border: none;
-    max-width: 100%;
-    padding: 0;
+    box-shadow: none; border: none;
+    max-width: 80mm !important;
+    padding: 0; margin: 0 auto;
   }
+  #rep-ticket-modal .ticket-card { max-width: 80mm !important; }
   .no-print { display: none !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
 @media (max-width: 380px) {
