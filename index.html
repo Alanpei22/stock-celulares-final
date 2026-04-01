@@ -635,6 +635,13 @@
 <!-- ═══════════ MODALES REPARACIONES ═══════════ -->
 
 <!-- MODAL FORMULARIO REPARACIÓN -->
+<!-- Banner imprimir ticket después del ingreso -->
+<div id="print-prompt-bar" class="print-prompt-bar hidden">
+  <span class="print-prompt-txt">✅ Reparación registrada</span>
+  <button class="print-prompt-btn" onclick="printPromptAction()">🧾 Imprimir ticket</button>
+  <button class="print-prompt-close" onclick="printPromptDismiss()">✕</button>
+</div>
+
 <div id="rep-form-modal" class="modal-overlay hidden">
   <div class="modal-card form-card">
     <div class="modal-header">

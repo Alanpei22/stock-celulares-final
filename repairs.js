@@ -558,6 +558,27 @@ function openRepairForm(id) {
   setTimeout(() => document.getElementById('rep-fi-marca').focus(), 300);
 }
 
+function _showPrintPrompt(repairId) {
+  const bar = document.getElementById('print-prompt-bar');
+  if (!bar) return;
+  bar.classList.remove('hidden');
+  bar.dataset.repairId = repairId;
+  clearTimeout(bar._hideTimer);
+  bar._hideTimer = setTimeout(() => bar.classList.add('hidden'), 15000);
+}
+
+function printPromptAction() {
+  const bar = document.getElementById('print-prompt-bar');
+  if (!bar) return;
+  bar.classList.add('hidden');
+  openTicket(bar.dataset.repairId);
+}
+
+function printPromptDismiss() {
+  const bar = document.getElementById('print-prompt-bar');
+  if (bar) bar.classList.add('hidden');
+}
+
 function closeRepairForm() {
   document.getElementById('rep-form-modal').classList.add('hidden');
   document.body.style.overflow = '';
@@ -706,6 +727,11 @@ async function saveRepair() {
         extra: { nOrden, marca, modelo, arreglo, monto, nombre }
       });
       triggerWaNotify('ingreso', { marca, modelo, nOrden, arreglo, nombre, monto });
+      closeRepairForm();
+      // Ofrecer imprimir ticket inmediatamente
+      REPAIRS.push({ ...newDoc });
+      _showPrintPrompt(id);
+      return;
     }
     closeRepairForm();
   } catch (e) {

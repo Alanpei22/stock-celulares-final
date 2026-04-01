@@ -1441,6 +1441,26 @@ body.dark .rep-dias-venc    { background: #7f1d1d; color: #fca5a5; }
 body.dark .rep-dias-neutral { background: #1e293b; color: #94a3b8; }
 body.dark .rep-cl-badge     { background: #7f1d1d; color: #fca5a5; }
 
+/* ── Banner imprimir ticket ── */
+.print-prompt-bar {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  z-index: 900; display: flex; align-items: center; gap: 10px;
+  background: #1e293b; color: #f1f5f9; border-radius: 14px;
+  padding: 10px 14px; box-shadow: 0 4px 20px rgba(0,0,0,.3);
+  max-width: calc(100vw - 32px); white-space: nowrap;
+}
+.print-prompt-bar.hidden { display: none; }
+.print-prompt-txt { font-size: .85rem; font-weight: 600; flex: 1; min-width: 0; }
+.print-prompt-btn {
+  background: #6366f1; color: #fff; border: none; border-radius: 10px;
+  padding: 7px 14px; font-size: .82rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.print-prompt-btn:active { opacity: .85; }
+.print-prompt-close {
+  background: none; border: none; color: #94a3b8; font-size: 1rem;
+  cursor: pointer; padding: 4px; line-height: 1; flex-shrink: 0;
+}
+
 @media print {
   body > *:not(#rep-ticket-modal) { display: none !important; }
   #rep-ticket-modal {
