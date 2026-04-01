@@ -472,8 +472,8 @@ function openRepairForm(id) {
     document.getElementById('rep-fi-tlf').value        = r.tlf          || '';
     document.getElementById('rep-fi-dni').value        = r.dni          || '';
     document.getElementById('rep-fi-obs').value         = r.observaciones || '';
-    document.getElementById('rep-fi-costo').value       = r.costo         || '';
-    document.getElementById('rep-fi-presupuesto').value = r.presupuesto   || '';
+    document.getElementById('rep-fi-costo').value = r.costo || '';
+    const _pEl = document.getElementById('rep-fi-presupuesto'); if (_pEl) _pEl.value = r.presupuesto || '';
     refreshStaffSelect(r.tecnico || '');
     _setGarantiaForm(r.diasGarantia || 0);
     loadChecklist(r.checklist || {});
@@ -523,7 +523,7 @@ function openRepairForm(id) {
     }).catch(() => {});
 
     ['rep-fi-marca','rep-fi-modelo','rep-fi-condicion','rep-fi-codigo',
-     'rep-fi-monto','rep-fi-sena','rep-fi-costo','rep-fi-presupuesto','rep-fi-fecha-est',
+     'rep-fi-monto','rep-fi-sena','rep-fi-costo','rep-fi-fecha-est',
      'rep-fi-nombre','rep-fi-tlf','rep-fi-dni','rep-fi-obs'].forEach(fid => {
       const el = document.getElementById(fid);
       if (el) el.value = '';
@@ -623,7 +623,7 @@ async function saveRepair() {
   const monto       = parseInt(document.getElementById('rep-fi-monto').value)       || 0;
   const sena        = parseInt(document.getElementById('rep-fi-sena').value)        || 0;
   const costo       = parseInt(document.getElementById('rep-fi-costo').value)       || 0;
-  const presupuesto = parseInt(document.getElementById('rep-fi-presupuesto').value) || 0;
+  const presupuesto = parseInt((document.getElementById('rep-fi-presupuesto') || {}).value) || 0;
   const tecnico     = document.getElementById('rep-fi-tecnico').value.trim();
   const fechaEstimada = document.getElementById('rep-fi-fecha-est').value;
   const nombre   = document.getElementById('rep-fi-nombre').value.trim();
