@@ -96,7 +96,7 @@ async function submitCajaOwnerPin() {
       // Entrar a modo dueño normal
       _cajaIsOwner = true;
       document.body.classList.add('owner-mode');
-      document.getElementById('caja-owner-btn').textContent = '🔓';
+      const _ob1 = document.getElementById('caja-owner-btn'); if (_ob1) _ob1.textContent = '🔓';
       clearTimeout(_cajaOwnerTimer);
       _cajaOwnerTimer = setTimeout(lockCajaOwner, 15 * 60 * 1000);
       closeCajaOwnerPin();
@@ -136,7 +136,7 @@ async function doResetOwnerPin(ctx) {
 function lockCajaOwner() {
   _cajaIsOwner = false;
   document.body.classList.remove('owner-mode');
-  document.getElementById('caja-owner-btn').textContent = '🔒';
+  const _ob2 = document.getElementById('caja-owner-btn'); if (_ob2) _ob2.textContent = '🔒';
   clearTimeout(_cajaOwnerTimer);
 }
 
