@@ -18,7 +18,7 @@ const FB_CONFIG = {
 const DENOMINACIONES = [20000, 10000, 2000, 1000, 500, 200, 100];
 
 const CATEGORIAS = {
-  ingreso: ['Venta equipo', 'Reparación', 'Hidrogel / Accesorio', 'Seña', 'Otro ingreso'],
+  ingreso: ['Venta equipo', 'Reparación', 'Venta producto', 'Hidrogel / Accesorio', 'Seña', 'Otro ingreso'],
   egreso:  ['Compra repuesto', 'Gasto fijo', 'Retiro dueño', 'Otro gasto']
 };
 const RETIRO_CAT = 'Retiro dueño';
@@ -26,7 +26,7 @@ const RETIRO_CAT = 'Retiro dueño';
 const METODOS_PAGO = ['Efectivo', 'Transferencia', 'MercadoPago', 'Tarjeta débito', 'Tarjeta crédito'];
 
 const CAT_ICONS = {
-  'Venta equipo': '📱', 'Reparación': '🔧', 'Hidrogel / Accesorio': '🛡️',
+  'Venta equipo': '📱', 'Reparación': '🔧', 'Venta producto': '🏷️', 'Hidrogel / Accesorio': '🛡️',
   'Seña': '📝', 'Otro ingreso': '💰',
   'Compra repuesto': '🛒', 'Gasto fijo': '📋', 'Retiro dueño': '🏧', 'Otro gasto': '💸'
 };
@@ -111,6 +111,7 @@ function initApp() {
   listenMovimientos();
   loadArqueo();
   loadCierre();
+  if (typeof initInventario === 'function') initInventario();
 }
 
 // PIN pad

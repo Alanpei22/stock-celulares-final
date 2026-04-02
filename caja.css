@@ -6,6 +6,28 @@
   80%     { transform: translateX(4px); }
 }
 
+/* ── TABS CAJA / INVENTARIO ─────────────────────────────── */
+.caja-pg-tab { display: flex; flex-direction: column; }
+.caja-pg-tab.section-hidden { display: none; }
+
+/* Inventario tab necesita bottom padding para el nav */
+#inv-tab { padding-bottom: 64px; }
+#inv-tab .list-wrap { padding-bottom: 0; }
+
+/* Bottom nav en caja.html */
+.caja-bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: flex; background: var(--card);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 90;
+  box-shadow: 0 -2px 10px rgba(0,0,0,.06);
+}
+body.dark .caja-bottom-nav { background: #0f172a; border-color: #1e293b; }
+
+/* Espacio para el nav en la pestaña de caja */
+#caja-tab { padding-bottom: 64px; }
+
 /* ── DATE NAV ──────────────────────────────────────────── */
 .caja-date-nav {
   display: flex;

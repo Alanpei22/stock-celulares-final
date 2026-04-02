@@ -1,4 +1,4 @@
-const CACHE = 'cel-v11';
+const CACHE = 'cel-v13';
 const SHELL = ['manifest.json', 'icon.svg'];
 
 self.addEventListener('install', e => {
@@ -17,9 +17,19 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   const ext = url.pathname.split('.').pop();
 
-  // JS, CSS y HTML: stale-while-revalidate
-  // Sirve del caché al instante; actualiza en segundo plano para la próxima visita
-  if (['js', 'css', 'html'].includes(ext) || url.pathname.endsWith('/')) {
+  // HTML: network-first — siempre busca la versión más nueva
+  if (ext === 'html' || url.pathname.endsWith('/')) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // JS y CSS: stale-while-revalidate — sirve del caché al instante, actualiza en fondo
+  if (['js', 'css'].includes(ext)) {
     e.respondWith(
       caches.open(CACHE).then(cache =>
         cache.match(e.request).then(cached => {
@@ -27,7 +37,6 @@ self.addEventListener('fetch', e => {
             cache.put(e.request, res.clone());
             return res;
           });
-          // Si hay versión cacheada la sirve al instante y actualiza en fondo
           return cached || networkFetch;
         })
       )

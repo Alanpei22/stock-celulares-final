@@ -44,6 +44,9 @@
 <!-- APP -->
 <div id="app" class="app-hidden">
 
+  <!-- ── TAB: CAJA ── -->
+  <div id="caja-tab" class="caja-pg-tab">
+
   <header>
     <div class="hdr-top">
       <div class="hdr-brand">
@@ -156,6 +159,70 @@
     </div>
     <button class="fab" id="fab-main" onclick="toggleFabMenu()" title="Nuevo movimiento">＋</button>
   </div>
+
+  </div><!-- /caja-tab -->
+
+  <!-- ── TAB: INVENTARIO ── -->
+  <div id="inv-tab" class="caja-pg-tab section-hidden">
+    <header>
+      <div class="hdr-top">
+        <div class="hdr-brand"><h1>🏷️ Inventario</h1></div>
+        <div class="hdr-actions">
+          <button class="hdr-btn" onclick="window.location.href='pos.html'" title="Punto de venta">🛒</button>
+          <button class="hdr-btn" id="inv-add-btn" title="Agregar producto">＋</button>
+        </div>
+      </div>
+      <div class="inv-scan-wrap">
+        <span class="inv-scan-ico">📷</span>
+        <input id="inv-scan-input" class="inv-scan-input" type="text"
+          placeholder="Escaneá un código de barras…"
+          inputmode="none" autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="inv-search" type="search" placeholder="Buscar nombre, código, categoría…"
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="filters">
+        <select class="pill" id="inv-f-cat"><option value="">Todas las categorías</option></select>
+        <select class="pill" id="inv-f-estado">
+          <option value="">Todos</option>
+          <option value="activo">Activos</option>
+          <option value="bajo">Stock bajo</option>
+          <option value="inactivo">Inactivos</option>
+        </select>
+      </div>
+    </header>
+    <div class="stats-bar">
+      <div class="stat"><span class="stat-num" id="inv-s-total">0</span><span class="stat-lbl">Productos</span></div>
+      <div class="stat"><span class="stat-num rep2-lowstock-num" id="inv-s-bajo">0</span><span class="stat-lbl">Stock bajo</span></div>
+      <div class="stat stat-val owner-only"><span class="stat-num" id="inv-s-valor">$0</span><span class="stat-lbl">Valor costo</span></div>
+    </div>
+    <div class="list-wrap">
+      <div id="inv-list"></div>
+      <div class="empty-state" id="inv-empty" style="display:none">
+        <span class="empty-ico">🏷️</span>
+        <p class="empty-txt">No hay productos registrados</p>
+        <button class="btn-primary" onclick="openProductoForm()">Agregar primer producto</button>
+      </div>
+    </div>
+  </div><!-- /inv-tab -->
+
+  <!-- ── BOTTOM NAV ── -->
+  <nav class="bottom-nav caja-bottom-nav">
+    <button class="nav-btn active" id="cnav-caja" onclick="switchCajaTab('caja')">
+      <span class="nav-ico">💰</span>
+      <span class="nav-lbl">Caja</span>
+    </button>
+    <button class="nav-btn" id="cnav-inv" onclick="switchCajaTab('inventario')">
+      <span class="nav-ico">🏷️</span>
+      <span class="nav-lbl">Inventario</span>
+    </button>
+    <button class="nav-btn" onclick="window.location.href='pos.html'">
+      <span class="nav-ico">🛒</span>
+      <span class="nav-lbl">POS</span>
+    </button>
+  </nav>
 
 </div>
 
@@ -422,9 +489,82 @@
   <div id="caja-hist-body" class="caja-hist-body"></div>
 </div>
 
+<!-- ═══════════ MODAL INVENTARIO PRODUCTO ═══════════ -->
+<div id="inv-form-modal" class="modal-overlay hidden">
+  <div class="modal-card form-card">
+    <div class="modal-header">
+      <h3 id="inv-form-title">➕ Nuevo producto</h3>
+      <button class="modal-close" id="inv-form-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="fg">
+          <label class="fl">Código de barras</label>
+          <input id="inv-fi-cod" class="fi" type="text" placeholder="Escanear o escribir…" autocomplete="off" autocorrect="off" spellcheck="false">
+        </div>
+        <div class="fg">
+          <label class="fl">Nombre *</label>
+          <input id="inv-fi-nom" class="fi" type="text" placeholder="Ej: Funda iPhone 15 negra" autocomplete="off">
+        </div>
+        <div class="fg fg--full">
+          <label class="fl">Categoría</label>
+          <select id="inv-fi-cat" class="fs">
+            <option value="">Sin categoría</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">Precio venta $</label>
+          <input id="inv-fi-pv" class="fi" type="number" placeholder="0" min="0" inputmode="decimal">
+        </div>
+        <div class="fg owner-only">
+          <label class="fl">Precio costo $</label>
+          <input id="inv-fi-pc" class="fi" type="number" placeholder="0" min="0" inputmode="decimal">
+        </div>
+        <div class="fg">
+          <label class="fl">Stock actual</label>
+          <input id="inv-fi-stock" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+        </div>
+        <div class="fg">
+          <label class="fl">Stock mínimo</label>
+          <input id="inv-fi-stockmin" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+        </div>
+        <div class="fg fg--full inv-activo-row">
+          <label class="inv-activo-lbl">
+            <input id="inv-fi-activo" type="checkbox" checked>
+            Producto activo
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-danger" id="inv-form-del" style="display:none" onclick="deleteProducto(_invEditingId)">🗑</button>
+      <button class="btn-secondary" id="inv-form-cancel" style="flex:1">Cancelar</button>
+      <button class="btn-primary" id="inv-form-save" style="flex:2">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="caja.js"></script>
 <script src="caja_extra.js"></script>
+<script src="inventario.js"></script>
+<script>
+function switchCajaTab(tab) {
+  const tabs = { caja: 'caja-tab', inventario: 'inv-tab' };
+  const btns = { caja: 'cnav-caja', inventario: 'cnav-inv' };
+  Object.keys(tabs).forEach(t => {
+    const sec = document.getElementById(tabs[t]);
+    const btn = document.getElementById(btns[t]);
+    if (sec) sec.classList.toggle('section-hidden', t !== tab);
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+  const fab = document.getElementById('fab-wrap');
+  const backdrop = document.getElementById('fab-backdrop');
+  if (fab) fab.style.display = tab === 'caja' ? '' : 'none';
+  if (backdrop) backdrop.style.display = 'none';
+  if (tab === 'inventario') focusInvScan();
+}
+</script>
 </body>
 </html>

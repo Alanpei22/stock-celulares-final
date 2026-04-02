@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a">
+  <title>TechPoint · POS</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="pos.css">
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="pos-header">
+  <button class="pos-back-btn" onclick="window.location.href='index.html'">← Volver</button>
+  <span class="pos-header-title">🛒 Punto de Venta</span>
+  <button class="pos-dark-btn" onclick="togglePosDark()" title="Modo oscuro">🌙</button>
+</header>
+
+<!-- ── Body ── -->
+<div class="pos-body">
+
+  <!-- Scan -->
+  <div class="pos-scan-area">
+    <div class="pos-scan-wrap">
+      <span class="pos-scan-ico">📷</span>
+      <input id="pos-scan-input" class="pos-scan-input" type="text"
+        placeholder="Escanear código de barras…"
+        inputmode="none" autocomplete="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div id="pos-found-info" class="pos-found-flash" style="display:none"></div>
+    <p class="pos-scan-hint">Apuntá el lector al código del producto</p>
+  </div>
+
+  <!-- Carrito -->
+  <div class="pos-cart-area" id="pos-cart-area">
+    <div class="pos-cart-empty" id="pos-cart-empty">
+      <span class="pos-cart-empty-ico">🛒</span>
+      <span>El carrito está vacío</span>
+    </div>
+    <div id="pos-cart-list"></div>
+  </div>
+
+  <!-- Footer pago -->
+  <div class="pos-footer">
+    <div class="pos-total-row">
+      <span class="pos-total-lbl">Total</span>
+      <span class="pos-total-monto" id="pos-total">$0</span>
+    </div>
+    <div class="pos-metodos">
+      <button class="pos-metodo-btn active" data-m="Efectivo"       onclick="selectMetodo('Efectivo')">💵 Efectivo</button>
+      <button class="pos-metodo-btn"        data-m="Transferencia"  onclick="selectMetodo('Transferencia')">🏦 Transf.</button>
+      <button class="pos-metodo-btn"        data-m="MercadoPago"    onclick="selectMetodo('MercadoPago')">💙 MP</button>
+      <button class="pos-metodo-btn"        data-m="Tarjeta débito" onclick="selectMetodo('Tarjeta débito')">💳 Débito</button>
+      <button class="pos-metodo-btn"        data-m="Tarjeta crédito" onclick="selectMetodo('Tarjeta crédito')">💳 Crédito</button>
+    </div>
+    <button class="pos-checkout-btn" id="pos-checkout-btn" onclick="openConfirm()" disabled>
+      ✅ Cobrar
+    </button>
+  </div>
+</div>
+
+<!-- ── Overlay confirmación ── -->
+<div class="pos-confirm-overlay hidden" id="pos-confirm-overlay" onclick="closeConfirm()">
+  <div class="pos-confirm-modal" onclick="event.stopPropagation()">
+    <div class="pos-confirm-title">Confirmar venta</div>
+    <div class="pos-confirm-lines" id="pos-confirm-lines"></div>
+    <div class="pos-confirm-btns">
+      <button class="pos-confirm-cancel" onclick="closeConfirm()">Cancelar</button>
+      <button class="pos-confirm-ok" id="pos-confirm-ok" onclick="checkout()">✅ Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Flash éxito ── -->
+<div class="pos-success-overlay hidden" id="pos-success-overlay">
+  <span class="pos-success-ico">✅</span>
+  <span class="pos-success-txt">¡Venta registrada!</span>
+  <span class="pos-success-sub" id="pos-success-sub"></span>
+</div>
+
+<!-- ── Toast ── -->
+<div class="pos-toast" id="pos-toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="pos.js"></script>
+
+</body>
+</html>

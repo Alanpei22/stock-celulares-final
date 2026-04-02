@@ -2524,3 +2524,65 @@ body.dark .bulk-table tbody tr:nth-child(even) { background:rgba(255,255,255,.03
 .bulk-inp:focus { outline:2px solid var(--acc); border-color:var(--acc); }
 .bulk-del-btn { background:#ef4444; color:#fff; border:none; border-radius:5px; width:22px; height:22px; font-size:.7rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
 .bulk-save-btn { margin-top:10px; }
+
+/* ── NAV CON 6 TABS ──────────────────────────────────────── */
+.bottom-nav.nav--6 .nav-btn { padding: 6px 0 4px; }
+.bottom-nav.nav--6 .nav-lbl { font-size: .55rem; letter-spacing: .02em; }
+.bottom-nav.nav--6 .nav-ico { font-size: 1.2rem; }
+
+/* ── INVENTARIO DE PRODUCTOS ──────────────────────────────── */
+.inv-scan-wrap {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card); border: 2px solid var(--acc);
+  border-radius: 12px; padding: 8px 12px; margin: 0 0 8px;
+}
+.inv-scan-ico { font-size: 1.2rem; flex-shrink: 0; }
+.inv-scan-input {
+  flex: 1; border: none; background: transparent; outline: none;
+  font-size: .95rem; color: var(--t1); caret-color: var(--acc);
+}
+.inv-scan-input::placeholder { color: var(--t3); }
+
+/* Lista de productos */
+.inv-item {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; margin-bottom: 8px; overflow: hidden;
+  transition: opacity .2s;
+}
+.inv-item--inactivo { opacity: .5; }
+.inv-item-main {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; cursor: pointer;
+}
+.inv-item-main:active { background: var(--bg); }
+.inv-item-info { flex: 1; min-width: 0; }
+.inv-item-nombre {
+  display: block; font-weight: 700; font-size: .95rem;
+  color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inv-item-sub { font-size: .78rem; color: var(--t3); }
+.inv-item-sub code { background: var(--bg); padding: 1px 4px; border-radius: 4px; font-size: .74rem; }
+.inv-item-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.inv-item-precio { font-weight: 700; font-size: .95rem; color: var(--acc); }
+.inv-item-stock { font-size: .78rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.inv-stock-ok   { background: #dcfce7; color: #15803d; }
+.inv-stock-bajo { background: #fef9c3; color: #92400e; }
+.inv-stock-cero { background: #fee2e2; color: #b91c1c; }
+
+/* Form modal inventario */
+.inv-activo-row { margin-top: 4px; }
+.inv-activo-lbl {
+  display: flex; align-items: center; gap: 8px;
+  font-size: .9rem; color: var(--t2); cursor: pointer;
+}
+.inv-activo-lbl input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--acc); }
+
+/* Dark mode inventario */
+body.dark .inv-scan-wrap { background: #1e293b; border-color: #3b82f6; }
+body.dark .inv-scan-input { color: #e2e8f0; }
+body.dark .inv-item { background: #1e293b; border-color: #334155; }
+body.dark .inv-item-main:active { background: #0f172a; }
+body.dark .inv-item-sub code { background: #0f172a; color: #94a3b8; }
+body.dark .inv-stock-ok   { background: #14532d; color: #86efac; }
+body.dark .inv-stock-bajo { background: #78350f; color: #fde68a; }
+body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
