@@ -29,6 +29,7 @@ function listenRepairs() {
       REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
       renderRepairs();
+      if (typeof renderDashFollowUps === 'function') renderDashFollowUps();
     }, err => {
       console.error('Repairs:', err);
       toast('Error cargando reparaciones', 'error');
@@ -405,6 +406,45 @@ function resetChecklist() {
   _updateClFormSummary();
 }
 
+// ── Seguimiento helpers ───────────────────
+function toggleSeguimientoForm() {
+  const body  = document.getElementById('seg-form-body');
+  const arrow = document.getElementById('seg-form-arrow');
+  if (!body) return;
+  const hidden = body.classList.toggle('hidden');
+  if (arrow) arrow.textContent = hidden ? '▼' : '▲';
+}
+
+function updateSegSummary() {
+  const fecha = (document.getElementById('rep-fi-seg-fecha') || {}).value || '';
+  const nota  = (document.getElementById('rep-fi-seg-nota')  || {}).value || '';
+  const badge = document.getElementById('seg-form-summary');
+  if (!badge) return;
+  if (fecha) {
+    badge.textContent = fecha + (nota ? ' · ' + nota.slice(0, 20) : '');
+    badge.className = 'cl-summary-badge cl-badge-ok';
+  } else {
+    badge.textContent = '';
+    badge.className = 'cl-summary-badge';
+  }
+}
+
+function _loadSeguimientoForm(r) {
+  const fechaEl = document.getElementById('rep-fi-seg-fecha');
+  const notaEl  = document.getElementById('rep-fi-seg-nota');
+  if (fechaEl) fechaEl.value = r.seguimientoFecha || '';
+  if (notaEl)  notaEl.value  = r.seguimientoNota  || '';
+  updateSegSummary();
+}
+
+function _resetSeguimientoForm() {
+  const fechaEl = document.getElementById('rep-fi-seg-fecha');
+  const notaEl  = document.getElementById('rep-fi-seg-nota');
+  if (fechaEl) fechaEl.value = '';
+  if (notaEl)  notaEl.value  = '';
+  updateSegSummary();
+}
+
 // ── Garantía helpers ──────────────────────
 function onGarantiaChange() {
   const sel = document.getElementById('rep-fi-garantia');
@@ -477,6 +517,7 @@ function openRepairForm(id) {
     refreshStaffSelect(r.tecnico || '');
     _setGarantiaForm(r.diasGarantia || 0);
     loadChecklist(r.checklist || {});
+    _loadSeguimientoForm(r);
 
     const accs = r.accesorios || [];
     document.getElementById('acc-cargador').checked    = accs.includes('cargador');
@@ -536,6 +577,7 @@ function openRepairForm(id) {
     });
     _setGarantiaForm(0);
     resetChecklist();
+    _resetSeguimientoForm();
     window._currentPatronDots = null;
     window._currentPatronImg  = null;
     const patronPrevNew = document.getElementById('patron-preview');
@@ -663,6 +705,8 @@ async function saveRepair() {
 
   const diasGarantia = _readGarantiaForm();
   const checklist    = readChecklist();
+  const seguimientoFecha = (document.getElementById('rep-fi-seg-fecha') || {}).value || null;
+  const seguimientoNota  = (document.getElementById('rep-fi-seg-nota')  || {}).value?.trim() || null;
 
   if (!marca)   { toast('Ingresá la marca', 'error'); return; }
   if (!modelo)  { toast('Ingresá el modelo', 'error'); return; }
@@ -678,7 +722,8 @@ async function saveRepair() {
       const updateData = {
         ...existing,
         marca, modelo, arreglo, condicion, codigo, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
-        fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs, diasGarantia, checklist
+        fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs, diasGarantia, checklist,
+        seguimientoFecha, seguimientoNota, seguimientoAck: seguimientoFecha ? (existing.seguimientoFecha === seguimientoFecha ? (existing.seguimientoAck || false) : false) : null
       };
       if (foto) updateData.foto = foto;
       await db.collection('repairs').doc(editingRepairId).set(updateData);
@@ -714,7 +759,10 @@ async function saveRepair() {
         fechaIngreso: ahora,
         estadoHistorial: [{ estado: 'reparando', fecha: ahora }],
         esGarantia: false,
-        diasGarantia, checklist
+        diasGarantia, checklist,
+        seguimientoFecha: seguimientoFecha || null,
+        seguimientoNota: seguimientoNota || null,
+        seguimientoAck: false
       };
       if (foto) newDoc.foto = foto;
       await db.collection('repairs').doc(id).set(newDoc);

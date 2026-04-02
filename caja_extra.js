@@ -520,7 +520,7 @@ async function _loadCajaDueno() {
         '<span class="cd-mov-monto ' + (isIng ? 'cd-pos' : 'cd-neg') + '">' +
           (isIng ? '+' : '−') + fmt(m.monto) +
         '</span>' +
-        '<button class="cd-del-btn" onclick="deleteCajaDueno(\'' + m.id + '\')">🗑</button>' +
+        '<button class="cd-del-btn" onclick="deleteCajaDueno(\'' + esc(m.id) + '\')">🗑</button>' +
         '</div>' +
         '</div>';
     }).join('');

@@ -265,6 +265,7 @@
         <span>⚠️ Stock bajo — <span id="rep2-lowstock-count">0</span> repuesto(s)</span>
         <span id="rep2-lowstock-chevron" class="lowstock-chevron">▼</span>
       </div>
+      <button class="lowstock-dismiss-btn" onclick="event.stopPropagation();dismissLowStockBanner()" title="Cerrar notificación">✕</button>
       <div id="rep2-lowstock-list" class="lowstock-list hidden"></div>
     </div>
     <div class="list-wrap">
@@ -276,8 +277,80 @@
     </div>
   </section>
 
+  <!-- ── SECCIÓN DASHBOARD ── -->
+  <section id="dash-section" class="main-section section-hidden">
+    <header>
+      <div class="hdr-top">
+        <div class="hdr-brand"><h1>🏠 Inicio</h1></div>
+        <div class="hdr-actions">
+          <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro"><span class="dark-icon">🌙</span></button>
+        </div>
+      </div>
+    </header>
+
+    <div class="dash-body">
+
+      <!-- Alertas -->
+      <div id="dash-alertas" class="dash-alertas hidden"></div>
+
+      <!-- Caja hoy -->
+      <div class="dash-card" id="dash-caja-card">
+        <div class="dash-card-hdr">
+          <span class="dash-card-title">💰 Caja hoy</span>
+          <button class="dash-card-link" onclick="window.location.href='caja.html'">Ver caja →</button>
+        </div>
+        <div class="dash-caja-nums" id="dash-caja-nums">
+          <div class="dash-caja-num"><span id="dash-caja-ing">$—</span><span class="dash-num-lbl">Ingresos</span></div>
+          <div class="dash-caja-num"><span id="dash-caja-eg">$—</span><span class="dash-num-lbl">Egresos</span></div>
+          <div class="dash-caja-num"><span id="dash-caja-neto" class="dash-neto">$—</span><span class="dash-num-lbl">Neto</span></div>
+        </div>
+      </div>
+
+      <!-- Reparaciones activas -->
+      <div class="dash-card">
+        <div class="dash-card-hdr">
+          <span class="dash-card-title">🔧 Reparaciones activas</span>
+          <button class="dash-card-link" onclick="switchSection('repairs')">Ver todas →</button>
+        </div>
+        <div id="dash-repairs-list" class="dash-repairs-list"></div>
+      </div>
+
+      <!-- Recordatorios -->
+      <div class="dash-card" id="dash-seguimiento-card" style="display:none">
+        <div class="dash-card-hdr">
+          <span class="dash-card-title">🔔 Recordatorios pendientes</span>
+        </div>
+        <div id="dash-seguimiento-list" class="dash-seguimiento-list"></div>
+      </div>
+
+      <!-- Stock bajo mínimo -->
+      <div class="dash-card" id="dash-stock-card" style="display:none">
+        <div class="dash-card-hdr">
+          <span class="dash-card-title">⚠️ Repuestos con stock bajo</span>
+          <button class="dash-card-link" onclick="switchSection('repuestos')">Ver repuestos →</button>
+        </div>
+        <div id="dash-stock-list" class="dash-stock-list"></div>
+      </div>
+
+      <!-- Acceso rápido -->
+      <div class="dash-accesos">
+        <button class="dash-acc-btn" onclick="switchSection('repairs');openRepairForm()">＋ Reparación</button>
+        <button class="dash-acc-btn" onclick="switchSection('stock');openForm()">＋ Equipo</button>
+        <button class="dash-acc-btn" onclick="window.location.href='caja.html'">💰 Ir a caja</button>
+      </div>
+
+    </div>
+  </section>
+
   <!-- ── BOTTOM NAV ── -->
   <nav class="bottom-nav">
+    <button class="nav-btn" id="nav-dash" onclick="switchSection('dash')">
+      <span class="nav-ico-wrap">
+        <span class="nav-ico">🏠</span>
+        <span class="nav-badge nav-badge--alert" id="nav-badge-dash" style="display:none">!</span>
+      </span>
+      <span class="nav-lbl">Inicio</span>
+    </button>
     <button class="nav-btn active" id="nav-stock" onclick="switchSection('stock')">
       <span class="nav-ico">📱</span>
       <span class="nav-lbl">Stock</span>
@@ -811,6 +884,27 @@
             <div id="rep-fi-foto-preview" class="foto-preview hidden">
               <img id="rep-fi-foto-img" src="" alt="Foto del equipo">
               <button type="button" class="btn-foto-remove" onclick="removeFoto()">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recordatorio de seguimiento -->
+        <div class="fg fg--full seg-toggle-wrap">
+          <button type="button" class="cl-toggle-btn" onclick="toggleSeguimientoForm()">
+            <span>🔔 Recordatorio de seguimiento</span>
+            <span id="seg-form-summary" class="cl-summary-badge"></span>
+            <span class="cl-arrow" id="seg-form-arrow">▼</span>
+          </button>
+          <div id="seg-form-body" class="cl-form-body hidden">
+            <div class="seg-fields">
+              <div class="fg" style="margin-bottom:0">
+                <label class="fl">Recordar el</label>
+                <input id="rep-fi-seg-fecha" class="fi" type="date" onchange="updateSegSummary()">
+              </div>
+              <div class="fg" style="margin-bottom:0">
+                <label class="fl">Nota</label>
+                <input id="rep-fi-seg-nota" class="fi" type="text" placeholder="Ej: llamar para confirmar retiro..." maxlength="80" oninput="updateSegSummary()">
+              </div>
             </div>
           </div>
         </div>

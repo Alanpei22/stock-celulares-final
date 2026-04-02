@@ -5,6 +5,13 @@
 let REPUESTOS         = [];
 let editingRepuestoId = null;
 let rep2RenderTimer;
+let _lowStockDismissed = false;
+
+function dismissLowStockBanner() {
+  _lowStockDismissed = true;
+  const banner = document.getElementById('rep2-lowstock-banner');
+  if (banner) banner.style.display = 'none';
+}
 
 // ── Carga Masiva ──────────────────────────
 const _BULK_BRANDS = {
@@ -150,7 +157,9 @@ function listenRepuestos() {
   db.collection('repuestos').onSnapshot(snap => {
     REPUESTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     REPUESTOS.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+    _lowStockDismissed = false; // reaparece en cada cambio de inventario
     renderRepuestos();
+    if (typeof renderDashLowStock === 'function') renderDashLowStock();
   }, err => {
     console.error('Repuestos:', err);
     toast('Error cargando repuestos', 'error');
@@ -282,15 +291,19 @@ function renderRepuestos() {
   const bannerCnt = document.getElementById('rep2-lowstock-count');
   const bannerList = document.getElementById('rep2-lowstock-list');
   if (banner) {
-    banner.style.display = lowItems.length > 0 ? '' : 'none';
-    if (bannerCnt) bannerCnt.textContent = lowItems.length;
-    if (bannerList) {
-      bannerList.innerHTML = lowItems.map(r =>
-        `<div class="lowstock-item">
-          <span class="lowstock-item-name">🔩 ${esc(r.marca || '')} ${esc(r.nombre)}</span>
-          <span class="lowstock-item-qty">${r.cantidad ?? 0} / mín ${r.stockMin}</span>
-        </div>`
-      ).join('');
+    if (_lowStockDismissed) {
+      banner.style.display = 'none';
+    } else {
+      banner.style.display = lowItems.length > 0 ? '' : 'none';
+      if (bannerCnt) bannerCnt.textContent = lowItems.length;
+      if (bannerList) {
+        bannerList.innerHTML = lowItems.map(r =>
+          `<div class="lowstock-item">
+            <span class="lowstock-item-name">🔩 ${esc(r.marca || '')} ${esc(r.nombre)}</span>
+            <span class="lowstock-item-qty">${r.cantidad ?? 0} / mín ${r.stockMin}</span>
+          </div>`
+        ).join('');
+      }
     }
   }
 

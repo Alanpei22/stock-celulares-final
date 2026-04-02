@@ -452,6 +452,53 @@ function renderStats() {
     const retEl = document.getElementById('desglose-retiros');
     if (retEl) retEl.textContent = fmt(totalRetiros);
   }
+  updateCajaResumen();
+}
+
+let _cajaResumenOpen = false;
+
+function updateCajaResumen() {
+  const bar = document.getElementById('caja-resumen-bar');
+  if (!bar) return;
+  if (!MOVIMIENTOS.length) { bar.classList.add('hidden'); return; }
+
+  const ingMovs = MOVIMIENTOS.filter(m => m.tipo === 'ingreso');
+  const egMovs  = MOVIMIENTOS.filter(m => m.tipo === 'egreso');
+  const totalIng = ingMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const totalEg  = egMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const neto = totalIng - totalEg;
+  const apertura = ARQUEO?.total || 0;
+
+  const _efec = m => {
+    const t = Number(m.monto) || 0, m2 = Number(m.monto2) || 0;
+    if (m.metodoPago === 'Efectivo' && m.metodoPago2) return t - m2;
+    if (m.metodoPago === 'Efectivo') return t;
+    if (m.metodoPago2 === 'Efectivo') return m2;
+    return 0;
+  };
+  const ingEfec = ingMovs.reduce((s, m) => s + _efec(m), 0);
+  const digIng  = totalIng - ingEfec;
+
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  set('cres-ing',  '+' + fmt(totalIng));
+  set('cres-eg',   '−' + fmt(totalEg));
+  set('cres-neto', fmt(neto));
+  const netoWrap = document.getElementById('cres-neto');
+  if (netoWrap) netoWrap.style.color = neto >= 0 ? '#10b981' : '#ef4444';
+  set('cres-d-ef',   fmt(ingEfec));
+  set('cres-d-dig',  fmt(digIng));
+  set('cres-d-mov',  MOVIMIENTOS.length);
+  set('cres-d-aper', fmt(apertura));
+
+  bar.classList.remove('hidden');
+}
+
+function toggleCajaResumen() {
+  _cajaResumenOpen = !_cajaResumenOpen;
+  const detail  = document.getElementById('caja-resumen-detail');
+  const chevron = document.getElementById('cres-chevron');
+  if (detail)  detail.classList.toggle('hidden', !_cajaResumenOpen);
+  if (chevron) chevron.textContent = _cajaResumenOpen ? '▼' : '▲';
 }
 
 function renderMovimientos() {
@@ -467,7 +514,7 @@ function renderMovimientos() {
   if (empty) empty.style.display = 'none';
 
   list.innerHTML = MOVIMIENTOS.map(m => {
-    const hora = m.createdAt ? m.createdAt.slice(11, 16) : '';
+    const hora = typeof m.createdAt === 'string' ? m.createdAt.slice(11, 16) : '';
     const metodoStr = m.metodoPago2
       ? `${m.metodoPago} $${(m.monto - (m.monto2||0)).toLocaleString('es-AR')} + ${m.metodoPago2} $${(m.monto2||0).toLocaleString('es-AR')}`
       : m.metodoPago;
@@ -552,7 +599,7 @@ function openMovForm(id) {
   if (id) {
     const m = MOVIMIENTOS.find(x => x.id === id);
     if (!m) return;
-    deleteWrap.style.display = '';
+    if (deleteWrap) deleteWrap.style.display = '';
     setMovTipo(m.tipo || 'ingreso');
     document.getElementById('mov-fi-monto').value = m.monto || '';
     document.getElementById('mov-fi-desc').value  = m.descripcion || '';
@@ -573,7 +620,7 @@ function openMovForm(id) {
       updateSplitRemainder();
     }
   } else {
-    deleteWrap.style.display = 'none';
+    if (deleteWrap) deleteWrap.style.display = 'none';
     setMovTipo('ingreso');
     document.getElementById('mov-fi-monto').value = '';
     document.getElementById('mov-fi-desc').value  = '';

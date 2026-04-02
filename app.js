@@ -540,12 +540,113 @@ function _closeRep2MenuOutside(e) {
 
 // ── Secciones ─────────────────────────────────────────────
 function switchSection(section) {
-  ['stock', 'repairs', 'repuestos'].forEach(s => {
+  ['dash', 'stock', 'repairs', 'repuestos'].forEach(s => {
     const sec = document.getElementById(s + '-section');
     const btn = document.getElementById('nav-' + s);
     if (sec) sec.classList.toggle('section-hidden', s !== section);
     if (btn) btn.classList.toggle('active', s === section);
   });
+  if (section === 'dash') renderDashboard();
+}
+
+// ── Dashboard ──────────────────────────────────────────────
+
+async function renderDashboard() {
+  renderDashRepairs();
+  renderDashFollowUps();
+  renderDashLowStock();
+  loadDashCaja();
+}
+
+function renderDashRepairs() {
+  const el = document.getElementById('dash-repairs-list');
+  if (!el) return;
+  const activos = (typeof REPAIRS !== 'undefined' ? REPAIRS : [])
+    .filter(r => r.estado === 'reparando' || r.estado === 'listo');
+  if (!activos.length) {
+    el.innerHTML = '<p class="dash-empty">Sin reparaciones activas</p>';
+    return;
+  }
+  el.innerHTML = activos.slice(0, 5).map(r => {
+    const cls = r.estado === 'listo' ? 'dash-rep-listo' : 'dash-rep-rep';
+    const lbl = r.estado === 'listo' ? 'Listo ✓' : 'Reparando';
+    return `<div class="dash-rep-row" onclick="switchSection('repairs')">
+      <span class="dash-rep-badge ${cls}">${lbl}</span>
+      <div class="dash-rep-info">
+        <span class="dash-rep-nombre">${esc(r.nombre || '—')}</span>
+        <span class="dash-rep-equipo">${esc((r.marca || '') + ' ' + (r.modelo || ''))}</span>
+      </div>
+    </div>`;
+  }).join('');
+  if (activos.length > 5) {
+    el.innerHTML += `<p class="dash-more">+ ${activos.length - 5} más → <button class="dash-more-btn" onclick="switchSection('repairs')">ver todas</button></p>`;
+  }
+}
+
+function renderDashLowStock() {
+  const card = document.getElementById('dash-stock-card');
+  const el   = document.getElementById('dash-stock-list');
+  if (!card || !el) return;
+  const rep = typeof REPUESTOS !== 'undefined' ? REPUESTOS : [];
+  const low = rep.filter(r => r.stockMin != null && r.stockMin > 0 && (r.cantidad || 0) <= r.stockMin);
+  if (!low.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  el.innerHTML = low.slice(0, 5).map(r =>
+    `<div class="dash-stock-row">
+      <span class="dash-stock-nombre">${esc(r.nombre)}</span>
+      <span class="dash-stock-qty">${r.cantidad ?? 0} / mín ${r.stockMin}</span>
+    </div>`
+  ).join('');
+  if (low.length > 5) el.innerHTML += `<p class="dash-more">+ ${low.length - 5} más</p>`;
+}
+
+function renderDashFollowUps() {
+  const card  = document.getElementById('dash-seguimiento-card');
+  const el    = document.getElementById('dash-seguimiento-list');
+  if (!card || !el) return;
+  const today = new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
+  const rep   = typeof REPAIRS !== 'undefined' ? REPAIRS : [];
+  const pending = rep.filter(r => r.seguimientoFecha && r.seguimientoFecha <= today && !r.seguimientoAck);
+  const badge = document.getElementById('nav-badge-dash');
+  if (badge) { badge.style.display = pending.length ? '' : 'none'; }
+  if (!pending.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  el.innerHTML = pending.map(r =>
+    `<div class="dash-seg-row">
+      <div class="dash-seg-info">
+        <span class="dash-seg-nombre">${esc(r.nombre || '—')}</span>
+        <span class="dash-seg-nota">${esc(r.seguimientoNota || r.seguimientoFecha || '')}</span>
+      </div>
+      <button class="dash-seg-ack" onclick="ackFollowUp('${esc(r.id)}')">✓ Listo</button>
+    </div>`
+  ).join('');
+}
+
+async function loadDashCaja() {
+  const today = new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
+  try {
+    const snap = await db.collection('caja_movimientos').where('fecha', '==', today).get();
+    const movs = snap.docs.map(d => d.data());
+    const ing  = movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const eg   = movs.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const neto = ing - eg;
+    const set  = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    set('dash-caja-ing',  ing  ? '+$' + ing.toLocaleString('es-AR')  : '$0');
+    set('dash-caja-eg',   eg   ? '−$' + eg.toLocaleString('es-AR')   : '$0');
+    set('dash-caja-neto', '$' + Math.abs(neto).toLocaleString('es-AR'));
+    const netoEl = document.getElementById('dash-caja-neto');
+    if (netoEl) netoEl.style.color = neto >= 0 ? '#10b981' : '#ef4444';
+  } catch(e) { console.warn('Dashboard caja:', e); }
+}
+
+async function ackFollowUp(id) {
+  try {
+    await db.collection('repairs').doc(id).update({ seguimientoAck: true });
+    const r = REPAIRS.find(x => x.id === id);
+    if (r) r.seguimientoAck = true;
+    renderDashFollowUps();
+    toast('Recordatorio marcado como listo', 'success');
+  } catch(e) { toast('Error al actualizar', 'error'); }
 }
 
 // ── Render ────────────────────────────────────────────────

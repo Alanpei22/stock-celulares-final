@@ -111,6 +111,26 @@
     </div>
   </div>
 
+  <!-- Resumen del día (colapsable) -->
+  <div id="caja-resumen-bar" class="caja-resumen-bar hidden" onclick="toggleCajaResumen()">
+    <div class="caja-resumen-row">
+      <span class="caja-resumen-item caja-resumen-ing" id="cres-ing">+$0</span>
+      <span class="caja-resumen-sep">·</span>
+      <span class="caja-resumen-item caja-resumen-eg" id="cres-eg">−$0</span>
+      <span class="caja-resumen-sep">·</span>
+      <span class="caja-resumen-item" id="cres-neto-wrap">Neto: <strong id="cres-neto">$0</strong></span>
+      <span class="caja-resumen-chevron" id="cres-chevron">▲</span>
+    </div>
+    <div id="caja-resumen-detail" class="caja-resumen-detail hidden">
+      <div class="cres-detail-grid">
+        <div class="cres-detail-item"><span id="cres-d-ef">$0</span><span>💵 Efectivo</span></div>
+        <div class="cres-detail-item"><span id="cres-d-dig">$0</span><span>💳 Digital</span></div>
+        <div class="cres-detail-item"><span id="cres-d-mov">0</span><span>Movimientos</span></div>
+        <div class="cres-detail-item"><span id="cres-d-aper">$0</span><span>Apertura</span></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Movement list -->
   <div class="list-wrap">
     <div id="caja-list"></div>
