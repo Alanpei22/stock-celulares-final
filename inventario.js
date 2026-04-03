@@ -132,9 +132,8 @@ function renderInventario() {
   }).join('');
 }
 
-function _fmtNum(n) {
-  return Number(n).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
+// _fmtNum → alias de fmtNum() en utils.js
+const _fmtNum = fmtNum;
 
 // ── Formulario producto ─────────────────────────────────────
 function openProductoForm(id, precodigo) {

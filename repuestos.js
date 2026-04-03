@@ -2,10 +2,11 @@
 //  REPUESTOS
 // ══════════════════════════════════════════
 
-let REPUESTOS         = [];
-let editingRepuestoId = null;
+let REPUESTOS           = [];
+let editingRepuestoId   = null;
 let rep2RenderTimer;
-let _lowStockDismissed = false;
+let _lowStockDismissed  = false;
+let _repuestosListener  = null; // referencia al unsubscribe de onSnapshot
 
 function dismissLowStockBanner() {
   _lowStockDismissed = true;
@@ -154,7 +155,10 @@ function _esc(s) { return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt
 
 // ── Firebase ──────────────────────────────
 function listenRepuestos() {
-  db.collection('repuestos').onSnapshot(snap => {
+  // Evitar listeners duplicados
+  if (_repuestosListener) { _repuestosListener(); _repuestosListener = null; }
+
+  _repuestosListener = db.collection('repuestos').onSnapshot(snap => {
     REPUESTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     REPUESTOS.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
     _lowStockDismissed = false; // reaparece en cada cambio de inventario

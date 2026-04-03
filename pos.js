@@ -2,15 +2,7 @@
 //  PUNTO DE VENTA — pos.js
 // ══════════════════════════════════════════
 
-const POS_FB_CONFIG = {
-  apiKey: "AIzaSyAMRkrADBxRF6rST8rNwO5IqdWneXocBsE",
-  authDomain: "stockcelustech.firebaseapp.com",
-  projectId: "stockcelustech",
-  storageBucket: "stockcelustech.firebasestorage.app",
-  messagingSenderId: "140592485004",
-  appId: "1:140592485004:web:29f6b0aa0f02fdf99ba1a9"
-};
-
+// FB_CONFIG definido en firebase-config.js (cargado antes)
 let db = null;
 let PRODUCTOS_MAP = new Map(); // codigo → producto
 let _posListener = null;
@@ -21,8 +13,7 @@ let _posMetodo = 'Efectivo';
 
 // ── Firebase init ───────────────────────────────────────────
 function initPos() {
-  if (!firebase.apps.length) firebase.initializeApp(POS_FB_CONFIG);
-  db = firebase.firestore();
+  db = window.initFirebase(); // delega a firebase-config.js
   initPosDark();
   loadProductos();
   initScanInput();
@@ -30,6 +21,7 @@ function initPos() {
 
 // ── Cargar productos (onSnapshot) ──────────────────────────
 function loadProductos() {
+  if (_posListener) { _posListener(); _posListener = null; }
   _posListener = db.collection('productos')
     .where('activo', '!=', false)
     .onSnapshot(snap => {
@@ -306,13 +298,9 @@ function posToast(msg, isError) {
   _posToastTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
 
-// ── Helpers ─────────────────────────────────────────────────
-function _esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function _fmtNum(n) {
-  return Number(n).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
+// ── Helpers — alias de utils.js ─────────────────────────────
+const _esc    = esc;    // definido en utils.js
+const _fmtNum = fmtNum; // definido en utils.js
 
 // ── Arrancar ────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', initPos);

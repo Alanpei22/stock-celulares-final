@@ -6,14 +6,7 @@ const PIN_CAJA   = '2210';
 const CAJA_AUTH  = 'caja_auth';
 const AUTH_DAYS  = 30;
 
-const FB_CONFIG = {
-  apiKey: "AIzaSyAMRkrADBxRF6rST8rNwO5IqdWneXocBsE",
-  authDomain: "stockcelustech.firebaseapp.com",
-  projectId: "stockcelustech",
-  storageBucket: "stockcelustech.firebasestorage.app",
-  messagingSenderId: "140592485004",
-  appId: "1:140592485004:web:29f6b0aa0f02fdf99ba1a9"
-};
+// FB_CONFIG definido en firebase-config.js (cargado antes)
 
 const DENOMINACIONES = [20000, 10000, 2000, 1000, 500, 200, 100];
 
@@ -48,8 +41,7 @@ let _pinBuf = '';
 // ══════════════════════════════════════════
 
 function initFirebase() {
-  if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-  db = firebase.firestore();
+  db = window.initFirebase(); // delega a firebase-config.js
 }
 
 // ══════════════════════════════════════════
@@ -377,6 +369,8 @@ function reopenArqueo() {
 // ══════════════════════════════════════════
 
 function listenMovimientos() {
+  // Evitar listeners duplicados (setDate() también cancela, pero doble guarda)
+  if (movListener) { movListener(); movListener = null; }
   const query = db.collection('caja_movimientos').where('fecha', '==', currentDate);
 
   try {

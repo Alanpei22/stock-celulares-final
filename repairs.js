@@ -15,15 +15,19 @@ let STAFF   = [];
 let editingRepairId    = null;
 let pendingGarantiaRef = null;
 let repRenderTimer;
+let _repairsListener   = null; // referencia al unsubscribe de onSnapshot
 
 // ── Firebase ──────────────────────────────
 function listenRepairs() {
+  // Evitar listeners duplicados
+  if (_repairsListener) { _repairsListener(); _repairsListener = null; }
+
   // Limitar a 365 días: cubre estadísticas anuales y no lee toda la historia
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 365);
   const cutoffISO = cutoff.toISOString();
 
-  db.collection('repairs')
+  _repairsListener = db.collection('repairs')
     .where('fechaIngreso', '>=', cutoffISO)
     .onSnapshot(snap => {
       REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
