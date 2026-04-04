@@ -41,7 +41,7 @@ let _pinBuf = '';
 // ══════════════════════════════════════════
 
 function initFirebase() {
-  db = window.initFirebase(); // delega a firebase-config.js
+  db = _fbInit();
 }
 
 // ══════════════════════════════════════════

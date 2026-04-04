@@ -22,10 +22,10 @@ const WA_TPL_DEFAULTS = {
 };
 let WA_TEMPLATES = {};
 // ── Firebase ─────────────────────────────────────────────
-// FB_CONFIG e initFirebase() definidos en firebase-config.js (cargado antes)
+// FB_CONFIG y _fbInit() definidos en firebase-config.js (cargado antes)
 let db = null;
 function initFirebase() {
-  db = window.initFirebase(); // delega a firebase-config.js
+  db = _fbInit();
 }
 let _autoBackupDone = false;
 function listenStock() {

@@ -13,7 +13,7 @@ let _posMetodo = 'Efectivo';
 
 // ── Firebase init ───────────────────────────────────────────
 function initPos() {
-  db = window.initFirebase(); // delega a firebase-config.js
+  db = _fbInit();
   initPosDark();
   loadProductos();
   initScanInput();
