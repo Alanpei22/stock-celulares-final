@@ -230,7 +230,7 @@ async function loadArqueo() {
       ARQUEO = doc.data();
     } else {
       ARQUEO = null;
-      const today = new Date().toISOString().slice(0, 10);
+      const today = _todayAR();
       if (currentDate === today) {
         openArqueoModal();
         return;
@@ -509,7 +509,9 @@ function renderMovimientos() {
   if (empty) empty.style.display = 'none';
 
   list.innerHTML = MOVIMIENTOS.map(m => {
-    const hora = typeof m.createdAt === 'string' ? m.createdAt.slice(11, 16) : '';
+    const hora = typeof m.createdAt === 'string'
+      ? new Date(m.createdAt).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })
+      : '';
     const metodoStr = m.metodoPago2
       ? `${m.metodoPago} $${(m.monto - (m.monto2||0)).toLocaleString('es-AR')} + ${m.metodoPago2} $${(m.monto2||0).toLocaleString('es-AR')}`
       : m.metodoPago;
