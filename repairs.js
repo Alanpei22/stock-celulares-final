@@ -687,10 +687,10 @@ async function saveRepair() {
   const arreglo  = arregloSel === 'Otro' ? arregloCustom : arregloSel;
   const condicion= document.getElementById('rep-fi-condicion').value.trim();
   const codigo   = document.getElementById('rep-fi-codigo').value.trim();
-  const monto       = parseInt(document.getElementById('rep-fi-monto').value)       || 0;
-  const sena        = parseInt(document.getElementById('rep-fi-sena').value)        || 0;
-  const costo       = parseInt(document.getElementById('rep-fi-costo').value)       || 0;
-  const presupuesto = parseInt((document.getElementById('rep-fi-presupuesto') || {}).value) || 0;
+  const monto       = parseFloat(document.getElementById('rep-fi-monto').value)       || 0;
+  const sena        = parseFloat(document.getElementById('rep-fi-sena').value)        || 0;
+  const costo       = parseFloat(document.getElementById('rep-fi-costo').value)       || 0;
+  const presupuesto = parseFloat((document.getElementById('rep-fi-presupuesto') || {}).value) || 0;
   const tecnico     = document.getElementById('rep-fi-tecnico').value.trim();
   const fechaEstimada = document.getElementById('rep-fi-fecha-est').value;
   const nombre   = document.getElementById('rep-fi-nombre').value.trim();
@@ -1063,8 +1063,21 @@ let _cobroRepair = null;
 
 function openCobroModal(r) {
   _cobroRepair = r;
-  document.getElementById('cobro-monto-label').textContent = '$ ' + Number(r.monto).toLocaleString('es-AR');
+  const monto = Number(r.monto) || 0;
+  const sena  = Number(r.sena)  || 0;
+  document.getElementById('cobro-monto-label').textContent = '$ ' + monto.toLocaleString('es-AR');
   document.getElementById('cobro-desc-label').textContent = `N°${r.nOrden} ${r.marca} ${r.modelo}`;
+  // Mostrar seña si existe
+  const senaEl = document.getElementById('cobro-sena-info');
+  if (senaEl) {
+    if (sena > 0) {
+      const saldo = monto - sena;
+      senaEl.innerHTML = `Seña ya cobrada: <b>$${sena.toLocaleString('es-AR')}</b> &nbsp;·&nbsp; Saldo: <b>$${saldo.toLocaleString('es-AR')}</b>`;
+      senaEl.style.display = '';
+    } else {
+      senaEl.style.display = 'none';
+    }
+  }
   // reset method selection
   document.querySelectorAll('.cobro-metodo-btn').forEach(b => b.classList.remove('cobro-m-active'));
   document.querySelector('.cobro-metodo-btn[data-m="Efectivo"]').classList.add('cobro-m-active');
@@ -1088,18 +1101,52 @@ async function confirmarCobro() {
   const r = _cobroRepair;
   closeCobroModal();
   try {
-    await db.collection('caja_movimientos').add({
+    const batch  = db.batch();
+    const hoy    = todayAR();          // ← zona horaria Argentina (fix)
+    const ahora  = new Date().toISOString();
+    const monto  = Number(r.monto)  || 0;
+    const costo  = Number(r.costo)  || 0;
+
+    // ── Ingreso: cobro al cliente ──────────────────────────
+    const ingRef = db.collection('caja_movimientos').doc();
+    batch.set(ingRef, {
       tipo: 'ingreso',
       categoria: 'Reparación',
       descripcion: `N°${r.nOrden} ${r.marca} ${r.modelo} — ${r.arreglo || ''}`.trim(),
-      monto: r.monto,
+      monto,
       metodoPago: metodo,
-      fecha: new Date().toISOString().slice(0, 10),
-      createdAt: new Date().toISOString(),
+      fecha: hoy,
+      createdAt: ahora,
       repairId: r.id
     });
+
+    // ── Egreso: costo del repuesto (si tiene costo cargado) ─
+    if (costo > 0) {
+      const egreRef = db.collection('caja_movimientos').doc();
+      batch.set(egreRef, {
+        tipo: 'egreso',
+        categoria: 'Repuesto',
+        descripcion: `Repuesto: N°${r.nOrden} ${r.marca} ${r.modelo}`.trim(),
+        monto: costo,
+        metodoPago: 'Efectivo',
+        fecha: hoy,
+        createdAt: ahora,
+        repairId: r.id
+      });
+    }
+
+    // ── Marcar reparación como cobrada ────────────────────
+    const repRef = db.collection('repairs').doc(r.id);
+    batch.update(repRef, {
+      cobrado: true,
+      metodoCobro: metodo,
+      fechaCobro: ahora
+    });
+
+    await batch.commit();
     toast('💰 Cobro registrado en caja', 'success');
   } catch(e) {
+    console.error('confirmarCobro:', e);
     toast('Error al registrar en caja', 'error');
   }
 }

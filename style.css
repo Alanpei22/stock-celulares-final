@@ -2168,6 +2168,8 @@ body.dark .toast { background: #1e293b; color: #e2e8f0; box-shadow: 0 4px 20px r
 .cobro-info { text-align: center; padding: .5rem 0; }
 .cobro-desc { display: block; font-size: .82rem; color: var(--t2); margin-bottom: .25rem; }
 .cobro-monto { display: block; font-size: 1.6rem; font-weight: 900; color: var(--t1); }
+.cobro-sena-info { display: block; font-size: .8rem; color: #e67e22; margin-top: .35rem; }
+body.dark .cobro-sena-info { color: #f39c12; }
 .cobro-m-active { background: var(--acc) !important; border-color: var(--acc) !important; color: #fff !important; }
 
 /* ── LOW STOCK BANNER ── */
