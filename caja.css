@@ -7,12 +7,16 @@
 }
 
 /* ── TABS CAJA / INVENTARIO ─────────────────────────────── */
-.caja-pg-tab { display: flex; flex-direction: column; }
+.caja-pg-tab {
+  display: flex; flex-direction: column;
+  flex: 1;          /* ocupa todo el alto disponible dentro de #app */
+  min-height: 0;    /* permite que flex-children puedan shrinkear */
+  overflow: hidden; /* deja que .list-wrap sea la zona scrollable */
+}
 .caja-pg-tab.section-hidden { display: none; }
 
-/* Inventario tab necesita bottom padding para el nav */
-#inv-tab { padding-bottom: 64px; }
-#inv-tab .list-wrap { padding-bottom: 0; }
+/* La lista de movimientos scrollea dentro del tab */
+#caja-tab .list-wrap { flex: 1; overflow-y: auto; min-height: 0; }
 
 /* Bottom nav en caja.html */
 .caja-bottom-nav {
@@ -25,8 +29,10 @@
 }
 body.dark .caja-bottom-nav { background: #0f172a; border-color: #1e293b; }
 
-/* Espacio para el nav en la pestaña de caja */
+/* Espacio para el bottom nav fijo en cada tab */
 #caja-tab { padding-bottom: 64px; }
+#inv-tab   { padding-bottom: 64px; }
+#inv-tab .list-wrap { padding-bottom: 0; }
 
 /* ── DATE NAV ──────────────────────────────────────────── */
 .caja-date-nav {
