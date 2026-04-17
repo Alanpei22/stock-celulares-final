@@ -85,6 +85,7 @@
             </div>
           </div>
           <button class="hdr-btn hdr-btn-ai" onclick="openAIAdd('equipo')" title="Agregar con IA">✨</button>
+          <button class="hdr-btn" onclick="openBulkAIImport()" title="Importar lista con IA">📋</button>
           <button class="hdr-btn" id="add-btn" title="Agregar equipo">＋</button>
         </div>
       </div>
@@ -705,6 +706,43 @@
         <button class="btn-secondary" style="width:100%" onclick="openAccessLogModal()">🔐 Historial de accesos</button>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL IMPORTAR LISTA IA ═══════════ -->
+<div id="bulk-ai-modal" class="modal-overlay hidden" onclick="if(event.target.id==='bulk-ai-modal')closeBulkAIImport()">
+  <div class="modal-card bulk-ai-card">
+    <div class="modal-header">
+      <h3>📋 Importar lista con IA</h3>
+      <button class="modal-close" onclick="closeBulkAIImport()">✕</button>
+    </div>
+    <div class="modal-body" id="bulk-ai-body">
+      <div id="bulk-ai-step1">
+        <p class="bulk-ai-hint">Pegá tu lista de equipos. La IA detecta modelo, almacenamiento, batería, color y precio automáticamente.</p>
+        <textarea id="bulk-ai-texto" class="fi bulk-ai-textarea" rows="10" placeholder="iPhone 13 – 128 GB (550k a 580k)&#10;* 100% – Rojo&#10;* 94% – Azul&#10;&#10;iPhone 14 Pro – 128 GB (790k)&#10;* 86% – Violeta"></textarea>
+        <button class="btn-primary" id="bulk-ai-analyze-btn" onclick="runBulkAIAnalysis()" style="width:100%;margin-top:10px">
+          <span id="bulk-ai-analyze-lbl">✨ Analizar con IA</span>
+        </button>
+        <p class="bulk-ai-error" id="bulk-ai-error"></p>
+      </div>
+      <div id="bulk-ai-step2" class="hidden">
+        <div class="bulk-ai-preview-hdr">
+          <span id="bulk-ai-count" class="bulk-ai-count">0 equipos</span>
+          <button class="btn-secondary" onclick="backToBulkAIInput()" style="font-size:.8rem;padding:6px 12px">← Editar</button>
+        </div>
+        <div class="bulk-ai-table-wrap">
+          <table class="bulk-ai-table">
+            <thead><tr>
+              <th>Modelo</th><th>Almac.</th><th>Bat.</th><th>Notas/Color</th><th>Precio</th><th></th>
+            </tr></thead>
+            <tbody id="bulk-ai-tbody"></tbody>
+          </table>
+        </div>
+        <button class="btn-primary" id="bulk-ai-save-btn" onclick="saveBulkAI()" style="width:100%;margin-top:12px">
+          <span id="bulk-ai-save-lbl">💾 Guardar todos</span>
+        </button>
+      </div>
     </div>
   </div>
 </div>

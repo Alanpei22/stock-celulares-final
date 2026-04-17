@@ -3948,3 +3948,22 @@ body.dark .inv-item-sub code { background: #0f172a; color: #94a3b8; }
 body.dark .inv-stock-ok   { background: #14532d; color: #86efac; }
 body.dark .inv-stock-bajo { background: #78350f; color: #fde68a; }
 body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
+
+
+/* ── BULK AI IMPORT ── */
+.bulk-ai-card { max-width: 680px; width: 96vw; max-height: 90vh; display:flex; flex-direction:column; }
+.bulk-ai-card .modal-body { overflow-y:auto; flex:1; }
+.bulk-ai-hint { font-size:.82rem; color:var(--t2); line-height:1.45; margin-bottom:10px; }
+.bulk-ai-textarea { min-height:200px; font-family:'SF Mono','Fira Code',monospace; font-size:.82rem; resize:vertical; line-height:1.5; }
+.bulk-ai-error { font-size:.78rem; color:#ef4444; min-height:1em; margin-top:6px; }
+.bulk-ai-preview-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.bulk-ai-count { font-weight:800; font-size:.95rem; color:var(--t1); }
+.bulk-ai-table-wrap { overflow-x:auto; max-height:48vh; overflow-y:auto; border:1px solid var(--border); border-radius:14px; }
+.bulk-ai-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.bulk-ai-table thead th { position:sticky; top:0; background:var(--bg2); padding:8px; text-align:left; font-weight:700; color:var(--t3); font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; border-bottom:1px solid var(--border); white-space:nowrap; }
+.bulk-ai-table tbody tr:nth-child(even) { background:rgba(0,0,0,.02); }
+.bulk-ai-table td { padding:4px; vertical-align:middle; }
+.bulk-ai-inp { border:1px solid transparent; border-radius:8px; padding:5px 7px; font-size:.82rem; width:100%; background:transparent; color:var(--t1); font-family:inherit; }
+.bulk-ai-inp:focus { outline:none; border-color:var(--acc); background:var(--card); }
+.bulk-ai-del { background:transparent; color:var(--t3); border:none; border-radius:6px; width:24px; height:24px; font-size:.75rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.bulk-ai-del:hover { background:var(--bg3); color:var(--t1); }

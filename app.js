@@ -2012,3 +2012,131 @@ async function aiStockPrice() {
     }]);
   } catch {}
 }
+
+// ══════════════════════════════════════════════════════════════
+// IMPORTAR LISTA DE EQUIPOS CON IA
+// ══════════════════════════════════════════════════════════════
+
+let _bulkAIItems = [];
+
+function openBulkAIImport() {
+  _bulkAIItems = [];
+  document.getElementById('bulk-ai-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('bulk-ai-step1').classList.remove('hidden');
+  document.getElementById('bulk-ai-step2').classList.add('hidden');
+  document.getElementById('bulk-ai-error').textContent = '';
+  document.getElementById('bulk-ai-analyze-lbl').textContent = '✨ Analizar con IA';
+  document.getElementById('bulk-ai-analyze-btn').disabled = false;
+}
+
+function closeBulkAIImport() {
+  document.getElementById('bulk-ai-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function backToBulkAIInput() {
+  document.getElementById('bulk-ai-step1').classList.remove('hidden');
+  document.getElementById('bulk-ai-step2').classList.add('hidden');
+}
+
+async function runBulkAIAnalysis() {
+  const texto = (document.getElementById('bulk-ai-texto').value || '').trim();
+  if (!texto) { document.getElementById('bulk-ai-error').textContent = 'Pegá una lista primero.'; return; }
+
+  const btn = document.getElementById('bulk-ai-analyze-btn');
+  const lbl = document.getElementById('bulk-ai-analyze-lbl');
+  btn.disabled = true;
+  lbl.textContent = '⏳ Analizando...';
+  document.getElementById('bulk-ai-error').textContent = '';
+
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'extractBulkEquipos', data: { text: texto } })
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+
+    const raw = json.text || '';
+    const start = raw.indexOf('[');
+    const end   = raw.lastIndexOf(']');
+    if (start === -1 || end === -1) throw new Error('La IA no devolvió un formato válido. Intentá de nuevo.');
+    _bulkAIItems = JSON.parse(raw.slice(start, end + 1));
+    if (!Array.isArray(_bulkAIItems) || !_bulkAIItems.length) throw new Error('No se detectaron equipos. Revisá el formato.');
+
+    _renderBulkAIPreview();
+  } catch(e) {
+    document.getElementById('bulk-ai-error').textContent = e.message;
+    btn.disabled = false;
+    lbl.textContent = '✨ Analizar con IA';
+  }
+}
+
+function _renderBulkAIPreview() {
+  const count = _bulkAIItems.length;
+  document.getElementById('bulk-ai-count').textContent = `${count} equipo${count !== 1 ? 's' : ''} detectados`;
+  document.getElementById('bulk-ai-save-lbl').textContent = `💾 Guardar ${count} equipo${count !== 1 ? 's' : ''}`;
+
+  const tbody = document.getElementById('bulk-ai-tbody');
+  tbody.innerHTML = _bulkAIItems.map((it, i) => `
+    <tr id="bai-row-${i}">
+      <td><input class="bulk-ai-inp" value="${esc(it.modelo||'')}" data-f="modelo" data-i="${i}" style="min-width:110px"></td>
+      <td><input class="bulk-ai-inp" value="${esc(it.almacenamiento||'')}" data-f="almacenamiento" data-i="${i}" style="width:70px"></td>
+      <td><input class="bulk-ai-inp" value="${esc(it.bateria!=null?it.bateria:'')}" data-f="bateria" data-i="${i}" style="width:45px" type="number" min="1" max="100"></td>
+      <td><input class="bulk-ai-inp" value="${esc(it.notas||it.color||'')}" data-f="notas" data-i="${i}" style="min-width:80px"></td>
+      <td><input class="bulk-ai-inp" value="${esc(it.precio||0)}" data-f="precio" data-i="${i}" style="width:80px" type="number" min="0"></td>
+      <td><button class="bulk-ai-del" onclick="_removeBulkAIRow(${i})" title="Quitar">✕</button></td>
+    </tr>`).join('');
+
+  document.getElementById('bulk-ai-step1').classList.add('hidden');
+  document.getElementById('bulk-ai-step2').classList.remove('hidden');
+}
+
+function _removeBulkAIRow(i) {
+  const row = document.getElementById('bai-row-' + i);
+  if (row) row.remove();
+  const rem = document.getElementById('bulk-ai-tbody').querySelectorAll('tr').length;
+  document.getElementById('bulk-ai-count').textContent = `${rem} equipo${rem !== 1 ? 's' : ''} detectados`;
+  document.getElementById('bulk-ai-save-lbl').textContent = `💾 Guardar ${rem} equipo${rem !== 1 ? 's' : ''}`;
+}
+
+async function saveBulkAI() {
+  const rows = document.getElementById('bulk-ai-tbody').querySelectorAll('tr');
+  if (!rows.length) { toast('No hay equipos para guardar', 'error'); return; }
+
+  const btn = document.getElementById('bulk-ai-save-btn');
+  btn.disabled = true;
+  document.getElementById('bulk-ai-save-lbl').textContent = '⏳ Guardando...';
+
+  let saved = 0, errors = 0;
+  for (const row of rows) {
+    const get = f => row.querySelector(`[data-f="${f}"]`)?.value?.trim() || '';
+    const modelo = get('modelo');
+    const precio = parseFloat(get('precio')) || 0;
+    if (!modelo || precio <= 0) { errors++; continue; }
+
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const bateria = parseInt(get('bateria')) || null;
+    const doc = {
+      id, marca: 'Apple', modelo, estado: 'Usado', precio,
+      almacenamiento: get('almacenamiento') || '',
+      notas: get('notas') || '',
+      vendido: false, fecha: new Date().toISOString()
+    };
+    if (bateria) doc.bateria = bateria;
+
+    try {
+      await db.collection('stock').doc(id).set(doc);
+      saved++;
+    } catch(e) { errors++; }
+    await new Promise(r => setTimeout(r, 80));
+  }
+
+  btn.disabled = false;
+  document.getElementById('bulk-ai-save-lbl').textContent = '💾 Guardar todos';
+
+  if (saved > 0) { toast(`✅ ${saved} equipo${saved !== 1 ? 's' : ''} agregado${saved !== 1 ? 's' : ''} al stock`); closeBulkAIImport(); }
+  if (errors > 0) toast(`⚠ ${errors} equipo${errors !== 1 ? 's' : ''} sin modelo o precio`, 'error');
+}

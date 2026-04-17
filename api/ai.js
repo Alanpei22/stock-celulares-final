@@ -154,6 +154,46 @@ Reglas:
 - proveedor: nombre del proveedor o negocio si aparece (vacío si no se menciona)`
   };
 
+  // ── extractBulkEquipos: necesita más tokens, se maneja aparte ──
+  if (action === 'extractBulkEquipos') {
+    const prompt = `Sos un sistema de procesamiento de inventario de celulares usados en Argentina.
+Analizá este listado y devolvé un array JSON donde cada elemento representa UN equipo individual.
+
+REGLAS:
+- La línea principal (sin asterisco) indica el modelo, almacenamiento y rango de precio.
+- Cada línea con asterisco (*) es un equipo individual con batería% y color.
+- "2 disponibles" o "(x2)" = generá 2 entradas idénticas.
+- Precio en "k" = multiplicar por 1000. Rango "550k a 580k" = promedio = 565000.
+- Precio único "600k" = 600000.
+- La marca siempre es "Apple" para iPhones.
+- modelo = "iPhone 13", "iPhone 14 Pro", etc. (sin almacenamiento en el nombre).
+- almacenamiento = "128 GB", "256 GB", etc.
+- bateria = número entero (ej: 94). null si no se menciona.
+- color va en el campo "notas". Si hay más info, separá con " · ".
+- estado siempre = "Usado".
+
+Formato de cada objeto:
+{"marca":"Apple","modelo":"iPhone 13","almacenamiento":"128 GB","estado":"Usado","bateria":94,"notas":"Azul","precio":565000}
+
+Devolvé ÚNICAMENTE el array JSON. Sin texto antes ni después. Sin markdown. Sin explicación.
+
+LISTADO:
+${data.text || ''}`;
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error?.message || 'Error de API');
+      return new Response(JSON.stringify({ text: result.content[0].text }), { headers: { 'content-type': 'application/json' } });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { 'content-type': 'application/json' } });
+    }
+  }
+
   if (!prompts[action]) {
     return new Response(JSON.stringify({ error: 'Acción no válida' }), {
       status: 400, headers: { 'content-type': 'application/json' }
