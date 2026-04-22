@@ -2,18 +2,7 @@
 //  CAJA DIARIA — TechPoint
 // ══════════════════════════════════════════
 
-const PIN_CAJA   = '2210';
-const CAJA_AUTH  = 'caja_auth';
-const AUTH_DAYS  = 30;
-
-const FB_CONFIG = {
-  apiKey: "AIzaSyAMRkrADBxRF6rST8rNwO5IqdWneXocBsE",
-  authDomain: "stockcelustech.firebaseapp.com",
-  projectId: "stockcelustech",
-  storageBucket: "stockcelustech.firebasestorage.app",
-  messagingSenderId: "140592485004",
-  appId: "1:140592485004:web:29f6b0aa0f02fdf99ba1a9"
-};
+// ── Firebase — ver firebase-config.js ────────────────────
 
 const DENOMINACIONES = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
 
@@ -30,16 +19,6 @@ let ARQUEO = null;
 let currentDate = new Date().toISOString().slice(0, 10);
 let movListener = null;
 let editingMovId = null;
-let _pinBuf = '';
-
-// ══════════════════════════════════════════
-//  FIREBASE
-// ══════════════════════════════════════════
-
-function initFirebase() {
-  if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-  db = firebase.firestore();
-}
 
 // ══════════════════════════════════════════
 //  DARK MODE
@@ -66,26 +45,8 @@ function _updateDarkIcon() {
 }
 
 // ══════════════════════════════════════════
-//  AUTH / PIN
+//  AUTH — Firebase
 // ══════════════════════════════════════════
-
-function checkAuth() {
-  const stored = localStorage.getItem(CAJA_AUTH);
-  if (stored) {
-    const ts = parseInt(stored, 10);
-    const days = (Date.now() - ts) / (1000 * 60 * 60 * 24);
-    if (days < AUTH_DAYS) {
-      showApp();
-      return;
-    }
-  }
-  showLogin();
-}
-
-function showLogin() {
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('app').classList.add('app-hidden');
-}
 
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
@@ -95,65 +56,10 @@ function showApp() {
 
 function initApp() {
   initDarkMode();
-  initFirebase();
+  db = _fbInit();
   updateDateLabel();
   listenMovimientos();
   loadArqueo();
-}
-
-// PIN pad
-
-function addPin(d) {
-  if (_pinBuf.length >= 4) return;
-  _pinBuf += d;
-  _updateCajaDots();
-  if (_pinBuf.length === 4) checkCajaPin();
-}
-
-function backPin() {
-  _pinBuf = _pinBuf.slice(0, -1);
-  _updateCajaDots();
-}
-
-function clearCajaPin() {
-  _pinBuf = '';
-  _updateCajaDots();
-  const errEl = document.getElementById('pin-error');
-  if (errEl) errEl.textContent = '';
-}
-
-function _updateCajaDots() {
-  const dots = document.querySelectorAll('#pin-dots span');
-  dots.forEach((dot, i) => {
-    dot.classList.toggle('filled', i < _pinBuf.length);
-  });
-}
-
-function checkCajaPin() {
-  if (_pinBuf === PIN_CAJA) {
-    localStorage.setItem(CAJA_AUTH, Date.now().toString());
-    const screen = document.getElementById('login-screen');
-    screen.classList.add('success');
-    setTimeout(() => showApp(), 400);
-  } else {
-    const screen = document.getElementById('login-screen');
-    screen.classList.add('shake');
-    setTimeout(() => screen.classList.remove('shake'), 500);
-    const errEl = document.getElementById('pin-error');
-    if (errEl) errEl.textContent = 'PIN incorrecto';
-    _pinBuf = '';
-    _updateCajaDots();
-  }
-}
-
-function initPinPad() {
-  document.querySelectorAll('.pin-btn[data-n]').forEach(btn => {
-    btn.addEventListener('click', () => addPin(btn.dataset.n));
-  });
-  const backBtn = document.getElementById('pin-back');
-  if (backBtn) backBtn.addEventListener('click', backPin);
-  const clearBtn = document.getElementById('pin-clear');
-  if (clearBtn) clearBtn.addEventListener('click', clearCajaPin);
 }
 
 // ══════════════════════════════════════════
@@ -558,5 +464,4 @@ function toast(msg, type = 'success') {
 //  BOOT
 // ══════════════════════════════════════════
 
-initPinPad();
-checkAuth();
+requireAuth().then(u => { if (u) showApp(); });

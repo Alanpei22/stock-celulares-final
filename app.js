@@ -1,5 +1,4 @@
 // ── Configuración ─────────────────────────────────────────
-const PIN = '2210';
 const AUTH_KEY = 'cel_auth';
 const STOCK_KEY = 'cel_stock';
 const SELLERS_KEY = 'cel_sellers';
@@ -21,20 +20,8 @@ const WA_TPL_DEFAULTS = {
   stock:            '📱 *{marca} {modelo}*\n{specs}\n✅ Estado: {estado}\n💰 Precio: {precio}\n\n_Consultá disponibilidad_ 👋'
 };
 let WA_TEMPLATES = {};
-// ── Firebase ─────────────────────────────────────────────
-const FB_CONFIG = {
-    apiKey: "AIzaSyAMRkrADBxRF6rST8rNwO5IqdWneXocBsE",
-    authDomain: "stockcelustech.firebaseapp.com",
-    projectId: "stockcelustech",
-    storageBucket: "stockcelustech.firebasestorage.app",
-    messagingSenderId: "140592485004",
-    appId: "1:140592485004:web:29f6b0aa0f02fdf99ba1a9"
-};
+// ── Firebase — ver firebase-config.js ────────────────────
 let db = null;
-function initFirebase() {
-    if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-    db = firebase.firestore();
-}
 let _autoBackupDone = false;
 function listenStock() {
     db.collection('stock').onSnapshot(snapshot => {
@@ -201,77 +188,11 @@ function lockOwnerMode() {
   toast('🔒 Vista bloqueada', 'info');
 }
 
-// ── Auth ──────────────────────────────────────────────────
-let pinBuffer = '';
-
-function checkAuth() {
-  const stored = localStorage.getItem(AUTH_KEY);
-  if (stored) {
-    const days = (Date.now() - parseInt(stored)) / 86400000;
-    if (days < AUTH_DAYS) { showApp(); return; }
-  }
-  showLogin();
-}
-
-function showLogin() {
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('app').classList.add('app-hidden');
-}
-
+// ── Auth — Firebase ──────────────────────────────────────
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.remove('app-hidden');
   initApp();
-}
-
-function initPinPad() {
-  document.querySelectorAll('.pin-btn[data-n]').forEach(btn => {
-    btn.addEventListener('click', () => addPin(btn.dataset.n));
-  });
-  document.getElementById('pin-back').addEventListener('click', backPin);
-  document.getElementById('pin-clear').addEventListener('click', clearPin);
-  document.addEventListener('keydown', e => {
-    const ls = document.getElementById('login-screen');
-    if (ls.style.display === 'none') return;
-    if (e.key >= '0' && e.key <= '9') addPin(e.key);
-    else if (e.key === 'Backspace') backPin();
-    else if (e.key === 'Escape') clearPin();
-  });
-}
-
-function addPin(d) {
-  if (pinBuffer.length >= 4) return;
-  pinBuffer += d;
-  updateDots();
-  if (pinBuffer.length === 4) setTimeout(checkPin, 180);
-}
-
-function backPin() { pinBuffer = pinBuffer.slice(0, -1); updateDots(); }
-function clearPin() { pinBuffer = ''; updateDots(); }
-
-function updateDots() {
-  document.querySelectorAll('#pin-dots span').forEach((d, i) => {
-    d.classList.toggle('filled', i < pinBuffer.length);
-  });
-}
-
-let justLoggedIn = false;
-
-function checkPin() {
-  if (pinBuffer === PIN) {
-    justLoggedIn = true;
-    localStorage.setItem(AUTH_KEY, Date.now().toString());
-    document.getElementById('login-screen').classList.add('success');
-    setTimeout(showApp, 650);
-  } else {
-    document.getElementById('pin-error').textContent = 'PIN incorrecto';
-    document.getElementById('login-screen').classList.add('shake');
-    setTimeout(() => {
-      document.getElementById('login-screen').classList.remove('shake');
-      document.getElementById('pin-error').textContent = '';
-      clearPin();
-    }, 650);
-  }
 }
 
 // ── Stock ─────────────────────────────────────────────────
@@ -356,12 +277,13 @@ function initApp() {
   if (appInited) return;
   appInited = true;
   initDarkMode();
-  initFirebase();
+  db = _fbInit();
+  window._DAKI_NAME = 'TechPoint';
   loadConfig();
   loadWaTemplates();
   fetchDolarBlue();
   applyBizImage();
-  if (justLoggedIn) { justLoggedIn = false; setTimeout(logAccess, 800); }
+  setTimeout(logAccess, 800);
 
   document.getElementById('add-btn').addEventListener('click', () => openForm());
   document.getElementById('stats-btn').addEventListener('click', openStats);
@@ -1193,8 +1115,7 @@ function initPWA() {
   }
 })();
 
-initPinPad();
-checkAuth();
+requireAuth().then(u => { if (u) showApp(); });
 
 // ── Toggle moneda (USD/ARS en formulario stock) ───────────
 let monedaMode = 'ars';

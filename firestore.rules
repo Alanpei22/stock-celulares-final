@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Solo usuarios autenticados pueden leer y escribir.
+    // Desplegá estas reglas DESPUÉS de haber creado tu cuenta en Firebase Auth
+    // y haber verificado que podés entrar a la app con email/contraseña.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

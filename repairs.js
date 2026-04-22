@@ -488,6 +488,7 @@ async function saveRepair() {
 function openRepairDetail(id) {
   const r = REPAIRS.find(x => x.id === id);
   if (!r) return;
+  window._printRep = r;
 
   document.getElementById('rep-det-marca').textContent  =
     (r.marca || '') + (r.nOrden ? ' · N°' + r.nOrden : '');
