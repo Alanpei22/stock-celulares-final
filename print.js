@@ -30,7 +30,15 @@ function _prAccs(v) {
   return String(v);
 }
 function _today() {
-  return new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' });
+  return new Date().toLocaleDateString('es-AR', { timeZone:'America/Argentina/Buenos_Aires', day:'2-digit', month:'2-digit', year:'numeric' });
+}
+// Calcula fecha fin de garantía desde hoy
+function _garantiaFin(dias) {
+  const n = Number(dias) || 0;
+  if (!n) return null;
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString('es-AR', { timeZone:'America/Argentina/Buenos_Aires', day:'2-digit', month:'2-digit', year:'numeric' });
 }
 
 // ── Abrir ventana de impresión ────────────────────────────────
@@ -289,13 +297,17 @@ ${rep.imei ? `<div class="row"><span>IMEI:</span><span class="r sm">${rep.imei}<
 <div class="row total-row"><span>SALDO ABONADO:</span><span class="r">${_prMoney(saldo)}</span></div>
 <div class="sep2"></div>
 
+${rep.diasGarantia > 0 ? `
 <div class="b" style="margin-bottom:3px">▸ GARANTÍA</div>
-<div class="sm" style="line-height:1.6">
-  ✔ 30 días en repuestos utilizados<br>
-  ✔ 90 días en mano de obra<br>
-  ✗ No cubre golpes ni humedad<br>
+<div class="row"><span>Días:</span><span class="r b">${rep.diasGarantia} días</span></div>
+<div class="row"><span>Desde:</span><span class="r">${_today()}</span></div>
+<div class="row"><span>Válida hasta:</span><span class="r b">${_garantiaFin(rep.diasGarantia)}</span></div>
+<div class="sep"></div>
+<div class="sm" style="line-height:1.5">
+  ✗ No cubre golpes ni daños por humedad<br>
   ✗ No cubre manipulación de terceros
 </div>
+` : '<div class="c sm">Sin garantía incluida.</div>'}
 <div class="sep"></div>
 
 <div class="c sm" style="margin-bottom:6px">El cliente retira el equipo en conformidad</div>
@@ -386,13 +398,17 @@ function _buildDeliveryA4(rep) {
       <tr class="hl"><td>SALDO ABONADO AL RETIRAR</td><td class="amt">${_prMoney(saldo)}</td></tr>
     </tbody>
   </table>
+  ${rep.diasGarantia > 0 ? `
   <div class="garantia-box">
-    <div class="card-title">Garantía</div>
-    <div class="garantia-item">✔ 30 días en repuestos utilizados</div>
-    <div class="garantia-item">✔ 90 días en mano de obra</div>
+    <div class="card-title">🛡 Garantía del servicio</div>
+    <div class="garantia-item hl">✔ ${rep.diasGarantia} días — válida hasta ${_garantiaFin(rep.diasGarantia)}</div>
     <div class="garantia-item no">✗ No cubre golpes ni daños por humedad</div>
     <div class="garantia-item no">✗ No cubre manipulación de terceros</div>
-  </div>
+  </div>` : `
+  <div class="garantia-box">
+    <div class="card-title">Garantía</div>
+    <div class="garantia-item no">Este servicio no incluye garantía.</div>
+  </div>`}
 </div>
 <div class="retiro-conf">
   El cliente declara retirar el equipo en perfecto estado de funcionamiento y en conformidad con el trabajo realizado.
@@ -431,6 +447,7 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 .totals .hl td { background:#0f172a; color:#fff; font-weight:700; font-size:10.5px; }
 .garantia-box { border:1px solid #d1fae5; border-radius:4px; padding:5px 8px; background:#f0fdf4; }
 .garantia-item { font-size:9px; margin-bottom:2px; line-height:1.4; color:#166534; }
+.garantia-item.hl { font-weight:700; font-size:10px; }
 .garantia-item.no { color:#991b1b; }
 .retiro-conf { font-size:8.5px; color:#475569; border:1px dashed #cbd5e1; border-radius:4px; padding:4px 8px; margin-bottom:6px; font-style:italic; text-align:center; }
 .firmas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
