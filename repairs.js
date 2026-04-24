@@ -942,16 +942,35 @@ function openRepairDetail(id) {
   `;
 
   const hasHistory = (r.tlf || r.dni);
+
+  // ── Grupo 1: Comunicación (WhatsApp / Presupuesto / IA / Copiar teléfono) ──
+  const commBtns = [];
+  if (r.tlf) commBtns.push(`<button class="rep-act rep-act--wa" onclick="repairWhatsApp('${id}')"><span class="rep-act__ico">🟢</span><span class="rep-act__lbl">WhatsApp</span></button>`);
+  if (r.tlf && r.presupuesto) commBtns.push(`<button class="rep-act rep-act--presup" onclick="sendPresupuestoWA('${id}')"><span class="rep-act__ico">💬</span><span class="rep-act__lbl">Presupuesto</span></button>`);
+  commBtns.push(`<button class="rep-act rep-act--ai" onclick="aiRepairWaMessage('${id}')"><span class="rep-act__ico">✨</span><span class="rep-act__lbl">Mensaje IA</span></button>`);
+  if (r.tlf) commBtns.push(`<button class="rep-act rep-act--neu" onclick="copyPhone('${esc(r.tlf)}')"><span class="rep-act__ico">📋</span><span class="rep-act__lbl">Copiar tel.</span></button>`);
+
+  // ── Grupo 2: Gestión (Editar / Ticket / Garantía / Historial) ──
+  const mgmtBtns = [];
+  mgmtBtns.push(`<button class="rep-act rep-act--neu" onclick="closeRepairDetail();openRepairForm('${id}')"><span class="rep-act__ico">✏️</span><span class="rep-act__lbl">Editar</span></button>`);
+  mgmtBtns.push(`<button class="rep-act rep-act--neu" onclick="openTicket('${id}')"><span class="rep-act__ico">🧾</span><span class="rep-act__lbl">Ticket</span></button>`);
+  if (!r.esGarantia) mgmtBtns.push(`<button class="rep-act rep-act--neu" onclick="openGarantiaModal('${id}')"><span class="rep-act__ico">🔄</span><span class="rep-act__lbl">Garantía</span></button>`);
+  if (hasHistory) mgmtBtns.push(`<button class="rep-act rep-act--neu" onclick="openCustomerHistory('${id}')"><span class="rep-act__ico">👤</span><span class="rep-act__lbl">Historial</span></button>`);
+
   document.getElementById('rep-det-actions').innerHTML = `
-    ${r.tlf ? `<button class="btn-whatsapp" onclick="repairWhatsApp('${id}')">🟢 WhatsApp</button>` : ''}
-    ${(r.tlf && r.presupuesto) ? `<button class="btn-presupuesto" onclick="sendPresupuestoWA('${id}')">💬 Presupuesto</button>` : ''}
-    <button class="btn-ai-wa" onclick="aiRepairWaMessage('${id}')">✨ Mensaje IA</button>
-    ${r.tlf ? `<button class="btn-edit" onclick="copyPhone('${esc(r.tlf)}')">📋 Tel.</button>` : ''}
-    <button class="btn-edit" onclick="closeRepairDetail();openRepairForm('${id}')">✏️ Editar</button>
-    <button class="btn-history" onclick="openTicket('${id}')">🧾 Ticket</button>
-    ${!r.esGarantia ? `<button class="btn-garantia" onclick="openGarantiaModal('${id}')">🔄 Garantía</button>` : ''}
-    ${hasHistory ? `<button class="btn-history" onclick="openCustomerHistory('${id}')">👤 Historial</button>` : ''}
-    <button class="btn-delete" onclick="deleteRepair('${id}')">🗑️</button>
+    ${commBtns.length ? `
+      <div class="rep-act-section">
+        <div class="rep-act-section__label">Comunicación</div>
+        <div class="rep-act-grid">${commBtns.join('')}</div>
+      </div>
+    ` : ''}
+    <div class="rep-act-section">
+      <div class="rep-act-section__label">Gestión</div>
+      <div class="rep-act-grid">${mgmtBtns.join('')}</div>
+    </div>
+    <div class="rep-act-danger-row">
+      <button class="rep-act rep-act--danger" onclick="deleteRepair('${id}')"><span class="rep-act__ico">🗑️</span><span class="rep-act__lbl">Eliminar</span></button>
+    </div>
   `;
 
   document.getElementById('rep-detail-modal').classList.remove('hidden');
