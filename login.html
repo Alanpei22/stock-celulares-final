@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0f1117">
+  <title>TechPoint — Iniciar sesión</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a; --surface: rgba(255,255,255,0.05); --surface2: rgba(255,255,255,0.09);
+      --border: rgba(255,255,255,0.12); --primary: #6366f1; --primary2: #4f46e5;
+      --text: rgba(255,255,255,0.92); --text2: rgba(255,255,255,0.52); --danger: #f87171;
+    }
+    body {
+      min-height: 100dvh; background: var(--bg); color: var(--text);
+      font-family: -apple-system, 'Segoe UI', sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      width: 100%; max-width: 360px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 36px 28px;
+    }
+    .logo {
+      font-size: 26px; font-weight: 800; letter-spacing: -0.02em;
+      margin-bottom: 4px; text-align: center;
+    }
+    .subtitle { color: var(--text2); font-size: 14px; text-align: center; margin-bottom: 28px; }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block; font-size: 12px; font-weight: 500; color: var(--text2);
+      margin-bottom: 6px; letter-spacing: 0.01em;
+    }
+    .field input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; padding: 12px 14px; color: var(--text);
+      font-family: inherit; font-size: 15px; transition: border-color .15s;
+    }
+    .field input:focus { outline: none; border-color: var(--primary); }
+    .btn-primary {
+      width: 100%; margin-top: 8px; padding: 13px 20px;
+      background: var(--primary); color: white; border: none; border-radius: 12px;
+      font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: background .15s, transform .05s;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--primary2); }
+    .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .link {
+      display: block; text-align: center; margin-top: 16px;
+      color: var(--text2); font-size: 13px; text-decoration: none;
+      cursor: pointer; background: none; border: none; width: 100%;
+      font-family: inherit;
+    }
+    .link:hover { color: var(--text); }
+    .error {
+      margin-top: 14px; padding: 10px 12px; background: rgba(248,113,113,0.1);
+      border: 1px solid rgba(248,113,113,0.3); border-radius: 10px;
+      color: var(--danger); font-size: 13px; text-align: center; display: none;
+    }
+    .error.show { display: block; }
+    .success {
+      margin-top: 14px; padding: 10px 12px; background: rgba(99,102,241,0.1);
+      border: 1px solid rgba(99,102,241,0.3); border-radius: 10px;
+      color: var(--primary); font-size: 13px; text-align: center; display: none;
+    }
+    .success.show { display: block; }
+  </style>
+</head>
+<body>
+
+  <form id="login-form" class="card" autocomplete="on">
+    <div class="logo">📱 TechPoint</div>
+    <div class="subtitle">Ingresá a tu cuenta</div>
+
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required placeholder="tu@email.com">
+    </div>
+
+    <div class="field">
+      <label for="password">Contraseña</label>
+      <input id="password" type="password" autocomplete="current-password" required placeholder="••••••••">
+    </div>
+
+    <button id="submit-btn" class="btn-primary" type="submit">Entrar</button>
+    <div id="err" class="error"></div>
+    <div id="ok" class="success"></div>
+
+    <button type="button" class="link" id="reset-link">¿Olvidaste tu contraseña?</button>
+  </form>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
+  <script src="firebase-config.js"></script>
+  <script src="auth.js"></script>
+
+  <script>
+    'use strict';
+
+    const form    = document.getElementById('login-form');
+    const emailEl = document.getElementById('email');
+    const passEl  = document.getElementById('password');
+    const btn     = document.getElementById('submit-btn');
+    const errEl   = document.getElementById('err');
+    const okEl    = document.getElementById('ok');
+    const resetLn = document.getElementById('reset-link');
+
+    function showErr(msg) {
+      errEl.textContent = msg; errEl.classList.add('show');
+      okEl.classList.remove('show');
+    }
+    function showOk(msg) {
+      okEl.textContent = msg; okEl.classList.add('show');
+      errEl.classList.remove('show');
+    }
+    function clearMsg() {
+      errEl.classList.remove('show'); okEl.classList.remove('show');
+    }
+
+    // Si ya hay sesión activa, ir directo a la app.
+    waitForAuth().then(user => {
+      if (!user) return;
+      const next = new URLSearchParams(location.search).get('next');
+      location.replace(next ? decodeURIComponent(next) : 'index.html');
+    });
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      clearMsg();
+      btn.disabled = true;
+      btn.textContent = 'Ingresando...';
+      try {
+        await signIn(emailEl.value, passEl.value);
+        location.replace('index.html');
+      } catch (err) {
+        let msg = 'Error al iniciar sesión';
+        const code = err?.code || '';
+        if (code === 'auth/invalid-email')           msg = 'Email inválido';
+        else if (code === 'auth/user-not-found')     msg = 'Usuario no encontrado';
+        else if (code === 'auth/wrong-password')     msg = 'Contraseña incorrecta';
+        else if (code === 'auth/invalid-credential') msg = 'Email o contraseña incorrectos';
+        else if (code === 'auth/too-many-requests')  msg = 'Demasiados intentos. Esperá unos minutos.';
+        else if (code === 'auth/network-request-failed') msg = 'Sin conexión a internet';
+        showErr(msg);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      }
+    });
+
+    resetLn.addEventListener('click', async () => {
+      clearMsg();
+      const email = emailEl.value.trim();
+      if (!email) { showErr('Ingresá tu email arriba primero'); return; }
+      try {
+        await sendPasswordReset(email);
+        showOk('Te mandamos un email para restablecer la contraseña. Revisá tu bandeja.');
+      } catch (err) {
+        showErr('No se pudo enviar: ' + (err.message || 'error'));
+      }
+    });
+  </script>
+
+</body>
+</html>

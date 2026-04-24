@@ -17,34 +17,9 @@
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="login-screen">
-  <div class="login-card">
-    <div class="login-logo">
-      <img id="login-biz-img" src="" alt="Logo" style="display:none" class="login-biz-img-el">
-      <div class="login-icon" id="login-default-icon">📱</div>
-    </div>
-    <h2 class="login-title">TechPoint</h2>
-    <p class="login-sub">Ingresá tu PIN de acceso</p>
-    <div class="pin-dots" id="pin-dots">
-      <span></span><span></span><span></span><span></span>
-    </div>
-    <div class="pin-grid">
-      <button class="pin-btn" data-n="1">1</button>
-      <button class="pin-btn" data-n="2">2</button>
-      <button class="pin-btn" data-n="3">3</button>
-      <button class="pin-btn" data-n="4">4</button>
-      <button class="pin-btn" data-n="5">5</button>
-      <button class="pin-btn" data-n="6">6</button>
-      <button class="pin-btn" data-n="7">7</button>
-      <button class="pin-btn" data-n="8">8</button>
-      <button class="pin-btn" data-n="9">9</button>
-      <button class="pin-btn pin-clear" id="pin-clear">✕</button>
-      <button class="pin-btn" data-n="0">0</button>
-      <button class="pin-btn pin-back" id="pin-back">⌫</button>
-    </div>
-    <p class="pin-error" id="pin-error"></p>
-  </div>
+<!-- Auth guard — el login real está en login.html -->
+<div id="login-screen" style="display:flex;align-items:center;justify-content:center;min-height:100dvh;background:#0f172a">
+  <span style="font-size:2.5rem">📱</span>
 </div>
 
 <!-- APP -->
@@ -87,6 +62,7 @@
           <button class="hdr-btn hdr-btn-ai" onclick="openAIAdd('equipo')" title="Agregar con IA">✨</button>
           <button class="hdr-btn" onclick="openBulkAIImport()" title="Importar lista con IA">📋</button>
           <button class="hdr-btn" id="add-btn" title="Agregar equipo">＋</button>
+          <button class="hdr-btn" onclick="(async()=>{ await signOut(); location.replace('login.html'); })()" title="Cerrar sesión">🚪</button>
         </div>
       </div>
       <div class="search-wrap">
@@ -167,6 +143,7 @@
             </div>
           </div>
           <button class="hdr-btn" id="rep-add-btn" title="Nueva reparación">＋</button>
+          <button class="hdr-btn" onclick="(async()=>{ await signOut(); location.replace('login.html'); })()" title="Cerrar sesión">🚪</button>
         </div>
         <input type="file" id="rep-import-file" accept=".json" hidden>
       </div>
@@ -236,6 +213,7 @@
           <button class="hdr-btn" onclick="openBulkImport()" title="Carga masiva">📦</button>
           <button class="hdr-btn hdr-btn-ai" onclick="openAIAdd('repuesto')" title="Agregar con IA">✨</button>
           <button class="hdr-btn" id="rep2-add-btn" title="Agregar repuesto">＋</button>
+          <button class="hdr-btn" onclick="(async()=>{ await signOut(); location.replace('login.html'); })()" title="Cerrar sesión">🚪</button>
         </div>
       </div>
       <div class="search-wrap">
@@ -975,7 +953,10 @@
     </div>
     <div class="det-body" id="rep-det-body"></div>
     <div class="det-actions" id="rep-det-actions"></div>
-    <button class="det-close-footer" onclick="closeRepairDetail()">← Cerrar</button>
+    <div style="display:flex;gap:8px;padding:10px 12px 4px;border-top:1px solid rgba(255,255,255,0.08)">
+      <button style="flex:1;padding:9px 0;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:inherit;cursor:pointer;font-size:13px" onclick="printRepair('80mm')">🖨 Ticket</button>
+      <button style="flex:1;padding:9px 0;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:inherit;cursor:pointer;font-size:13px" onclick="printRepair('A4')">📄 A4</button>
+    </div>
   </div>
 </div>
 
@@ -1127,9 +1108,11 @@
 
 <div id="toast" class="toast"></div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="utils.js"></script>
 <script src="firebase-config.js"></script>
+<script src="auth.js"></script>
 <!-- IA PANEL -->
 <div id="ai-overlay" class="ai-overlay hidden" onclick="closeAiPanel()"></div>
 <div id="ai-panel" class="ai-panel hidden">
@@ -1393,6 +1376,7 @@
 <script src="modulos_catalog.js"></script>
 <script src="repuestos.js"></script>
 <script src="app.js"></script>
+<script src="print.js"></script>
 
 <!-- ── AI CHAT FLOTANTE ── -->
 <button class="ai-fab" onclick="toggleAiChat()" title="Asistente IA">✨</button>

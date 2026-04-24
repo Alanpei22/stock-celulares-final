@@ -12,33 +12,9 @@
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="login-screen">
-  <div class="login-card">
-    <div class="login-logo">
-      <div class="login-icon">💰</div>
-    </div>
-    <h2 class="login-title">Caja Diaria</h2>
-    <p class="login-sub">Ingresá tu PIN de acceso</p>
-    <div class="pin-dots" id="pin-dots">
-      <span></span><span></span><span></span><span></span>
-    </div>
-    <div class="pin-grid">
-      <button class="pin-btn" data-n="1">1</button>
-      <button class="pin-btn" data-n="2">2</button>
-      <button class="pin-btn" data-n="3">3</button>
-      <button class="pin-btn" data-n="4">4</button>
-      <button class="pin-btn" data-n="5">5</button>
-      <button class="pin-btn" data-n="6">6</button>
-      <button class="pin-btn" data-n="7">7</button>
-      <button class="pin-btn" data-n="8">8</button>
-      <button class="pin-btn" data-n="9">9</button>
-      <button class="pin-btn pin-clear" id="pin-clear">✕</button>
-      <button class="pin-btn" data-n="0">0</button>
-      <button class="pin-btn pin-back" id="pin-back">⌫</button>
-    </div>
-    <p class="pin-error" id="pin-error"></p>
-  </div>
+<!-- Auth guard — el login real está en login.html -->
+<div id="login-screen" style="display:flex;align-items:center;justify-content:center;min-height:100dvh;background:#0f172a">
+  <span style="font-size:2.5rem">💰</span>
 </div>
 
 <!-- APP -->
@@ -68,6 +44,8 @@
             <button class="hdr-drop-item" id="cierre-btn" onclick="openCierreModal();closeCajaMenu()">🔐 Cerrar caja del día</button>
             <button class="hdr-drop-item owner-only" onclick="openCajaHistorial();closeCajaMenu()">📊 Historial / Stats</button>
             <button class="hdr-drop-item owner-only" onclick="openCajaDueno();closeCajaMenu()">📦 Caja Dueño</button>
+            <div class="hdr-drop-sep"></div>
+            <button class="hdr-drop-item" onclick="(async()=>{ await signOut(); location.replace('login.html'); })()">🚪 Cerrar sesión</button>
           </div>
         </div>
       </div>
@@ -545,9 +523,11 @@
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="utils.js"></script>
 <script src="firebase-config.js"></script>
+<script src="auth.js"></script>
 <script src="caja.js"></script>
 <script src="caja_extra.js"></script>
 <script src="inventario.js"></script>

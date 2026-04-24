@@ -16,8 +16,13 @@ const FB_CONFIG = {
 };
 
 // Inicializa Firebase y devuelve la instancia de Firestore.
-// Nombre con prefijo _fb para no colisionar con initFirebase() de cada módulo.
 function _fbInit() {
   if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
   return firebase.firestore();
+}
+
+// Devuelve la instancia de Auth (requiere firebase-auth-compat.js en HTML).
+function _fbAuth() {
+  if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  return firebase.auth();
 }
