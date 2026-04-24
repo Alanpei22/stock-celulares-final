@@ -953,9 +953,17 @@
     </div>
     <div class="det-body" id="rep-det-body"></div>
     <div class="det-actions" id="rep-det-actions"></div>
-    <div style="display:flex;gap:8px;padding:10px 12px 4px;border-top:1px solid rgba(255,255,255,0.08)">
-      <button style="flex:1;padding:9px 0;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:inherit;cursor:pointer;font-size:13px" onclick="printRepair('80mm')">🖨 Ticket</button>
-      <button style="flex:1;padding:9px 0;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:inherit;cursor:pointer;font-size:13px" onclick="printRepair('A4')">📄 A4</button>
+    <div style="padding:8px 12px 6px;border-top:1px solid rgba(255,255,255,0.08)">
+      <div style="font-size:10px;color:rgba(255,255,255,0.38);letter-spacing:.06em;margin-bottom:5px">INGRESO</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button style="flex:1;padding:8px 0;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:inherit;cursor:pointer;font-size:12px" onclick="printRepair('80mm')">🖨 80mm</button>
+        <button style="flex:1;padding:8px 0;border-radius:8px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:inherit;cursor:pointer;font-size:12px" onclick="printRepair('A4')">📄 A4</button>
+      </div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.38);letter-spacing:.06em;margin-bottom:5px">RETIRO / ENTREGA</div>
+      <div style="display:flex;gap:6px">
+        <button style="flex:1;padding:8px 0;border-radius:8px;border:1px solid rgba(99,214,166,0.3);background:rgba(99,214,166,0.07);color:inherit;cursor:pointer;font-size:12px" onclick="printDelivery('80mm')">🚚 80mm</button>
+        <button style="flex:1;padding:8px 0;border-radius:8px;border:1px solid rgba(99,214,166,0.3);background:rgba(99,214,166,0.07);color:inherit;cursor:pointer;font-size:12px" onclick="printDelivery('A4')">📄 A4</button>
+      </div>
     </div>
   </div>
 </div>
