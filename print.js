@@ -41,7 +41,7 @@ function _garantiaFin(dias) {
   return d.toLocaleDateString('es-AR', { timeZone:'America/Argentina/Buenos_Aires', day:'2-digit', month:'2-digit', year:'numeric' });
 }
 
-// ── Abrir ventana de impresión ────────────────────────────────
+// ── Abrir ventana de impresión (un solo trabajo) ─────────────
 function _openPrint(html, title) {
   const w = window.open('', '_blank', 'width=520,height=720,scrollbars=yes');
   if (!w) {
@@ -54,18 +54,145 @@ function _openPrint(html, title) {
   w.addEventListener('load', () => { w.focus(); setTimeout(() => w.print(), 350); });
 }
 
+// ── Abrir ventana con flujo secuencial: ORIGINAL → pausa → COPIA ──
+// Imprime primero el original, espera que el usuario lo corte,
+// y después con un click imprime la copia en un segundo trabajo.
+function _openPrintSequential({ bodyOriginal, bodyCopia, css, title }) {
+  const w = window.open('', '_blank', 'width=520,height=760,scrollbars=yes');
+  if (!w) {
+    alert('Habilitá los popups para imprimir.\nAjustes del navegador → Permitir popups de este sitio.');
+    return;
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>${title || 'Ticket'}</title>
+<style>
+${css}
+/* ── Controles en pantalla (se ocultan al imprimir) ── */
+.ctrl-bar {
+  position: fixed; top:0; left:0; right:0; z-index:9999;
+  background: linear-gradient(180deg,#161618,#0b0b0d);
+  color:#F2F2F7; padding:14px 16px 12px;
+  font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  box-shadow: 0 4px 18px rgba(0,0,0,.35);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.ctrl-head { font-size:14px; font-weight:700; margin-bottom:3px; text-align:center; }
+.ctrl-hint { font-size:11.5px; opacity:.72; text-align:center; margin-bottom:10px; line-height:1.35; }
+.ctrl-row  { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+.ctrl-btn  {
+  border:none; border-radius:10px; padding:10px 16px;
+  font-size:13px; font-weight:700; cursor:pointer;
+  font-family:inherit;
+  transition: transform .15s ease, opacity .2s;
+}
+.ctrl-btn:active { transform: scale(.96); }
+.ctrl-btn--pri  { background:#C8965A; color:#fff; box-shadow:0 2px 8px rgba(200,150,90,.35); }
+.ctrl-btn--alt  { background:#22c55e; color:#fff; box-shadow:0 2px 8px rgba(34,197,94,.35); }
+.ctrl-btn--sec  { background:#2E2E31; color:#F2F2F7; }
+.ctrl-btn:disabled { opacity:.4; cursor:default; }
+.ctrl-step { display:inline-block; padding:2px 8px; border-radius:99px; background:rgba(255,255,255,.08); font-size:10px; font-weight:700; letter-spacing:.1em; margin-right:6px; vertical-align:2px; }
+.ctrl-step.done { background:rgba(34,197,94,.22); color:#86efac; }
+.ctrl-step.active { background:rgba(200,150,90,.28); color:#E5C38A; }
+.doc-wrap { padding-top: 140px; }
+.ticket-hidden { display:none !important; }
+@media print {
+  .ctrl-bar { display:none !important; }
+  .doc-wrap { padding-top: 0 !important; }
+}
+</style>
+</head><body>
+<div class="ctrl-bar" id="ctrlBar">
+  <div class="ctrl-head" id="ctrlHead">
+    <span class="ctrl-step active" id="pillO">1·ORIGINAL</span><span class="ctrl-step" id="pillC">2·COPIA</span>
+  </div>
+  <div class="ctrl-hint" id="ctrlHint">Se abrirá el diálogo de impresión para el <b>ORIGINAL</b>…</div>
+  <div class="ctrl-row" id="ctrlRow">
+    <button class="ctrl-btn ctrl-btn--pri" id="btnO" onclick="printOriginal()">🖨 Imprimir ORIGINAL</button>
+    <button class="ctrl-btn ctrl-btn--alt" id="btnC" onclick="printCopia()" style="display:none">🖨 Imprimir COPIA</button>
+    <button class="ctrl-btn ctrl-btn--sec" id="btnClose" onclick="window.close()" style="display:none">✕ Cerrar</button>
+  </div>
+</div>
+
+<div class="doc-wrap">
+  <div id="docO">${bodyOriginal}</div>
+  <div id="docC" class="ticket-hidden">${bodyCopia}</div>
+</div>
+
+<script>
+(function(){
+  var step = 0; // 0 idle · 1 imprimiendo original · 2 esperando corte · 3 imprimiendo copia · 4 listo
+  function showOnly(which) {
+    document.getElementById('docO').classList.toggle('ticket-hidden', which !== 'O');
+    document.getElementById('docC').classList.toggle('ticket-hidden', which !== 'C');
+  }
+  window.printOriginal = function() {
+    step = 1;
+    showOnly('O');
+    document.getElementById('ctrlHint').innerHTML = 'Imprimiendo <b>ORIGINAL</b>…';
+    document.getElementById('btnO').disabled = true;
+    setTimeout(function(){ window.print(); }, 180);
+  };
+  window.printCopia = function() {
+    step = 3;
+    showOnly('C');
+    document.getElementById('pillO').classList.remove('active');
+    document.getElementById('pillO').classList.add('done');
+    document.getElementById('pillC').classList.add('active');
+    document.getElementById('ctrlHint').innerHTML = 'Imprimiendo <b>COPIA</b>…';
+    document.getElementById('btnC').disabled = true;
+    setTimeout(function(){ window.print(); }, 180);
+  };
+  window.addEventListener('afterprint', function(){
+    if (step === 1) {
+      step = 2;
+      document.getElementById('ctrlHint').innerHTML = '✂ Cortá el <b>ORIGINAL</b> y cuando estés listo, imprimí la <b>COPIA</b>.';
+      document.getElementById('btnO').style.display = 'none';
+      document.getElementById('btnC').style.display = 'inline-block';
+      document.getElementById('btnClose').style.display = 'inline-block';
+    } else if (step === 3) {
+      step = 4;
+      document.getElementById('pillC').classList.remove('active');
+      document.getElementById('pillC').classList.add('done');
+      document.getElementById('ctrlHead').innerHTML = '<span class="ctrl-step done">1·ORIGINAL</span><span class="ctrl-step done">2·COPIA</span>';
+      document.getElementById('ctrlHint').innerHTML = '✓ Listo, ambos tickets impresos.';
+      document.getElementById('btnC').style.display = 'none';
+      document.getElementById('btnClose').style.display = 'inline-block';
+    }
+  });
+  window.addEventListener('load', function(){
+    window.focus();
+    setTimeout(window.printOriginal, 420);
+  });
+})();
+</script>
+</body></html>`;
+
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
 // ── Punto de entrada — Ticket de ingreso ─────────────────────
 function printRepair(format) {
   const rep = window._printRep;
   if (!rep) return;
-  _openPrint(format === 'A4' ? _buildA4(rep) : _build80mm(rep));
+  if (format === 'A4') {
+    _openPrint(_buildA4(rep));
+  } else {
+    _build80mm(rep); // abre el popup con flujo secuencial (original → copia)
+  }
 }
 
 // ── Punto de entrada — Ticket de retiro/entrega ──────────────
 function printDelivery(format) {
   const rep = window._printRep;
   if (!rep) return;
-  _openPrint(format === 'A4' ? _buildDeliveryA4(rep) : _buildDelivery80mm(rep));
+  if (format === 'A4') {
+    _openPrint(_buildDeliveryA4(rep));
+  } else {
+    _buildDelivery80mm(rep); // abre el popup con flujo secuencial
+  }
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -125,11 +252,12 @@ ${rep.presupuesto ? `<div class="row"><span>Presupuesto:</span><span class="r">$
 <div class="c" style="margin-top:10px;font-size:10px">✦ Gracias por elegirnos ✦</div>`;
 }
 
-function _build80mm(rep) {
-  const css = `
+// CSS compartido por los tickets 80mm (ingreso y retiro)
+const _CSS_80MM = `
 * { margin:0; padding:0; box-sizing:border-box; }
 @page { size: 80mm auto; margin: 3mm 0; }
-body { font-family:'Courier New',Courier,monospace; font-size:11px; width:72mm; margin:0 auto; color:#000; background:#fff; }
+body { font-family:'Courier New',Courier,monospace; font-size:11px; color:#000; background:#fff; }
+#docO, #docC { width:72mm; margin:0 auto; }
 .c  { text-align:center; }
 .b  { font-weight:bold; }
 .lg { font-size:15px; }
@@ -141,16 +269,17 @@ body { font-family:'Courier New',Courier,monospace; font-size:11px; width:72mm; 
 .total-row { font-size:12.5px; font-weight:bold; }
 .firma { border-top:1px solid #000; margin-top:14px; padding-top:3px; }
 .label-tag { font-size:10px; letter-spacing:.1em; margin:3px 0 2px; }
-.cut { text-align:center; font-size:10px; margin:10px 0; letter-spacing:2px; }
 @media print { body { -webkit-print-color-adjust:exact; } }`;
 
-  return `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>Ticket #${rep.nOrden || ''}</title>
-<style>${css}</style></head><body>
-${_ticket80mmBody(rep, '— ORIGINAL —')}
-<div class="cut">✂ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ✂</div>
-${_ticket80mmBody(rep, '— COPIA —')}
-</body></html>`;
+function _build80mm(rep) {
+  // Flujo secuencial: imprime original, usuario corta, imprime copia
+  _openPrintSequential({
+    bodyOriginal: _ticket80mmBody(rep, '— ORIGINAL —'),
+    bodyCopia:    _ticket80mmBody(rep, '— COPIA —'),
+    css: _CSS_80MM,
+    title: `Ticket #${rep.nOrden || ''}`
+  });
+  return null; // no devuelve HTML — ya abrió el popup
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -320,31 +449,14 @@ ${rep.diasGarantia > 0 ? `
 }
 
 function _buildDelivery80mm(rep) {
-  const css = `
-* { margin:0; padding:0; box-sizing:border-box; }
-@page { size: 80mm auto; margin: 3mm 0; }
-body { font-family:'Courier New',Courier,monospace; font-size:11px; width:72mm; margin:0 auto; color:#000; background:#fff; }
-.c  { text-align:center; }
-.b  { font-weight:bold; }
-.lg { font-size:15px; }
-.sm { font-size:9.5px; }
-.sep  { border-top:1px dashed #555; margin:4px 0; }
-.sep2 { border-top:2px solid #000; margin:5px 0; }
-.row  { display:flex; justify-content:space-between; gap:4px; margin-bottom:1px; }
-.row .r { text-align:right; white-space:nowrap; }
-.total-row { font-size:12.5px; font-weight:bold; }
-.firma { border-top:1px solid #000; margin-top:14px; padding-top:3px; }
-.label-tag { font-size:10px; letter-spacing:.1em; margin:3px 0 2px; }
-.cut { text-align:center; font-size:10px; margin:10px 0; letter-spacing:2px; }
-@media print { body { -webkit-print-color-adjust:exact; } }`;
-
-  return `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><title>Retiro #${rep.nOrden || ''}</title>
-<style>${css}</style></head><body>
-${_delivery80mmBody(rep, '— ORIGINAL —')}
-<div class="cut">✂ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ✂</div>
-${_delivery80mmBody(rep, '— COPIA —')}
-</body></html>`;
+  // Flujo secuencial: imprime original, usuario corta, imprime copia
+  _openPrintSequential({
+    bodyOriginal: _delivery80mmBody(rep, '— ORIGINAL —'),
+    bodyCopia:    _delivery80mmBody(rep, '— COPIA —'),
+    css: _CSS_80MM,
+    title: `Retiro #${rep.nOrden || ''}`
+  });
+  return null;
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
