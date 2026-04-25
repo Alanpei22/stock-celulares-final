@@ -479,9 +479,20 @@
         <label class="fl">💳 Forma de pago</label>
         <select id="sell-pago" class="fs"></select>
       </div>
+      <!-- Registrar en caja -->
+      <label class="sell-caja-row">
+        <div class="sell-caja-info">
+          <span class="sell-caja-title">📒 Registrar en caja</span>
+          <span class="sell-caja-sub">Crea un ingreso automáticamente</span>
+        </div>
+        <div class="sell-caja-toggle-wrap">
+          <input type="checkbox" id="sell-caja-check" class="sell-caja-cb" checked>
+          <span class="sell-caja-toggle"></span>
+        </div>
+      </label>
       <div class="form-actions" style="margin-top:8px">
         <button class="btn-secondary" id="sell-cancel">Cancelar</button>
-        <button class="btn-primary" id="sell-confirm">💰 Confirmar Venta</button>
+        <button class="btn-primary" id="sell-confirm">✅ Confirmar Venta</button>
       </div>
     </div>
   </div>
@@ -1162,30 +1173,38 @@
 </div>
 
 <!-- Modal: Registrar cobro en caja -->
-<div id="cobro-overlay" class="nota-overlay hidden" onclick="closeCobroModal()"></div>
-<div id="cobro-modal" class="nota-modal hidden">
-  <div class="nota-modal-hdr">
-    <span>💰 ¿Registrar cobro en caja?</span>
-    <button type="button" onclick="closeCobroModal()">✕</button>
-  </div>
-  <div class="cobro-info">
-    <span id="cobro-desc-label" class="cobro-desc"></span>
-    <span id="cobro-monto-label" class="cobro-monto"></span>
-    <span id="cobro-sena-info" class="cobro-sena-info" style="display:none"></span>
-  </div>
-  <div class="fg" style="margin-top:.75rem">
-    <label class="fl">Método de pago</label>
-    <div class="chip-group cobro-metodos">
-      <button class="cobro-metodo-btn cat-btn cobro-m-active" data-m="Efectivo" onclick="selectCobroMetodo('Efectivo')">💵 Efectivo</button>
-      <button class="cobro-metodo-btn cat-btn" data-m="Transferencia" onclick="selectCobroMetodo('Transferencia')">🏦 Transf.</button>
-      <button class="cobro-metodo-btn cat-btn" data-m="MercadoPago" onclick="selectCobroMetodo('MercadoPago')">💙 MP</button>
-      <button class="cobro-metodo-btn cat-btn" data-m="Tarjeta débito" onclick="selectCobroMetodo('Tarjeta débito')">💳 Débito</button>
-      <button class="cobro-metodo-btn cat-btn" data-m="Tarjeta crédito" onclick="selectCobroMetodo('Tarjeta crédito')">💳 Crédito</button>
+<div id="cobro-overlay" class="modal-overlay hidden" onclick="if(event.target.id==='cobro-overlay')closeCobroModal()">
+  <div id="cobro-modal" class="modal-card cobro-card">
+    <div class="modal-header">
+      <div>
+        <span class="det-marca">💰 REGISTRAR EN CAJA</span>
+        <span id="cobro-desc-label" class="det-modelo cobro-det-modelo"></span>
+      </div>
+      <button class="modal-close" onclick="closeCobroModal()">✕</button>
     </div>
-  </div>
-  <div class="nota-modal-btns" style="margin-top:1rem">
-    <button type="button" class="btn-nota-clear" onclick="closeCobroModal()">Ahora no</button>
-    <button type="button" class="btn-nota-save" onclick="confirmarCobro()">✅ Registrar</button>
+    <div class="modal-body cobro-body">
+      <!-- Monto destacado -->
+      <div class="cobro-monto-wrap">
+        <div class="cobro-monto-lbl">Total a registrar</div>
+        <div id="cobro-monto-label" class="cobro-monto-num"></div>
+        <div id="cobro-sena-info" class="cobro-sena-info" style="display:none"></div>
+      </div>
+      <!-- Método de pago -->
+      <div class="fg">
+        <label class="fl">Método de pago</label>
+        <div class="cobro-metodos">
+          <button class="cobro-metodo-btn cobro-m-active" data-m="Efectivo"       onclick="selectCobroMetodo('Efectivo')">💵 Efectivo</button>
+          <button class="cobro-metodo-btn"                data-m="Transferencia"  onclick="selectCobroMetodo('Transferencia')">🏦 Transferencia</button>
+          <button class="cobro-metodo-btn"                data-m="MercadoPago"    onclick="selectCobroMetodo('MercadoPago')">💙 Mercado Pago</button>
+          <button class="cobro-metodo-btn"                data-m="Tarjeta débito" onclick="selectCobroMetodo('Tarjeta débito')">💳 Débito</button>
+          <button class="cobro-metodo-btn"                data-m="Tarjeta crédito" onclick="selectCobroMetodo('Tarjeta crédito')">💳 Crédito</button>
+        </div>
+      </div>
+    </div>
+    <div class="cobro-footer">
+      <button type="button" class="cobro-btn-skip" onclick="closeCobroModal()">Ahora no</button>
+      <button type="button" class="cobro-btn-confirm" onclick="confirmarCobro()">✅ Registrar en caja</button>
+    </div>
   </div>
 </div>
 

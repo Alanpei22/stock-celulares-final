@@ -1502,6 +1502,11 @@ body.dark .rep-print-btn--out:hover { background: rgba(34,197,94,0.15); border-c
 .chip-reparando { background: #FEF3C7; color: #92400E; border: 1.5px solid #FDE68A; }
 .chip-cancelado { background: #FEE2E2; color: #991B1B; border: 1.5px solid #FECACA; }
 .chip-garantia { background: var(--bg1); color: var(--text2); border: 1.5px solid var(--border); }
+.chip-cobrar {
+ background: #f0fdf4; color: #15803d; border: 1.5px solid #bbf7d0;
+ font-weight: 700;
+}
+.chip-cobrar:hover { background: #dcfce7; border-color: #86efac; }
 
 /* ── AI CHAT ── */
 .ai-fab {
@@ -2144,11 +2149,107 @@ body.owner-mode .owner-lock-btn { color: var(--accent); font-weight: 700; }
 .rep-card--no-van { background: var(--bg1); border-color: var(--border); }
 
 /* ── COBRO MODAL ── */
-.cobro-info { text-align: center; padding: .5rem 0; }
-.cobro-desc { display: block; font-size: .82rem; color: var(--t2); margin-bottom: .25rem; }
-.cobro-monto { display: block; font-size: 1.6rem; font-weight: 900; color: var(--t1); letter-spacing: -0.02em; }
-.cobro-sena-info { display: block; font-size: .8rem; color: var(--text2); margin-top: .35rem; font-weight: 600; }
-.cobro-m-active { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; }
+.cobro-card { max-height: 90vh; max-width: 420px; }
+.cobro-det-modelo { font-size: .95rem !important; }
+.cobro-body { gap: 18px !important; }
+.cobro-monto-wrap {
+ text-align: center;
+ background: var(--bg1);
+ border-radius: var(--radius-sm);
+ padding: 16px 20px 14px;
+ border: 1px solid var(--border);
+}
+.cobro-monto-lbl { font-size: .72rem; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .09em; margin-bottom: 4px; }
+.cobro-monto-num { font-size: 2.2rem; font-weight: 900; color: var(--text); letter-spacing: -0.03em; line-height: 1; }
+.cobro-sena-info { display: block; font-size: .8rem; color: var(--accent); margin-top: 6px; font-weight: 700; }
+.cobro-metodos {
+ display: flex; flex-wrap: wrap; gap: 7px;
+ margin-top: 6px;
+}
+.cobro-metodo-btn {
+ flex: 0 1 auto;
+ border: 1.5px solid var(--border);
+ background: var(--card); color: var(--text);
+ border-radius: 10px; padding: 8px 14px;
+ font-size: .8rem; font-weight: 600;
+ cursor: pointer; transition: all .15s ease;
+ touch-action: manipulation;
+}
+.cobro-metodo-btn:hover { background: var(--hover); border-color: var(--accent); }
+.cobro-metodo-btn:active { transform: scale(.97); }
+.cobro-m-active {
+ background: var(--accent) !important;
+ border-color: var(--accent) !important;
+ color: #fff !important;
+ box-shadow: 0 2px 8px rgba(200,150,90,0.3);
+}
+.cobro-footer {
+ display: flex; gap: 10px; align-items: center;
+ padding: 14px 20px 20px;
+ border-top: 1px solid var(--border);
+}
+.cobro-btn-skip {
+ flex: 0 0 auto; background: transparent; border: none;
+ color: var(--text3); font-size: .85rem; font-weight: 600;
+ cursor: pointer; padding: 10px 14px; border-radius: var(--radius);
+ transition: color .15s, background .15s;
+}
+.cobro-btn-skip:hover { color: var(--text2); background: var(--bg1); }
+.cobro-btn-confirm {
+ flex: 1; background: #22c55e; color: #fff; border: none;
+ border-radius: var(--radius); padding: 14px;
+ font-size: .95rem; font-weight: 800; cursor: pointer;
+ box-shadow: 0 3px 12px rgba(34,197,94,0.35);
+ transition: transform .15s, background .15s;
+ touch-action: manipulation;
+}
+.cobro-btn-confirm:hover { background: #16a34a; }
+.cobro-btn-confirm:active { transform: scale(.97); }
+
+/* ── SELL MODAL: toggle registrar en caja ── */
+.sell-caja-row {
+ display: flex; align-items: center; justify-content: space-between; gap: 12px;
+ background: var(--bg1);
+ border: 1px solid var(--border);
+ border-radius: var(--radius-sm);
+ padding: 12px 14px;
+ cursor: pointer;
+ transition: background .15s;
+}
+.sell-caja-row:hover { background: var(--bg2); }
+.sell-caja-title { display: block; font-size: .86rem; font-weight: 700; color: var(--text); }
+.sell-caja-sub   { display: block; font-size: .72rem; color: var(--text3); margin-top: 2px; }
+/* Ocultar checkbox nativo */
+.sell-caja-cb { position: absolute; opacity: 0; width: 0; height: 0; }
+/* Toggle visual */
+.sell-caja-toggle-wrap { flex-shrink: 0; }
+.sell-caja-toggle {
+ display: block; width: 42px; height: 24px;
+ background: var(--bg3); border-radius: 99px;
+ position: relative; transition: background .2s;
+ flex-shrink: 0;
+}
+.sell-caja-toggle::after {
+ content: ''; position: absolute;
+ top: 3px; left: 3px;
+ width: 18px; height: 18px; border-radius: 50%;
+ background: #fff;
+ box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+ transition: transform .2s ease;
+}
+/* El checkbox está justo antes del toggle dentro del label */
+.sell-caja-cb:checked + .sell-caja-toggle { background: #22c55e; }
+.sell-caja-cb:checked + .sell-caja-toggle::after { transform: translateX(18px); }
+
+body.dark .chip-cobrar { background: rgba(34,197,94,0.12); color: #4ade80; border-color: rgba(34,197,94,0.3); }
+body.dark .chip-cobrar:hover { background: rgba(34,197,94,0.2); }
+body.dark .cobro-monto-wrap { background: #1E1E20; border-color: rgba(255,255,255,0.08); }
+body.dark .cobro-metodo-btn { background: #1E1E20; border-color: rgba(255,255,255,0.1); color: #F2F2F7; }
+body.dark .cobro-metodo-btn:hover { background: #28282A; border-color: var(--accent); }
+body.dark .cobro-footer { border-color: rgba(255,255,255,0.08); }
+body.dark .sell-caja-row { background: #1E1E20; border-color: rgba(255,255,255,0.08); }
+body.dark .sell-caja-row:hover { background: #28282A; }
+body.dark .sell-caja-toggle { background: #3A3A3C; }
 
 /* ── LOW STOCK BANNER ── */
 .lowstock-banner {

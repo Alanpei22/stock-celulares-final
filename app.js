@@ -1112,16 +1112,42 @@ function closeSellModal() {
 function confirmSell() {
   const id = pendingSellId;
   if (!id) return;
-  const p = STOCK.find(x => x.id === id);
-  const vendedor = document.getElementById('sell-vendedor').value;
-  const formaPago = document.getElementById('sell-pago').value;
-  db.collection('stock').doc(id).update({
+  const p          = STOCK.find(x => x.id === id);
+  const vendedor   = document.getElementById('sell-vendedor').value;
+  const formaPago  = document.getElementById('sell-pago').value;
+  const regCaja    = document.getElementById('sell-caja-check')?.checked ?? true;
+
+  const ahora = new Date().toISOString();
+  const batch = db.batch();
+
+  // ── Marcar equipo como vendido ──
+  batch.update(db.collection('stock').doc(id), {
     vendido: true,
-    fecha_venta: new Date().toISOString(),
+    fecha_venta: ahora,
     vendedor,
     forma_pago: formaPago
   });
-  // Log de venta
+
+  // ── Registrar en caja (si toggle activo y tiene precio) ──
+  if (regCaja && p?.precio > 0) {
+    const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' ');
+    const desc  = `Venta: ${p.marca} ${p.modelo}${specs ? ' ' + specs : ''}`;
+    const movRef = db.collection('caja_movimientos').doc();
+    batch.set(movRef, {
+      tipo: 'ingreso',
+      categoria: 'Venta',
+      descripcion: desc,
+      monto: p.precio,
+      metodoPago: formaPago,
+      fecha: todayAR(),
+      createdAt: ahora,
+      stockId: id
+    });
+  }
+
+  batch.commit().catch(e => console.error('confirmSell batch:', e));
+
+  // ── Log de actividad ──
   if (p) {
     db.collection('actividad').add({
       tipo: 'venta',
@@ -1129,12 +1155,13 @@ function confirmSell() {
       tecnico: vendedor || null,
       repairId: null,
       extra: { stockId: id, precio: p.precio, formaPago, marca: p.marca, modelo: p.modelo },
-      fecha: new Date().toISOString()
+      fecha: ahora
     }).catch(() => {});
   }
+
   closeSellModal();
   closeDetail();
-  toast('Venta registrada ✅', 'success');
+  toast(regCaja ? 'Venta registrada en caja ✅' : 'Venta registrada ✅', 'success');
 }
 
 // ── Modal Estadísticas ────────────────────────────────────

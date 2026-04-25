@@ -129,7 +129,8 @@ function initRepairs() {
   document.addEventListener('keydown', function _repEsc(e) {
     if (e.key !== 'Escape') return;
     const order = [
-      { id: 'rep-form-modal',   fn: closeRepairForm   },
+      { id: 'cobro-overlay',    fn: closeCobroModal    },
+      { id: 'rep-form-modal',   fn: closeRepairForm    },
       { id: 'garantia-modal',   fn: closeGarantiaModal },
       { id: 'history-modal',    fn: closeHistoryModal  },
       { id: 'rep-stats-modal',  fn: closeRepairStats   },
@@ -321,8 +322,12 @@ function renderRepairs() {
     const garantiaChip = !r.esGarantia && r.estado !== 'cancelado'
       ? `<button class="card-chip chip-garantia" onclick="event.stopPropagation();openGarantiaModal('${r.id}')">🔄 GARANTÍA</button>`
       : '';
-    const quickBtn = (chipsHTML || garantiaChip)
-      ? `<div class="card-quick-actions" onclick="event.stopPropagation()">${chipsHTML}${garantiaChip}</div>`
+    // Chip COBRAR: solo si tiene monto, no fue cobrado aún, y estado es listo o entregado
+    const cobrarChip = (r.monto > 0 && !r.cobrado && (r.estado === 'listo' || r.estado === 'entregado'))
+      ? `<button class="card-chip chip-cobrar" onclick="event.stopPropagation();openCobroModal(REPAIRS.find(x=>x.id==='${r.id}'))">💰 COBRAR</button>`
+      : '';
+    const quickBtn = (chipsHTML || garantiaChip || cobrarChip)
+      ? `<div class="card-quick-actions" onclick="event.stopPropagation()">${chipsHTML}${garantiaChip}${cobrarChip}</div>`
       : '';
 
     return `
@@ -352,7 +357,7 @@ function renderRepairs() {
         ${diasBadgeHTML || clHTML ? `<div class="card-extras-row">${diasBadgeHTML}${clHTML}</div>` : ''}
         ${notaHTML}
         <div class="card-quick-actions" onclick="event.stopPropagation()">
-          ${chipsHTML}${garantiaChip}
+          ${chipsHTML}${garantiaChip}${cobrarChip}
           <button class="card-chip chip-nota" onclick="openNotaModal('${r.id}')">${r.notaRapida ? '📝' : '📝 NOTA'}</button>
         </div>
       </div>`;
@@ -1119,28 +1124,29 @@ function openCobroModal(r) {
   const monto = Number(r.monto) || 0;
   const sena  = Number(r.sena)  || 0;
   document.getElementById('cobro-monto-label').textContent = '$ ' + monto.toLocaleString('es-AR');
-  document.getElementById('cobro-desc-label').textContent = `N°${r.nOrden} ${r.marca} ${r.modelo}`;
+  document.getElementById('cobro-desc-label').textContent  = `N°${r.nOrden || '?'} — ${r.marca} ${r.modelo}`;
   // Mostrar seña si existe
   const senaEl = document.getElementById('cobro-sena-info');
   if (senaEl) {
     if (sena > 0) {
       const saldo = monto - sena;
-      senaEl.innerHTML = `Seña ya cobrada: <b>$${sena.toLocaleString('es-AR')}</b> &nbsp;·&nbsp; Saldo: <b>$${saldo.toLocaleString('es-AR')}</b>`;
+      senaEl.innerHTML = `Seña cobrada: <b>$${sena.toLocaleString('es-AR')}</b> &nbsp;·&nbsp; Saldo pendiente: <b>$${saldo.toLocaleString('es-AR')}</b>`;
       senaEl.style.display = '';
     } else {
       senaEl.style.display = 'none';
     }
   }
-  // reset method selection
+  // Reset método de pago a Efectivo
   document.querySelectorAll('.cobro-metodo-btn').forEach(b => b.classList.remove('cobro-m-active'));
   document.querySelector('.cobro-metodo-btn[data-m="Efectivo"]').classList.add('cobro-m-active');
+  // Abrir overlay (el modal está adentro del overlay ahora)
   document.getElementById('cobro-overlay').classList.remove('hidden');
-  document.getElementById('cobro-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
 }
 
 function closeCobroModal() {
   document.getElementById('cobro-overlay').classList.add('hidden');
-  document.getElementById('cobro-modal').classList.add('hidden');
+  document.body.style.overflow = '';
   _cobroRepair = null;
 }
 
