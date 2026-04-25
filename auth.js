@@ -40,6 +40,11 @@ async function signIn(email, password) {
 
 // ── Logout ────────────────────────────────────────────────
 async function signOut() {
+  // Cancelar todos los listeners Firestore activos antes de cerrar sesión
+  try { if (typeof window._appCleanup     === 'function') window._appCleanup();     } catch {}
+  try { if (typeof window._repairsCleanup === 'function') window._repairsCleanup(); } catch {}
+  try { if (typeof window._repuestosCleanup === 'function') window._repuestosCleanup(); } catch {}
+
   try { await _a().signOut(); } catch(e) { console.warn('[auth] signOut:', e); }
   try {
     localStorage.removeItem('cel_auth');

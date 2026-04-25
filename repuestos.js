@@ -8,6 +8,12 @@ let rep2RenderTimer;
 let _lowStockDismissed  = false;
 let _repuestosListener  = null; // referencia al unsubscribe de onSnapshot
 
+// Expone cleanup para que auth.js cancele el listener en logout
+window._repuestosCleanup = function() {
+  if (_repuestosListener) { _repuestosListener(); _repuestosListener = null; }
+  REPUESTOS = [];
+};
+
 function dismissLowStockBanner() {
   _lowStockDismissed = true;
   const banner = document.getElementById('rep2-lowstock-banner');

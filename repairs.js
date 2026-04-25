@@ -16,6 +16,14 @@ let editingRepairId    = null;
 let pendingGarantiaRef = null;
 let repRenderTimer;
 let _repairsListener   = null; // referencia al unsubscribe de onSnapshot
+let _repairsLoaded     = false; // true tras el primer snapshot
+
+// Expone cleanup para que auth.js pueda cancelar el listener en logout
+window._repairsCleanup = function() {
+  if (_repairsListener) { _repairsListener(); _repairsListener = null; }
+  _repairsLoaded = false;
+  REPAIRS = [];
+};
 
 // ── Firebase ──────────────────────────────
 function listenRepairs() {
@@ -30,6 +38,7 @@ function listenRepairs() {
   _repairsListener = db.collection('repairs')
     .where('fechaIngreso', '>=', cutoffISO)
     .onSnapshot(snap => {
+      _repairsLoaded = true;
       REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
       renderRepairs();
@@ -115,6 +124,24 @@ function initRepairs() {
   loadCustomMarcas();
   loadWaNotifyNumber();
   listenRepairs();
+
+  // Cerrar modales con ESC (repairs)
+  document.addEventListener('keydown', function _repEsc(e) {
+    if (e.key !== 'Escape') return;
+    const order = [
+      { id: 'rep-form-modal',   fn: closeRepairForm   },
+      { id: 'garantia-modal',   fn: closeGarantiaModal },
+      { id: 'history-modal',    fn: closeHistoryModal  },
+      { id: 'rep-stats-modal',  fn: closeRepairStats   },
+      { id: 'rep-ticket-modal', fn: closeTicket        },
+      { id: 'staff-modal',      fn: closeStaffModal    },
+      { id: 'rep-detail-modal', fn: closeRepairDetail  },
+    ];
+    for (const { id, fn } of order) {
+      const el = document.getElementById(id);
+      if (el && !el.classList.contains('hidden')) { fn(); return; }
+    }
+  });
 }
 
 // ── Filtro rápido desde stat bar ──────────
@@ -203,8 +230,14 @@ function renderRepairs() {
   const emptyEl = document.getElementById('rep-empty');
 
   if (filtered.length === 0) {
-    listEl.innerHTML = '';
-    emptyEl.style.display = '';
+    if (!_repairsLoaded) {
+      // Aún esperando la primera respuesta de Firestore
+      emptyEl.style.display = 'none';
+      listEl.innerHTML = '<div class="list-loading"><span class="list-loading__spinner"></span>Cargando reparaciones…</div>';
+    } else {
+      listEl.innerHTML = '';
+      emptyEl.style.display = '';
+    }
     return;
   }
   emptyEl.style.display = 'none';
@@ -1466,12 +1499,12 @@ function renderActividad() {
     const fecha = a.fecha ? new Date(a.fecha).toLocaleString('es-AR', {
       day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'
     }) : '';
-    const tec = a.tecnico ? `<span class="act-tec">👤 ${a.tecnico}</span>` : '';
+    const tec = a.tecnico ? `<span class="act-tec">👤 ${esc(a.tecnico)}</span>` : '';
     return `
       <div class="act-item">
-        <div class="act-ico act-ico--${a.tipo || ''}">${ico}</div>
+        <div class="act-ico act-ico--${esc(a.tipo || '')}">${ico}</div>
         <div class="act-body">
-          <div class="act-desc">${a.desc || '—'}</div>
+          <div class="act-desc">${esc(a.desc) || '—'}</div>
           <div class="act-meta">${fecha}${tec}</div>
         </div>
       </div>`;

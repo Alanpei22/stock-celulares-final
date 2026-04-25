@@ -123,8 +123,10 @@
     // Si ya hay sesión activa, ir directo a la app.
     waitForAuth().then(user => {
       if (!user) return;
-      const next = new URLSearchParams(location.search).get('next');
-      location.replace(next ? decodeURIComponent(next) : 'index.html');
+      const raw  = new URLSearchParams(location.search).get('next') || '';
+      // Sólo aceptar rutas relativas (evita open redirect a dominios externos)
+      const next = raw && /^[a-zA-Z0-9_\-./]+\.html(\?.*)?$/.test(raw) ? raw : 'index.html';
+      location.replace(next);
     });
 
     form.addEventListener('submit', async e => {

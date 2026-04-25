@@ -1,0 +1,20 @@
+# Archivos temporales del proceso de merge
+*_main_temp.*
+*_temp.*
+*.bak
+*.orig
+
+# Editores
+.vscode/
+*.swp
+*.swo
+*~
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node (por si se agrega en el futuro)
+node_modules/
+npm-debug.log*

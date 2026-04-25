@@ -23,17 +23,31 @@ let WA_TEMPLATES = {};
 // ── Firebase — ver firebase-config.js ────────────────────
 let db = null;
 let _autoBackupDone = false;
+let _stockListener  = null; // unsubscribe del listener de stock
+let _stockLoaded    = false; // true tras el primer snapshot
+
+// Expone cleanup para que auth.js pueda cancelar todos los listeners en logout
+window._appCleanup = function() {
+  if (_stockListener) { _stockListener(); _stockListener = null; }
+  _stockLoaded = false;
+  STOCK = [];
+};
+
 function listenStock() {
-    db.collection('stock').onSnapshot(snapshot => {
-          STOCK = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          STOCK.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
-          render();
-          // Backup automático una vez por sesión, 3s después de cargar datos
-          if (!_autoBackupDone) { _autoBackupDone = true; setTimeout(autoBackup, 3000); }
-    }, err => {
-          console.error('Firestore:', err);
-          toast('Error de conexion', 'error');
-    });
+  // Cancelar listener previo (evita duplicados en re-login)
+  if (_stockListener) { _stockListener(); _stockListener = null; }
+
+  _stockListener = db.collection('stock').onSnapshot(snapshot => {
+    _stockLoaded = true;
+    STOCK = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    STOCK.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+    render();
+    // Backup automático una vez por sesión, 3s después de cargar datos
+    if (!_autoBackupDone) { _autoBackupDone = true; setTimeout(autoBackup, 3000); }
+  }, err => {
+    console.error('Firestore:', err);
+    toast('Error de conexion', 'error');
+  });
 }
 
 // ── Modo Oscuro ────────────────────────────────────────────
@@ -400,6 +414,22 @@ function initApp() {
   document.getElementById('settings-modal').addEventListener('click', e => { if (e.target.id === 'settings-modal') closeSettings(); });
   document.getElementById('biz-image-input').addEventListener('change', handleBizImage);
 
+  // Cerrar modales de stock con ESC
+  document.addEventListener('keydown', function _appEsc(e) {
+    if (e.key !== 'Escape') return;
+    const order = [
+      { id: 'sell-modal',     fn: closeSellModal  },
+      { id: 'stats-modal',    fn: closeStats       },
+      { id: 'settings-modal', fn: closeSettings    },
+      { id: 'export-modal',   fn: closeExport      },
+      { id: 'detail-modal',   fn: closeDetail      },
+    ];
+    for (const { id, fn } of order) {
+      const el = document.getElementById(id);
+      if (el && !el.classList.contains('hidden')) { fn(); return; }
+    }
+  });
+
   initPWA();
   listenStock();
   initRepairs();
@@ -659,7 +689,16 @@ function render() {
 
   const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');
-  if (filtered.length === 0) { listEl.innerHTML = ''; emptyEl.style.display = ''; return; }
+  if (filtered.length === 0) {
+    if (!_stockLoaded) {
+      emptyEl.style.display = 'none';
+      listEl.innerHTML = '<div class="list-loading"><span class="list-loading__spinner"></span>Cargando stock…</div>';
+    } else {
+      listEl.innerHTML = '';
+      emptyEl.style.display = '';
+    }
+    return;
+  }
   emptyEl.style.display = 'none';
 
   const today = new Date();
