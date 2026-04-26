@@ -740,11 +740,17 @@ function _onMovDescInput() {
     _clearSaleItem(false);
   }
 
-  if (q.length < 2) { _hideMovSuggestions(); return; }
+  // Cuando está vacío, no mostrar nada
+  if (q.length < 1) { _hideMovSuggestions(); return; }
 
   // Solo autocompletar para INGRESO (ventas)
   const tipo = document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') ? 'ingreso' : 'egreso';
   if (tipo !== 'ingreso') { _hideMovSuggestions(); return; }
+
+  // Tokenizar la búsqueda: cada palabra debe coincidir en algún campo
+  // Esto permite buscar "vidrio iphone" → encuentra "Vidrio templado iPhone 14"
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const matches = (haystack) => tokens.every(t => haystack.includes(t));
 
   const results = [];
 
@@ -753,7 +759,7 @@ function _onMovDescInput() {
     PRODUCTOS.forEach(p => {
       if (p.activo === false) return;
       const haystack = `${p.nombre || ''} ${p.codigo || ''} ${p.categoria || ''}`.toLowerCase();
-      if (haystack.includes(q)) {
+      if (matches(haystack)) {
         results.push({
           source: 'producto',
           id: p.id,
@@ -770,7 +776,7 @@ function _onMovDescInput() {
   // ── Repuestos ──
   CAJA_REPUESTOS.forEach(r => {
     const haystack = `${r.nombre || ''} ${r.marca || ''} ${r.modelo || ''} ${r.tipo || ''}`.toLowerCase();
-    if (haystack.includes(q)) {
+    if (matches(haystack)) {
       results.push({
         source: 'repuesto',
         id: r.id,
@@ -783,21 +789,39 @@ function _onMovDescInput() {
     }
   });
 
-  // Priorizar coincidencia al inicio del nombre
+  // Priorizar coincidencia al inicio del nombre, después por stock disponible, después alfabético
   results.sort((a, b) => {
     const aStart = a.nombre.toLowerCase().startsWith(q) ? 0 : 1;
     const bStart = b.nombre.toLowerCase().startsWith(q) ? 0 : 1;
     if (aStart !== bStart) return aStart - bStart;
+    // Items con stock antes de los sin stock
+    const aHas = a.stock > 0 ? 0 : 1;
+    const bHas = b.stock > 0 ? 0 : 1;
+    if (aHas !== bHas) return aHas - bHas;
     return a.nombre.localeCompare(b.nombre);
   });
 
-  _showMovSuggestions(results.slice(0, 8));
+  _showMovSuggestions(results.slice(0, 8), q);
 }
 
-function _showMovSuggestions(results) {
+function _showMovSuggestions(results, q) {
   const drop = document.getElementById('mov-desc-suggest');
   if (!drop) return;
-  if (!results.length) { drop.classList.add('hidden'); drop.innerHTML = ''; return; }
+
+  // Sin resultados → mostrar empty state (no esconder)
+  if (!results.length) {
+    drop.innerHTML = `
+      <div class="mov-sug-empty">
+        <span class="sug-empty-ico">🔍</span>
+        <div class="sug-empty-text">
+          <div class="sug-empty-title">Sin coincidencias para "${esc(q || '')}"</div>
+          <div class="sug-empty-sub">Seguí escribiendo libre · o cargá el producto en Inventario</div>
+        </div>
+      </div>`;
+    drop._results = [];
+    drop.classList.remove('hidden');
+    return;
+  }
 
   drop.innerHTML = results.map((r, i) => {
     const stockCls = r.stock <= 0 ? 'sug-stock-zero'
