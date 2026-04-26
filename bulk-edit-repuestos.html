@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bulk Edit · Repuestos</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #0F0F10; color: #F2F2F7;
+      padding: 24px 16px; min-height: 100vh;
+      max-width: 880px; margin: 0 auto;
+    }
+    h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+    h1 .accent { color: #C8965A; }
+    .subtitle { color: #A1A1A6; font-size: .85rem; margin-bottom: 20px; }
+    .card {
+      background: #161618; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px; padding: 16px; margin-bottom: 14px;
+    }
+    .step-num {
+      display: inline-block; background: #C8965A; color: #fff;
+      width: 24px; height: 24px; border-radius: 50%;
+      font-size: .8rem; font-weight: 800; line-height: 24px; text-align: center;
+      margin-right: 8px;
+    }
+    .step-num.done { background: #22c55e; }
+    .step-title { font-weight: 700; font-size: 1rem; }
+    .step-desc { color: #A1A1A6; font-size: .8rem; margin: 8px 0 12px 32px; line-height: 1.4; }
+    .btn {
+      width: 100%; padding: 14px; border: none; border-radius: 12px;
+      background: #C8965A; color: #fff;
+      font-size: .95rem; font-weight: 800; cursor: pointer;
+      transition: opacity .15s, transform .1s; font-family: inherit;
+    }
+    .btn:hover:not(:disabled) { opacity: .9; }
+    .btn:active:not(:disabled) { transform: scale(.98); }
+    .btn:disabled { opacity: .35; cursor: not-allowed; }
+    .btn--success { background: #22c55e; }
+    .btn--secondary { background: #2E2E31; }
+    .auth-msg { padding: 14px; border-radius: 12px; background: #1c1917; color: #fbbf24; font-size: .85rem; margin-bottom: 14px; }
+    .stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      margin: 12px 0;
+    }
+    .stat {
+      background: #1E1E20; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .stat-label { font-size: .65rem; font-weight: 700; color: #6E6E73; text-transform: uppercase; letter-spacing: .08em; }
+    .stat-value { font-size: 1.4rem; font-weight: 900; color: #F2F2F7; margin-top: 2px; letter-spacing: -0.02em; }
+    pre#log {
+      background: #0A0A0B; color: #86efac;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px; padding: 12px;
+      font-size: 11.5px; line-height: 1.5;
+      max-height: 320px; overflow-y: auto;
+      font-family: 'Courier New', Courier, monospace;
+      white-space: pre-wrap; word-break: break-word;
+      margin-top: 14px;
+    }
+    .info-box {
+      background: rgba(200,150,90,0.08);
+      border: 1px solid rgba(200,150,90,0.25);
+      border-radius: 10px; padding: 12px 14px;
+      font-size: .8rem; color: #E5C38A;
+      margin-bottom: 14px; line-height: 1.5;
+    }
+    .file-input-wrap {
+      position: relative; overflow: hidden;
+      display: block; width: 100%; padding: 14px;
+      background: #2E2E31; color: #F2F2F7;
+      border-radius: 12px; text-align: center;
+      cursor: pointer; font-size: .9rem; font-weight: 700;
+      transition: background .15s;
+    }
+    .file-input-wrap:hover { background: #3A3A3C; }
+    .file-input-wrap input { position: absolute; left: -9999px; opacity: 0; }
+    .preview-table {
+      max-height: 280px; overflow-y: auto;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; margin: 10px 0;
+      font-size: 12px;
+    }
+    .preview-table table { width: 100%; border-collapse: collapse; }
+    .preview-table th, .preview-table td {
+      padding: 7px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      text-align: left;
+    }
+    .preview-table th {
+      background: #1E1E20; color: #A1A1A6;
+      font-weight: 700; font-size: 11px;
+      text-transform: uppercase; letter-spacing: .06em;
+      position: sticky; top: 0;
+    }
+    .price-old { color: #6E6E73; text-decoration: line-through; }
+    .price-new { color: #86efac; font-weight: 700; }
+    a { color: #C8965A; }
+  </style>
+</head>
+<body>
+
+<h1>📊 Bulk Edit · <span class="accent">Repuestos</span></h1>
+<div class="subtitle">Exportá el inventario a Excel, editá los precios de costo, e importá los cambios.</div>
+
+<div class="info-box">
+  <b>💡 Cómo usarlo:</b><br>
+  1. <b>Descargá el Excel</b> con todo el listado (un sheet por tipo).<br>
+  2. Editá la columna <b>"Precio Costo"</b> en Excel (Google Sheets también funciona).<br>
+  3. <b>Subí el archivo modificado</b> — vas a ver un preview de los cambios.<br>
+  4. Confirmá y los precios se actualizan en la app.<br>
+  <i>El campo <code>id</code> no se debe modificar — sirve para matchear los registros.</i>
+</div>
+
+<div id="auth-status" class="auth-msg">⏳ Verificando sesión…</div>
+
+<div id="stats-wrap" style="display:none">
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Total repuestos</div><div class="stat-value" id="stat-total">—</div></div>
+    <div class="stat"><div class="stat-label">Tipos / sectores</div><div class="stat-value" id="stat-tipos">—</div></div>
+    <div class="stat"><div class="stat-label">Sin precio costo</div><div class="stat-value" id="stat-sinprecio">—</div></div>
+  </div>
+</div>
+
+<!-- Step 1: Export -->
+<div class="card">
+  <div><span class="step-num" id="num-1">1</span><span class="step-title">📥 Descargar Excel</span></div>
+  <div class="step-desc">Genera un .xlsx con varias hojas: <b>TODOS</b> (vista general) + una hoja por cada tipo (Pantalla, Módulo, Batería, etc.). Ordenado alfabéticamente por marca y modelo.</div>
+  <button class="btn" id="btn-export" disabled>📥 Descargar repuestos.xlsx</button>
+</div>
+
+<!-- Step 2: Import -->
+<div class="card">
+  <div><span class="step-num" id="num-2">2</span><span class="step-title">📤 Subir Excel modificado</span></div>
+  <div class="step-desc">Cargá el .xlsx con los precios actualizados. Se compara contra los datos actuales y te muestra qué va a cambiar antes de aplicar.</div>
+  <label class="file-input-wrap" id="file-label">
+    <span id="file-label-text">📂 Elegí el archivo Excel…</span>
+    <input type="file" id="file-import" accept=".xlsx,.xls">
+  </label>
+</div>
+
+<!-- Preview + Apply -->
+<div class="card" id="preview-wrap" style="display:none">
+  <div><span class="step-num" id="num-3">3</span><span class="step-title">✅ Preview de cambios</span></div>
+  <div class="step-desc" id="preview-desc"></div>
+  <div class="preview-table" id="preview-table"></div>
+  <button class="btn btn--success" id="btn-apply" disabled>✅ Aplicar cambios</button>
+</div>
+
+<pre id="log">Esperando inicialización…</pre>
+
+<div style="margin-top: 16px; text-align: center;">
+  <a href="index.html" style="font-size: .85rem;">← Volver a la app</a>
+</div>
+
+<!-- SheetJS desde CDN -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="utils.js"></script>
+<script src="firebase-config.js"></script>
+<script src="auth.js"></script>
+
+<script>
+  // ── Estado ──
+  let db = null;
+  let REPUESTOS = [];
+  let _pendingChanges = []; // { id, nombre, oldPrecio, newPrecio, oldStockMin, newStockMin, ... }
+
+  const $ = id => document.getElementById(id);
+
+  function log(msg) {
+    const pre = $('log');
+    const ts = new Date().toLocaleTimeString('es-AR');
+    if (pre.textContent === 'Esperando inicialización…') pre.textContent = '';
+    pre.textContent += `[${ts}] ${msg}\n`;
+    pre.scrollTop = pre.scrollHeight;
+  }
+
+  // ── Auth + carga inicial ──
+  requireAuth().then(async user => {
+    if (!user) return;
+    db = _fbInit();
+    $('auth-status').innerHTML = `✓ Sesión: <b>${user.email}</b>`;
+    $('auth-status').style.color = '#86efac';
+    log(`✓ Autenticado como ${user.email}`);
+    await cargarRepuestos();
+  });
+
+  async function cargarRepuestos() {
+    log('📥 Cargando repuestos desde Firestore…');
+    try {
+      const snap = await db.collection('repuestos').get();
+      REPUESTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const tipos = [...new Set(REPUESTOS.map(r => r.tipo || 'Sin tipo'))];
+      const sinPrecio = REPUESTOS.filter(r => !r.precioCompra || r.precioCompra <= 0).length;
+      $('stat-total').textContent     = REPUESTOS.length;
+      $('stat-tipos').textContent     = tipos.length;
+      $('stat-sinprecio').textContent = sinPrecio;
+      $('stats-wrap').style.display = '';
+      $('btn-export').disabled = !REPUESTOS.length;
+      log(`✓ ${REPUESTOS.length} repuestos cargados (${tipos.length} tipos, ${sinPrecio} sin precio costo)`);
+    } catch (e) {
+      log('✗ Error cargando: ' + e.message);
+    }
+  }
+
+  // ── EXPORT ──
+  $('btn-export').onclick = () => {
+    log('📊 Generando Excel…');
+    try {
+      // Ordenar por tipo > marca > modelo
+      const sorted = [...REPUESTOS].sort((a, b) => {
+        const t = (a.tipo || 'Sin tipo').localeCompare(b.tipo || 'Sin tipo');
+        if (t !== 0) return t;
+        const m = (a.marca || '').localeCompare(b.marca || '');
+        if (m !== 0) return m;
+        return (a.modelo || '').localeCompare(b.modelo || '');
+      });
+
+      // Construir filas
+      const filas = sorted.map(r => ({
+        id: r.id,
+        Tipo: r.tipo || '',
+        Marca: r.marca || '',
+        Modelo: r.modelo || '',
+        Nombre: r.nombre || '',
+        Cantidad: r.cantidad ?? 0,
+        'Stock Mín': r.stockMin ?? 0,
+        'Precio Costo': r.precioCompra ?? 0,
+        Proveedor: r.proveedor || '',
+        Notas: r.notas || '',
+      }));
+
+      // Workbook con varias hojas
+      const wb = XLSX.utils.book_new();
+
+      // Hoja TODOS
+      const wsAll = XLSX.utils.json_to_sheet(filas);
+      // Anchos de columna
+      wsAll['!cols'] = [
+        { wch: 22 }, // id
+        { wch: 14 }, // Tipo
+        { wch: 14 }, // Marca
+        { wch: 18 }, // Modelo
+        { wch: 38 }, // Nombre
+        { wch: 9 },  // Cantidad
+        { wch: 9 },  // Stock Mín
+        { wch: 13 }, // Precio Costo
+        { wch: 16 }, // Proveedor
+        { wch: 24 }, // Notas
+      ];
+      XLSX.utils.book_append_sheet(wb, wsAll, 'TODOS');
+
+      // Hojas por tipo
+      const tiposGrupos = {};
+      sorted.forEach(r => {
+        const t = r.tipo || 'Sin tipo';
+        (tiposGrupos[t] = tiposGrupos[t] || []).push(r);
+      });
+      Object.keys(tiposGrupos).sort().forEach(tipo => {
+        const grupo = tiposGrupos[tipo];
+        const filas = grupo.map(r => ({
+          id: r.id,
+          Marca: r.marca || '',
+          Modelo: r.modelo || '',
+          Nombre: r.nombre || '',
+          Cantidad: r.cantidad ?? 0,
+          'Stock Mín': r.stockMin ?? 0,
+          'Precio Costo': r.precioCompra ?? 0,
+          Proveedor: r.proveedor || '',
+          Notas: r.notas || '',
+        }));
+        const ws = XLSX.utils.json_to_sheet(filas);
+        ws['!cols'] = [
+          { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 38 },
+          { wch: 9 }, { wch: 9 }, { wch: 13 }, { wch: 16 }, { wch: 24 },
+        ];
+        // Sheet name: max 31 chars, sin caracteres prohibidos
+        const sheetName = String(tipo).replace(/[\\\/\[\]\*\?\:]/g, '').slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Sin tipo');
+      });
+
+      // Descargar
+      const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0, 19);
+      XLSX.writeFile(wb, `repuestos-${stamp}.xlsx`);
+      log(`✓ Excel descargado: repuestos-${stamp}.xlsx`);
+      log(`  → ${filas.length} repuestos · ${Object.keys(tiposGrupos).length + 1} hojas`);
+      $('num-1').classList.add('done');
+    } catch (e) {
+      log('✗ Error en export: ' + e.message);
+      console.error(e);
+    }
+  };
+
+  // ── IMPORT ──
+  $('file-import').onchange = async (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    $('file-label-text').textContent = '📄 ' + file.name;
+    log(`📤 Leyendo: ${file.name}…`);
+
+    try {
+      const buf = await file.arrayBuffer();
+      const wb  = XLSX.read(buf, { type: 'array' });
+
+      // Leer todas las hojas y mergear por id (last write wins)
+      const filasPorId = new Map();
+      wb.SheetNames.forEach(name => {
+        const ws = wb.Sheets[name];
+        const filas = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        filas.forEach(row => {
+          const id = String(row.id || '').trim();
+          if (!id) return;
+          filasPorId.set(id, row);
+        });
+      });
+
+      log(`  → ${filasPorId.size} filas con id encontradas en el Excel`);
+
+      // Comparar con datos actuales
+      const cambios = [];
+      let sinId = 0, idDesconocido = 0, sinCambios = 0;
+      const repMap = new Map(REPUESTOS.map(r => [r.id, r]));
+
+      filasPorId.forEach((row, id) => {
+        const orig = repMap.get(id);
+        if (!orig) { idDesconocido++; return; }
+
+        const newPrecio   = Number(row['Precio Costo']) || 0;
+        const newStockMin = row['Stock Mín'] != null && row['Stock Mín'] !== '' ? Number(row['Stock Mín']) : null;
+        const newCantidad = row['Cantidad']   != null && row['Cantidad']   !== '' ? Number(row['Cantidad']) : null;
+        const newProveedor = String(row['Proveedor'] || '').trim();
+        const newNotas     = String(row['Notas'] || '').trim();
+
+        const oldPrecio   = Number(orig.precioCompra) || 0;
+        const oldStockMin = orig.stockMin ?? 0;
+        const oldCantidad = orig.cantidad ?? 0;
+        const oldProveedor = orig.proveedor || '';
+        const oldNotas     = orig.notas || '';
+
+        const diff = {};
+        if (newPrecio !== oldPrecio)              diff.precioCompra = newPrecio;
+        if (newStockMin != null && newStockMin !== oldStockMin) diff.stockMin = newStockMin;
+        if (newCantidad != null && newCantidad !== oldCantidad) diff.cantidad = newCantidad;
+        if (newProveedor !== oldProveedor)        diff.proveedor = newProveedor;
+        if (newNotas !== oldNotas)                diff.notas = newNotas;
+
+        if (Object.keys(diff).length === 0) { sinCambios++; return; }
+
+        cambios.push({
+          id,
+          nombre: orig.nombre || (orig.marca + ' ' + orig.modelo),
+          marca: orig.marca,
+          modelo: orig.modelo,
+          oldPrecio, newPrecio,
+          oldStockMin, newStockMin: diff.stockMin != null ? newStockMin : oldStockMin,
+          diff
+        });
+      });
+
+      log(`  → ${cambios.length} cambios detectados`);
+      log(`  → ${sinCambios} sin cambios`);
+      if (idDesconocido) log(`  ⚠ ${idDesconocido} ids del Excel no existen en la base`);
+      if (sinId) log(`  ⚠ ${sinId} filas sin id (ignoradas)`);
+
+      _pendingChanges = cambios;
+      mostrarPreview(cambios);
+      $('num-2').classList.add('done');
+    } catch (e) {
+      log('✗ Error leyendo el Excel: ' + e.message);
+      console.error(e);
+    }
+  };
+
+  function mostrarPreview(cambios) {
+    const wrap = $('preview-wrap');
+    const desc = $('preview-desc');
+    const table = $('preview-table');
+
+    if (!cambios.length) {
+      wrap.style.display = '';
+      desc.textContent = 'No hay cambios para aplicar.';
+      table.innerHTML = '';
+      $('btn-apply').disabled = true;
+      return;
+    }
+
+    desc.textContent = `${cambios.length} repuestos van a actualizarse:`;
+    table.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Repuesto</th>
+            <th>Cambios</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cambios.map(c => {
+            const detalles = Object.entries(c.diff).map(([k, v]) => {
+              const oldVal = k === 'precioCompra' ? c.oldPrecio
+                          : k === 'stockMin'     ? (c.oldStockMin ?? 0)
+                          : k === 'cantidad'     ? '?'
+                          : k === 'proveedor'    ? '?'
+                          : k === 'notas'        ? '?'
+                          : '?';
+              const formatVal = v => k === 'precioCompra' ? '$' + Number(v).toLocaleString('es-AR') : v;
+              return `<div><b>${k}:</b> <span class="price-old">${formatVal(oldVal)}</span> → <span class="price-new">${formatVal(v)}</span></div>`;
+            }).join('');
+            return `<tr>
+              <td>${escapeHtml(c.marca || '')} ${escapeHtml(c.modelo || '')}<br><small style="color:#6E6E73">${escapeHtml(c.nombre || '')}</small></td>
+              <td>${detalles}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+    wrap.style.display = '';
+    $('btn-apply').disabled = false;
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ── APLICAR cambios ──
+  $('btn-apply').onclick = async () => {
+    if (!_pendingChanges.length) return;
+    const ok = confirm(`¿Aplicar ${_pendingChanges.length} cambios a la base?`);
+    if (!ok) { log('✕ Cancelado'); return; }
+
+    $('btn-apply').disabled = true;
+    log(`\n🚀 Aplicando ${_pendingChanges.length} cambios…`);
+
+    try {
+      const BATCH_SIZE = 400;
+      let batch = db.batch(), inBatch = 0, totalUpdated = 0, batchNum = 0;
+
+      for (const c of _pendingChanges) {
+        batch.update(db.collection('repuestos').doc(c.id), c.diff);
+        inBatch++;
+        if (inBatch >= BATCH_SIZE) {
+          await batch.commit();
+          batchNum++;
+          totalUpdated += inBatch;
+          log(`  ✓ Batch ${batchNum}: ${inBatch} actualizados`);
+          batch = db.batch(); inBatch = 0;
+        }
+      }
+      if (inBatch > 0) {
+        await batch.commit();
+        batchNum++;
+        totalUpdated += inBatch;
+        log(`  ✓ Batch final ${batchNum}: ${inBatch} actualizados`);
+      }
+
+      log(`\n✅ ${totalUpdated} repuestos actualizados.`);
+      log('Recargá la app principal para ver los cambios.');
+      $('num-3').classList.add('done');
+      $('btn-apply').textContent = '✓ Cambios aplicados';
+      _pendingChanges = [];
+      // Refrescar
+      await cargarRepuestos();
+    } catch (e) {
+      log('✗ ERROR: ' + e.message);
+      console.error(e);
+      $('btn-apply').disabled = false;
+    }
+  };
+</script>
+</body>
+</html>
