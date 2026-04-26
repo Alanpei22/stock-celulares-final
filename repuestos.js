@@ -26,7 +26,7 @@ const _BULK_BRANDS = {
   'samsung':'Samsung',
   'redmi':'Xiaomi','xiaomi':'Xiaomi',
   'zte':'ZTE',
-  'iphone':'Apple','apple':'Apple',
+  'iphone':'iPhone','apple':'iPhone',
   'nokia':'Nokia','tcl':'TCL',
   'huawei':'Huawei','lg':'LG',
   'alcatel':'Alcatel','lenovo':'Lenovo',

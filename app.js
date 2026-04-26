@@ -2115,7 +2115,7 @@ async function saveBulkAI() {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const bateria = parseInt(get('bateria')) || null;
     const doc = {
-      id, marca: 'Apple', modelo, estado: 'Usado', precio,
+      id, marca: 'iPhone', modelo, estado: 'Usado', precio,
       almacenamiento: get('almacenamiento') || '',
       notas: get('notas') || '',
       vendido: false, fecha: new Date().toISOString()

@@ -165,7 +165,7 @@ REGLAS:
 - "2 disponibles" o "(x2)" = generá 2 entradas idénticas.
 - Precio en "k" = multiplicar por 1000. Rango "550k a 580k" = promedio = 565000.
 - Precio único "600k" = 600000.
-- La marca siempre es "Apple" para iPhones.
+- La marca siempre es "iPhone" para iPhones.
 - modelo = "iPhone 13", "iPhone 14 Pro", etc. (sin almacenamiento en el nombre).
 - almacenamiento = "128 GB", "256 GB", etc.
 - bateria = número entero (ej: 94). null si no se menciona.
@@ -173,7 +173,7 @@ REGLAS:
 - estado siempre = "Usado".
 
 Formato de cada objeto:
-{"marca":"Apple","modelo":"iPhone 13","almacenamiento":"128 GB","estado":"Usado","bateria":94,"notas":"Azul","precio":565000}
+{"marca":"iPhone","modelo":"iPhone 13","almacenamiento":"128 GB","estado":"Usado","bateria":94,"notas":"Azul","precio":565000}
 
 Devolvé ÚNICAMENTE el array JSON. Sin texto antes ni después. Sin markdown. Sin explicación.
 

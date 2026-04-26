@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Migración: Apple → iPhone</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #0F0F10; color: #F2F2F7;
+      padding: 24px 16px; min-height: 100vh;
+      max-width: 760px; margin: 0 auto;
+    }
+    h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 4px; }
+    h1 .accent { color: #C8965A; }
+    .subtitle { color: #A1A1A6; font-size: .85rem; margin-bottom: 20px; }
+    .card {
+      background: #161618; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px; padding: 16px; margin-bottom: 14px;
+    }
+    .step-num {
+      display: inline-block; background: #C8965A; color: #fff;
+      width: 24px; height: 24px; border-radius: 50%;
+      font-size: .8rem; font-weight: 800; line-height: 24px; text-align: center;
+      margin-right: 8px;
+    }
+    .step-num.done { background: #22c55e; }
+    .step-title { font-weight: 700; font-size: 1rem; }
+    .step-desc { color: #A1A1A6; font-size: .8rem; margin: 8px 0 12px 32px; line-height: 1.4; }
+    .btn {
+      width: 100%; padding: 14px;
+      border: none; border-radius: 12px;
+      background: #C8965A; color: #fff;
+      font-size: .95rem; font-weight: 800; cursor: pointer;
+      transition: opacity .15s, transform .1s;
+      font-family: inherit;
+    }
+    .btn:hover:not(:disabled) { opacity: .9; }
+    .btn:active:not(:disabled) { transform: scale(.98); }
+    .btn:disabled { opacity: .35; cursor: not-allowed; }
+    .btn--danger { background: #ef4444; }
+    .btn--success { background: #22c55e; }
+    .auth-msg { padding: 14px; border-radius: 12px; background: #1c1917; color: #fbbf24; font-size: .85rem; margin-bottom: 14px; }
+    .stats {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      margin: 12px 0;
+    }
+    .stat {
+      background: #1E1E20; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .stat-label { font-size: .65rem; font-weight: 700; color: #6E6E73; text-transform: uppercase; letter-spacing: .08em; }
+    .stat-value { font-size: 1.4rem; font-weight: 900; color: #F2F2F7; margin-top: 2px; letter-spacing: -0.02em; }
+    pre#log {
+      background: #0A0A0B; color: #86efac;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px; padding: 12px;
+      font-size: 11.5px; line-height: 1.5;
+      max-height: 320px; overflow-y: auto;
+      font-family: 'Courier New', Courier, monospace;
+      white-space: pre-wrap; word-break: break-word;
+      margin-top: 14px;
+    }
+    .info-box {
+      background: rgba(200,150,90,0.08);
+      border: 1px solid rgba(200,150,90,0.25);
+      border-radius: 10px; padding: 12px 14px;
+      font-size: .8rem; color: #E5C38A;
+      margin-bottom: 14px; line-height: 1.5;
+    }
+    a { color: #C8965A; }
+  </style>
+</head>
+<body>
+
+<h1>🔄 Migración <span class="accent">Apple → iPhone</span></h1>
+<div class="subtitle">Reemplaza el campo <code>marca</code> en <b>stock</b>, <b>repairs</b> y <b>repuestos</b>.</div>
+
+<div class="info-box">
+  <b>⚠️ Antes de ejecutar:</b><br>
+  1. Asegurate de estar logueado en la app principal.<br>
+  2. Hacé el backup primero (descarga un JSON local).<br>
+  3. Corré el dry-run para ver exactamente qué se va a cambiar.<br>
+  4. Solo después clickeá "Ejecutar migración".
+</div>
+
+<div id="auth-status" class="auth-msg">⏳ Verificando sesión…</div>
+
+<!-- Stats -->
+<div id="stats-wrap" style="display:none">
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Stock</div><div class="stat-value" id="stat-stock">—</div></div>
+    <div class="stat"><div class="stat-label">Repairs</div><div class="stat-value" id="stat-repairs">—</div></div>
+    <div class="stat"><div class="stat-label">Repuestos</div><div class="stat-value" id="stat-repuestos">—</div></div>
+  </div>
+</div>
+
+<!-- Step 1: Backup -->
+<div class="card">
+  <div><span class="step-num" id="num-1">1</span><span class="step-title">📦 Hacer Backup</span></div>
+  <div class="step-desc">Descarga un archivo JSON con todos los registros que tienen "Apple" en la marca. Guardalo en lugar seguro antes de migrar.</div>
+  <button class="btn" id="btn-backup" disabled>📥 Descargar Backup</button>
+</div>
+
+<!-- Step 2: Dry run -->
+<div class="card">
+  <div><span class="step-num" id="num-2">2</span><span class="step-title">🔍 Dry Run (vista previa)</span></div>
+  <div class="step-desc">Recorre los datos sin modificar nada y muestra qué cambiaría. Te dice exactamente cuántos registros y de qué colección.</div>
+  <button class="btn" id="btn-dryrun" disabled>🔍 Ejecutar Dry Run</button>
+</div>
+
+<!-- Step 3: Execute -->
+<div class="card">
+  <div><span class="step-num" id="num-3">3</span><span class="step-title">✅ Ejecutar Migración</span></div>
+  <div class="step-desc">Solo se habilita después de hacer el backup y el dry-run. Pide confirmación antes de modificar nada.</div>
+  <button class="btn btn--success" id="btn-migrate" disabled>🚀 Ejecutar Migración</button>
+</div>
+
+<pre id="log">Esperando inicialización…</pre>
+
+<div style="margin-top: 16px; text-align: center;">
+  <a href="index.html" style="font-size: .85rem;">← Volver a la app</a>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="utils.js"></script>
+<script src="firebase-config.js"></script>
+<script src="auth.js"></script>
+
+<script>
+  // ── Estado global ──
+  let db = null;
+  let _backupDone = false;
+  let _dryRunDone = false;
+  let _affected = { stock: [], repairs: [], repuestos: [] };
+
+  const $ = id => document.getElementById(id);
+
+  function log(msg) {
+    const pre = $('log');
+    const ts = new Date().toLocaleTimeString('es-AR');
+    if (pre.textContent === 'Esperando inicialización…') pre.textContent = '';
+    pre.textContent += `[${ts}] ${msg}\n`;
+    pre.scrollTop = pre.scrollHeight;
+  }
+
+  function isApple(marca) {
+    return /apple/i.test(marca || '');
+  }
+
+  // ── Auth ──
+  requireAuth().then(async user => {
+    if (!user) return; // requireAuth ya redirige
+    db = _fbInit();
+    $('auth-status').innerHTML = `✓ Sesión: <b>${user.email}</b>`;
+    $('auth-status').style.color = '#86efac';
+    log(`✓ Autenticado como ${user.email}`);
+    await loadStats();
+    $('btn-backup').disabled = false;
+    $('btn-dryrun').disabled = false;
+  });
+
+  // ── Cargar stats iniciales ──
+  async function loadStats() {
+    log('📊 Contando registros afectados…');
+    try {
+      const counts = await scanAll();
+      $('stat-stock').textContent     = counts.stock.length;
+      $('stat-repairs').textContent   = counts.repairs.length;
+      $('stat-repuestos').textContent = counts.repuestos.length;
+      $('stats-wrap').style.display = '';
+      _affected = counts;
+      const total = counts.stock.length + counts.repairs.length + counts.repuestos.length;
+      log(`📊 Total a migrar: ${total} registros (${counts.stock.length} stock + ${counts.repairs.length} repairs + ${counts.repuestos.length} repuestos)`);
+      if (total === 0) {
+        log('✓ Nada que migrar — la base ya está limpia.');
+        $('btn-backup').disabled = true;
+        $('btn-dryrun').disabled = true;
+      }
+    } catch (e) {
+      log('✗ Error contando: ' + e.message);
+    }
+  }
+
+  // ── Helper: leer las 3 colecciones y filtrar ──
+  async function scanAll() {
+    const result = { stock: [], repairs: [], repuestos: [] };
+
+    const [stockSnap, repairsSnap, repuestosSnap] = await Promise.all([
+      db.collection('stock').get(),
+      db.collection('repairs').get(),
+      db.collection('repuestos').get(),
+    ]);
+
+    stockSnap.forEach(d => {
+      const data = d.data();
+      if (isApple(data.marca)) result.stock.push({ id: d.id, oldMarca: data.marca, modelo: data.modelo, ref: d.ref });
+    });
+    repairsSnap.forEach(d => {
+      const data = d.data();
+      if (isApple(data.marca)) result.repairs.push({ id: d.id, oldMarca: data.marca, modelo: data.modelo, nOrden: data.nOrden, ref: d.ref });
+    });
+    repuestosSnap.forEach(d => {
+      const data = d.data();
+      if (isApple(data.marca)) result.repuestos.push({ id: d.id, oldMarca: data.marca, nombre: data.nombre, ref: d.ref });
+    });
+
+    return result;
+  }
+
+  // ── BACKUP ──
+  $('btn-backup').onclick = async () => {
+    $('btn-backup').disabled = true;
+    log('📦 Generando backup completo de los registros afectados…');
+    try {
+      const stockSnap    = await db.collection('stock').get();
+      const repairsSnap  = await db.collection('repairs').get();
+      const repuestosSnap= await db.collection('repuestos').get();
+
+      const backup = {
+        timestamp: new Date().toISOString(),
+        descripcion: 'Backup pre-migración Apple → iPhone',
+        stock:     stockSnap.docs.filter(d => isApple(d.data().marca)).map(d => ({ id: d.id, ...d.data() })),
+        repairs:   repairsSnap.docs.filter(d => isApple(d.data().marca)).map(d => ({ id: d.id, ...d.data() })),
+        repuestos: repuestosSnap.docs.filter(d => isApple(d.data().marca)).map(d => ({ id: d.id, ...d.data() })),
+      };
+
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0, 19);
+      a.href = url; a.download = `backup-apple-iphone-${stamp}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      log(`✓ Backup descargado: ${backup.stock.length + backup.repairs.length + backup.repuestos.length} registros`);
+      log(`  → Archivo: backup-apple-iphone-${stamp}.json`);
+      _backupDone = true;
+      $('num-1').classList.add('done');
+      $('btn-backup').textContent = '✓ Backup descargado (volver a hacerlo)';
+      $('btn-backup').disabled = false;
+      _checkMigrateEnabled();
+    } catch (e) {
+      log('✗ Error en backup: ' + e.message);
+      $('btn-backup').disabled = false;
+    }
+  };
+
+  // ── DRY RUN ──
+  $('btn-dryrun').onclick = async () => {
+    $('btn-dryrun').disabled = true;
+    log('🔍 Dry run iniciado — NO se modifica nada…');
+    try {
+      const data = await scanAll();
+      _affected = data;
+
+      log(`\n── STOCK (${data.stock.length}) ──`);
+      data.stock.slice(0, 10).forEach(x => log(`  ${x.id}  "${x.oldMarca}" → "iPhone"  (${x.modelo || '?'})`));
+      if (data.stock.length > 10) log(`  ... y ${data.stock.length - 10} más`);
+
+      log(`\n── REPAIRS (${data.repairs.length}) ──`);
+      data.repairs.slice(0, 10).forEach(x => log(`  N°${x.nOrden || '?'} ${x.id}  "${x.oldMarca}" → "iPhone"  (${x.modelo || '?'})`));
+      if (data.repairs.length > 10) log(`  ... y ${data.repairs.length - 10} más`);
+
+      log(`\n── REPUESTOS (${data.repuestos.length}) ──`);
+      data.repuestos.slice(0, 10).forEach(x => log(`  ${x.id}  "${x.oldMarca}" → "iPhone"  (${x.nombre || '?'})`));
+      if (data.repuestos.length > 10) log(`  ... y ${data.repuestos.length - 10} más`);
+
+      const total = data.stock.length + data.repairs.length + data.repuestos.length;
+      log(`\n✓ DRY RUN COMPLETO — Migraría ${total} registros`);
+      _dryRunDone = true;
+      $('num-2').classList.add('done');
+      $('btn-dryrun').textContent = '✓ Dry run hecho (volver a correr)';
+      $('btn-dryrun').disabled = false;
+      _checkMigrateEnabled();
+    } catch (e) {
+      log('✗ Error en dry-run: ' + e.message);
+      $('btn-dryrun').disabled = false;
+    }
+  };
+
+  function _checkMigrateEnabled() {
+    $('btn-migrate').disabled = !(_backupDone && _dryRunDone);
+  }
+
+  // ── MIGRACIÓN REAL ──
+  $('btn-migrate').onclick = async () => {
+    const total = _affected.stock.length + _affected.repairs.length + _affected.repuestos.length;
+    if (total === 0) { alert('Nada que migrar.'); return; }
+    const ok = confirm(
+      `¿Confirmás la migración?\n\n` +
+      `Se actualizarán ${total} registros:\n` +
+      `  • ${_affected.stock.length} en stock\n` +
+      `  • ${_affected.repairs.length} en repairs\n` +
+      `  • ${_affected.repuestos.length} en repuestos\n\n` +
+      `Esta acción no se puede deshacer (pero tenés el backup).`
+    );
+    if (!ok) { log('✕ Cancelado por el usuario'); return; }
+
+    $('btn-migrate').disabled = true;
+    log('\n🚀 Iniciando migración…');
+
+    try {
+      const BATCH_SIZE = 400; // límite Firestore = 500, dejo margen
+      let totalUpdated = 0;
+
+      for (const [colName, items] of Object.entries(_affected)) {
+        if (!items.length) continue;
+        log(`\n── Migrando ${colName} (${items.length} registros) ──`);
+
+        let batch = db.batch();
+        let inBatch = 0, batchNum = 0, updatedInColl = 0;
+
+        for (const item of items) {
+          batch.update(item.ref, { marca: 'iPhone' });
+          inBatch++;
+          if (inBatch >= BATCH_SIZE) {
+            await batch.commit();
+            batchNum++;
+            updatedInColl += inBatch;
+            log(`  ✓ Batch ${batchNum}: ${inBatch} actualizados`);
+            batch = db.batch();
+            inBatch = 0;
+          }
+        }
+        if (inBatch > 0) {
+          await batch.commit();
+          batchNum++;
+          updatedInColl += inBatch;
+          log(`  ✓ Batch final ${batchNum}: ${inBatch} actualizados`);
+        }
+        log(`  → Total ${colName}: ${updatedInColl} registros`);
+        totalUpdated += updatedInColl;
+      }
+
+      log(`\n✅ MIGRACIÓN COMPLETA — ${totalUpdated} registros actualizados.`);
+      log('Recargá la app principal para ver los cambios.');
+      $('num-3').classList.add('done');
+      $('btn-migrate').textContent = '✓ Migración completada';
+      // Refrescar contadores
+      await loadStats();
+    } catch (e) {
+      log('✗ ERROR durante la migración: ' + e.message);
+      log('  Revisá la consola del navegador para más detalles.');
+      console.error(e);
+      $('btn-migrate').disabled = false;
+    }
+  };
+</script>
+</body>
+</html>
