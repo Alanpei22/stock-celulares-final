@@ -76,7 +76,7 @@ function _listenProductos() {
 
 // ── Render lista ────────────────────────────────────────────
 function renderInventario() {
-  const search = (document.getElementById('inv-search')?.value || '').toLowerCase();
+  const search = (document.getElementById('inv-search')?.value || '').trim();
   const catF   = document.getElementById('inv-f-cat')?.value || '';
   const estF   = document.getElementById('inv-f-estado')?.value || '';
 
@@ -84,9 +84,7 @@ function renderInventario() {
 
   if (search) {
     lista = lista.filter(p =>
-      (p.nombre || '').toLowerCase().includes(search) ||
-      (p.codigo || '').toLowerCase().includes(search) ||
-      (p.categoria || '').toLowerCase().includes(search)
+      searchMatch([p.nombre, p.codigo, p.categoria], search)
     );
   }
   if (catF)  lista = lista.filter(p => p.categoria === catF);

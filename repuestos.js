@@ -204,11 +204,11 @@ function initCatalogAutocomplete() {
   if (!input || !list) return;
 
   input.addEventListener('input', () => {
-    const q = input.value.trim().toLowerCase();
+    const q = input.value.trim();
     if (q.length < 2) { list.classList.add('hidden'); return; }
 
     const matches = MODULOS_CATALOG.filter(([marca, nombre]) =>
-      nombre.toLowerCase().includes(q) || marca.toLowerCase().includes(q)
+      searchMatch([nombre, marca], q)
     ).slice(0, 12);
 
     if (!matches.length) { list.classList.add('hidden'); return; }
@@ -267,9 +267,7 @@ function renderRepuestos() {
     if (fTipo  && r.tipo  !== fTipo)  return false;
     if (fMarca && r.marca !== fMarca) return false;
     if (q) {
-      const hay = [r.nombre, r.marca, r.modelo, r.tipo, r.proveedor]
-        .map(x => String(x || '')).join(' ').toLowerCase();
-      if (!hay.includes(q)) return false;
+      if (!searchMatch([r.nombre, r.marca, r.modelo, r.tipo, r.proveedor], q)) return false;
     }
     return true;
   });

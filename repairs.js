@@ -186,9 +186,7 @@ function renderRepairs() {
     } else if (fEstado && r.estado !== fEstado) return false;
     if (fMarca  && r.marca  !== fMarca)  return false;
     if (q) {
-      const hay = [r.nOrden, r.marca, r.modelo, r.arreglo, r.nombre, r.tlf, r.dni]
-        .map(x => String(x || '')).join(' ').toLowerCase();
-      if (!hay.includes(q)) return false;
+      if (!searchMatch([r.nOrden, r.marca, r.modelo, r.arreglo, r.nombre, r.tlf, r.dni], q)) return false;
     }
     if (fFecha === 'hoy') {
       if (!r.fechaIngreso || !r.fechaIngreso.startsWith(todayStr)) return false;
@@ -2126,10 +2124,7 @@ function renderRepUsoList() {
   }
   let items = REPUESTOS;
   if (q) {
-    items = items.filter(r =>
-      [r.nombre, r.marca, r.modelo, r.tipo]
-        .map(x => (x || '').toLowerCase()).join(' ').includes(q)
-    );
+    items = items.filter(r => searchMatch([r.nombre, r.marca, r.modelo, r.tipo], q));
   }
   if (!items.length) {
     list.innerHTML = '<p class="rep-uso-empty">Sin resultados</p>';

@@ -38,15 +38,13 @@ function initPresupuestos() {
 
 // ── Render ────────────────────────────────
 function renderPresupuestos() {
-  const q       = (document.getElementById('pres-search').value || '').trim().toLowerCase();
+  const q       = (document.getElementById('pres-search').value || '').trim();
   const fEstado = document.getElementById('pres-f-estado').value;
 
   let filtered = PRESUPUESTOS.filter(p => {
     if (fEstado && p.estado !== fEstado) return false;
     if (q) {
-      const hay = [p.nombre, p.marca, p.modelo, p.problema, p.tlf]
-        .map(x => String(x || '')).join(' ').toLowerCase();
-      if (!hay.includes(q)) return false;
+      if (!searchMatch([p.nombre, p.marca, p.modelo, p.problema, p.tlf], q)) return false;
     }
     return true;
   });

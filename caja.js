@@ -747,19 +747,16 @@ function _onMovDescInput() {
   const tipo = document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') ? 'ingreso' : 'egreso';
   if (tipo !== 'ingreso') { _hideMovSuggestions(); return; }
 
-  // Tokenizar la búsqueda: cada palabra debe coincidir en algún campo
-  // Esto permite buscar "vidrio iphone" → encuentra "Vidrio templado iPhone 14"
-  const tokens = q.split(/\s+/).filter(Boolean);
-  const matches = (haystack) => tokens.every(t => haystack.includes(t));
-
+  // searchMatch (utils.js) tokeniza, normaliza acentos y expande sinónimos.
+  // Ejemplos: "modulo iphone" encuentra "Pantalla iPhone 14",
+  //           "Módulo" matchea "modulo", "vidrio" matchea "templado", etc.
   const results = [];
 
   // ── Productos (inventario) ──
   if (typeof PRODUCTOS !== 'undefined' && Array.isArray(PRODUCTOS)) {
     PRODUCTOS.forEach(p => {
       if (p.activo === false) return;
-      const haystack = `${p.nombre || ''} ${p.codigo || ''} ${p.categoria || ''}`.toLowerCase();
-      if (matches(haystack)) {
+      if (searchMatch([p.nombre, p.codigo, p.categoria], q)) {
         results.push({
           source: 'producto',
           id: p.id,
@@ -775,8 +772,7 @@ function _onMovDescInput() {
 
   // ── Repuestos ──
   CAJA_REPUESTOS.forEach(r => {
-    const haystack = `${r.nombre || ''} ${r.marca || ''} ${r.modelo || ''} ${r.tipo || ''}`.toLowerCase();
-    if (matches(haystack)) {
+    if (searchMatch([r.nombre, r.marca, r.modelo, r.tipo], q)) {
       results.push({
         source: 'repuesto',
         id: r.id,
@@ -790,9 +786,10 @@ function _onMovDescInput() {
   });
 
   // Priorizar coincidencia al inicio del nombre, después por stock disponible, después alfabético
+  const qNorm = normalizeText(q);
   results.sort((a, b) => {
-    const aStart = a.nombre.toLowerCase().startsWith(q) ? 0 : 1;
-    const bStart = b.nombre.toLowerCase().startsWith(q) ? 0 : 1;
+    const aStart = normalizeText(a.nombre).startsWith(qNorm) ? 0 : 1;
+    const bStart = normalizeText(b.nombre).startsWith(qNorm) ? 0 : 1;
     if (aStart !== bStart) return aStart - bStart;
     // Items con stock antes de los sin stock
     const aHas = a.stock > 0 ? 0 : 1;

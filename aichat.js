@@ -390,12 +390,18 @@ async function executeUpdateRepuestos(cmd, actions) {
       let match = null;
 
       if (typeof REPUESTOS !== 'undefined') {
+        const needleN = normalizeText(needle);
+        const marcaNeedleN = normalizeText(marcaNeedle || '');
         // Exact name match first
-        match = REPUESTOS.find(r => (r.nombre || '').toLowerCase() === needle);
-        // Fallback: contains
-        if (!match) match = REPUESTOS.find(r => (r.nombre || '').toLowerCase().includes(needle) && (!marcaNeedle || (r.marca || '').toLowerCase().includes(marcaNeedle)));
+        match = REPUESTOS.find(r => normalizeText(r.nombre) === needleN);
+        // Fallback: nombre contains needle
+        if (!match) match = REPUESTOS.find(r =>
+          normalizeText(r.nombre).includes(needleN) &&
+          (!marcaNeedle || normalizeText(r.marca).includes(marcaNeedleN)));
         // Fallback: needle contains repuesto name
-        if (!match) match = REPUESTOS.find(r => needle.includes((r.nombre || '').toLowerCase()) && (!marcaNeedle || (r.marca || '').toLowerCase().includes(marcaNeedle)));
+        if (!match) match = REPUESTOS.find(r =>
+          needleN.includes(normalizeText(r.nombre)) &&
+          (!marcaNeedle || normalizeText(r.marca).includes(marcaNeedleN)));
       }
 
       if (match) {

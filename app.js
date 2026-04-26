@@ -645,9 +645,9 @@ function render() {
     if (fMax > 0 && (p.precio || 0) > fMax) return false;
     if (fVendedor && p.vendedor !== fVendedor) return false;
     if (fUbi && p.ubicacion !== fUbi) return false;
-    if (words.length) {
-      const hay = (p.marca + ' ' + p.modelo + ' ' + (p.imei || '') + ' ' + (p.notas || '')).toLowerCase();
-      return words.every(w => hay.includes(w));
+    if (q) {
+      const hay = `${p.marca || ''} ${p.modelo || ''} ${p.almacenamiento || ''} ${p.imei || ''} ${p.notas || ''}`;
+      return searchMatch(hay, q);
     }
     return true;
   });
