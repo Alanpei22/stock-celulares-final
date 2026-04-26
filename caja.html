@@ -288,10 +288,15 @@
     <input type="hidden" id="mov-hidden-cat">
   </div>
 
-  <!-- Descripción -->
+  <!-- Descripción + autocomplete inventario/repuestos -->
   <div class="fg">
     <label class="fl">Descripción</label>
-    <input id="mov-fi-desc" class="fi" type="text" placeholder="Ej: Reparación N°123, compra módulo... *">
+    <div class="mov-desc-wrap">
+      <input id="mov-fi-desc" class="fi" type="text" placeholder="Buscá producto / repuesto o escribí libre... *" autocomplete="off">
+      <div id="mov-desc-suggest" class="mov-desc-suggest hidden"></div>
+    </div>
+    <!-- Item seleccionado (cantidad + stock) -->
+    <div id="mov-sale-item-info" class="mov-sale-item-info hidden"></div>
   </div>
 
   <!-- Método de pago -->

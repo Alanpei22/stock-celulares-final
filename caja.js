@@ -31,6 +31,20 @@ let movListener = null;
 let editingMovId = null;
 let CIERRE = null;
 
+// ── Autocomplete de venta ─────────────────────────────────
+let CAJA_REPUESTOS = [];        // listener específico para autocomplete
+let _cajaRepuestosListener = null;
+let _selectedSaleItem = null;   // { source, id, nombre, stock, precio, icon, extra }
+
+// Expone cleanup para que auth.js cancele listeners en logout
+window._cajaCleanup = function() {
+  if (movListener) { movListener(); movListener = null; }
+  if (_cajaRepuestosListener) { _cajaRepuestosListener(); _cajaRepuestosListener = null; }
+  CAJA_REPUESTOS = [];
+  MOVIMIENTOS = [];
+  _selectedSaleItem = null;
+};
+
 // ══════════════════════════════════════════
 //  DARK MODE
 // ══════════════════════════════════════════
@@ -72,6 +86,8 @@ function initApp() {
   listenMovimientos();
   loadArqueo();
   loadCierre();
+  listenCajaRepuestos();           // ← repuestos para autocomplete
+  _initMovDescAutocomplete();      // ← input handler de descripción
   if (typeof initInventario === 'function') initInventario();
 }
 
@@ -536,6 +552,7 @@ function openMovForm(id) {
     document.getElementById('mov-fi-monto').value = '';
     document.getElementById('mov-fi-desc').value  = '';
     selectMetodo('Efectivo');
+    _clearSaleItem();
   }
 
   // Clear any previous error highlights and split state
@@ -563,6 +580,8 @@ function closeMovForm() {
   document.getElementById('mov-overlay').classList.add('hidden');
   document.getElementById('mov-modal').classList.add('hidden');
   editingMovId = null;
+  _clearSaleItem();
+  _hideMovSuggestions();
 }
 
 function setMovTipo(tipo) {
@@ -686,6 +705,213 @@ function _markError(el, on) {
   }
 }
 
+// ══════════════════════════════════════════
+//  AUTOCOMPLETE de descripción de venta
+//  → Productos (inventario) + Repuestos
+//  → Descuenta stock al guardar (solo en INGRESO)
+// ══════════════════════════════════════════
+
+function listenCajaRepuestos() {
+  if (_cajaRepuestosListener) return;
+  _cajaRepuestosListener = db.collection('repuestos').onSnapshot(snap => {
+    CAJA_REPUESTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }, err => console.error('Repuestos (caja):', err));
+}
+
+function _initMovDescAutocomplete() {
+  const input = document.getElementById('mov-fi-desc');
+  if (!input) return;
+  input.setAttribute('autocomplete', 'off');
+  input.addEventListener('input', _onMovDescInput);
+  input.addEventListener('focus', _onMovDescInput);
+  input.addEventListener('blur', () => setTimeout(_hideMovSuggestions, 180));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') _hideMovSuggestions();
+  });
+}
+
+function _onMovDescInput() {
+  const input = document.getElementById('mov-fi-desc');
+  if (!input) return;
+  const q = (input.value || '').trim().toLowerCase();
+
+  // Si el usuario cambió el texto después de elegir, descartar selección previa
+  if (_selectedSaleItem && input.value.trim() !== _selectedSaleItem.nombre) {
+    _clearSaleItem(false);
+  }
+
+  if (q.length < 2) { _hideMovSuggestions(); return; }
+
+  // Solo autocompletar para INGRESO (ventas)
+  const tipo = document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') ? 'ingreso' : 'egreso';
+  if (tipo !== 'ingreso') { _hideMovSuggestions(); return; }
+
+  const results = [];
+
+  // ── Productos (inventario) ──
+  if (typeof PRODUCTOS !== 'undefined' && Array.isArray(PRODUCTOS)) {
+    PRODUCTOS.forEach(p => {
+      if (p.activo === false) return;
+      const haystack = `${p.nombre || ''} ${p.codigo || ''} ${p.categoria || ''}`.toLowerCase();
+      if (haystack.includes(q)) {
+        results.push({
+          source: 'producto',
+          id: p.id,
+          nombre: p.nombre || '(sin nombre)',
+          extra: [p.categoria, p.codigo].filter(Boolean).join(' · '),
+          stock: Number(p.stock) || 0,
+          precio: Number(p.precioVenta) || 0,
+          icon: '📦',
+        });
+      }
+    });
+  }
+
+  // ── Repuestos ──
+  CAJA_REPUESTOS.forEach(r => {
+    const haystack = `${r.nombre || ''} ${r.marca || ''} ${r.modelo || ''} ${r.tipo || ''}`.toLowerCase();
+    if (haystack.includes(q)) {
+      results.push({
+        source: 'repuesto',
+        id: r.id,
+        nombre: r.nombre || `${r.tipo || ''} ${r.marca || ''} ${r.modelo || ''}`.trim() || '(repuesto)',
+        extra: [r.tipo, r.marca].filter(Boolean).join(' · '),
+        stock: Number(r.cantidad) || 0,
+        precio: Number(r.precioVenta) || Number(r.precioCompra) || 0,
+        icon: '🔧',
+      });
+    }
+  });
+
+  // Priorizar coincidencia al inicio del nombre
+  results.sort((a, b) => {
+    const aStart = a.nombre.toLowerCase().startsWith(q) ? 0 : 1;
+    const bStart = b.nombre.toLowerCase().startsWith(q) ? 0 : 1;
+    if (aStart !== bStart) return aStart - bStart;
+    return a.nombre.localeCompare(b.nombre);
+  });
+
+  _showMovSuggestions(results.slice(0, 8));
+}
+
+function _showMovSuggestions(results) {
+  const drop = document.getElementById('mov-desc-suggest');
+  if (!drop) return;
+  if (!results.length) { drop.classList.add('hidden'); drop.innerHTML = ''; return; }
+
+  drop.innerHTML = results.map((r, i) => {
+    const stockCls = r.stock <= 0 ? 'sug-stock-zero'
+                  : r.stock <= 2 ? 'sug-stock-low'
+                  : 'sug-stock-ok';
+    const precioStr = r.precio > 0 ? `$${r.precio.toLocaleString('es-AR')}` : '';
+    return `<button type="button" class="mov-sug-item" data-i="${i}" onmousedown="event.preventDefault()" onclick="_selectMovSuggestion(${i})">
+      <span class="sug-ico">${r.icon}</span>
+      <span class="sug-info">
+        <span class="sug-name">${esc(r.nombre)}</span>
+        <span class="sug-meta">${r.source === 'producto' ? '📦 Inventario' : '🔧 Repuesto'}${r.extra ? ' · ' + esc(r.extra) : ''}</span>
+      </span>
+      <span class="sug-right">
+        ${precioStr ? `<span class="sug-precio">${precioStr}</span>` : ''}
+        <span class="sug-stock ${stockCls}">${r.stock} u.</span>
+      </span>
+    </button>`;
+  }).join('');
+
+  // Guardar resultados en el elemento para usarlos al hacer click
+  drop._results = results;
+  drop.classList.remove('hidden');
+}
+
+function _hideMovSuggestions() {
+  const drop = document.getElementById('mov-desc-suggest');
+  if (drop) drop.classList.add('hidden');
+}
+
+function _selectMovSuggestion(idx) {
+  const drop = document.getElementById('mov-desc-suggest');
+  const r = drop?._results?.[idx];
+  if (!r) return;
+
+  _selectedSaleItem = r;
+
+  // Llenar descripción
+  const input = document.getElementById('mov-fi-desc');
+  input.value = r.nombre;
+
+  // Auto-set categoría según el origen
+  selectCat('Venta producto');
+
+  // Pre-cargar monto con precio de venta * cantidad (= 1 inicialmente)
+  if (r.precio > 0) {
+    document.getElementById('mov-fi-monto').value = r.precio;
+  }
+
+  _showQtyPicker(r);
+  _hideMovSuggestions();
+}
+
+function _showQtyPicker(item) {
+  const wrap = document.getElementById('mov-sale-item-info');
+  if (!wrap) return;
+  const stockBadgeCls = item.stock <= 0 ? 'sug-stock-zero'
+                      : item.stock <= 2 ? 'sug-stock-low'
+                      : 'sug-stock-ok';
+  const stockMax = Math.max(item.stock, 1); // permitir vender 1 aunque stock = 0 (orden a pedido)
+
+  wrap.innerHTML = `
+    <div class="sale-item-card">
+      <div class="sale-item-row">
+        <span class="sale-item-icon">${item.icon}</span>
+        <div class="sale-item-text">
+          <span class="sale-item-name">${esc(item.nombre)}</span>
+          <span class="sale-item-meta">${item.source === 'producto' ? '📦 Inventario' : '🔧 Repuesto'} · Stock: <b class="${stockBadgeCls}">${item.stock}</b></span>
+        </div>
+        <button class="sale-item-clear" onclick="_clearSaleItem()" type="button" title="Quitar">✕</button>
+      </div>
+      <div class="sale-item-qty">
+        <span class="sale-item-qty-lbl">Cantidad</span>
+        <div class="sale-qty-controls">
+          <button type="button" class="qty-btn" onclick="_changeSaleQty(-1)">−</button>
+          <input id="mov-sale-qty" type="number" min="1" max="${stockMax}" value="1" inputmode="numeric">
+          <button type="button" class="qty-btn" onclick="_changeSaleQty(1)">+</button>
+        </div>
+      </div>
+      ${item.stock <= 0 ? '<div class="sale-item-warn">⚠️ Sin stock — se descontará a 0 (verificá si es pedido especial)</div>' : ''}
+    </div>
+  `;
+  wrap.classList.remove('hidden');
+
+  // Recalcular monto cuando cambia la cantidad
+  const qtyInput = document.getElementById('mov-sale-qty');
+  qtyInput.addEventListener('input', () => {
+    const qty = Math.max(1, parseInt(qtyInput.value) || 1);
+    if (item.precio > 0) {
+      document.getElementById('mov-fi-monto').value = qty * item.precio;
+    }
+  });
+}
+
+function _hideQtyPicker() {
+  const wrap = document.getElementById('mov-sale-item-info');
+  if (wrap) { wrap.classList.add('hidden'); wrap.innerHTML = ''; }
+}
+
+function _changeSaleQty(delta) {
+  const inp = document.getElementById('mov-sale-qty');
+  if (!inp) return;
+  const max = parseInt(inp.max) || 999;
+  let val = (parseInt(inp.value) || 1) + delta;
+  val = Math.max(1, Math.min(max, val));
+  inp.value = val;
+  inp.dispatchEvent(new Event('input'));
+}
+
+function _clearSaleItem(clearText = true) {
+  _selectedSaleItem = null;
+  _hideQtyPicker();
+  if (clearText) document.getElementById('mov-fi-desc').value = '';
+}
+
 async function saveMov() {
   const montoInput = document.getElementById('mov-fi-monto');
   const descInput  = document.getElementById('mov-fi-desc');
@@ -734,14 +960,44 @@ async function saveMov() {
     data.monto2 = splitAmt;
   }
 
+  // ── Item seleccionado del autocomplete (solo en INGRESO y al CREAR, no editar) ──
+  let stockUpdate = null;
+  if (_selectedSaleItem && tipo === 'ingreso' && !editingMovId) {
+    const qty = Math.max(1, parseInt(document.getElementById('mov-sale-qty')?.value) || 1);
+    data.itemId     = _selectedSaleItem.id;
+    data.itemSource = _selectedSaleItem.source;
+    data.itemQty    = qty;
+    data.itemNombre = _selectedSaleItem.nombre;
+
+    const collection = _selectedSaleItem.source === 'producto' ? 'productos' : 'repuestos';
+    const stockField = _selectedSaleItem.source === 'producto' ? 'stock' : 'cantidad';
+    const newStock   = Math.max(0, (_selectedSaleItem.stock || 0) - qty);
+    stockUpdate = { collection, id: _selectedSaleItem.id, stockField, newStock, qty };
+  }
+
   try {
     if (editingMovId) {
       await db.collection('caja_movimientos').doc(editingMovId).update(data);
       toast('Movimiento actualizado', 'success');
     } else {
       await db.collection('caja_movimientos').add({ ...data, createdAt: new Date().toISOString() });
-      toast('Movimiento registrado', 'success');
+
+      // Descontar stock después de guardar el movimiento (no bloqueante si falla)
+      if (stockUpdate) {
+        try {
+          await db.collection(stockUpdate.collection).doc(stockUpdate.id).update({
+            [stockUpdate.stockField]: stockUpdate.newStock
+          });
+          toast(`Movimiento + stock − ${stockUpdate.qty} u. ✅`, 'success');
+        } catch (stockErr) {
+          console.error('Stock decrement error:', stockErr);
+          toast('Movimiento guardado, pero falló el descuento de stock', 'error');
+        }
+      } else {
+        toast('Movimiento registrado', 'success');
+      }
     }
+    _clearSaleItem();
     closeMovForm();
   } catch (e) {
     console.error('saveMov:', e);
