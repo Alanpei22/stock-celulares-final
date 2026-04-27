@@ -192,6 +192,8 @@ function initRepuestos() {
   document.getElementById('rep2-form-modal').addEventListener('click', e => {
     if (e.target.id === 'rep2-form-modal') closeRepuestoForm();
   });
+  // Hint dinámico del costo en pesos al lado del campo USD
+  document.getElementById('rep2-fi-costoUSD')?.addEventListener('input', _updateCostoARSHint);
   initCatalogAutocomplete();
   listenRepuestos();
 }
@@ -328,8 +330,16 @@ function renderRepuestos() {
   listEl.innerHTML = filtered.map(r => {
     const isLow  = r.stockMin != null && r.stockMin > 0 && (r.cantidad || 0) <= r.stockMin;
     const lowCls = isLow ? ' rep2-card--lowstock' : '';
-    const price  = r.precioCompra
-      ? '$ ' + Number(r.precioCompra).toLocaleString('es-AR') : '—';
+    // Costo USD canónico, precioVenta en pesos
+    const dolar = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue : 0;
+    const usd   = Number(r.precioCostoUSD) || 0;
+    const venta = Number(r.precioVenta) || 0;
+    // Fallback al legacy precioCompra si no hay USD cargado
+    const costoARS = usd > 0 && dolar > 0 ? Math.round(usd * dolar) : (Number(r.precioCompra) || 0);
+    const priceParts = [];
+    if (usd > 0) priceParts.push(`<span class="rep2-price-usd">U$D ${usd.toLocaleString('es-AR')}</span>`);
+    else if (costoARS > 0) priceParts.push(`<span class="rep2-price-cost">$${costoARS.toLocaleString('es-AR')}</span>`);
+    if (venta > 0) priceParts.push(`<span class="rep2-price-venta">→ $${venta.toLocaleString('es-AR')}</span>`);
 
     return `
       <div class="card rep2-card${lowCls}" onclick="openRepuestoForm('${r.id}')">
@@ -352,7 +362,7 @@ function renderRepuestos() {
             <button class="rep2-qty-btn rep2-qty-plus" onclick="changeQty('${r.id}',+1)">＋</button>
           </div>
           <div class="card-meta">
-            <span class="card-date owner-only">${price}</span>
+            <span class="card-date owner-only">${priceParts.join(' ') || '—'}</span>
             ${r.stockMin != null && r.stockMin > 0
               ? `<span class="card-imei">mín: ${r.stockMin}</span>` : ''}
           </div>
@@ -383,29 +393,50 @@ function openRepuestoForm(id) {
     if (!r) return;
     title.textContent = '✏️ Editar Repuesto';
     delWrap.style.display = '';
-    document.getElementById('rep2-fi-nombre').value    = r.nombre       || '';
-    document.getElementById('rep2-fi-marca').value     = r.marca        || '';
-    document.getElementById('rep2-fi-modelo').value    = r.modelo       || '';
-    document.getElementById('rep2-fi-tipo').value      = r.tipo         || '';
-    document.getElementById('rep2-fi-cantidad').value  = r.cantidad     ?? '';
-    document.getElementById('rep2-fi-stockmin').value  = r.stockMin     ?? '';
-    document.getElementById('rep2-fi-precio').value    = r.precioCompra ?? '';
-    document.getElementById('rep2-fi-proveedor').value = r.proveedor    || '';
-    document.getElementById('rep2-fi-notas').value     = r.notas        || '';
+    document.getElementById('rep2-fi-nombre').value      = r.nombre          || '';
+    document.getElementById('rep2-fi-marca').value       = r.marca           || '';
+    document.getElementById('rep2-fi-modelo').value      = r.modelo          || '';
+    document.getElementById('rep2-fi-tipo').value        = r.tipo            || '';
+    document.getElementById('rep2-fi-cantidad').value    = r.cantidad        ?? '';
+    document.getElementById('rep2-fi-stockmin').value    = r.stockMin        ?? '';
+    document.getElementById('rep2-fi-costoUSD').value    = r.precioCostoUSD  ?? '';
+    document.getElementById('rep2-fi-precioVenta').value = r.precioVenta     ?? '';
+    document.getElementById('rep2-fi-proveedor').value   = r.proveedor       || '';
+    document.getElementById('rep2-fi-notas').value       = r.notas           || '';
   } else {
     title.textContent = '🔩 Nuevo Repuesto';
     delWrap.style.display = 'none';
     ['rep2-fi-nombre','rep2-fi-marca','rep2-fi-modelo',
-     'rep2-fi-cantidad','rep2-fi-stockmin','rep2-fi-precio',
+     'rep2-fi-cantidad','rep2-fi-stockmin',
+     'rep2-fi-costoUSD','rep2-fi-precioVenta',
      'rep2-fi-proveedor','rep2-fi-notas'].forEach(i => {
        document.getElementById(i).value = '';
     });
     document.getElementById('rep2-fi-tipo').value = '';
   }
 
+  // Hint del costo en pesos al lado del costo USD
+  _updateCostoARSHint();
+
   document.getElementById('rep2-form-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   setTimeout(() => document.getElementById('rep2-fi-nombre').focus(), 300);
+}
+
+// Actualiza el hint "= $X.XXX" al costado del input de Costo USD
+function _updateCostoARSHint() {
+  const usdEl  = document.getElementById('rep2-fi-costoUSD');
+  const hintEl = document.getElementById('rep2-fi-costoARS-hint');
+  if (!usdEl || !hintEl) return;
+  const usd = parseFloat(usdEl.value) || 0;
+  const dolar = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue : 0;
+  if (usd > 0 && dolar > 0) {
+    hintEl.textContent = ` ≈ $${Math.round(usd * dolar).toLocaleString('es-AR')}`;
+  } else if (usd > 0 && !dolar) {
+    hintEl.textContent = ' (cargá el dólar en Configuración)';
+  } else {
+    hintEl.textContent = '';
+  }
 }
 
 function closeRepuestoForm() {
@@ -415,22 +446,29 @@ function closeRepuestoForm() {
 }
 
 function saveRepuesto() {
-  const nombre       = document.getElementById('rep2-fi-nombre').value.trim();
-  const marca        = document.getElementById('rep2-fi-marca').value.trim();
-  const modelo       = document.getElementById('rep2-fi-modelo').value.trim();
-  const tipo         = document.getElementById('rep2-fi-tipo').value;
-  const cantidad     = parseInt(document.getElementById('rep2-fi-cantidad').value) || 0;
-  const stockMin     = parseInt(document.getElementById('rep2-fi-stockmin').value) || 0;
-  const precioCompra = parseFloat(document.getElementById('rep2-fi-precio').value) || 0;
-  const proveedor    = document.getElementById('rep2-fi-proveedor').value.trim();
-  const notas        = document.getElementById('rep2-fi-notas').value.trim();
+  const nombre         = document.getElementById('rep2-fi-nombre').value.trim();
+  const marca          = document.getElementById('rep2-fi-marca').value.trim();
+  const modelo         = document.getElementById('rep2-fi-modelo').value.trim();
+  const tipo           = document.getElementById('rep2-fi-tipo').value;
+  const cantidad       = parseInt(document.getElementById('rep2-fi-cantidad').value) || 0;
+  const stockMin       = parseInt(document.getElementById('rep2-fi-stockmin').value) || 0;
+  const precioCostoUSD = parseFloat(document.getElementById('rep2-fi-costoUSD').value)    || 0;
+  const precioVenta    = parseFloat(document.getElementById('rep2-fi-precioVenta').value) || 0;
+  const proveedor      = document.getElementById('rep2-fi-proveedor').value.trim();
+  const notas          = document.getElementById('rep2-fi-notas').value.trim();
 
   if (!nombre) { toast('Ingresá el nombre del repuesto', 'error'); return; }
   if (!marca)  { toast('Ingresá la marca', 'error'); return; }
   if (!tipo)   { toast('Seleccioná el tipo', 'error'); return; }
 
+  // precioCompra (legacy) = costo en pesos al momento del guardado, para reportes/back-compat.
+  // El canónico es precioCostoUSD; se recalcula dinámicamente con dolarBlue actual.
+  const dolar = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue : 0;
+  const precioCompra = precioCostoUSD > 0 && dolar > 0 ? Math.round(precioCostoUSD * dolar) : 0;
+
   const data = { nombre, marca, modelo, tipo, cantidad, stockMin,
-                 precioCompra, proveedor, notas };
+                 precioCostoUSD, precioVenta, precioCompra,
+                 proveedor, notas };
 
   if (editingRepuestoId) {
     db.collection('repuestos').doc(editingRepuestoId).set(data, { merge: true })

@@ -1066,9 +1066,23 @@ async function changeRepairStatus(id, newStatus) {
         const rep = REPUESTOS.find(x => x.id === repuestoId);
         if (rep) {
           const nueva = Math.max(0, (rep.cantidad || 0) - 1);
+          // Snapshot del costo al momento de uso (USD × dólar, fallback a precioCompra legacy)
+          const dolar    = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue
+                         : (typeof getCurrentDolar === 'function' ? (getCurrentDolar() || 0) : 0);
+          const costoUSD = Number(rep.precioCostoUSD) || 0;
+          const costoARS = costoUSD > 0 && dolar > 0
+            ? Math.round(costoUSD * dolar)
+            : (Number(rep.precioCompra) || 0);
+          const repairUpdate = {
+            costoRepuesto: costoARS,
+            repuestoId: rep.id,
+            repuestoNombre: rep.nombre || '',
+            costoRepuestoUSD: costoUSD,
+            dolarSnapshot: dolar
+          };
           Promise.all([
             db.collection('repuestos').doc(repuestoId).update({ cantidad: nueva }),
-            db.collection('repairs').doc(id).update({ costoRepuesto: rep.precioCompra || 0 })
+            db.collection('repairs').doc(id).update(repairUpdate)
           ])
             .then(() => toast(`🔩 −1 ${rep.nombre}`, 'success'))
             .catch(() => toast('Error al descontar repuesto', 'error'));
@@ -2057,9 +2071,23 @@ async function quickStatusChange(e, id, newStatus) {
         const rep = REPUESTOS.find(x => x.id === repuestoId);
         if (rep) {
           const nueva = Math.max(0, (rep.cantidad || 0) - 1);
+          // Snapshot del costo al momento de uso (USD × dólar, fallback a precioCompra legacy)
+          const dolar    = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue
+                         : (typeof getCurrentDolar === 'function' ? (getCurrentDolar() || 0) : 0);
+          const costoUSD = Number(rep.precioCostoUSD) || 0;
+          const costoARS = costoUSD > 0 && dolar > 0
+            ? Math.round(costoUSD * dolar)
+            : (Number(rep.precioCompra) || 0);
+          const repairUpdate = {
+            costoRepuesto: costoARS,
+            repuestoId: rep.id,
+            repuestoNombre: rep.nombre || '',
+            costoRepuestoUSD: costoUSD,
+            dolarSnapshot: dolar
+          };
           Promise.all([
             db.collection('repuestos').doc(repuestoId).update({ cantidad: nueva }),
-            db.collection('repairs').doc(id).update({ costoRepuesto: rep.precioCompra || 0 })
+            db.collection('repairs').doc(id).update(repairUpdate)
           ])
             .then(() => toast(`🔩 −1 ${rep.nombre}`, 'success'))
             .catch(() => toast('Error al descontar repuesto', 'error'));

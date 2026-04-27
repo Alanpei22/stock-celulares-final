@@ -4404,3 +4404,27 @@ body.dark .sale-item-clear:hover { background: #3A3A3C; color: #F2F2F7; }
 body.dark .sale-qty-controls { background: #161618; border-color: rgba(255,255,255,0.1); }
 body.dark .qty-btn:hover { background: #2E2E31; }
 body.dark .sale-item-warn { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: #fbbf24; }
+
+/* ── REPUESTOS · chips de precio en tarjeta ── */
+.rep2-price-usd {
+ display: inline-block;
+ padding: 1px 7px;
+ background: rgba(34,197,94,0.12);
+ color: #15803d;
+ border-radius: 6px;
+ font-weight: 700; font-size: .78rem;
+ margin-right: 3px;
+}
+.rep2-price-cost {
+ display: inline-block;
+ color: var(--text2);
+ font-weight: 600; font-size: .78rem;
+ margin-right: 3px;
+}
+.rep2-price-venta {
+ display: inline-block;
+ color: var(--accent);
+ font-weight: 700; font-size: .78rem;
+}
+body.dark .rep2-price-usd { background: rgba(34,197,94,0.18); color: #4ade80; }
+body.dark .rep2-price-venta { color: var(--accent); }

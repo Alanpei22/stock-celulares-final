@@ -88,6 +88,7 @@ function initApp() {
   loadCierre();
   listenCajaRepuestos();           // ← repuestos para autocomplete
   _initMovDescAutocomplete();      // ← input handler de descripción
+  ensureDolar(db);                 // ← cotización para calcular costo en pesos
   if (typeof initInventario === 'function') initInventario();
 }
 
@@ -752,6 +753,8 @@ function _onMovDescInput() {
   //           "Módulo" matchea "modulo", "vidrio" matchea "templado", etc.
   const results = [];
 
+  const dolar = getCurrentDolar() || 0;
+
   // ── Productos (inventario) ──
   if (typeof PRODUCTOS !== 'undefined' && Array.isArray(PRODUCTOS)) {
     PRODUCTOS.forEach(p => {
@@ -764,6 +767,8 @@ function _onMovDescInput() {
           extra: [p.categoria, p.codigo].filter(Boolean).join(' · '),
           stock: Number(p.stock) || 0,
           precio: Number(p.precioVenta) || 0,
+          costoUSD: 0,
+          costoARS: Number(p.precioCosto) || 0,
           icon: '📦',
         });
       }
@@ -773,13 +778,21 @@ function _onMovDescInput() {
   // ── Repuestos ──
   CAJA_REPUESTOS.forEach(r => {
     if (searchMatch([r.nombre, r.marca, r.modelo, r.tipo], q)) {
+      const precioVenta = Number(r.precioVenta) || 0;
+      const costoUSD    = Number(r.precioCostoUSD) || 0;
+      // costoARS = USD × dólar actual (snapshot). Fallback: precioCompra legacy.
+      const costoARS = costoUSD > 0 && dolar > 0
+        ? Math.round(costoUSD * dolar)
+        : (Number(r.precioCompra) || 0);
       results.push({
         source: 'repuesto',
         id: r.id,
         nombre: r.nombre || `${r.tipo || ''} ${r.marca || ''} ${r.modelo || ''}`.trim() || '(repuesto)',
         extra: [r.tipo, r.marca].filter(Boolean).join(' · '),
         stock: Number(r.cantidad) || 0,
-        precio: Number(r.precioVenta) || Number(r.precioCompra) || 0,
+        precio: precioVenta || costoARS, // si no hay precio venta, mostrar al menos el costo como referencia
+        costoUSD,
+        costoARS,
         icon: '🔧',
       });
     }
@@ -985,10 +998,15 @@ async function saveMov() {
   let stockUpdate = null;
   if (_selectedSaleItem && tipo === 'ingreso' && !editingMovId) {
     const qty = Math.max(1, parseInt(document.getElementById('mov-sale-qty')?.value) || 1);
-    data.itemId     = _selectedSaleItem.id;
-    data.itemSource = _selectedSaleItem.source;
-    data.itemQty    = qty;
-    data.itemNombre = _selectedSaleItem.nombre;
+    data.itemId       = _selectedSaleItem.id;
+    data.itemSource   = _selectedSaleItem.source;
+    data.itemQty      = qty;
+    data.itemNombre   = _selectedSaleItem.nombre;
+    // Snapshot del costo al momento de la venta (para reportar margen real)
+    data.costoUSDUnit = _selectedSaleItem.costoUSD || 0;
+    data.costoARSUnit = _selectedSaleItem.costoARS || 0;
+    data.costoARSTotal = (_selectedSaleItem.costoARS || 0) * qty;
+    data.gananciaARS  = (Number(monto) || 0) - data.costoARSTotal;
 
     const collection = _selectedSaleItem.source === 'producto' ? 'productos' : 'repuestos';
     const stockField = _selectedSaleItem.source === 'producto' ? 'stock' : 'cantidad';

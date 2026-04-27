@@ -108,10 +108,12 @@
 <div class="info-box">
   <b>💡 Cómo usarlo:</b><br>
   1. <b>Descargá el Excel</b> con todo el listado (un sheet por tipo).<br>
-  2. Editá la columna <b>"Precio Costo"</b> en Excel (Google Sheets también funciona).<br>
+  2. Editá las columnas <b>"Costo USD"</b> y <b>"Precio Venta ARS"</b> (Google Sheets también funciona).<br>
   3. <b>Subí el archivo modificado</b> — vas a ver un preview de los cambios.<br>
   4. Confirmá y los precios se actualizan en la app.<br>
-  <i>El campo <code>id</code> no se debe modificar — sirve para matchear los registros.</i>
+  <i>📌 <b>Costo USD</b> = lo que pagás por el repuesto al proveedor (en dólares — no se desactualiza).<br>
+  📌 <b>Precio Venta ARS</b> = lo que cobrás cuando vendés el repuesto suelto (sin reparación).<br>
+  ⚠️ El campo <code>id</code> NO se debe modificar — sirve para matchear los registros.</i>
 </div>
 
 <div id="auth-status" class="auth-msg">⏳ Verificando sesión…</div>
@@ -198,13 +200,17 @@
       const snap = await db.collection('repuestos').get();
       REPUESTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const tipos = [...new Set(REPUESTOS.map(r => r.tipo || 'Sin tipo'))];
-      const sinPrecio = REPUESTOS.filter(r => !r.precioCompra || r.precioCompra <= 0).length;
+      const sinCosto = REPUESTOS.filter(r => !r.precioCostoUSD || r.precioCostoUSD <= 0).length;
+      const sinVenta = REPUESTOS.filter(r => !r.precioVenta || r.precioVenta <= 0).length;
       $('stat-total').textContent     = REPUESTOS.length;
       $('stat-tipos').textContent     = tipos.length;
-      $('stat-sinprecio').textContent = sinPrecio;
+      $('stat-sinprecio').textContent = sinCosto;
+      // Renombrar el label de la stat "Sin precio costo" a algo más claro
+      const lblEl = $('stat-sinprecio')?.previousElementSibling;
+      if (lblEl) lblEl.textContent = 'Sin costo USD';
       $('stats-wrap').style.display = '';
       $('btn-export').disabled = !REPUESTOS.length;
-      log(`✓ ${REPUESTOS.length} repuestos cargados (${tipos.length} tipos, ${sinPrecio} sin precio costo)`);
+      log(`✓ ${REPUESTOS.length} repuestos cargados (${tipos.length} tipos, ${sinCosto} sin costo USD, ${sinVenta} sin precio venta)`);
     } catch (e) {
       log('✗ Error cargando: ' + e.message);
     }
@@ -232,7 +238,8 @@
         Nombre: r.nombre || '',
         Cantidad: r.cantidad ?? 0,
         'Stock Mín': r.stockMin ?? 0,
-        'Precio Costo': r.precioCompra ?? 0,
+        'Costo USD': r.precioCostoUSD ?? 0,
+        'Precio Venta ARS': r.precioVenta ?? 0,
         Proveedor: r.proveedor || '',
         Notas: r.notas || '',
       }));
@@ -242,7 +249,6 @@
 
       // Hoja TODOS
       const wsAll = XLSX.utils.json_to_sheet(filas);
-      // Anchos de columna
       wsAll['!cols'] = [
         { wch: 22 }, // id
         { wch: 14 }, // Tipo
@@ -251,7 +257,8 @@
         { wch: 38 }, // Nombre
         { wch: 9 },  // Cantidad
         { wch: 9 },  // Stock Mín
-        { wch: 13 }, // Precio Costo
+        { wch: 12 }, // Costo USD
+        { wch: 16 }, // Precio Venta ARS
         { wch: 16 }, // Proveedor
         { wch: 24 }, // Notas
       ];
@@ -272,16 +279,16 @@
           Nombre: r.nombre || '',
           Cantidad: r.cantidad ?? 0,
           'Stock Mín': r.stockMin ?? 0,
-          'Precio Costo': r.precioCompra ?? 0,
+          'Costo USD': r.precioCostoUSD ?? 0,
+          'Precio Venta ARS': r.precioVenta ?? 0,
           Proveedor: r.proveedor || '',
           Notas: r.notas || '',
         }));
         const ws = XLSX.utils.json_to_sheet(filas);
         ws['!cols'] = [
           { wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 38 },
-          { wch: 9 }, { wch: 9 }, { wch: 13 }, { wch: 16 }, { wch: 24 },
+          { wch: 9 }, { wch: 9 }, { wch: 12 }, { wch: 16 }, { wch: 16 }, { wch: 24 },
         ];
-        // Sheet name: max 31 chars, sin caracteres prohibidos
         const sheetName = String(tipo).replace(/[\\\/\[\]\*\?\:]/g, '').slice(0, 31);
         XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Sin tipo');
       });
@@ -332,20 +339,37 @@
         const orig = repMap.get(id);
         if (!orig) { idDesconocido++; return; }
 
-        const newPrecio   = Number(row['Precio Costo']) || 0;
+        // Soporta tanto las columnas nuevas como las viejas (Precio Costo legacy)
+        const newCostoUSD = row['Costo USD'] != null && row['Costo USD'] !== ''
+          ? Number(row['Costo USD']) : null;
+        const newPrecioVenta = row['Precio Venta ARS'] != null && row['Precio Venta ARS'] !== ''
+          ? Number(row['Precio Venta ARS']) : null;
+        // Compat con archivos viejos (col "Precio Costo" en pesos)
+        const legacyPrecio = row['Precio Costo'] != null && row['Precio Costo'] !== ''
+          ? Number(row['Precio Costo']) : null;
         const newStockMin = row['Stock Mín'] != null && row['Stock Mín'] !== '' ? Number(row['Stock Mín']) : null;
         const newCantidad = row['Cantidad']   != null && row['Cantidad']   !== '' ? Number(row['Cantidad']) : null;
         const newProveedor = String(row['Proveedor'] || '').trim();
         const newNotas     = String(row['Notas'] || '').trim();
 
-        const oldPrecio   = Number(orig.precioCompra) || 0;
-        const oldStockMin = orig.stockMin ?? 0;
-        const oldCantidad = orig.cantidad ?? 0;
-        const oldProveedor = orig.proveedor || '';
-        const oldNotas     = orig.notas || '';
+        const oldCostoUSD    = Number(orig.precioCostoUSD) || 0;
+        const oldPrecioVenta = Number(orig.precioVenta) || 0;
+        const oldPrecioARS   = Number(orig.precioCompra) || 0;
+        const oldStockMin    = orig.stockMin ?? 0;
+        const oldCantidad    = orig.cantidad ?? 0;
+        const oldProveedor   = orig.proveedor || '';
+        const oldNotas       = orig.notas || '';
 
         const diff = {};
-        if (newPrecio !== oldPrecio)              diff.precioCompra = newPrecio;
+        if (newCostoUSD != null && newCostoUSD !== oldCostoUSD) {
+          diff.precioCostoUSD = newCostoUSD;
+        }
+        if (newPrecioVenta != null && newPrecioVenta !== oldPrecioVenta) {
+          diff.precioVenta = newPrecioVenta;
+        }
+        if (legacyPrecio != null && legacyPrecio !== oldPrecioARS) {
+          diff.precioCompra = legacyPrecio;
+        }
         if (newStockMin != null && newStockMin !== oldStockMin) diff.stockMin = newStockMin;
         if (newCantidad != null && newCantidad !== oldCantidad) diff.cantidad = newCantidad;
         if (newProveedor !== oldProveedor)        diff.proveedor = newProveedor;
@@ -358,8 +382,8 @@
           nombre: orig.nombre || (orig.marca + ' ' + orig.modelo),
           marca: orig.marca,
           modelo: orig.modelo,
-          oldPrecio, newPrecio,
-          oldStockMin, newStockMin: diff.stockMin != null ? newStockMin : oldStockMin,
+          oldCostoUSD, newCostoUSD: diff.precioCostoUSD != null ? newCostoUSD : oldCostoUSD,
+          oldPrecioVenta, newPrecioVenta: diff.precioVenta != null ? newPrecioVenta : oldPrecioVenta,
           diff
         });
       });
@@ -392,25 +416,34 @@
     }
 
     desc.textContent = `${cambios.length} repuestos van a actualizarse:`;
+    const FIELD_LABELS = {
+      precioCostoUSD: 'Costo USD',
+      precioVenta:    'Precio Venta ARS',
+      precioCompra:   'Precio Costo ARS (legacy)',
+      stockMin:       'Stock Mín',
+      cantidad:       'Cantidad',
+      proveedor:      'Proveedor',
+      notas:          'Notas',
+    };
+    const formatVal = (k, v) => {
+      if (k === 'precioCostoUSD') return 'U$D ' + Number(v).toLocaleString('es-AR');
+      if (k === 'precioVenta' || k === 'precioCompra') return '$' + Number(v).toLocaleString('es-AR');
+      return String(v ?? '—');
+    };
     table.innerHTML = `
       <table>
         <thead>
-          <tr>
-            <th>Repuesto</th>
-            <th>Cambios</th>
-          </tr>
+          <tr><th>Repuesto</th><th>Cambios</th></tr>
         </thead>
         <tbody>
           ${cambios.map(c => {
             const detalles = Object.entries(c.diff).map(([k, v]) => {
-              const oldVal = k === 'precioCompra' ? c.oldPrecio
-                          : k === 'stockMin'     ? (c.oldStockMin ?? 0)
-                          : k === 'cantidad'     ? '?'
-                          : k === 'proveedor'    ? '?'
-                          : k === 'notas'        ? '?'
-                          : '?';
-              const formatVal = v => k === 'precioCompra' ? '$' + Number(v).toLocaleString('es-AR') : v;
-              return `<div><b>${k}:</b> <span class="price-old">${formatVal(oldVal)}</span> → <span class="price-new">${formatVal(v)}</span></div>`;
+              let oldVal;
+              if      (k === 'precioCostoUSD') oldVal = c.oldCostoUSD;
+              else if (k === 'precioVenta')    oldVal = c.oldPrecioVenta;
+              else                             oldVal = '—';
+              const label = FIELD_LABELS[k] || k;
+              return `<div><b>${label}:</b> <span class="price-old">${escapeHtml(formatVal(k, oldVal))}</span> → <span class="price-new">${escapeHtml(formatVal(k, v))}</span></div>`;
             }).join('');
             return `<tr>
               <td>${escapeHtml(c.marca || '')} ${escapeHtml(c.modelo || '')}<br><small style="color:#6E6E73">${escapeHtml(c.nombre || '')}</small></td>

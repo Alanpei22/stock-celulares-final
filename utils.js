@@ -114,6 +114,54 @@ const _SYN_MAP = (() => {
   return m;
 })();
 
+// ══════════════════════════════════════════════════════════
+//  COTIZACIÓN DEL DÓLAR — accesible desde cualquier página
+// ══════════════════════════════════════════════════════════
+
+let _cachedDolar = null;
+
+// Devuelve el dólar actual (sync, cacheado). null si no hay valor.
+function getCurrentDolar() {
+  if (_cachedDolar > 0) return _cachedDolar;
+  // Intentar leer de localStorage (manual override)
+  const manual = parseInt(localStorage.getItem('dolarManual')) || 0;
+  if (manual > 0) { _cachedDolar = manual; return manual; }
+  // Compat: si app.js está cargado y ya seteó dolarBlue
+  if (typeof dolarBlue !== 'undefined' && dolarBlue > 0) {
+    _cachedDolar = dolarBlue;
+    return dolarBlue;
+  }
+  return null;
+}
+
+// Asegura que tengamos el dólar cargado. Lee localStorage → Firestore → API.
+// Pasale tu instancia de db de Firestore para el fallback.
+async function ensureDolar(db) {
+  // 1. localStorage (manual)
+  const manual = parseInt(localStorage.getItem('dolarManual')) || 0;
+  if (manual > 0) { _cachedDolar = manual; return manual; }
+  // 2. Firestore (compartido entre dispositivos)
+  if (db) {
+    try {
+      const doc = await db.collection('config').doc('appSettings').get();
+      const v = doc.exists ? (doc.data().dolarManual || 0) : 0;
+      if (v > 0) {
+        _cachedDolar = v;
+        localStorage.setItem('dolarManual', v);
+        return v;
+      }
+    } catch {}
+  }
+  // 3. API pública (fallback)
+  try {
+    const r = await fetch('https://dolarapi.com/v1/dolares/blue');
+    const d = await r.json();
+    const v = Math.round(d.venta || d.compra || 0) + 10;
+    if (v > 0) { _cachedDolar = v; return v; }
+  } catch {}
+  return null;
+}
+
 // Devuelve true si haystack matchea TODOS los tokens del query (cada uno
 // expandido con sus sinónimos). Tolerante a acentos y mayúsculas.
 //

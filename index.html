@@ -1387,13 +1387,17 @@
       </div>
       <div style="display:flex;gap:10px">
         <div class="fg" style="flex:1">
-          <label class="fl">Precio compra $</label>
-          <input id="rep2-fi-precio" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+          <label class="fl">💵 Costo USD <span class="fl-hint" id="rep2-fi-costoARS-hint" style="font-weight:500"></span></label>
+          <input id="rep2-fi-costoUSD" class="fi" type="number" placeholder="0" min="0" step="0.01" inputmode="decimal">
         </div>
         <div class="fg" style="flex:1">
-          <label class="fl">Proveedor</label>
-          <input id="rep2-fi-proveedor" class="fi" type="text" placeholder="Nombre" autocomplete="off">
+          <label class="fl">💲 Precio venta ARS</label>
+          <input id="rep2-fi-precioVenta" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
         </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Proveedor</label>
+        <input id="rep2-fi-proveedor" class="fi" type="text" placeholder="Nombre" autocomplete="off">
       </div>
       <div class="fg">
         <label class="fl">Notas</label>
