@@ -211,6 +211,9 @@
               <button class="hdr-drop-item" onclick="location.href='bulk-edit-repuestos.html'">
                 📊 Exportar / Importar Excel
               </button>
+              <button class="hdr-drop-item" onclick="openPedidosModal()">
+                📋 Pedido de mercadería
+              </button>
             </div>
           </div>
           <button class="hdr-btn" onclick="openBulkImport()" title="Carga masiva">📦</button>
@@ -1414,9 +1417,114 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════
+     MODAL: Pedido de mercadería
+══════════════════════════════════════════════════ -->
+<div id="pedidos-modal" class="modal-overlay hidden">
+  <div class="modal-card pedidos-card">
+    <div class="modal-header">
+      <h3>📋 Pedido de mercadería</h3>
+      <button class="modal-close" onclick="closePedidosModal()">✕</button>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="pedidos-stats">
+      <div class="pedidos-stat">
+        <span class="pedidos-stat-num" id="pedidos-stat-pend">0</span>
+        <span class="pedidos-stat-lbl">Pendientes</span>
+      </div>
+      <div class="pedidos-stat">
+        <span class="pedidos-stat-num pedidos-stat-num--urg" id="pedidos-stat-urg">0</span>
+        <span class="pedidos-stat-lbl">🔴 Urgentes</span>
+      </div>
+      <div class="pedidos-stat">
+        <span class="pedidos-stat-num pedidos-stat-num--ok" id="pedidos-stat-comp">0</span>
+        <span class="pedidos-stat-lbl">Comprados</span>
+      </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="pedidos-actions">
+      <button class="btn-primary pedidos-add-btn" onclick="openPedidoForm()">＋ Agregar item</button>
+      <div class="pedidos-action-row">
+        <button class="pedidos-action-btn pedidos-action-btn--wa" onclick="exportPedidoWhatsApp()" title="Compartir/WhatsApp">📲 Enviar a proveedor</button>
+        <button class="pedidos-action-btn" onclick="copyPedidoTextoToClipboard()" title="Copiar texto">📋 Copiar</button>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="pedidos-filters">
+      <button class="pedido-filter-btn pedido-filter-active" data-f="pendientes" onclick="setPedidosFilter('pendientes')">Pendientes</button>
+      <button class="pedido-filter-btn" data-f="comprados" onclick="setPedidosFilter('comprados')">Comprados</button>
+      <button class="pedido-filter-btn" data-f="todos" onclick="setPedidosFilter('todos')">Todos</button>
+    </div>
+
+    <!-- Lista -->
+    <div class="modal-body" style="padding:8px 18px 16px">
+      <div class="pedidos-empty" id="pedidos-empty" style="display:none">
+        Aún no hay items.
+      </div>
+      <div id="pedidos-list" class="pedidos-list"></div>
+    </div>
+
+    <!-- Footer: bulk actions -->
+    <div class="pedidos-footer">
+      <button class="pedidos-bulk-btn" onclick="clearComprados()">🧹 Limpiar comprados</button>
+      <button class="pedidos-bulk-btn pedidos-bulk-btn--danger" onclick="clearAllPedidos()">🗑️ Borrar TODO</button>
+    </div>
+  </div>
+</div>
+
+<!-- Form: agregar/editar item -->
+<div id="pedido-form-modal" class="modal-overlay hidden">
+  <div class="modal-card pedido-form-card">
+    <div class="modal-header">
+      <h3 id="pedido-form-title">＋ Nuevo item</h3>
+      <button class="modal-close" onclick="closePedidoForm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg fg--full" style="position:relative">
+        <label class="fl">Nombre * <span class="fl-hint">— buscá en repuestos/inventario o escribí libre</span></label>
+        <input id="pedido-fi-nombre" class="fi" type="text" placeholder="Ej: Pantalla iPhone 14, Cable tipo C…" autocomplete="off">
+        <div id="pedido-suggest" class="mov-desc-suggest hidden"></div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="fg" style="flex:1">
+          <label class="fl">Cantidad *</label>
+          <input id="pedido-fi-cantidad" class="fi" type="number" min="1" value="1" inputmode="numeric">
+        </div>
+        <div class="fg" style="flex:2">
+          <label class="fl">Categoría *</label>
+          <select id="pedido-fi-categoria" class="fi"></select>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Prioridad</label>
+        <select id="pedido-fi-prioridad" class="fi"></select>
+      </div>
+      <div class="fg">
+        <label class="fl">Proveedor (opcional)</label>
+        <input id="pedido-fi-proveedor" class="fi" type="text" placeholder="Nombre del proveedor" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label class="fl">Notas (opcional)</label>
+        <textarea id="pedido-fi-notas" class="fi" rows="2" style="resize:none" placeholder="Color, modelo específico, código, etc."></textarea>
+      </div>
+      <div id="pedido-delete-wrap" style="display:none;margin-top:4px">
+        <button class="btn-danger" onclick="if(_pedidoEditingId)deletePedido(_pedidoEditingId)">🗑 Eliminar item</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <button class="btn-secondary" onclick="closePedidoForm()" style="flex:1">Cancelar</button>
+        <button class="btn-primary" onclick="savePedido()" style="flex:2">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="repairs.js"></script>
 <script src="modulos_catalog.js"></script>
 <script src="repuestos.js"></script>
+<script src="pedidos.js"></script>
 <script src="app.js"></script>
 <script src="print.js"></script>
 

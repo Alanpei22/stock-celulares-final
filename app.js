@@ -434,6 +434,7 @@ function initApp() {
   listenStock();
   initRepairs();
   initRepuestos();
+  if (typeof initPedidos === 'function') initPedidos();
 }
 
 // ── Menú desplegable header ───────────────────────────────

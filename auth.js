@@ -45,6 +45,7 @@ async function signOut() {
   try { if (typeof window._repairsCleanup   === 'function') window._repairsCleanup();   } catch {}
   try { if (typeof window._repuestosCleanup === 'function') window._repuestosCleanup(); } catch {}
   try { if (typeof window._cajaCleanup      === 'function') window._cajaCleanup();      } catch {}
+  try { if (typeof window._pedidosCleanup   === 'function') window._pedidosCleanup();   } catch {}
 
   try { await _a().signOut(); } catch(e) { console.warn('[auth] signOut:', e); }
   try {
