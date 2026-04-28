@@ -456,6 +456,33 @@
   <div id="cd-movs-list"></div>
 </div>
 
+<!-- MODAL VINCULACIÓN CON REPARACIÓN -->
+<div id="repair-link-overlay" class="nota-overlay hidden" onclick="_cancelRepairLink()"></div>
+<div id="repair-link-modal" class="arqueo-modal hidden" style="max-width:380px">
+  <div class="nota-modal-hdr">
+    <span>🔧 Vincular con reparación</span>
+    <button onclick="_cancelRepairLink()">✕</button>
+  </div>
+  <div id="repair-link-info"></div>
+  <p class="repair-link-question">¿El equipo ya fue entregado al cliente?</p>
+  <div class="repair-link-btns">
+    <button class="repair-link-btn repair-link-btn--no" onclick="_selectRepairMode('sena')">
+      <span class="rlb-ico">📝</span>
+      <span class="rlb-text">
+        <span class="rlb-title">NO — Registrar seña</span>
+        <span class="rlb-sub">El equipo sigue en el taller</span>
+      </span>
+    </button>
+    <button class="repair-link-btn repair-link-btn--si" onclick="_selectRepairMode('cobro')">
+      <span class="rlb-ico">✅</span>
+      <span class="rlb-text">
+        <span class="rlb-title">SÍ — Cobro total</span>
+        <span class="rlb-sub">El cliente ya retiró el equipo</span>
+      </span>
+    </button>
+  </div>
+</div>
+
 <!-- HISTORIAL + STATS MODAL (owner) -->
 <div id="caja-hist-overlay" class="nota-overlay hidden" onclick="closeCajaHistorial()"></div>
 <div id="caja-hist-modal" class="arqueo-modal hidden" style="max-width:440px;max-height:85vh;overflow-y:auto">

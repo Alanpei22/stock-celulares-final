@@ -322,3 +322,64 @@ body.dark .fab-sub-eg { background: rgba(239,68,68,0.15); color: #FCA5A5; }
 @media (prefers-reduced-motion: reduce) {
  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* ══ VINCULACIÓN CON REPARACIÓN ══════════════════════════════ */
+.rlc-card {
+ background: var(--bg1, #F1F0EE);
+ border-radius: 14px; padding: 10px 14px;
+ margin-bottom: 10px;
+ border: 1px solid var(--border, #E3E1DE);
+}
+.rlc-row {
+ display: flex; justify-content: space-between; align-items: baseline;
+ padding: 4px 0; gap: 8px;
+ border-bottom: 1px solid var(--border, #E3E1DE);
+}
+.rlc-row:last-child { border-bottom: none; }
+.rlc-row--saldo { padding-top: 7px; margin-top: 2px; }
+.rlc-lbl { font-size: .78rem; color: var(--t3, #888); font-weight: 500; white-space: nowrap; }
+.rlc-val { font-size: .88rem; font-weight: 700; color: var(--t1, #1A1A1A); text-align: right; }
+.rlc-orden { color: #C8965A; font-size: 1rem; }
+.rlc-sena-val  { color: #10b981; }
+.rlc-saldo-val { color: #C8965A; font-size: 1rem; }
+
+.repair-link-question {
+ font-weight: 700; font-size: .97rem; text-align: center;
+ margin: 8px 0 12px; color: var(--t1, #1A1A1A);
+}
+.repair-link-btns { display: flex; flex-direction: column; gap: 10px; }
+.repair-link-btn {
+ display: flex; align-items: center; gap: 12px;
+ border: 2px solid var(--border, #E3E1DE);
+ border-radius: 16px; padding: 12px 14px;
+ background: var(--card, #fff); cursor: pointer;
+ text-align: left; transition: all 180ms;
+}
+.repair-link-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+.repair-link-btn--no  { border-color: #C8965A; }
+.repair-link-btn--no:hover  { background: rgba(200,150,90,.06); }
+.repair-link-btn--si  { border-color: #10b981; }
+.repair-link-btn--si:hover  { background: rgba(16,185,129,.06); }
+.rlb-ico   { font-size: 1.6rem; line-height: 1; }
+.rlb-text  { display: flex; flex-direction: column; gap: 2px; }
+.rlb-title { font-size: .93rem; font-weight: 700; color: var(--t1, #1A1A1A); }
+.rlb-sub   { font-size: .75rem; color: var(--t3, #888); }
+
+/* Chip de saldo en autocomplete */
+.sug-saldo-chip { background: rgba(200,150,90,.12); color: #B5783D; font-weight: 700; }
+/* Fondo suave para filas de reparación en el autocomplete */
+.mov-sug-item--repair { background: rgba(200,150,90,.04); border-left: 3px solid #C8965A; }
+
+/* Badge de modo en el card inline */
+.repair-mode-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+
+/* Dark mode */
+body.dark .rlc-card { background: #1c1c1e; border-color: rgba(255,255,255,0.06); }
+body.dark .rlc-row  { border-color: rgba(255,255,255,0.06); }
+body.dark .rlc-val  { color: #F2F2F7; }
+body.dark .repair-link-btn { background: #1c1c1e; border-color: rgba(255,255,255,0.08); }
+body.dark .repair-link-btn--no  { border-color: #D4A76A; }
+body.dark .repair-link-btn--si  { border-color: #34D399; }
+body.dark .rlb-title { color: #F2F2F7; }
+body.dark .mov-sug-item--repair { background: rgba(200,150,90,.07); border-left-color: #D4A76A; }
+body.dark .sug-saldo-chip { background: rgba(212,167,106,.15); color: #D4A76A; }

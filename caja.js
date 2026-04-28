@@ -36,13 +36,23 @@ let CAJA_REPUESTOS = [];        // listener específico para autocomplete
 let _cajaRepuestosListener = null;
 let _selectedSaleItem = null;   // { source, id, nombre, stock, precio, icon, extra }
 
+// ── Autocomplete de reparaciones ──────────────────────────
+let CAJA_REPAIRS = [];
+let _cajaRepairsListener = null;
+let _selectedRepairItem = null; // { repair, mode }  mode: 'sena' | 'cobro'
+let _pendingRepairLink  = null; // repair esperando confirmación en el popup
+
 // Expone cleanup para que auth.js cancele listeners en logout
 window._cajaCleanup = function() {
-  if (movListener) { movListener(); movListener = null; }
-  if (_cajaRepuestosListener) { _cajaRepuestosListener(); _cajaRepuestosListener = null; }
+  if (movListener)             { movListener();             movListener = null; }
+  if (_cajaRepuestosListener)  { _cajaRepuestosListener();  _cajaRepuestosListener = null; }
+  if (_cajaRepairsListener)    { _cajaRepairsListener();    _cajaRepairsListener = null; }
   CAJA_REPUESTOS = [];
-  MOVIMIENTOS = [];
-  _selectedSaleItem = null;
+  CAJA_REPAIRS   = [];
+  MOVIMIENTOS    = [];
+  _selectedSaleItem  = null;
+  _selectedRepairItem = null;
+  _pendingRepairLink  = null;
 };
 
 // ══════════════════════════════════════════
@@ -87,6 +97,7 @@ function initApp() {
   loadArqueo();
   loadCierre();
   listenCajaRepuestos();           // ← repuestos para autocomplete
+  listenCajaRepairs();             // ← reparaciones para autocomplete
   _initMovDescAutocomplete();      // ← input handler de descripción
   ensureDolar(db);                 // ← cotización para calcular costo en pesos
   if (typeof initInventario === 'function') initInventario();
@@ -554,6 +565,7 @@ function openMovForm(id) {
     document.getElementById('mov-fi-desc').value  = '';
     selectMetodo('Efectivo');
     _clearSaleItem();
+    _selectedRepairItem = null;
   }
 
   // Clear any previous error highlights and split state
@@ -581,7 +593,8 @@ function closeMovForm() {
   document.getElementById('mov-overlay').classList.add('hidden');
   document.getElementById('mov-modal').classList.add('hidden');
   editingMovId = null;
-  _clearSaleItem();
+  _clearSaleItem(false);
+  _clearRepairItem(false);
   _hideMovSuggestions();
 }
 
@@ -719,6 +732,15 @@ function listenCajaRepuestos() {
   }, err => console.error('Repuestos (caja):', err));
 }
 
+function listenCajaRepairs() {
+  if (_cajaRepairsListener) return;
+  _cajaRepairsListener = db.collection('repairs')
+    .onSnapshot(snap => {
+      CAJA_REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      CAJA_REPAIRS.sort((a, b) => (b.nOrden || 0) - (a.nOrden || 0));
+    }, err => console.error('Repairs (caja):', err));
+}
+
 function _initMovDescAutocomplete() {
   const input = document.getElementById('mov-fi-desc');
   if (!input) return;
@@ -798,9 +820,53 @@ function _onMovDescInput() {
     }
   });
 
+  // ── Reparaciones ──
+  const qIsNumeric = /^\d+$/.test(q.replace(/\s/g, ''));
+  CAJA_REPAIRS.forEach(r => {
+    // Omitir canceladas y las ya cobradas+entregadas
+    if (r.estado === 'cancelado' || r.estado === 'no van') return;
+    if (r.cobrado && r.estado === 'entregado') return;
+
+    let matches = false;
+    if (qIsNumeric) {
+      const nStr = String(r.nOrden || '');
+      matches = nStr.startsWith(q.replace(/\s/g, ''));
+    }
+    if (!matches) {
+      matches = searchMatch([r.nombre, r.marca, r.modelo, r.arreglo, String(r.nOrden || '')], q);
+    }
+    if (!matches) return;
+
+    const saldo = Math.max(0, (r.monto || 0) - (r.sena || 0));
+    results.push({
+      source: 'repair',
+      repair: r,
+      id: r.id,
+      nombre: `N°${r.nOrden || '?'} — ${r.nombre || 'Sin nombre'}`,
+      extra: [r.marca, r.modelo, r.arreglo].filter(Boolean).join(' · '),
+      stock: -1,
+      precio: saldo || r.monto || 0,
+      saldo,
+      estado: r.estado,
+      icon: '🔧',
+      costoUSD: 0,
+      costoARS: 0,
+    });
+  });
+
   // Priorizar coincidencia al inicio del nombre, después por stock disponible, después alfabético
   const qNorm = normalizeText(q);
   results.sort((a, b) => {
+    // Reparaciones "listo" primero dentro de su grupo
+    if (a.source === 'repair' && b.source === 'repair') {
+      const aL = a.estado === 'listo' ? 0 : 1;
+      const bL = b.estado === 'listo' ? 0 : 1;
+      if (aL !== bL) return aL - bL;
+      return (b.repair?.nOrden || 0) - (a.repair?.nOrden || 0);
+    }
+    // Reparaciones al final de la lista (productos/repuestos primero)
+    if (a.source === 'repair' && b.source !== 'repair') return 1;
+    if (a.source !== 'repair' && b.source === 'repair') return -1;
     const aStart = normalizeText(a.nombre).startsWith(qNorm) ? 0 : 1;
     const bStart = normalizeText(b.nombre).startsWith(qNorm) ? 0 : 1;
     if (aStart !== bStart) return aStart - bStart;
@@ -811,7 +877,7 @@ function _onMovDescInput() {
     return a.nombre.localeCompare(b.nombre);
   });
 
-  _showMovSuggestions(results.slice(0, 8), q);
+  _showMovSuggestions(results.slice(0, 10), q);
 }
 
 function _showMovSuggestions(results, q) {
@@ -834,6 +900,31 @@ function _showMovSuggestions(results, q) {
   }
 
   drop.innerHTML = results.map((r, i) => {
+    // ── Reparación ──
+    if (r.source === 'repair') {
+      const saldo = r.saldo || 0;
+      const saldoStr = saldo > 0
+        ? `Saldo $${saldo.toLocaleString('es-AR')}`
+        : (r.precio > 0 ? `$${r.precio.toLocaleString('es-AR')}` : '');
+      const estadoCls = r.estado === 'listo'     ? 'sug-stock-ok'
+                      : r.estado === 'entregado' ? 'sug-stock-low'
+                      : 'sug-stock-zero';
+      const estadoLbl = r.estado === 'listo'     ? '✓ Listo'
+                      : r.estado === 'entregado' ? 'Entregado'
+                      : 'Reparando';
+      return `<button type="button" class="mov-sug-item mov-sug-item--repair" data-i="${i}" onmousedown="event.preventDefault()" onclick="_selectMovSuggestion(${i})">
+        <span class="sug-ico">🔧</span>
+        <span class="sug-info">
+          <span class="sug-name">${esc(r.nombre)}</span>
+          <span class="sug-meta">🔩 Reparación${r.extra ? ' · ' + esc(r.extra) : ''}</span>
+        </span>
+        <span class="sug-right">
+          ${saldoStr ? `<span class="sug-precio sug-saldo-chip">${esc(saldoStr)}</span>` : ''}
+          <span class="sug-stock ${estadoCls}">${estadoLbl}</span>
+        </span>
+      </button>`;
+    }
+    // ── Producto / Repuesto ──
     const stockCls = r.stock <= 0 ? 'sug-stock-zero'
                   : r.stock <= 2 ? 'sug-stock-low'
                   : 'sug-stock-ok';
@@ -866,6 +957,14 @@ function _selectMovSuggestion(idx) {
   const r = drop?._results?.[idx];
   if (!r) return;
 
+  _hideMovSuggestions();
+
+  // ── Reparación → abrir popup "¿Entregado?" ──
+  if (r.source === 'repair') {
+    _openRepairLinkModal(r.repair);
+    return;
+  }
+
   _selectedSaleItem = r;
 
   // Llenar descripción
@@ -881,8 +980,8 @@ function _selectMovSuggestion(idx) {
   }
 
   _showQtyPicker(r);
-  _hideMovSuggestions();
 }
+
 
 function _showQtyPicker(item) {
   const wrap = document.getElementById('mov-sale-item-info');
@@ -946,6 +1045,106 @@ function _clearSaleItem(clearText = true) {
   if (clearText) document.getElementById('mov-fi-desc').value = '';
 }
 
+// ══════════════════════════════════════════
+//  VINCULACIÓN CON REPARACIÓN
+// ══════════════════════════════════════════
+
+function _openRepairLinkModal(repair) {
+  _pendingRepairLink = repair;
+  const saldo = Math.max(0, (repair.monto || 0) - (repair.sena || 0));
+  const equip = [repair.marca, repair.modelo].filter(Boolean).join(' ');
+  const infoEl = document.getElementById('repair-link-info');
+  if (infoEl) {
+    infoEl.innerHTML = `
+      <div class="rlc-card">
+        <div class="rlc-row"><span class="rlc-lbl">N° Orden</span><span class="rlc-val rlc-orden">#${esc(String(repair.nOrden || '—'))}</span></div>
+        ${repair.nombre ? `<div class="rlc-row"><span class="rlc-lbl">Cliente</span><span class="rlc-val">${esc(repair.nombre)}</span></div>` : ''}
+        ${equip ? `<div class="rlc-row"><span class="rlc-lbl">Equipo</span><span class="rlc-val">${esc(equip)}</span></div>` : ''}
+        ${repair.arreglo ? `<div class="rlc-row"><span class="rlc-lbl">Trabajo</span><span class="rlc-val">${esc(repair.arreglo)}</span></div>` : ''}
+        ${repair.monto > 0 ? `<div class="rlc-row"><span class="rlc-lbl">Precio total</span><span class="rlc-val">$${(repair.monto).toLocaleString('es-AR')}</span></div>` : ''}
+        ${repair.sena > 0 ? `<div class="rlc-row"><span class="rlc-lbl">Seña pagada</span><span class="rlc-val rlc-sena-val">$${(repair.sena).toLocaleString('es-AR')}</span></div>` : ''}
+        ${saldo > 0 ? `<div class="rlc-row rlc-row--saldo"><span class="rlc-lbl">Saldo pendiente</span><span class="rlc-val rlc-saldo-val">$${saldo.toLocaleString('es-AR')}</span></div>` : ''}
+      </div>`;
+  }
+  document.getElementById('repair-link-overlay')?.classList.remove('hidden');
+  document.getElementById('repair-link-modal')?.classList.remove('hidden');
+}
+
+function _cancelRepairLink() {
+  _pendingRepairLink = null;
+  document.getElementById('repair-link-overlay')?.classList.add('hidden');
+  document.getElementById('repair-link-modal')?.classList.add('hidden');
+}
+
+function _selectRepairMode(mode) {
+  const repair = _pendingRepairLink;
+  if (!repair) return;
+  _pendingRepairLink = null;
+  document.getElementById('repair-link-overlay')?.classList.add('hidden');
+  document.getElementById('repair-link-modal')?.classList.add('hidden');
+
+  // Limpiar selección previa de producto/repuesto
+  _clearSaleItem(false);
+  _selectedRepairItem = { repair, mode };
+
+  const equip   = [repair.marca, repair.modelo].filter(Boolean).join(' ');
+  const cliente = repair.nombre || '';
+  const saldo   = Math.max(0, (repair.monto || 0) - (repair.sena || 0));
+  const partes  = [`N°${repair.nOrden || ''}`];
+  if (cliente) partes.push(cliente);
+  if (equip)   partes.push(equip);
+
+  if (mode === 'sena') {
+    selectCat('Seña');
+    document.getElementById('mov-fi-desc').value = `Seña ${partes.join(' — ')}`;
+    // Dejar que el usuario ingrese el monto de la seña
+  } else {
+    selectCat('Reparación');
+    document.getElementById('mov-fi-desc').value = `Reparación ${partes.join(' — ')}`;
+    // Pre-llenar con el saldo pendiente (o total si no hay seña)
+    if (saldo > 0) {
+      document.getElementById('mov-fi-monto').value = saldo;
+    } else if (repair.monto > 0) {
+      document.getElementById('mov-fi-monto').value = repair.monto;
+    }
+  }
+
+  _showRepairCard(repair, mode);
+}
+
+function _showRepairCard(repair, mode) {
+  const wrap = document.getElementById('mov-sale-item-info');
+  if (!wrap) return;
+  const saldo   = Math.max(0, (repair.monto || 0) - (repair.sena || 0));
+  const equip   = [repair.marca, repair.modelo].filter(Boolean).join(' ');
+  const modeLbl = mode === 'sena' ? '📝 Seña' : '✅ Cobro total';
+  const modeClr = mode === 'sena' ? 'var(--acc,#C8965A)' : 'var(--grn2,#10b981)';
+
+  wrap.innerHTML = `
+    <div class="sale-item-card">
+      <div class="sale-item-row">
+        <span class="sale-item-icon">🔧</span>
+        <div class="sale-item-text">
+          <span class="sale-item-name">N°${esc(String(repair.nOrden || '—'))} — ${esc(repair.nombre || 'Sin cliente')}</span>
+          <span class="sale-item-meta">${esc(equip)}${repair.arreglo ? ' · ' + esc(repair.arreglo) : ''}</span>
+        </div>
+        <button class="sale-item-clear" onclick="_clearRepairItem()" type="button" title="Desvincular">✕</button>
+      </div>
+      <div class="repair-mode-row">
+        <span class="repair-mode-badge" style="background:${modeClr};color:#fff;padding:2px 10px;border-radius:20px;font-size:.75rem;font-weight:700">${modeLbl}</span>
+        ${saldo > 0 ? `<span class="repair-saldo-lbl" style="font-size:.8rem;color:var(--t2,#666);margin-left:8px">Saldo: <b>$${saldo.toLocaleString('es-AR')}</b></span>` : ''}
+      </div>
+    </div>
+  `;
+  wrap.classList.remove('hidden');
+}
+
+function _clearRepairItem(clearText = true) {
+  _selectedRepairItem = null;
+  _hideQtyPicker();
+  if (clearText) document.getElementById('mov-fi-desc').value = '';
+}
+
 async function saveMov() {
   const montoInput = document.getElementById('mov-fi-monto');
   const descInput  = document.getElementById('mov-fi-desc');
@@ -995,7 +1194,9 @@ async function saveMov() {
   }
 
   // ── Item seleccionado del autocomplete (solo en INGRESO y al CREAR, no editar) ──
-  let stockUpdate = null;
+  let stockUpdate  = null;
+  let repairUpdate = null;
+
   if (_selectedSaleItem && tipo === 'ingreso' && !editingMovId) {
     const qty = Math.max(1, parseInt(document.getElementById('mov-sale-qty')?.value) || 1);
     data.itemId       = _selectedSaleItem.id;
@@ -1014,6 +1215,30 @@ async function saveMov() {
     stockUpdate = { collection, id: _selectedSaleItem.id, stockField, newStock, qty };
   }
 
+  if (_selectedRepairItem && tipo === 'ingreso' && !editingMovId) {
+    const { repair, mode } = _selectedRepairItem;
+    data.repairId    = repair.id;
+    data.repairNOrden = repair.nOrden || null;
+    data.repairMode  = mode;
+
+    if (mode === 'sena') {
+      data.esSena = true;
+      repairUpdate = {
+        id: repair.id,
+        sena: (Number(repair.sena) || 0) + monto,
+      };
+    } else {
+      data.esCobro = true;
+      const upd = {
+        cobrado: true,
+        metodoCobro: metodoPago,
+        fechaCobro: new Date().toISOString(),
+      };
+      if (repair.estado === 'listo') upd.estado = 'entregado';
+      repairUpdate = { id: repair.id, ...upd };
+    }
+  }
+
   try {
     if (editingMovId) {
       await db.collection('caja_movimientos').doc(editingMovId).update(data);
@@ -1021,8 +1246,20 @@ async function saveMov() {
     } else {
       await db.collection('caja_movimientos').add({ ...data, createdAt: new Date().toISOString() });
 
+      // Actualizar reparación vinculada
+      if (repairUpdate) {
+        try {
+          const { id: repId, ...repFields } = repairUpdate;
+          await db.collection('repairs').doc(repId).update(repFields);
+          const modeMsg = repairUpdate.cobrado ? 'cobrada ✅' : 'seña actualizada ✅';
+          toast(`Movimiento registrado · Reparación ${modeMsg}`, 'success');
+        } catch (repErr) {
+          console.error('Repair update error:', repErr);
+          toast('Movimiento guardado, pero falló la actualización de la reparación', 'error');
+        }
+      }
       // Descontar stock después de guardar el movimiento (no bloqueante si falla)
-      if (stockUpdate) {
+      else if (stockUpdate) {
         try {
           await db.collection(stockUpdate.collection).doc(stockUpdate.id).update({
             [stockUpdate.stockField]: stockUpdate.newStock
@@ -1036,7 +1273,8 @@ async function saveMov() {
         toast('Movimiento registrado', 'success');
       }
     }
-    _clearSaleItem();
+    _clearSaleItem(false);
+    _clearRepairItem(false);
     closeMovForm();
   } catch (e) {
     console.error('saveMov:', e);
