@@ -208,6 +208,9 @@
               <button class="hdr-drop-item owner-lock-btn" onclick="toggleOwnerLock();closeRep2Menu()">
                 <span class="lock-icon">🔒</span> Modo dueño
               </button>
+              <button class="hdr-drop-item" onclick="location.href='carga-costos.html'">
+                💵 Carga rápida de costos
+              </button>
               <button class="hdr-drop-item" onclick="location.href='bulk-edit-repuestos.html'">
                 📊 Exportar / Importar Excel
               </button>
@@ -1516,6 +1519,68 @@
       <div style="display:flex;gap:10px;margin-top:4px">
         <button class="btn-secondary" onclick="closePedidoForm()" style="flex:1">Cancelar</button>
         <button class="btn-primary" onclick="savePedido()" style="flex:2">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     MODAL: Costo requerido al entregar reparación
+══════════════════════════════════════════════════ -->
+<div id="costo-req-overlay" class="modal-overlay hidden">
+  <div class="modal-card costo-req-card">
+    <div class="modal-header">
+      <h3>💵 Cargá el costo antes de entregar</h3>
+      <button class="modal-close" onclick="closeCostoRequeridoModal(false)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="costo-req-rep-info" id="costo-req-info"></div>
+      <p class="costo-req-hint">Para tener tu margen real al cierre del mes, cargá cómo se cubrió esta reparación:</p>
+
+      <!-- Tabs -->
+      <div class="costo-req-tabs">
+        <button class="costo-req-tab costo-req-tab--active" data-mode="catalog" onclick="_toggleCostoReqMode('catalog')">🔩 Del catálogo</button>
+        <button class="costo-req-tab" data-mode="manual" onclick="_toggleCostoReqMode('manual')">✏️ Manual</button>
+        <button class="costo-req-tab" data-mode="norep" onclick="_toggleCostoReqMode('norep')">🚫 Solo MO</button>
+      </div>
+
+      <!-- Modo catálogo -->
+      <div id="costo-req-mode-catalog" class="costo-req-mode">
+        <div class="fg" style="position:relative">
+          <label class="fl">Buscar en repuestos cargados</label>
+          <input id="costo-req-search" class="fi" type="text" placeholder="Pantalla iPhone 14, módulo G05..." autocomplete="off" oninput="_onCostoReqSearchInput()">
+          <div id="costo-req-suggest" class="mov-desc-suggest hidden"></div>
+        </div>
+        <div class="costo-req-help">El stock se descuenta −1 al confirmar.</div>
+      </div>
+
+      <!-- Modo manual -->
+      <div id="costo-req-mode-manual" class="costo-req-mode" style="display:none">
+        <div style="display:flex;gap:10px">
+          <div class="fg" style="flex:1">
+            <label class="fl">Costo USD</label>
+            <input id="costo-req-usd" class="fi" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="fg" style="flex:1">
+            <label class="fl">Costo ARS</label>
+            <input id="costo-req-ars" class="fi" type="number" min="0" inputmode="numeric" placeholder="0">
+          </div>
+        </div>
+        <div class="costo-req-help">Llená uno de los dos. Si llenás ambos, se usa el ARS.</div>
+      </div>
+
+      <!-- Modo sin repuesto -->
+      <div id="costo-req-mode-norep" class="costo-req-mode" style="display:none">
+        <label class="costo-req-norep-label">
+          <input type="checkbox" id="costo-req-no-rep">
+          <span><b>Esta reparación NO usó repuesto</b><br>
+          <span style="color:var(--text3);font-size:.78rem">Solo mano de obra (formateo, asesoramiento, ajuste, etc.)</span></span>
+        </label>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn-secondary" style="flex:1" onclick="closeCostoRequeridoModal(false)">Cancelar</button>
+        <button class="btn-primary" style="flex:2" onclick="confirmCostoRequerido()">✅ Confirmar y entregar</button>
       </div>
     </div>
   </div>

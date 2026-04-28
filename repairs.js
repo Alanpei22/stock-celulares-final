@@ -1058,6 +1058,15 @@ async function changeRepairStatus(id, newStatus) {
   const r = REPAIRS.find(x => x.id === id);
   if (!r || r.estado === newStatus) return;
 
+  // ── GUARDIA: al pasar a "entregado", forzar carga de costo si falta ──
+  if (newStatus === 'entregado' && _faltaCargarCosto(r)) {
+    const ok = await openCostoRequeridoModal(r);
+    if (!ok) return; // canceló
+    // Refrescar referencia local
+    const r2 = REPAIRS.find(x => x.id === id);
+    if (r2) Object.assign(r, r2);
+  }
+
   // Al marcar como "listo", preguntar qué repuesto se usó
   if (newStatus === 'listo') {
     openRepUsoModal(async (repuestoId) => {
@@ -2063,6 +2072,17 @@ document.addEventListener('DOMContentLoaded', () => {
 async function quickStatusChange(e, id, newStatus) {
   e.stopPropagation();
 
+  const rep = REPAIRS.find(x => x.id === id);
+  if (!rep) return;
+
+  // ── GUARDIA: al pasar a "entregado", forzar carga de costo si falta ──
+  if (newStatus === 'entregado' && _faltaCargarCosto(rep)) {
+    const ok = await openCostoRequeridoModal(rep);
+    if (!ok) return;
+    const r2 = REPAIRS.find(x => x.id === id);
+    if (r2) Object.assign(rep, r2);
+  }
+
   // Al marcar como "listo", preguntar qué repuesto se usó
   if (newStatus === 'listo') {
     openRepUsoModal(async (repuestoId) => {
@@ -2599,4 +2619,196 @@ async function deleteMarca(idx) {
   applyMarcasToDatalists();
   renderMarcasGuardadas();
   toast('Marca eliminada', 'success');
+}
+
+// ══════════════════════════════════════════════════════════
+//  GUARDIA: forzar carga de costo antes de marcar "Entregado"
+// ══════════════════════════════════════════════════════════
+
+// Devuelve true si la reparación NO tiene info de costo cargada todavía
+function _faltaCargarCosto(r) {
+  if (!r) return false;
+  if (r.sinRepuesto === true) return false; // declarada solo MO
+  const c1 = Number(r.costo) || 0;
+  const c2 = Number(r.costoRepuesto) || 0;
+  return c1 <= 0 && c2 <= 0;
+}
+
+// Modal bloqueante. Devuelve Promise<bool> — true si confirmó, false si canceló.
+function openCostoRequeridoModal(r) {
+  return new Promise(resolve => {
+    _costoRequiredCb = resolve;
+    _costoRequiredRepair = r;
+    _costoRequiredSelectedRep = null;
+
+    const monto = Number(r.monto) || 0;
+    document.getElementById('costo-req-info').innerHTML =
+      `<b>N°${r.nOrden || '?'}</b> — ${esc(r.marca || '')} ${esc(r.modelo || '')}<br>
+       <span style="color:var(--text3);font-size:.78rem">Monto cobrado: $${monto.toLocaleString('es-AR')}</span>`;
+    // Reset campos
+    document.getElementById('costo-req-search').value = '';
+    document.getElementById('costo-req-usd').value = '';
+    document.getElementById('costo-req-ars').value = '';
+    document.getElementById('costo-req-suggest').classList.add('hidden');
+    document.getElementById('costo-req-no-rep').checked = false;
+    _toggleCostoReqMode('catalog');
+    document.getElementById('costo-req-overlay').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => document.getElementById('costo-req-search').focus(), 80);
+  });
+}
+
+let _costoRequiredCb = null;
+let _costoRequiredRepair = null;
+let _costoRequiredSelectedRep = null;
+
+function closeCostoRequeridoModal(confirmed) {
+  document.getElementById('costo-req-overlay').classList.add('hidden');
+  document.body.style.overflow = '';
+  if (_costoRequiredCb) {
+    const cb = _costoRequiredCb;
+    _costoRequiredCb = null;
+    cb(!!confirmed);
+  }
+  _costoRequiredRepair = null;
+  _costoRequiredSelectedRep = null;
+}
+
+// Cambia entre modos: catalog / manual / sin-repuesto
+function _toggleCostoReqMode(mode) {
+  document.querySelectorAll('.costo-req-tab').forEach(t => {
+    t.classList.toggle('costo-req-tab--active', t.dataset.mode === mode);
+  });
+  document.getElementById('costo-req-mode-catalog').style.display = mode === 'catalog' ? '' : 'none';
+  document.getElementById('costo-req-mode-manual').style.display  = mode === 'manual'  ? '' : 'none';
+  document.getElementById('costo-req-mode-norep').style.display   = mode === 'norep'   ? '' : 'none';
+}
+
+// Autocomplete del catálogo dentro del modal
+function _onCostoReqSearchInput() {
+  const inp = document.getElementById('costo-req-search');
+  const drop = document.getElementById('costo-req-suggest');
+  const q = (inp.value || '').trim();
+  if (q.length < 1) { drop.classList.add('hidden'); _costoRequiredSelectedRep = null; return; }
+
+  if (typeof REPUESTOS === 'undefined' || !REPUESTOS.length) {
+    drop.innerHTML = '<div class="mov-sug-empty"><span class="sug-empty-ico">🔧</span><div class="sug-empty-text"><div class="sug-empty-title">No hay repuestos cargados</div></div></div>';
+    drop.classList.remove('hidden');
+    return;
+  }
+
+  const results = REPUESTOS.filter(r => {
+    if (typeof searchMatch === 'function') return searchMatch([r.nombre, r.marca, r.modelo, r.tipo], q);
+    return (r.nombre || '').toLowerCase().includes(q.toLowerCase());
+  }).slice(0, 6);
+
+  if (!results.length) {
+    drop.innerHTML = `<div class="mov-sug-empty"><span class="sug-empty-ico">🔍</span><div class="sug-empty-text"><div class="sug-empty-title">Sin coincidencias para "${esc(q)}"</div><div class="sug-empty-sub">Probá con costo manual o "sin repuesto"</div></div></div>`;
+    drop.classList.remove('hidden');
+    drop._results = [];
+    return;
+  }
+
+  drop.innerHTML = results.map((r, i) => {
+    const usd = Number(r.precioCostoUSD) || 0;
+    const cantStock = Number(r.cantidad) || 0;
+    return `<button type="button" class="mov-sug-item" onmousedown="event.preventDefault()" onclick="_selectCostoReqSuggestion(${i})">
+      <span class="sug-ico">🔧</span>
+      <span class="sug-info">
+        <span class="sug-name">${esc(r.nombre || '')}</span>
+        <span class="sug-meta">${esc(r.tipo || '')}${r.marca ? ' · ' + esc(r.marca) : ''}</span>
+      </span>
+      <span class="sug-right">
+        ${usd > 0 ? `<span class="sug-precio">U$D ${usd}</span>` : '<span class="sug-precio" style="color:#f87171">sin costo</span>'}
+        <span class="sug-stock ${cantStock <= 0 ? 'sug-stock-zero' : (cantStock <= 2 ? 'sug-stock-low' : 'sug-stock-ok')}">${cantStock} u.</span>
+      </span>
+    </button>`;
+  }).join('');
+  drop._results = results;
+  drop.classList.remove('hidden');
+}
+
+function _selectCostoReqSuggestion(idx) {
+  const drop = document.getElementById('costo-req-suggest');
+  const r = drop?._results?.[idx];
+  if (!r) return;
+  _costoRequiredSelectedRep = r;
+  document.getElementById('costo-req-search').value = r.nombre || '';
+  drop.classList.add('hidden');
+}
+
+async function confirmCostoRequerido() {
+  const r = _costoRequiredRepair;
+  if (!r) return;
+
+  // Detectar modo activo
+  const activeTab = document.querySelector('.costo-req-tab--active')?.dataset.mode || 'catalog';
+
+  let update = {};
+
+  if (activeTab === 'catalog') {
+    if (!_costoRequiredSelectedRep) {
+      toast('Elegí un repuesto del catálogo', 'error');
+      return;
+    }
+    const rep = _costoRequiredSelectedRep;
+    const dolar = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue
+                : (typeof getCurrentDolar === 'function' ? (getCurrentDolar() || 0) : 0);
+    const costoUSD = Number(rep.precioCostoUSD) || 0;
+    const costoARS = costoUSD > 0 && dolar > 0
+      ? Math.round(costoUSD * dolar)
+      : (Number(rep.precioCompra) || 0);
+
+    update = {
+      costoRepuesto: costoARS,
+      costo: costoARS,
+      repuestoId: rep.id,
+      repuestoNombre: rep.nombre || '',
+      costoRepuestoUSD: costoUSD,
+      dolarSnapshot: dolar,
+    };
+
+    // Descontar 1 del stock
+    try {
+      const nueva = Math.max(0, (rep.cantidad || 0) - 1);
+      await db.collection('repuestos').doc(rep.id).update({ cantidad: nueva });
+    } catch (e) {
+      console.error('Stock decrement:', e);
+    }
+  }
+  else if (activeTab === 'manual') {
+    const usd = parseFloat(document.getElementById('costo-req-usd').value) || 0;
+    const ars = parseFloat(document.getElementById('costo-req-ars').value) || 0;
+    if (usd <= 0 && ars <= 0) {
+      toast('Cargá el costo en USD o ARS', 'error');
+      return;
+    }
+    const dolar = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue
+                : (typeof getCurrentDolar === 'function' ? (getCurrentDolar() || 0) : 0);
+    const costoARS = ars > 0 ? Math.round(ars) : (usd > 0 && dolar > 0 ? Math.round(usd * dolar) : 0);
+    update = {
+      costoRepuesto: costoARS,
+      costo: costoARS,
+      costoRepuestoUSD: usd,
+      dolarSnapshot: dolar,
+    };
+  }
+  else { // sin-repuesto
+    update = {
+      sinRepuesto: true,
+      costoRepuesto: 0,
+      costo: 0,
+    };
+  }
+
+  try {
+    await db.collection('repairs').doc(r.id).update(update);
+    // Actualizar snapshot local
+    Object.assign(r, update);
+    closeCostoRequeridoModal(true);
+    toast('💰 Costo registrado', 'success');
+  } catch (e) {
+    console.error('costo update:', e);
+    toast('Error al guardar', 'error');
+  }
 }
