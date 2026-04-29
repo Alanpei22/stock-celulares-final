@@ -342,6 +342,16 @@ function listenMovimientos() {
   }
 }
 
+// ── Porción en efectivo de un movimiento (split-aware) ──────
+function _efecMonto(m) {
+  const total = Number(m.monto) || 0;
+  const m2amt = Number(m.monto2) || 0;
+  if (m.metodoPago === 'Efectivo' && m.metodoPago2) return total - m2amt;
+  if (m.metodoPago === 'Efectivo') return total;
+  if (m.metodoPago2 === 'Efectivo') return m2amt;
+  return 0;
+}
+
 function renderStats() {
   const apertura  = ARQUEO?.total || 0;
   const ingMovs   = MOVIMIENTOS.filter(m => m.tipo === 'ingreso');
@@ -352,16 +362,9 @@ function renderStats() {
   const totalIng    = ingMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const totalEg     = egMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const totalGastos = gastos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const _efecPortion = m => {
-    const total = Number(m.monto) || 0;
-    const m2amt = Number(m.monto2) || 0;
-    if (m.metodoPago === 'Efectivo' && m.metodoPago2) return total - m2amt;
-    if (m.metodoPago === 'Efectivo') return total;
-    if (m.metodoPago2 === 'Efectivo') return m2amt;
-    return 0;
-  };
-  const ingEfec = ingMovs.reduce((s, m) => s + _efecPortion(m), 0);
-  const egEfec  = egMovs.reduce((s, m) => s + _efecPortion(m), 0);
+
+  const ingEfec = ingMovs.reduce((s, m) => s + _efecMonto(m), 0);
+  const egEfec  = egMovs.reduce((s, m) => s + _efecMonto(m), 0);
   const efectivoEnCaja = apertura + ingEfec - egEfec;
   const neto = totalIng - totalGastos; // retiros no afectan neto
 
@@ -374,10 +377,10 @@ function renderStats() {
   const netoEl = document.getElementById('stat-neto');
   if (netoEl) { netoEl.textContent = fmt(neto); netoEl.style.color = neto >= 0 ? '#10b981' : '#ef4444'; }
 
-  // Desglose del día
+  // Desglose del día — usa _efecMonto para respetar el split
   const reparac   = ingMovs.filter(m => m.categoria === 'Reparación').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const ventaEfec = ingMovs.filter(m => m.metodoPago === 'Efectivo' && m.categoria !== 'Reparación').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const digital   = ingMovs.filter(m => m.metodoPago !== 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const ventaEfec = ingMovs.filter(m => m.categoria !== 'Reparación').reduce((s, m) => s + _efecMonto(m), 0);
+  const digital   = ingMovs.reduce((s, m) => s + ((Number(m.monto) || 0) - _efecMonto(m)), 0);
   const totalRetiros = retiros.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   set('desglose-efectivo', ventaEfec);
   set('desglose-digital', digital);
@@ -406,14 +409,7 @@ function updateCajaResumen() {
   const neto = totalIng - totalEg;
   const apertura = ARQUEO?.total || 0;
 
-  const _efec = m => {
-    const t = Number(m.monto) || 0, m2 = Number(m.monto2) || 0;
-    if (m.metodoPago === 'Efectivo' && m.metodoPago2) return t - m2;
-    if (m.metodoPago === 'Efectivo') return t;
-    if (m.metodoPago2 === 'Efectivo') return m2;
-    return 0;
-  };
-  const ingEfec = ingMovs.reduce((s, m) => s + _efec(m), 0);
+  const ingEfec = ingMovs.reduce((s, m) => s + _efecMonto(m), 0);
   const digIng  = totalIng - ingEfec;
 
   const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
@@ -1357,8 +1353,8 @@ function changeCierreBillete(d, delta) {
 
 function _getCierreEsperado() {
   const apertura = ARQUEO?.total || 0;
-  const ingEfec = MOVIMIENTOS.filter(m => m.tipo === 'ingreso' && m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const egEfec  = MOVIMIENTOS.filter(m => m.tipo === 'egreso'  && m.metodoPago === 'Efectivo').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const ingEfec = MOVIMIENTOS.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + _efecMonto(m), 0);
+  const egEfec  = MOVIMIENTOS.filter(m => m.tipo === 'egreso' ).reduce((s, m) => s + _efecMonto(m), 0);
   return apertura + ingEfec - egEfec;
 }
 

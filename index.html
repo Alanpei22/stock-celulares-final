@@ -1498,7 +1498,10 @@
         </div>
         <div class="fg" style="flex:2">
           <label class="fl">Categoría *</label>
-          <select id="pedido-fi-categoria" class="fi"></select>
+          <input id="pedido-fi-categoria" class="fi" type="text"
+            placeholder="Pantalla, Batería…" autocomplete="off"
+            list="pedido-cat-list">
+          <datalist id="pedido-cat-list"></datalist>
         </div>
       </div>
       <div class="fg">

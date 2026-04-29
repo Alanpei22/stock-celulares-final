@@ -57,11 +57,14 @@ function initPedidos() {
 }
 
 function _llenarSelectsPedido() {
-  const catSel = document.getElementById('pedido-fi-categoria');
-  if (catSel && !catSel.options.length) {
-    catSel.innerHTML = '<option value="">Seleccionar…</option>' +
-      PEDIDO_CATEGORIAS.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  // Categorías: datalist que mezcla las fijas + las que ya existen en pedidos (custom)
+  const catList = document.getElementById('pedido-cat-list');
+  if (catList) {
+    const usedCats = [...new Set(PEDIDOS.map(p => p.categoria).filter(Boolean))];
+    const allCats  = [...new Set([...PEDIDO_CATEGORIAS, ...usedCats])].sort((a, b) => a.localeCompare(b));
+    catList.innerHTML = allCats.map(c => `<option value="${esc(c)}">`).join('');
   }
+  // Prioridades: select fijo (solo la primera vez)
   const priSel = document.getElementById('pedido-fi-prioridad');
   if (priSel && !priSel.options.length) {
     priSel.innerHTML = PEDIDO_PRIORIDADES
@@ -112,6 +115,9 @@ function renderPedidos() {
   const list = document.getElementById('pedidos-list');
   const empty = document.getElementById('pedidos-empty');
   if (!list) return;
+
+  // Actualizar datalist de categorías con las que ya existen en pedidos
+  _llenarSelectsPedido();
 
   // Filtrado
   let items = PEDIDOS;
@@ -554,14 +560,9 @@ function _selectPedidoSuggestion(idx) {
   if (!r) return;
   _pedidoSelectedItem = r;
   document.getElementById('pedido-fi-nombre').value = r.nombre;
-  // Auto-set categoría si la categoría del item está en la lista
-  const catSel = document.getElementById('pedido-fi-categoria');
-  if (catSel) {
-    const opt = [...catSel.options].find(o => o.value.toLowerCase() === (r.categoria || '').toLowerCase());
-    if (opt) catSel.value = opt.value;
-    else if (PEDIDO_CATEGORIAS.includes(r.categoria)) catSel.value = r.categoria;
-    else catSel.value = 'Otro';
-  }
+  // Auto-set categoría desde el item seleccionado (el campo ahora es input libre)
+  const catInp = document.getElementById('pedido-fi-categoria');
+  if (catInp) catInp.value = r.categoria || '';
   // Auto-set proveedor si el item lo tiene
   const provInp = document.getElementById('pedido-fi-proveedor');
   if (provInp && r.proveedor) provInp.value = r.proveedor;
