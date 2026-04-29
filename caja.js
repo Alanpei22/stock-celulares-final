@@ -181,15 +181,14 @@ async function loadArqueo() {
       ARQUEO = null;
       const today = _todayAR();
       if (currentDate === today) {
-        // Verificar si hay caja chica pre-seteada del cierre de ayer
+        // Caja chica pre-seteada de cualquier cierre previo NO usado todavía
+        // (cubre el caso de saltar días: viernes cerrás → lunes abrís)
         let cajaChicaPreset = 0;
         try {
           const cfgDoc = await db.collection('caja_config').doc('nextOpening').get();
           if (cfgDoc.exists) {
             const d = cfgDoc.data();
-            const yesterday = new Date(today + 'T12:00:00');
-            yesterday.setDate(yesterday.getDate() - 1);
-            if (d.fecha === yesterday.toISOString().slice(0, 10) && d.monto > 0) {
+            if (d.fecha && d.fecha < today && d.monto > 0 && !d.usado) {
               cajaChicaPreset = d.monto;
             }
           }
@@ -295,6 +294,8 @@ async function saveArqueo() {
       vendedor
     });
     ARQUEO = { billetes, total, fecha: currentDate, savedAt: ahora.toISOString(), horaAR, vendedor };
+    // Marcar caja chica del día anterior como ya usada
+    try { await db.collection('caja_config').doc('nextOpening').set({ usado: true }, { merge: true }); } catch {}
     closeArqueoModal();
     renderStats();
     toast('✅ Arqueo guardado: $' + total.toLocaleString('es-AR'), 'success');
@@ -802,7 +803,11 @@ function listenCajaRepuestos() {
 
 function listenCajaRepairs() {
   if (_cajaRepairsListener) return;
+  // Limitar a 365 días para no traer toda la historia de reparaciones
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 365);
   _cajaRepairsListener = db.collection('repairs')
+    .where('fechaIngreso', '>=', cutoff.toISOString())
     .onSnapshot(snap => {
       CAJA_REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       CAJA_REPAIRS.sort((a, b) => (b.nOrden || 0) - (a.nOrden || 0));
@@ -1263,6 +1268,11 @@ async function saveMov() {
     toast('El monto del 2do método debe ser > $0 y < total', 'error');
     return;
   }
+  // Evitar split entre dos métodos iguales (rompe el cálculo de efectivo)
+  if (_splitActive && metodo2 && metodo2 === metodoPago) {
+    toast('El 2do método no puede ser igual al primero', 'error');
+    return;
+  }
 
   const tipo = document.getElementById('mov-btn-ingreso').classList.contains('tipo-active') ? 'ingreso' : 'egreso';
 
@@ -1271,6 +1281,9 @@ async function saveMov() {
     data.metodoPago2 = metodo2;
     data.monto2 = splitAmt;
   }
+  // Vendedor activo (para reportes por turno)
+  const vendedorActivo = localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '';
+  if (vendedorActivo) data.vendedor = vendedorActivo;
 
   // ── Item seleccionado del autocomplete (solo en INGRESO y al CREAR, no editar) ──
   let stockUpdate  = null;
@@ -1307,6 +1320,12 @@ async function saveMov() {
         sena: (Number(repair.sena) || 0) + monto,
       };
     } else {
+      // Validar que el monto cubra el saldo pendiente
+      const saldoPendiente = Math.max(0, (Number(repair.monto) || 0) - (Number(repair.sena) || 0));
+      if (saldoPendiente > 0 && monto < saldoPendiente) {
+        const ok = confirm(`⚠️ El cobro ($${monto.toLocaleString('es-AR')}) es menor que el saldo pendiente ($${saldoPendiente.toLocaleString('es-AR')}).\n\n¿Marcar como cobro total de todas formas? (Si decís NO, registrá como seña)`);
+        if (!ok) return;
+      }
       data.esCobro = true;
       const upd = {
         cobrado: true,
@@ -1441,10 +1460,12 @@ function changeCierreBillete(d, delta) {
 function openCajaChicaModal(contadoTotal) {
   const el = document.getElementById('cajachica-contado');
   if (el) el.textContent = fmt(contadoTotal || 0);
+  const modal = document.getElementById('cajachica-modal');
+  if (modal) modal.dataset.contado = String(contadoTotal || 0); // para validación
   const inp = document.getElementById('cajachica-monto');
   if (inp) inp.value = '';
   document.getElementById('cajachica-overlay')?.classList.remove('hidden');
-  document.getElementById('cajachica-modal')?.classList.remove('hidden');
+  modal?.classList.remove('hidden');
   setTimeout(() => document.getElementById('cajachica-monto')?.focus(), 200);
 }
 
@@ -1465,6 +1486,11 @@ function setCajaChicaMonto(v) {
 
 async function saveCajaChica() {
   const monto = parseInt(document.getElementById('cajachica-monto').value) || 0;
+  const contadoTotal = Number(document.getElementById('cajachica-modal')?.dataset.contado) || 0;
+  // Validar que caja chica no supere el efectivo contado
+  if (monto > contadoTotal && contadoTotal > 0) {
+    if (!confirm(`⚠️ La caja chica ($${monto.toLocaleString('es-AR')}) es mayor que el efectivo contado ($${contadoTotal.toLocaleString('es-AR')}).\n\n¿Confirmás de todas formas?`)) return;
+  }
   try {
     // Guardar en cierre del día
     await db.collection('caja_cierres').doc(currentDate).update({
@@ -1507,6 +1533,7 @@ async function confirmAperturaRapida(monto) {
       fromCajaChica: true,
     });
     ARQUEO = { billetes: {}, total: monto, fecha: currentDate, savedAt: ahora.toISOString(), horaAR, vendedor, fromCajaChica: true };
+    try { await db.collection('caja_config').doc('nextOpening').set({ usado: true }, { merge: true }); } catch {}
     closeArqueoModal();
     renderStats();
     toast(`✅ Apertura confirmada — $${monto.toLocaleString('es-AR')}`, 'success');
@@ -1590,7 +1617,16 @@ function _calcPeriodoStats(desdeISO) {
   const totalIng = ing.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const totalEg  = eg .reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const efec     = ing.reduce((s, m) => s + _efecMonto(m), 0);
-  return { totalIng, totalEg, efec, digital: totalIng - efec, neto: totalIng - totalEg, count: movs.length };
+  // Desglose por vendedor (si los movimientos tienen el campo)
+  const porVendedor = {};
+  movs.forEach(m => {
+    const v = m.vendedor || '—';
+    if (!porVendedor[v]) porVendedor[v] = { ing: 0, eg: 0, count: 0 };
+    if (m.tipo === 'ingreso') porVendedor[v].ing += Number(m.monto) || 0;
+    else                       porVendedor[v].eg  += Number(m.monto) || 0;
+    porVendedor[v].count++;
+  });
+  return { totalIng, totalEg, efec, digital: totalIng - efec, neto: totalIng - totalEg, count: movs.length, porVendedor };
 }
 
 function openCierreParcialModal() {

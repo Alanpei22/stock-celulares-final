@@ -23,7 +23,12 @@ function initInventario() {
   _initInvScanInput();
 
   document.getElementById('inv-add-btn').addEventListener('click', () => openProductoForm());
-  document.getElementById('inv-search').addEventListener('input', renderInventario);
+  // Búsqueda con debounce para evitar lag con muchos productos
+  let _invSearchTimer;
+  document.getElementById('inv-search').addEventListener('input', () => {
+    clearTimeout(_invSearchTimer);
+    _invSearchTimer = setTimeout(renderInventario, 80);
+  });
   document.getElementById('inv-f-cat').addEventListener('change', renderInventario);
   document.getElementById('inv-f-estado').addEventListener('change', renderInventario);
 
