@@ -42,14 +42,20 @@ let _cajaRepairsListener = null;
 let _selectedRepairItem = null; // { repair, mode }  mode: 'sena' | 'cobro'
 let _pendingRepairLink  = null; // repair esperando confirmación en el popup
 
+// ── Cierres parciales (turnos) ─────────────────────────────
+let CIERRES_PARCIALES = [];
+let _parcialListener  = null;
+
 // Expone cleanup para que auth.js cancele listeners en logout
 window._cajaCleanup = function() {
   if (movListener)             { movListener();             movListener = null; }
   if (_cajaRepuestosListener)  { _cajaRepuestosListener();  _cajaRepuestosListener = null; }
   if (_cajaRepairsListener)    { _cajaRepairsListener();    _cajaRepairsListener = null; }
+  if (_parcialListener)        { _parcialListener();        _parcialListener = null; }
   CAJA_REPUESTOS = [];
   CAJA_REPAIRS   = [];
   MOVIMIENTOS    = [];
+  CIERRES_PARCIALES = [];
   _selectedSaleItem  = null;
   _selectedRepairItem = null;
   _pendingRepairLink  = null;
@@ -96,6 +102,7 @@ function initApp() {
   listenMovimientos();
   loadArqueo();
   loadCierre();
+  listenCierresParciales();        // ← turnos/cierres parciales
   listenCajaRepuestos();           // ← repuestos para autocomplete
   listenCajaRepairs();             // ← reparaciones para autocomplete
   _initMovDescAutocomplete();      // ← input handler de descripción
@@ -124,14 +131,14 @@ function nextDay() {
 function setDate(date) {
   currentDate = date;
   updateDateLabel();
-  if (movListener) {
-    movListener();
-    movListener = null;
-  }
+  if (movListener) { movListener(); movListener = null; }
+  if (_parcialListener) { _parcialListener(); _parcialListener = null; }
   MOVIMIENTOS = [];
+  CIERRES_PARCIALES = [];
   ARQUEO = null;
   CIERRE = null;
   listenMovimientos();
+  listenCierresParciales();
   loadArqueo();
   loadCierre();
 }
@@ -471,14 +478,26 @@ function renderMovimientos() {
   const empty = document.getElementById('caja-empty');
   if (!list) return;
 
-  if (!MOVIMIENTOS.length) {
+  if (!MOVIMIENTOS.length && !CIERRES_PARCIALES.length) {
     list.innerHTML = '';
     if (empty) empty.style.display = '';
     return;
   }
   if (empty) empty.style.display = 'none';
 
-  list.innerHTML = MOVIMIENTOS.map(m => {
+  // Mezclar movimientos + cierres parciales ordenados por tiempo
+  const items = [
+    ...MOVIMIENTOS.map(m => ({ ...m, _type: 'mov' })),
+    ...CIERRES_PARCIALES.map(c => ({ ...c, _type: 'turno' })),
+  ].sort((a, b) => {
+    const ka = a._type === 'turno' ? a.timestamp : a.createdAt;
+    const kb = b._type === 'turno' ? b.timestamp : b.createdAt;
+    return (ka || '').localeCompare(kb || '');
+  });
+
+  list.innerHTML = items.map(item => {
+    if (item._type === 'turno') return _renderTurnoSep(item);
+    const m = item;
     const hora = typeof m.createdAt === 'string'
       ? new Date(m.createdAt).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })
       : '';
@@ -499,6 +518,27 @@ function renderMovimientos() {
         </div>
       </div>`;
   }).join('');
+}
+
+function _renderTurnoSep(c) {
+  const neto    = c.netoPeriodo || 0;
+  const difAbs  = Math.abs(c.diferencia || 0);
+  const difStr  = c.efectivoContado > 0
+    ? (c.diferencia === 0 ? ' ✓' : (c.diferencia > 0 ? ` +$${difAbs.toLocaleString('es-AR')}` : ` -$${difAbs.toLocaleString('es-AR')}`))
+    : '';
+  return `
+    <div class="turno-sep">
+      <div class="turno-sep-badge">
+        🔄 <b>${esc(c.vendedor || 'Turno')}</b>
+        <span class="turno-sep-hora">${esc(c.periodoDesdeHora || '')} → ${esc(c.horaAR || '')}</span>
+      </div>
+      <div class="turno-sep-stats">
+        ${c.ingresosPeriodo > 0 ? `<span class="tsep-ing">+${fmt(c.ingresosPeriodo)}</span>` : ''}
+        ${c.egresosPeriodo  > 0 ? `<span class="tsep-eg">−${fmt(c.egresosPeriodo)}</span>`  : ''}
+        <span class="tsep-neto" style="color:${neto>=0?'#10b981':'#ef4444'}">Neto ${fmt(neto)}</span>
+        ${c.efectivoContado > 0 ? `<span class="tsep-contado">💵 ${fmt(c.efectivoContado)}${difStr}</span>` : ''}
+      </div>
+    </div>`;
 }
 
 // ══════════════════════════════════════════
@@ -767,6 +807,17 @@ function listenCajaRepairs() {
       CAJA_REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       CAJA_REPAIRS.sort((a, b) => (b.nOrden || 0) - (a.nOrden || 0));
     }, err => console.error('Repairs (caja):', err));
+}
+
+function listenCierresParciales() {
+  if (_parcialListener) { _parcialListener(); _parcialListener = null; }
+  _parcialListener = db.collection('caja_cierres_parciales')
+    .where('fecha', '==', currentDate)
+    .onSnapshot(snap => {
+      CIERRES_PARCIALES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      CIERRES_PARCIALES.sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
+      renderMovimientos();
+    }, err => console.error('CierresParciales:', err));
 }
 
 function _initMovDescAutocomplete() {
@@ -1519,6 +1570,117 @@ async function saveCierre() {
     // Primero preguntar caja chica, después caja dueño
     setTimeout(() => openCajaChicaModal(contado), 600);
   } catch(e) { toast('Error al guardar cierre', 'error'); }
+}
+
+// ══════════════════════════════════════════
+//  CIERRES PARCIALES (TURNOS)
+// ══════════════════════════════════════════
+
+function _getPeriodoDesde() {
+  if (CIERRES_PARCIALES.length > 0) {
+    return CIERRES_PARCIALES[CIERRES_PARCIALES.length - 1].timestamp;
+  }
+  return ARQUEO?.savedAt || (currentDate + 'T00:00:00.000Z');
+}
+
+function _calcPeriodoStats(desdeISO) {
+  const movs = MOVIMIENTOS.filter(m => (m.createdAt || '') > desdeISO);
+  const ing  = movs.filter(m => m.tipo === 'ingreso');
+  const eg   = movs.filter(m => m.tipo === 'egreso');
+  const totalIng = ing.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const totalEg  = eg .reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const efec     = ing.reduce((s, m) => s + _efecMonto(m), 0);
+  return { totalIng, totalEg, efec, digital: totalIng - efec, neto: totalIng - totalEg, count: movs.length };
+}
+
+function openCierreParcialModal() {
+  closeCajaMenu();
+  const desdeISO  = _getPeriodoDesde();
+  const desdeHora = new Date(desdeISO).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
+  const stats     = _calcPeriodoStats(desdeISO);
+  const esperado  = _getCierreEsperado();
+
+  const info = document.getElementById('parcial-info');
+  if (info) {
+    const rows = [];
+    rows.push(`<div class="parcial-desde">⏱ Período desde <strong>${esc(desdeHora)}</strong> · ${stats.count} movimiento${stats.count !== 1 ? 's' : ''}</div>`);
+    rows.push('<div class="parcial-grid">');
+    if (stats.totalIng > 0) {
+      rows.push(`<span class="pg-lbl">Ingresos</span><span class="pg-val pg-ing">+${fmt(stats.totalIng)}</span>`);
+      if (stats.efec > 0 && stats.digital > 0) {
+        rows.push(`<span class="pg-sub">💵 Efectivo</span><span class="pg-sub-val">${fmt(stats.efec)}</span>`);
+        rows.push(`<span class="pg-sub">💳 Digital</span><span class="pg-sub-val">${fmt(stats.digital)}</span>`);
+      }
+    }
+    if (stats.totalEg > 0)
+      rows.push(`<span class="pg-lbl">Egresos</span><span class="pg-val pg-eg">−${fmt(stats.totalEg)}</span>`);
+    rows.push(`<span class="pg-lbl">Neto turno</span><span class="pg-val" style="color:${stats.neto>=0?'#10b981':'#ef4444'}">${stats.neto>=0?'+':''}${fmt(stats.neto)}</span>`);
+    rows.push(`<span class="pg-lbl">💵 Ef. esperado caja</span><span class="pg-val">${fmt(esperado)}</span>`);
+    rows.push('</div>');
+    info.innerHTML = rows.join('');
+  }
+
+  const nombreInp = document.getElementById('parcial-fi-nombre');
+  if (nombreInp) nombreInp.value = localStorage.getItem('cajaVendedor') || '';
+  const efecInp = document.getElementById('parcial-fi-efectivo');
+  if (efecInp) efecInp.value = '';
+  const notasInp = document.getElementById('parcial-fi-notas');
+  if (notasInp) notasInp.value = '';
+
+  document.getElementById('parcial-overlay').classList.remove('hidden');
+  document.getElementById('parcial-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('parcial-fi-efectivo')?.focus(), 200);
+}
+
+function closeCierreParcialModal() {
+  document.getElementById('parcial-overlay').classList.add('hidden');
+  document.getElementById('parcial-modal').classList.add('hidden');
+}
+
+async function saveCierreParcial() {
+  const nombre = document.getElementById('parcial-fi-nombre')?.value.trim() || '';
+  const efectivoContado = parseInt(document.getElementById('parcial-fi-efectivo')?.value) || 0;
+  const notas  = document.getElementById('parcial-fi-notas')?.value.trim() || null;
+
+  if (!nombre) {
+    toast('Ingresá tu nombre para cerrar el turno', 'error');
+    document.getElementById('parcial-fi-nombre')?.focus();
+    return;
+  }
+
+  const ahora = new Date();
+  const horaAR = ahora.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
+  const desdeISO = _getPeriodoDesde();
+  const desdeHora = new Date(desdeISO).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
+  const stats    = _calcPeriodoStats(desdeISO);
+  const esperado = _getCierreEsperado();
+
+  if (nombre) localStorage.setItem('cajaVendedor', nombre);
+
+  try {
+    await db.collection('caja_cierres_parciales').add({
+      fecha: currentDate,
+      timestamp: ahora.toISOString(),
+      horaAR,
+      vendedor: nombre,
+      periodoDesde: desdeISO,
+      periodoDesdeHora: desdeHora,
+      ingresosPeriodo: stats.totalIng,
+      egresosPeriodo:  stats.totalEg,
+      efecPeriodo:     stats.efec,
+      digitalPeriodo:  stats.digital,
+      netoPeriodo:     stats.neto,
+      efectivoEsperado: esperado,
+      efectivoContado,
+      diferencia: efectivoContado > 0 ? efectivoContado - esperado : null,
+      notas,
+    });
+    closeCierreParcialModal();
+    toast(`🔄 Turno de ${nombre} cerrado — ${horaAR}`, 'success');
+  } catch (e) {
+    console.error('saveCierreParcial:', e);
+    toast('Error al guardar cierre de turno', 'error');
+  }
 }
 
 // ══════════════════════════════════════════

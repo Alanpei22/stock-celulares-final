@@ -323,6 +323,58 @@ body.dark .fab-sub-eg { background: rgba(239,68,68,0.15); color: #FCA5A5; }
  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
+/* ══ TURNO SEPARADOR ════════════════════════════════════════ */
+.turno-sep {
+ margin: 4px 8px;
+ background: var(--bg1, #F1F0EE);
+ border: 1px solid var(--border, #E3E1DE);
+ border-radius: 14px; padding: 10px 14px;
+ border-left: 4px solid #C8965A;
+}
+.turno-sep-badge {
+ display: flex; align-items: center; gap: 6px;
+ font-size: .87rem; font-weight: 700; color: var(--t1, #1A1A1A);
+ margin-bottom: 5px;
+}
+.turno-sep-hora {
+ font-size: .75rem; font-weight: 500; color: var(--t3, #888);
+ margin-left: auto;
+}
+.turno-sep-stats {
+ display: flex; flex-wrap: wrap; gap: 6px 10px;
+ font-size: .78rem;
+}
+.tsep-ing   { color: #10b981; font-weight: 700; }
+.tsep-eg    { color: #ef4444; font-weight: 700; }
+.tsep-neto  { font-weight: 700; }
+.tsep-contado { color: var(--t2, #555); }
+
+/* Cierre parcial modal */
+.parcial-info {
+ background: var(--bg1); border-radius: 14px;
+ padding: 12px 14px; margin-bottom: 12px;
+ border: 1px solid var(--border);
+}
+.parcial-desde {
+ font-size: .82rem; color: var(--t2); margin-bottom: 8px;
+}
+.parcial-grid {
+ display: grid; grid-template-columns: 1fr auto;
+ gap: 5px 8px; align-items: center;
+}
+.pg-lbl  { font-size: .78rem; color: var(--t3); font-weight: 600; }
+.pg-val  { font-size: .9rem; font-weight: 800; text-align: right; }
+.pg-ing  { color: #10b981; }
+.pg-eg   { color: #ef4444; }
+.pg-sub  { font-size: .72rem; color: var(--t3); padding-left: 10px; }
+.pg-sub-val { font-size: .78rem; font-weight: 600; text-align: right; color: var(--t2); }
+.parcial-form-fields { display: flex; flex-direction: column; gap: 10px; }
+
+/* Dark */
+body.dark .turno-sep { background: #1c1c1e; border-color: rgba(255,255,255,0.06); }
+body.dark .turno-sep-badge { color: #F2F2F7; }
+body.dark .parcial-info { background: #1c1c1e; border-color: rgba(255,255,255,0.06); }
+
 /* ══ CAJA CHICA ════════════════════════════════════════════ */
 .arqueo-cajachica-hint {
  background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.25);

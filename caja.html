@@ -41,6 +41,7 @@
             </button>
             <div class="hdr-drop-sep"></div>
             <button class="hdr-drop-item" onclick="reopenArqueo();closeCajaMenu()">🧾 Arqueo de caja</button>
+            <button class="hdr-drop-item" onclick="openCierreParcialModal()">🔄 Cierre de turno</button>
             <button class="hdr-drop-item" id="cierre-btn" onclick="openCierreModal();closeCajaMenu()">🔐 Cerrar caja del día</button>
             <button class="hdr-drop-item owner-only" onclick="openCajaHistorial();closeCajaMenu()">📊 Historial / Stats</button>
             <button class="hdr-drop-item owner-only" onclick="openCajaDueno();closeCajaMenu()">📦 Caja Dueño</button>
@@ -226,6 +227,39 @@
   </div>
   <div class="nota-modal-btns">
     <button class="btn-nota-save" onclick="saveArqueo()" style="width:100%" id="arqueo-save-btn">✅ Confirmar apertura</button>
+  </div>
+</div>
+
+<!-- MODAL CIERRE DE TURNO (cierre parcial) -->
+<div id="parcial-overlay" class="nota-overlay hidden" onclick="closeCierreParcialModal()"></div>
+<div id="parcial-modal" class="arqueo-modal hidden" style="max-width:420px">
+  <div class="nota-modal-hdr">
+    <span>🔄 Cierre de turno</span>
+    <button onclick="closeCierreParcialModal()">✕</button>
+  </div>
+  <!-- Resumen del período -->
+  <div id="parcial-info" class="parcial-info"></div>
+  <!-- Datos del cierre -->
+  <div class="parcial-form-fields">
+    <div class="fg">
+      <label class="fl">Tu nombre *</label>
+      <input id="parcial-fi-nombre" class="fi" type="text" placeholder="Quién cierra el turno" maxlength="40" autocomplete="off">
+    </div>
+    <div class="fg">
+      <label class="fl">💵 Efectivo contado en caja (opcional)</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:1.1rem;font-weight:700;color:var(--t3)">$</span>
+        <input id="parcial-fi-efectivo" class="fi" type="number" placeholder="0" min="0" inputmode="numeric" style="flex:1">
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Notas (opcional)</label>
+      <input id="parcial-fi-notas" class="fi" type="text" placeholder="Observaciones del turno" maxlength="80">
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:14px">
+    <button class="btn-secondary" onclick="closeCierreParcialModal()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" onclick="saveCierreParcial()" style="flex:2">🔄 Cerrar turno</button>
   </div>
 </div>
 
