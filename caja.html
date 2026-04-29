@@ -212,10 +212,13 @@
     <button onclick="closeArqueoModal()">✕</button>
   </div>
   <div id="arqueo-ya-hecho" class="arqueo-ya-hecho hidden"></div>
+  <!-- Hint caja chica del día anterior -->
+  <div id="arqueo-cajachica-hint" class="arqueo-cajachica-hint hidden"></div>
+  <button id="arqueo-confirm-rapido" class="btn-cajachica-confirm hidden"></button>
   <div class="arqueo-vendedor-row">
     <input id="arqueo-vendedor-input" class="fi arqueo-vendedor-input" type="text" placeholder="Tu nombre (quién abre la caja)" maxlength="40">
   </div>
-  <p class="arqueo-sub">Contá los billetes en caja ahora</p>
+  <p class="arqueo-sub">O contá los billetes manualmente:</p>
   <div id="arqueo-billetes" class="arqueo-billetes"></div>
   <div class="arqueo-total-row">
     <span>Total en caja</span>
@@ -223,6 +226,35 @@
   </div>
   <div class="nota-modal-btns">
     <button class="btn-nota-save" onclick="saveArqueo()" style="width:100%" id="arqueo-save-btn">✅ Confirmar apertura</button>
+  </div>
+</div>
+
+<!-- MODAL CAJA CHICA (post-cierre: cuánto queda para mañana) -->
+<div id="cajachica-overlay" class="nota-overlay hidden"></div>
+<div id="cajachica-modal" class="arqueo-modal hidden" style="max-width:380px">
+  <div class="nota-modal-hdr">
+    <span>💵 Caja chica para mañana</span>
+    <button onclick="_skipCajaChica()">✕</button>
+  </div>
+  <div class="cajachica-contado-row">
+    <span class="cajachica-contado-lbl">Contado total</span>
+    <span id="cajachica-contado" class="cajachica-contado-val">$0</span>
+  </div>
+  <p class="arqueo-sub">¿Cuánto efectivo dejás en caja para la apertura de mañana?</p>
+  <div class="mov-monto-area" style="margin:.5rem 0 .3rem">
+    <span class="mov-monto-prefix">$</span>
+    <input id="cajachica-monto" class="mov-monto-big" type="number" placeholder="0" min="0" inputmode="numeric">
+  </div>
+  <div class="quick-amounts" style="margin-bottom:.4rem">
+    <button class="quick-amt" onclick="setCajaChicaMonto(1000)">1k</button>
+    <button class="quick-amt" onclick="setCajaChicaMonto(2000)">2k</button>
+    <button class="quick-amt" onclick="setCajaChicaMonto(5000)">5k</button>
+    <button class="quick-amt" onclick="setCajaChicaMonto(10000)">10k</button>
+    <button class="quick-amt" onclick="setCajaChicaMonto(20000)">20k</button>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:10px">
+    <button class="btn-secondary" onclick="_skipCajaChica()" style="flex:1">Omitir</button>
+    <button class="btn-primary" onclick="saveCajaChica()" style="flex:2">💾 Guardar</button>
   </div>
 </div>
 

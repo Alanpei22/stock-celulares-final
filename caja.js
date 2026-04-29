@@ -174,7 +174,20 @@ async function loadArqueo() {
       ARQUEO = null;
       const today = _todayAR();
       if (currentDate === today) {
-        openArqueoModal();
+        // Verificar si hay caja chica pre-seteada del cierre de ayer
+        let cajaChicaPreset = 0;
+        try {
+          const cfgDoc = await db.collection('caja_config').doc('nextOpening').get();
+          if (cfgDoc.exists) {
+            const d = cfgDoc.data();
+            const yesterday = new Date(today + 'T12:00:00');
+            yesterday.setDate(yesterday.getDate() - 1);
+            if (d.fecha === yesterday.toISOString().slice(0, 10) && d.monto > 0) {
+              cajaChicaPreset = d.monto;
+            }
+          }
+        } catch { /* no bloquea si falla */ }
+        openArqueoModal(cajaChicaPreset);
         return;
       }
     }
@@ -185,9 +198,28 @@ async function loadArqueo() {
   renderStats();
 }
 
-function openArqueoModal() {
+function openArqueoModal(cajaChicaPreset = 0) {
   document.getElementById('arqueo-billetes').innerHTML = renderArqueoRows();
   updateArqueoTotal();
+
+  const hintEl  = document.getElementById('arqueo-cajachica-hint');
+  const rapidEl = document.getElementById('arqueo-confirm-rapido');
+  if (cajaChicaPreset > 0) {
+    if (hintEl) {
+      hintEl.textContent = `💡 Ayer se dejaron $${cajaChicaPreset.toLocaleString('es-AR')} de caja chica`;
+      hintEl.classList.remove('hidden');
+    }
+    if (rapidEl) {
+      rapidEl.textContent = `✅ Confirmar apertura — hay $${cajaChicaPreset.toLocaleString('es-AR')}`;
+      rapidEl.className = 'btn-cajachica-confirm';
+      rapidEl.onclick = () => confirmAperturaRapida(cajaChicaPreset);
+    }
+  } else {
+    if (hintEl)  hintEl.classList.add('hidden');
+    if (rapidEl) rapidEl.className = 'btn-cajachica-confirm hidden';
+    if (rapidEl) rapidEl.onclick = null;
+  }
+
   document.getElementById('arqueo-overlay').classList.remove('hidden');
   document.getElementById('arqueo-modal').classList.remove('hidden');
 }
@@ -1351,6 +1383,88 @@ function changeCierreBillete(d, delta) {
   updateCierreTotal();
 }
 
+// ══════════════════════════════════════════
+//  CAJA CHICA (post-cierre / pre-apertura)
+// ══════════════════════════════════════════
+
+function openCajaChicaModal(contadoTotal) {
+  const el = document.getElementById('cajachica-contado');
+  if (el) el.textContent = fmt(contadoTotal || 0);
+  const inp = document.getElementById('cajachica-monto');
+  if (inp) inp.value = '';
+  document.getElementById('cajachica-overlay')?.classList.remove('hidden');
+  document.getElementById('cajachica-modal')?.classList.remove('hidden');
+  setTimeout(() => document.getElementById('cajachica-monto')?.focus(), 200);
+}
+
+function closeCajaChicaModal() {
+  document.getElementById('cajachica-overlay')?.classList.add('hidden');
+  document.getElementById('cajachica-modal')?.classList.add('hidden');
+}
+
+function _skipCajaChica() {
+  closeCajaChicaModal();
+  setTimeout(() => openCajaDuenoPrompt(_getCierreEsperado()), 300);
+}
+
+function setCajaChicaMonto(v) {
+  const inp = document.getElementById('cajachica-monto');
+  if (inp) inp.value = v;
+}
+
+async function saveCajaChica() {
+  const monto = parseInt(document.getElementById('cajachica-monto').value) || 0;
+  try {
+    // Guardar en cierre del día
+    await db.collection('caja_cierres').doc(currentDate).update({
+      cajaChicaSiguiente: monto,
+    });
+    // Guardar en config para que mañana loadArqueo lo encuentre rápido
+    await db.collection('caja_config').doc('nextOpening').set({
+      fecha: currentDate,
+      monto,
+      savedAt: new Date().toISOString(),
+    });
+    closeCajaChicaModal();
+    toast(monto > 0
+      ? `💰 Caja chica guardada: $${monto.toLocaleString('es-AR')} para mañana`
+      : 'Caja chica omitida', 'info');
+    setTimeout(() => openCajaDuenoPrompt(_getCierreEsperado()), 400);
+  } catch (e) {
+    console.error('saveCajaChica:', e);
+    // Si falla solo el update del cierre, igual guardamos config y continuamos
+    try {
+      await db.collection('caja_config').doc('nextOpening').set({
+        fecha: currentDate, monto, savedAt: new Date().toISOString(),
+      });
+    } catch {}
+    closeCajaChicaModal();
+    setTimeout(() => openCajaDuenoPrompt(_getCierreEsperado()), 400);
+  }
+}
+
+async function confirmAperturaRapida(monto) {
+  const ahora = new Date();
+  const horaAR = ahora.toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
+  const inputVend = document.getElementById('arqueo-vendedor-input');
+  const vendedor = (inputVend && inputVend.value.trim()) || localStorage.getItem('cajaVendedor') || '';
+  if (inputVend && inputVend.value.trim()) localStorage.setItem('cajaVendedor', inputVend.value.trim());
+  try {
+    await db.collection('caja_arqueos').doc(currentDate).set({
+      billetes: {}, total: monto,
+      fecha: currentDate, savedAt: ahora.toISOString(), horaAR, vendedor,
+      fromCajaChica: true,
+    });
+    ARQUEO = { billetes: {}, total: monto, fecha: currentDate, savedAt: ahora.toISOString(), horaAR, vendedor, fromCajaChica: true };
+    closeArqueoModal();
+    renderStats();
+    toast(`✅ Apertura confirmada — $${monto.toLocaleString('es-AR')}`, 'success');
+  } catch (e) {
+    console.error('confirmAperturaRapida:', e);
+    toast('Error al confirmar apertura', 'error');
+  }
+}
+
 function _getCierreEsperado() {
   const apertura = ARQUEO?.total || 0;
   const ingEfec = MOVIMIENTOS.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + _efecMonto(m), 0);
@@ -1402,7 +1516,8 @@ async function saveCierre() {
       ? 'sin diferencia ✅'
       : (diferencia > 0 ? '+' : '') + '$' + diferencia.toLocaleString('es-AR');
     toast('🔐 Cierre guardado — ' + difStr, Math.abs(diferencia) <= 500 ? 'success' : 'info');
-    setTimeout(() => openCajaDuenoPrompt(esperado), 600);
+    // Primero preguntar caja chica, después caja dueño
+    setTimeout(() => openCajaChicaModal(contado), 600);
   } catch(e) { toast('Error al guardar cierre', 'error'); }
 }
 

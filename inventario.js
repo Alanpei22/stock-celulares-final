@@ -105,7 +105,15 @@ function renderInventario() {
 
   if (!lista.length) {
     el.innerHTML = '';
-    if (empty) empty.style.display = '';
+    if (empty) {
+      empty.style.display = '';
+      // Diferenciar entre "no hay productos" y "sin resultados de búsqueda"
+      if (search || catF || estF) {
+        empty.innerHTML = `<span class="empty-ico">🔍</span><p class="empty-txt">Sin resultados para <em>"${esc(search || catF || estF)}"</em></p><button class="btn-secondary" onclick="document.getElementById('inv-search').value='';document.getElementById('inv-f-cat').value='';document.getElementById('inv-f-estado').value='';renderInventario()">Limpiar filtros</button>`;
+      } else {
+        empty.innerHTML = `<span class="empty-ico">🏷️</span><p class="empty-txt">No hay productos registrados</p><button class="btn-primary" onclick="openProductoForm()">Agregar primer producto</button>`;
+      }
+    }
     return;
   }
   if (empty) empty.style.display = 'none';
