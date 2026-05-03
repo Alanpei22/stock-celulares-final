@@ -1,0 +1,38 @@
+name: Notifications cron
+
+on:
+  schedule:
+    # Cierre pendiente: 19:30 AR = 22:30 UTC
+    - cron: '30 22 * * *'
+    # Reparaciones demoradas: 10:00 AR = 13:00 UTC
+    - cron: '0 13 * * *'
+  workflow_dispatch: {} # permite disparar manualmente desde GitHub UI
+
+jobs:
+  cierre-pendiente:
+    if: github.event.schedule == '30 22 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/cron-cierre-pendiente
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsSL -X POST "$BASE_URL/api/cron-cierre-pendiente" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{}'
+
+  reparaciones-demoradas:
+    if: github.event.schedule == '0 13 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/cron-reparaciones-demoradas
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsSL -X POST "$BASE_URL/api/cron-reparaciones-demoradas" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{}'

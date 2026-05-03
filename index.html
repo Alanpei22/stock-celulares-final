@@ -305,7 +305,10 @@
 
     <div class="dash-body">
 
-      <!-- Alertas -->
+      <!-- Notificaciones in-app (banners) -->
+      <div id="notif-banners" class="notif-banners hidden"></div>
+
+      <!-- Alertas (legacy) -->
       <div id="dash-alertas" class="dash-alertas hidden"></div>
 
       <!-- Caja hoy -->
@@ -1765,8 +1768,11 @@
 <script src="modulos_catalog.js"></script>
 <script src="repuestos.js"></script>
 <script src="pedidos.js"></script>
+<script src="notifications.js"></script>
+<script src="webpush.js"></script>
 <script src="app.js"></script>
 <script src="print.js"></script>
+<script src="notif-settings.js"></script>
 
 <!-- ── AI CHAT FLOTANTE ── -->
 <button class="ai-fab" onclick="toggleAiChat()" title="Asistente IA">✨</button>
@@ -1842,6 +1848,213 @@
     </div>
     <div class="actividad-feed" id="actividad-feed">
       <div class="act-empty">Cargando actividad...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: CONFIGURACIÓN DE NOTIFICACIONES ═══════════ -->
+<div id="notif-config-overlay" class="notifcfg-overlay hidden">
+  <div class="notifcfg-screen">
+    <div class="notifcfg-hdr">
+      <button class="notifcfg-back" onclick="closeNotifConfig()" aria-label="Volver">←</button>
+      <div class="notifcfg-title">🔔 Notificaciones</div>
+      <div style="width:38px"></div>
+    </div>
+
+    <div class="notifcfg-body">
+
+      <!-- ── Sección 1: PUSH ── -->
+      <div class="notifcfg-section">
+        <div class="notifcfg-section-hdr">
+          <div class="notifcfg-section-icon">📱</div>
+          <div>
+            <div class="notifcfg-section-title">Notificaciones push</div>
+            <div class="notifcfg-section-sub">Avisos del sistema, incluso con la app cerrada</div>
+          </div>
+        </div>
+
+        <div class="notifcfg-row notifcfg-master">
+          <div class="notifcfg-row-text">
+            <span class="notifcfg-row-lbl">Recibir push en este dispositivo</span>
+            <span class="notifcfg-row-sub" id="ncfg-push-status">Tocá para activar</span>
+          </div>
+          <label class="notifcfg-toggle">
+            <input type="checkbox" id="ncfg-push-master">
+            <span class="notifcfg-toggle-ui"></span>
+          </label>
+        </div>
+
+        <div id="ncfg-push-items" class="notifcfg-sub-group">
+          <div class="notifcfg-row" data-needs="push">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">⏰ Cierre pendiente</span>
+              <span class="notifcfg-row-sub">Si pasaron las <span id="ncfg-hora-cierre">19:30</span> sin cerrar caja</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="push.cierrePendiente"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row" data-needs="push">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">🔧 Reparaciones listas</span>
+              <span class="notifcfg-row-sub">Listas hace +<span id="ncfg-dias-reparacion">3</span> días sin retirar</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="push.reparacionesListas"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row" data-needs="push">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">📦 Bajo stock crítico</span>
+              <span class="notifcfg-row-sub">Cuando un producto llega a 0</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="push.bajoStockCritico"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row" data-needs="push">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">💰 Cobros desde otro dispositivo</span>
+              <span class="notifcfg-row-sub">Cuando alguien registra un ingreso</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="push.cobrosRemotos"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row" data-needs="push">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">🪙 Señas nuevas</span>
+              <span class="notifcfg-row-sub">Cuando alguien registra una seña de reparación</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="push.senasNuevas"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+        </div>
+
+        <button class="notifcfg-test" id="ncfg-test-push" onclick="_testPush()">🧪 Enviar push de prueba</button>
+      </div>
+
+      <!-- ── Sección 2: AVISOS IN-APP ── -->
+      <div class="notifcfg-section">
+        <div class="notifcfg-section-hdr">
+          <div class="notifcfg-section-icon">💬</div>
+          <div>
+            <div class="notifcfg-section-title">Avisos en la app</div>
+            <div class="notifcfg-section-sub">Banners y toasts cuando estás usando la app</div>
+          </div>
+        </div>
+
+        <div class="notifcfg-row notifcfg-master">
+          <div class="notifcfg-row-text">
+            <span class="notifcfg-row-lbl">Mostrar avisos in-app</span>
+            <span class="notifcfg-row-sub">Banners en dashboard y caja</span>
+          </div>
+          <label class="notifcfg-toggle">
+            <input type="checkbox" data-key="inApp.enabled">
+            <span class="notifcfg-toggle-ui"></span>
+          </label>
+        </div>
+
+        <div class="notifcfg-sub-group">
+          <div class="notifcfg-row">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">⏰ Cierre pendiente</span>
+              <span class="notifcfg-row-sub">Banner si pasaron las 19:30 sin cerrar</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="inApp.cierrePendiente"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">🔧 Reparaciones listas</span>
+              <span class="notifcfg-row-sub">Card en dashboard con count</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="inApp.reparacionesListas"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">📦 Bajo stock</span>
+              <span class="notifcfg-row-sub">Productos y repuestos por debajo del mínimo</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="inApp.bajoStock"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">📅 Reparaciones con fecha vencida</span>
+              <span class="notifcfg-row-sub">Cuando pasa la fechaEstimada</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="inApp.fechaRetiroVencida"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">☀️ Resumen de ayer</span>
+              <span class="notifcfg-row-sub">Toast con neto del día anterior al abrir</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="inApp.resumenAyer"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">⚠️ Diferencia en último cierre</span>
+              <span class="notifcfg-row-sub">Si la diferencia supera el umbral</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-key="inApp.diferenciaCierre"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Sección 3: UMBRALES ── -->
+      <div class="notifcfg-section">
+        <div class="notifcfg-section-hdr">
+          <div class="notifcfg-section-icon">⚙️</div>
+          <div>
+            <div class="notifcfg-section-title">Umbrales</div>
+            <div class="notifcfg-section-sub">Cuándo se dispara cada aviso</div>
+          </div>
+        </div>
+
+        <div class="notifcfg-thr">
+          <label class="notifcfg-thr-row">
+            <span>Días para "reparación demorada"</span>
+            <input type="number" min="1" max="30" data-key="thresholds.diasReparacionDemorada">
+          </label>
+          <label class="notifcfg-thr-row">
+            <span>Días para "reparación crítica" (push obligatorio)</span>
+            <input type="number" min="3" max="60" data-key="thresholds.diasReparacionCritica">
+          </label>
+          <label class="notifcfg-thr-row">
+            <span>Hora para "cierre pendiente"</span>
+            <input type="time" data-key="thresholds.cierreHHMM">
+          </label>
+          <label class="notifcfg-thr-row">
+            <span>Diferencia mínima para alertar (ARS)</span>
+            <input type="number" min="0" step="100" data-key="thresholds.diferenciaMinAlerta">
+          </label>
+        </div>
+      </div>
+
+      <!-- ── Sección 4: DISPOSITIVO ── -->
+      <div class="notifcfg-section">
+        <div class="notifcfg-section-hdr">
+          <div class="notifcfg-section-icon">📱</div>
+          <div>
+            <div class="notifcfg-section-title">Este dispositivo</div>
+            <div class="notifcfg-section-sub">Identificación para targeting de notificaciones</div>
+          </div>
+        </div>
+        <div class="notifcfg-device">
+          <label>Nombre</label>
+          <input type="text" id="ncfg-device-name" maxlength="40" placeholder="Ej: Mi celular">
+        </div>
+        <div class="notifcfg-device">
+          <label>ID interno</label>
+          <code id="ncfg-device-id" class="notifcfg-device-id"></code>
+        </div>
+      </div>
+
+      <!-- ── Sección 5: TARGETING (qué dispositivos reciben qué push) ── -->
+      <div class="notifcfg-section" id="ncfg-targeting-section">
+        <div class="notifcfg-section-hdr">
+          <div class="notifcfg-section-icon">🎯</div>
+          <div>
+            <div class="notifcfg-section-title">A qué dispositivos llega cada push</div>
+            <div class="notifcfg-section-sub">Si no seleccionás ninguno, llega a todos</div>
+          </div>
+        </div>
+        <div id="ncfg-targeting-list">
+          <p class="notifcfg-empty-target">Cargando dispositivos suscritos...</p>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>

@@ -114,6 +114,25 @@ function initApp() {
   ensureDolar(db);                 // ← cotización para calcular costo en pesos
   if (typeof initInventario === 'function') initInventario();
 
+  // ── Notifications boot (Fase 1) ──
+  if (typeof loadNotifConfig === 'function') {
+    loadNotifConfig().then(() => {
+      const tryRenderBanner = () => {
+        if (typeof renderInAppBanners === 'function') renderInAppBanners('notif-banners', 'caja');
+      };
+      tryRenderBanner();
+      // Re-check cada 10 min (para que aparezca el banner de cierre pendiente al pasar las 19:30)
+      setInterval(tryRenderBanner, 10 * 60 * 1000);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') tryRenderBanner();
+      });
+      // Cross-device listener
+      if (typeof startCrossDeviceListener === 'function') {
+        setTimeout(startCrossDeviceListener, 2000);
+      }
+    });
+  }
+
   // (HIGH-01 obsoleto: dropdown HTML zombie removido, ahora usamos bottom sheet)
 
   // MED-12: patch closeCajaDuenoPrompt una sola vez (flag para evitar acumulación en re-login)

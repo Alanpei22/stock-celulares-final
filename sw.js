@@ -1,4 +1,4 @@
-const CACHE = 'cel-v36';
+const CACHE = 'cel-v37';
 const SHELL = ['manifest.json', 'icon.svg'];
 
 self.addEventListener('install', e => {
@@ -47,5 +47,44 @@ self.addEventListener('fetch', e => {
   // Todo lo demás (imágenes, fuentes, etc.): cache-first
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request))
+  );
+});
+
+// ══════════════════════════════════════════
+//  WEB PUSH — recepción + click
+// ══════════════════════════════════════════
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; }
+  catch { data = { title: 'Notificación', body: event.data ? event.data.text() : '' }; }
+
+  const title = data.title || '🔔 TechPoint';
+  const options = {
+    body: data.body || '',
+    icon: data.icon || '/icon.svg',
+    badge: data.badge || '/icon.svg',
+    tag: data.tag || undefined,
+    requireInteraction: !!data.requireInteraction,
+    data: { url: data.url || '/index.html', ...(data.data || {}) },
+  };
+  if (data.actions) options.actions = data.actions;
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/index.html';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(wins => {
+      // Si hay una ventana abierta de la app, focusearla y navegar
+      for (const w of wins) {
+        if (w.url.includes(self.registration.scope) && 'focus' in w) {
+          w.navigate(url).catch(() => {});
+          return w.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
   );
 });

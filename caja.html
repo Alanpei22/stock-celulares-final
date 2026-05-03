@@ -35,6 +35,9 @@
     </div>
   </header>
 
+  <!-- Notificaciones in-app (banners) -->
+  <div id="notif-banners" class="notif-banners hidden"></div>
+
   <!-- Date navigation -->
   <div class="caja-date-nav">
     <button class="date-nav-btn" onclick="prevDay()">◀</button>
@@ -666,6 +669,8 @@
 <script src="caja.js"></script>
 <script src="caja_extra.js"></script>
 <script src="inventario.js"></script>
+<script src="notifications.js"></script>
+<script src="webpush.js"></script>
 <script>
 function switchCajaTab(tab) {
   const tabs = { caja: 'caja-tab', inventario: 'inv-tab' };

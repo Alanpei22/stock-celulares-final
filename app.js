@@ -435,6 +435,40 @@ function initApp() {
   initRepairs();
   initRepuestos();
   if (typeof initPedidos === 'function') initPedidos();
+
+  // ── Notifications boot ──
+  if (typeof loadNotifConfig === 'function') {
+    loadNotifConfig().then(() => {
+      // Banners en dashboard cuando esté visible
+      _initBannersAutoRefresh();
+      // Toast resumen de ayer (solo 1 vez por día)
+      if (typeof _maybeShowResumenAyer === 'function') {
+        setTimeout(_maybeShowResumenAyer, 1500);
+      }
+      // Cross-device listener para cobros/señas en otros dispositivos
+      if (typeof startCrossDeviceListener === 'function') {
+        setTimeout(startCrossDeviceListener, 2000);
+      }
+    });
+  }
+}
+
+// ── Notification banners auto-refresh ──
+function _initBannersAutoRefresh() {
+  // Re-render cuando cambia de sección al dashboard
+  const tryRender = () => {
+    const dashSec = document.getElementById('dash-section');
+    if (dashSec && !dashSec.classList.contains('section-hidden')) {
+      if (typeof renderInAppBanners === 'function') renderInAppBanners('notif-banners', 'dashboard');
+    }
+  };
+  tryRender();
+  // Refresh cada 5 min
+  setInterval(tryRender, 5 * 60 * 1000);
+  // Refresh cuando vuelve visible
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') tryRender();
+  });
 }
 
 // ══════════════════════════════════════════
@@ -536,6 +570,7 @@ function toggleDashMenu() {
   openSheet('Inicio', [
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
     { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
+    { icon: '🔔', label: 'Notificaciones', sub: 'Push + avisos in-app', onClick: () => (typeof openNotifConfig === 'function') && openNotifConfig() },
     { divider: true },
     { icon: '💰', label: 'Ir a caja', onClick: () => location.href = 'caja.html' },
     { icon: '🛒', label: 'Punto de venta', onClick: () => location.href = 'pos.html' },
