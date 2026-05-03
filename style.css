@@ -2492,6 +2492,91 @@ body.dark .sell-caja-toggle { background: #3A3A3C; }
 }
 .det-close-footer:active { opacity: .7; }
 
+/* ── BOTTOM SHEET (menú deslizante) ─────────────────────── */
+.sheet-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1300;
+  opacity:0; transition:opacity 220ms ease;
+}
+.sheet-overlay:not(.hidden) { opacity:1; }
+.sheet-overlay.hidden { display:none; }
+
+.sheet {
+  position:fixed; bottom:0; left:0; right:0; z-index:1301;
+  background:var(--card,#fff); border-radius:24px 24px 0 0;
+  padding:8px 0 max(20px, env(safe-area-inset-bottom));
+  max-height:85vh; overflow-y:auto;
+  box-shadow:0 -8px 40px rgba(0,0,0,.18);
+  transform:translateY(100%); transition:transform 280ms cubic-bezier(.32,.72,0,1);
+  -webkit-overflow-scrolling:touch;
+}
+.sheet.sheet--open { transform:translateY(0); }
+.sheet.hidden { display:none; }
+@media (min-width:540px) {
+  .sheet { left:50%; right:auto; transform:translate(-50%, 100%); max-width:480px; width:100%; border-radius:24px 24px 0 0; }
+  .sheet.sheet--open { transform:translate(-50%, 0); }
+}
+
+.sheet-handle {
+  width:42px; height:5px; background:var(--border,#d4d4d4); border-radius:4px;
+  margin:8px auto 12px; cursor:pointer;
+}
+.sheet-title {
+  font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--t3,#999); padding:0 22px 8px; text-align:center;
+}
+.sheet-title:empty { display:none; }
+.sheet-items { display:flex; flex-direction:column; gap:2px; padding:0 8px; }
+.sheet-item {
+  display:flex; align-items:center; gap:14px;
+  padding:14px 16px; border:none; background:none; cursor:pointer;
+  font-size:1rem; color:var(--t1,#1a1a1a); text-align:left;
+  border-radius:12px; transition:background 150ms;
+  width:100%;
+}
+.sheet-item:hover, .sheet-item:active { background:var(--bg1,#f3f3f3); }
+.sheet-item--danger { color:#ef4444; }
+.sheet-item-icon { font-size:1.4rem; width:28px; text-align:center; flex-shrink:0; }
+.sheet-item-label { flex:1; font-weight:600; }
+.sheet-item-sub { font-size:.78rem; color:var(--t3,#999); font-weight:400; }
+.sheet-sep { height:1px; background:var(--border,#eee); margin:6px 18px; }
+
+body.dark .sheet { background:#2c2c2e; box-shadow:0 -8px 40px rgba(0,0,0,.5); }
+body.dark .sheet-handle { background:rgba(255,255,255,.18); }
+body.dark .sheet-item:hover, body.dark .sheet-item:active { background:rgba(255,255,255,.05); }
+body.dark .sheet-sep { background:rgba(255,255,255,.08); }
+
+/* ── CONTROL DE STOCK GUIADO ── */
+.stockwiz-card { max-width: 460px; width: 96vw; max-height: 92vh; display:flex; flex-direction:column; padding-bottom:0; }
+.stockwiz-body { padding: 14px 18px 18px; overflow-y:auto; flex:1; }
+.stockwiz-body.hidden { display:none; }
+.stockwiz-intro { font-size:.88rem; color:var(--t2); margin:0 0 14px; line-height:1.45; }
+.stockwiz-count { text-align:center; font-size:.95rem; font-weight:700; color:var(--t1); padding:10px; background:var(--bg1); border-radius:12px; margin:14px 0 6px; }
+.fi-checkbox label { display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer; }
+.fi-checkbox input[type="checkbox"] { width:18px; height:18px; cursor:pointer; }
+.stockwiz-progress { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.stockwiz-progress-bar { flex:1; height:8px; background:var(--bg1); border-radius:8px; overflow:hidden; }
+#stockwiz-progress-fill { height:100%; background:linear-gradient(90deg,#10B981,#059669); width:0%; transition:width 280ms ease; }
+#stockwiz-progress-txt { font-size:.78rem; font-weight:700; color:var(--t2); white-space:nowrap; }
+.stockwiz-item-info { padding:14px 12px; background:var(--bg1); border-radius:14px; margin-bottom:14px; text-align:center; }
+.stockwiz-item-nombre { font-size:1.05rem; font-weight:800; color:var(--t1); margin-bottom:4px; line-height:1.3; }
+.stockwiz-item-meta { font-size:.78rem; color:var(--t2); }
+.stockwiz-current { font-size:.72rem; font-weight:600; color:var(--t3); margin-left:6px; font-style:italic; }
+.stockwiz-btns { display:flex; gap:8px; margin-top:14px; }
+.stockwiz-btns button { flex:1; padding:10px 8px; font-size:.85rem; font-weight:700; border-radius:12px; cursor:pointer; border:none; transition:all 200ms; }
+.stockwiz-btns .btn-secondary { background:var(--bg1); color:var(--t1); border:1px solid var(--border); }
+.stockwiz-btns .btn-primary { background:#10B981; color:#fff; flex:1.4; }
+.stockwiz-btns button:active { opacity:.75; }
+.stockwiz-btns button:disabled { opacity:.4; cursor:not-allowed; }
+.stockwiz-finish-row { text-align:center; margin-top:10px; }
+.btn-link { background:none; border:none; color:var(--t3); font-size:.78rem; cursor:pointer; text-decoration:underline; padding:6px; }
+.stockwiz-done-ico { font-size:3.2rem; text-align:center; margin:14px 0 4px; }
+.stockwiz-done-title { text-align:center; margin:0 0 14px; color:var(--t1); }
+.stockwiz-done-stats { background:var(--bg1); border-radius:12px; padding:12px; font-size:.88rem; line-height:1.7; }
+.stockwiz-done-stats b { color:#10B981; }
+body.dark .stockwiz-item-info,
+body.dark .stockwiz-count,
+body.dark .stockwiz-done-stats { background:#1c1c1e; }
+
 /* ── CARGA MASIVA ── */
 .bulk-card { max-width: 700px; width: 96vw; max-height: 90vh; display:flex; flex-direction:column; }
 .bulk-card .modal-body { overflow-y:auto; flex:1; }

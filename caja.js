@@ -24,6 +24,8 @@ let db = null;
 let _fabOpen = false;
 let MOVIMIENTOS = [];
 let ARQUEO = null;
+let _movTipo = 'ingreso'; // HIGH-02: track tipo via module variable
+let _cajaChicaFecha = null; // fecha del preset de caja chica encontrado
 // Fecha en horario Argentina (UTC-3)
 const _todayAR = () => new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
 let currentDate = _todayAR();
@@ -79,10 +81,11 @@ function toggleDarkMode() {
 }
 
 function _updateDarkIcon() {
-  const btn = document.querySelector('.dark-toggle-btn');
-  if (!btn) return;
+  // LOW-01: actualizar solo el span del ícono, no el textContent completo del botón
+  const icon = document.querySelector('.dark-toggle-btn .dark-icon');
+  if (!icon) return;
   const isDark = document.body.classList.contains('dark');
-  btn.textContent = isDark ? '☀️' : '🌙';
+  icon.textContent = isDark ? '☀️' : '🌙';
 }
 
 // ══════════════════════════════════════════
@@ -108,6 +111,56 @@ function initApp() {
   _initMovDescAutocomplete();      // ← input handler de descripción
   ensureDolar(db);                 // ← cotización para calcular costo en pesos
   if (typeof initInventario === 'function') initInventario();
+
+  // HIGH-01: registrar listener del dropdown una sola vez (y reemplazarlo si ya existe)
+  if (_cajaMenuClickHandler) document.removeEventListener('click', _cajaMenuClickHandler);
+  _cajaMenuClickHandler = e => {
+    const btn = document.getElementById('caja-menu-btn');
+    const dd  = document.getElementById('caja-menu-dropdown');
+    if (dd && btn && !btn.contains(e.target) && !dd.contains(e.target)) dd.classList.add('hidden');
+  };
+  document.addEventListener('click', _cajaMenuClickHandler);
+
+  // MED-12: patch closeCajaDuenoPrompt una sola vez (flag para evitar acumulación en re-login)
+  if (typeof closeCajaDuenoPrompt === 'function' && !closeCajaDuenoPrompt._patched) {
+    const _origClose = closeCajaDuenoPrompt;
+    closeCajaDuenoPrompt = function() {
+      _origClose();
+      if (CIERRE) setTimeout(() => openReporteModal(), 350);
+    };
+    closeCajaDuenoPrompt._patched = true;
+  }
+
+  // MED-01: refresh automático cuando el reloj pasa medianoche
+  _scheduleMedianoche();
+}
+
+let _medianochTimer = null;
+function _scheduleMedianoche() {
+  if (_medianochTimer) clearTimeout(_medianochTimer);
+  const now  = new Date();
+  const msAR = now.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+  // Calcular ms hasta medianoche AR (aproximado: esperar hasta que _todayAR() cambie)
+  const mañana = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const mañanaStr = mañana.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
+  const todayStr  = _todayAR();
+  // Buscar el momento exacto de medianoche AR
+  const msHastaMedianoche = (() => {
+    const ar = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false }).formatToParts(now);
+    const h = Number(ar.find(p => p.type === 'hour')?.value || 0);
+    const m = Number(ar.find(p => p.type === 'minute')?.value || 0);
+    const s = Number(ar.find(p => p.type === 'second')?.value || 0);
+    return ((23 - h) * 3600 + (59 - m) * 60 + (60 - s)) * 1000;
+  })();
+  _medianochTimer = setTimeout(() => {
+    currentDate = _todayAR();
+    updateDateLabel();
+    listenMovimientos();
+    loadArqueo();
+    loadCierre();
+    toast('📅 Nuevo día iniciado', 'info');
+    _scheduleMedianoche(); // reprogramar para la próxima medianoche
+  }, msHastaMedianoche + 1000); // +1s de margen
 }
 
 // ══════════════════════════════════════════
@@ -190,6 +243,7 @@ async function loadArqueo() {
             const d = cfgDoc.data();
             if (d.fecha && d.fecha < today && d.monto > 0 && !d.usado) {
               cajaChicaPreset = d.monto;
+              _cajaChicaFecha = d.fecha; // para mostrar fecha real en el hint
             }
           }
         } catch { /* no bloquea si falla */ }
@@ -212,7 +266,11 @@ function openArqueoModal(cajaChicaPreset = 0) {
   const rapidEl = document.getElementById('arqueo-confirm-rapido');
   if (cajaChicaPreset > 0) {
     if (hintEl) {
-      hintEl.textContent = `💡 Ayer se dejaron $${cajaChicaPreset.toLocaleString('es-AR')} de caja chica`;
+      // MED-13: mostrar fecha real en vez de hardcodear "ayer"
+      const hintFecha = _cajaChicaFecha
+        ? new Date(_cajaChicaFecha + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'short' })
+        : 'el último cierre';
+      hintEl.textContent = `💡 El ${hintFecha} se dejaron $${cajaChicaPreset.toLocaleString('es-AR')} de caja chica`;
       hintEl.classList.remove('hidden');
     }
     if (rapidEl) {
@@ -369,7 +427,7 @@ function listenMovimientos() {
         MOVIMIENTOS.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
         renderMovimientos();
         renderStats();
-      }).catch(e => console.error('listenMovimientos get fallback error:', e));
+      }).catch(e => { console.error('listenMovimientos get fallback error:', e); toast('Error cargando movimientos', 'error'); }); // MED-02
     });
   } catch (err) {
     console.error('listenMovimientos setup error:', err);
@@ -386,9 +444,12 @@ function listenMovimientos() {
 function _efecMonto(m) {
   const total = Number(m.monto) || 0;
   const m2amt = Number(m.monto2) || 0;
-  if (m.metodoPago === 'Efectivo' && m.metodoPago2) return total - m2amt;
-  if (m.metodoPago === 'Efectivo') return total;
-  if (m.metodoPago2 === 'Efectivo') return m2amt;
+  // Defensivo: metodoPago vacío/undefined → tratar como Efectivo (movimientos viejos sin el campo)
+  const met1 = m.metodoPago || 'Efectivo';
+  const met2 = m.metodoPago2 || '';
+  if (met1 === 'Efectivo' && met2) return total - m2amt;
+  if (met1 === 'Efectivo') return total;
+  if (met2 === 'Efectivo') return m2amt;
   return 0;
 }
 
@@ -442,11 +503,15 @@ function updateCajaResumen() {
   if (!bar) return;
   if (!MOVIMIENTOS.length) { bar.classList.add('hidden'); return; }
 
-  const ingMovs = MOVIMIENTOS.filter(m => m.tipo === 'ingreso');
-  const egMovs  = MOVIMIENTOS.filter(m => m.tipo === 'egreso');
+  const ingMovs  = MOVIMIENTOS.filter(m => m.tipo === 'ingreso');
+  const egMovs   = MOVIMIENTOS.filter(m => m.tipo === 'egreso');
+  const retiros  = egMovs.filter(m => m.categoria === RETIRO_CAT);
+  const gastos   = egMovs.filter(m => m.categoria !== RETIRO_CAT);
   const totalIng = ingMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const totalEg  = egMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const neto = totalIng - totalEg;
+  const totalGastos = gastos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  // HIGH-07: neto excluye retiros (igual que el stat-card) para mostrar valores consistentes
+  const neto = totalIng - totalGastos;
   const apertura = ARQUEO?.total || 0;
 
   const ingEfec = ingMovs.reduce((s, m) => s + _efecMonto(m), 0);
@@ -455,7 +520,8 @@ function updateCajaResumen() {
   const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
   set('cres-ing',  '+' + fmt(totalIng));
   set('cres-eg',   '−' + fmt(totalEg));
-  set('cres-neto', fmt(neto));
+  // MED-08: mostrar signo explícito para neto negativo (fmt usa Math.abs internamente)
+  set('cres-neto', (neto < 0 ? '−' : '') + fmt(neto));
   const netoWrap = document.getElementById('cres-neto');
   if (netoWrap) netoWrap.style.color = neto >= 0 ? '#10b981' : '#ef4444';
   set('cres-d-ef',   fmt(ingEfec));
@@ -471,7 +537,7 @@ function toggleCajaResumen() {
   const detail  = document.getElementById('caja-resumen-detail');
   const chevron = document.getElementById('cres-chevron');
   if (detail)  detail.classList.toggle('hidden', !_cajaResumenOpen);
-  if (chevron) chevron.textContent = _cajaResumenOpen ? '▼' : '▲';
+  if (chevron) chevron.textContent = _cajaResumenOpen ? '▲' : '▼'; // LOW-15: ▲=expanded, ▼=collapsed
 }
 
 function renderMovimientos() {
@@ -503,7 +569,7 @@ function renderMovimientos() {
       ? new Date(m.createdAt).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })
       : '';
     const metodoStr = m.metodoPago2
-      ? `${m.metodoPago} $${(m.monto - (m.monto2||0)).toLocaleString('es-AR')} + ${m.metodoPago2} $${(m.monto2||0).toLocaleString('es-AR')}`
+      ? `${m.metodoPago} $${Math.round(m.monto - (m.monto2||0)).toLocaleString('es-AR')} + ${m.metodoPago2} $${(m.monto2||0).toLocaleString('es-AR')}` // MED-07
       : m.metodoPago;
     const meta = [metodoStr, hora].filter(Boolean).join(' · ');
     const signo = m.tipo === 'ingreso' ? '+' : '−';
@@ -550,21 +616,74 @@ function _renderTurnoSep(c) {
 //  FAB SPEED DIAL
 // ══════════════════════════════════════════
 
-// ── Menú dropdown header ──
+// ══════════════════════════════════════════
+//  BOTTOM SHEET — menú deslizante reutilizable
+// ══════════════════════════════════════════
+let _sheetItems = [];
+
+function openSheet(title, items) {
+  _sheetItems = items.filter(it => !it.hide);
+  const titleEl = document.getElementById('sheet-title');
+  const cont    = document.getElementById('sheet-items');
+  const overlay = document.getElementById('sheet-overlay');
+  const sheet   = document.getElementById('sheet');
+  if (!titleEl || !cont || !overlay || !sheet) return;
+
+  titleEl.textContent = title || '';
+  cont.innerHTML = _sheetItems.map((it, i) => {
+    if (it.divider) return '<div class="sheet-sep"></div>';
+    const cls = 'sheet-item' + (it.danger ? ' sheet-item--danger' : '');
+    return `<button class="${cls}" type="button" onclick="_sheetItemClick(${i})">
+      <span class="sheet-item-icon">${it.icon || ''}</span>
+      <span class="sheet-item-label">${it.label}</span>
+      ${it.sub ? `<span class="sheet-item-sub">${it.sub}</span>` : ''}
+    </button>`;
+  }).join('');
+
+  overlay.classList.remove('hidden');
+  sheet.classList.remove('hidden');
+  requestAnimationFrame(() => sheet.classList.add('sheet--open'));
+}
+
+function closeSheet() {
+  const overlay = document.getElementById('sheet-overlay');
+  const sheet   = document.getElementById('sheet');
+  if (!sheet) return;
+  sheet.classList.remove('sheet--open');
+  setTimeout(() => {
+    overlay?.classList.add('hidden');
+    sheet.classList.add('hidden');
+  }, 280);
+}
+
+function _sheetItemClick(i) {
+  const it = _sheetItems[i];
+  if (!it) return;
+  closeSheet();
+  if (it.onClick) setTimeout(() => it.onClick(), 220);
+}
+
+// ── Menú caja (bottom sheet) ──
 function toggleCajaMenu() {
-  const dd = document.getElementById('caja-menu-dropdown');
-  if (!dd) return;
-  dd.classList.toggle('hidden');
+  const isOwner = (typeof _cajaIsOwner !== 'undefined' && _cajaIsOwner) || (typeof OWNER_MODE !== 'undefined' && OWNER_MODE);
+  openSheet('Caja', [
+    { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
+    { icon: '🔒', label: 'Modo dueño', onClick: openCajaOwnerPin },
+    { divider: true },
+    { icon: '🧾', label: 'Arqueo de caja', onClick: reopenArqueo },
+    { icon: '🔄', label: 'Cierre de turno', sub: 'Cambio de cajero', onClick: openCierreParcialModal },
+    { icon: '🔐', label: CIERRE ? 'Cierre registrado' : 'Cerrar caja del día', sub: CIERRE ? `Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}` : null, onClick: openCierreModal },
+    { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', onClick: openReporteModal },
+    { divider: true, hide: !isOwner },
+    { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
+    { icon: '📦', label: 'Caja Dueño', hide: !isOwner, onClick: openCajaDueno },
+    { divider: true },
+    { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
+  ]);
 }
-function closeCajaMenu() {
-  const dd = document.getElementById('caja-menu-dropdown');
-  if (dd) dd.classList.add('hidden');
-}
-document.addEventListener('click', e => {
-  const btn = document.getElementById('caja-menu-btn');
-  const dd  = document.getElementById('caja-menu-dropdown');
-  if (dd && btn && !btn.contains(e.target) && !dd.contains(e.target)) dd.classList.add('hidden');
-});
+function closeCajaMenu() { closeSheet(); }
+// HIGH-01: listener registrado una sola vez en initApp (ver abajo), no en top-level
+let _cajaMenuClickHandler = null;
 
 function toggleFabMenu() { _fabOpen ? closeFabMenu() : openFabMenu(); }
 
@@ -608,6 +727,8 @@ function openMovForm(id) {
     const m = MOVIMIENTOS.find(x => x.id === id);
     if (!m) return;
     if (deleteWrap) deleteWrap.style.display = '';
+    // Limpiar split antes de cargar datos del movimiento existente
+    resetSplit();
     setMovTipo(m.tipo || 'ingreso');
     document.getElementById('mov-fi-monto').value = m.monto || '';
     document.getElementById('mov-fi-desc').value  = m.descripcion || '';
@@ -629,6 +750,7 @@ function openMovForm(id) {
     }
   } else {
     if (deleteWrap) deleteWrap.style.display = 'none';
+    resetSplit();
     setMovTipo('ingreso');
     document.getElementById('mov-fi-monto').value = '';
     document.getElementById('mov-fi-desc').value  = '';
@@ -637,9 +759,8 @@ function openMovForm(id) {
     _selectedRepairItem = null;
   }
 
-  // Clear any previous error highlights and split state
+  // Clear any previous error highlights
   document.querySelectorAll('#mov-modal .field-error').forEach(el => el.classList.remove('field-error'));
-  resetSplit();
   // Reset vuelto
   const vueltoSec = document.getElementById('vuelto-section');
   if (vueltoSec) vueltoSec.classList.add('hidden');
@@ -668,6 +789,7 @@ function closeMovForm() {
 }
 
 function setMovTipo(tipo) {
+  _movTipo = tipo; // HIGH-02: keep module variable in sync
   const btnIng = document.getElementById('mov-btn-ingreso');
   const btnEg  = document.getElementById('mov-btn-egreso');
   if (btnIng) btnIng.classList.toggle('tipo-active', tipo === 'ingreso');
@@ -831,7 +953,8 @@ function _initMovDescAutocomplete() {
   input.setAttribute('autocomplete', 'off');
   input.addEventListener('input', _onMovDescInput);
   input.addEventListener('focus', _onMovDescInput);
-  input.addEventListener('blur', () => setTimeout(_hideMovSuggestions, 180));
+  // MED-10: 300ms en vez de 180ms para que el tap mobile registre antes de que se oculte
+  input.addEventListener('blur', () => setTimeout(_hideMovSuggestions, 300));
   input.addEventListener('keydown', e => {
     if (e.key === 'Escape') _hideMovSuggestions();
   });
@@ -850,9 +973,8 @@ function _onMovDescInput() {
   // Cuando está vacío, no mostrar nada
   if (q.length < 1) { _hideMovSuggestions(); return; }
 
-  // Solo autocompletar para INGRESO (ventas)
-  const tipo = document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') ? 'ingreso' : 'egreso';
-  if (tipo !== 'ingreso') { _hideMovSuggestions(); return; }
+  // Solo autocompletar para INGRESO (ventas) — HIGH-02: use module variable
+  if (_movTipo !== 'ingreso') { _hideMovSuggestions(); return; }
 
   // searchMatch (utils.js) tokeniza, normaliza acentos y expande sinónimos.
   // Ejemplos: "modulo iphone" encuentra "Pantalla iPhone 14",
@@ -896,7 +1018,10 @@ function _onMovDescInput() {
         nombre: r.nombre || `${r.tipo || ''} ${r.marca || ''} ${r.modelo || ''}`.trim() || '(repuesto)',
         extra: [r.tipo, r.marca].filter(Boolean).join(' · '),
         stock: Number(r.cantidad) || 0,
-        precio: precioVenta || costoARS, // si no hay precio venta, mostrar al menos el costo como referencia
+        // HIGH-05: si no hay precioVenta configurado, mostrar 0 (no el costo) para evitar
+        // que el cajero cobre al costo sin darse cuenta
+        precio: precioVenta || 0,
+        sinPrecio: precioVenta === 0, // flag para avisar en la UI
         costoUSD,
         costoARS,
         icon: '🔧',
@@ -996,7 +1121,7 @@ function _showMovSuggestions(results, q) {
       const estadoLbl = r.estado === 'listo'     ? '✓ Listo'
                       : r.estado === 'entregado' ? 'Entregado'
                       : 'Reparando';
-      return `<button type="button" class="mov-sug-item mov-sug-item--repair" data-i="${i}" onmousedown="event.preventDefault()" onclick="_selectMovSuggestion(${i})">
+      return `<button type="button" class="mov-sug-item mov-sug-item--repair" data-i="${i}" onpointerdown="event.preventDefault()" onclick="_selectMovSuggestion(${i})">
         <span class="sug-ico">🔧</span>
         <span class="sug-info">
           <span class="sug-name">${esc(r.nombre)}</span>
@@ -1012,8 +1137,11 @@ function _showMovSuggestions(results, q) {
     const stockCls = r.stock <= 0 ? 'sug-stock-zero'
                   : r.stock <= 2 ? 'sug-stock-low'
                   : 'sug-stock-ok';
-    const precioStr = r.precio > 0 ? `$${r.precio.toLocaleString('es-AR')}` : '';
-    return `<button type="button" class="mov-sug-item" data-i="${i}" onmousedown="event.preventDefault()" onclick="_selectMovSuggestion(${i})">
+    // HIGH-05: si no tiene precio de venta, avisar al cajero en vez de mostrar el costo
+    const precioStr = r.precio > 0
+      ? `$${r.precio.toLocaleString('es-AR')}`
+      : (r.sinPrecio ? '⚠️ Sin precio' : '');
+    return `<button type="button" class="mov-sug-item" data-i="${i}" onpointerdown="event.preventDefault()" onclick="_selectMovSuggestion(${i})">
       <span class="sug-ico">${r.icon}</span>
       <span class="sug-info">
         <span class="sug-name">${esc(r.nombre)}</span>
@@ -1073,7 +1201,8 @@ function _showQtyPicker(item) {
   const stockBadgeCls = item.stock <= 0 ? 'sug-stock-zero'
                       : item.stock <= 2 ? 'sug-stock-low'
                       : 'sug-stock-ok';
-  const stockMax = Math.max(item.stock, 1); // permitir vender 1 aunque stock = 0 (orden a pedido)
+  // HIGH-06: si stock=0 es pedido especial — no limitar cantidad a 1
+  const stockMax = item.stock > 0 ? item.stock : 999;
 
   wrap.innerHTML = `
     <div class="sale-item-card">
@@ -1093,7 +1222,7 @@ function _showQtyPicker(item) {
           <button type="button" class="qty-btn" onclick="_changeSaleQty(1)">+</button>
         </div>
       </div>
-      ${item.stock <= 0 ? '<div class="sale-item-warn">⚠️ Sin stock — se descontará a 0 (verificá si es pedido especial)</div>' : ''}
+      ${item.stock <= 0 ? '<div class="sale-item-warn">⚠️ Sin stock — pedido especial, ingresá la cantidad manualmente</div>' : ''}
     </div>
   `;
   wrap.classList.remove('hidden');
@@ -1247,7 +1376,7 @@ async function saveMov() {
   const descOk  = descripcion.length > 0;
   const catOk   = categoria.length > 0;
   const metOk   = metodoPago.length > 0;
-  const splitOk = !_splitActive || (metodo2.length > 0 && splitAmt > 0 && splitAmt < monto);
+  const splitOk = !_splitActive || (metodo2.length > 0 && splitAmt > 0 && splitAmt <= monto);
 
   _markError(montoInput?.closest('.mov-monto-area'), !montoOk);
   _markError(descInput?.closest('.fg'), !descOk);
@@ -1281,8 +1410,8 @@ async function saveMov() {
     data.metodoPago2 = metodo2;
     data.monto2 = splitAmt;
   }
-  // Vendedor activo (para reportes por turno)
-  const vendedorActivo = localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '';
+  // Vendedor activo (para reportes por turno) — MED-14: ARQUEO.vendedor tiene prioridad sobre localStorage
+  const vendedorActivo = ARQUEO?.vendedor || localStorage.getItem('cajaVendedor') || '';
   if (vendedorActivo) data.vendedor = vendedorActivo;
 
   // ── Item seleccionado del autocomplete (solo en INGRESO y al CREAR, no editar) ──
@@ -1290,7 +1419,14 @@ async function saveMov() {
   let repairUpdate = null;
 
   if (_selectedSaleItem && tipo === 'ingreso' && !editingMovId) {
-    const qty = Math.max(1, parseInt(document.getElementById('mov-sale-qty')?.value) || 1);
+    let qty = Math.max(1, parseInt(document.getElementById('mov-sale-qty')?.value) || 1);
+    // LOW-13: cap qty to available stock (only when stock > 0, i.e. not special order)
+    if (_selectedSaleItem.stock > 0 && qty > _selectedSaleItem.stock) {
+      toast(`Cantidad ajustada al stock disponible (${_selectedSaleItem.stock} u.)`, 'error');
+      qty = _selectedSaleItem.stock;
+      const qtyInp = document.getElementById('mov-sale-qty');
+      if (qtyInp) qtyInp.value = qty;
+    }
     data.itemId       = _selectedSaleItem.id;
     data.itemSource   = _selectedSaleItem.source;
     data.itemQty      = qty;
@@ -1303,8 +1439,8 @@ async function saveMov() {
 
     const collection = _selectedSaleItem.source === 'producto' ? 'productos' : 'repuestos';
     const stockField = _selectedSaleItem.source === 'producto' ? 'stock' : 'cantidad';
-    const newStock   = Math.max(0, (_selectedSaleItem.stock || 0) - qty);
-    stockUpdate = { collection, id: _selectedSaleItem.id, stockField, newStock, qty };
+    // CRIT-03: usar increment atómico en vez de valor stale para evitar race conditions
+    stockUpdate = { collection, id: _selectedSaleItem.id, stockField, qty };
   }
 
   if (_selectedRepairItem && tipo === 'ingreso' && !editingMovId) {
@@ -1317,7 +1453,8 @@ async function saveMov() {
       data.esSena = true;
       repairUpdate = {
         id: repair.id,
-        sena: (Number(repair.sena) || 0) + monto,
+        // CRIT-07: increment atómico para evitar pérdida de seña en escrituras simultáneas
+        sena: firebase.firestore.FieldValue.increment(monto),
       };
     } else {
       // Validar que el monto cubra el saldo pendiente
@@ -1344,32 +1481,34 @@ async function saveMov() {
     } else {
       await db.collection('caja_movimientos').add({ ...data, createdAt: new Date().toISOString() });
 
+      let toastMsg = 'Movimiento registrado';
+
       // Actualizar reparación vinculada
       if (repairUpdate) {
         try {
           const { id: repId, ...repFields } = repairUpdate;
           await db.collection('repairs').doc(repId).update(repFields);
-          const modeMsg = repairUpdate.cobrado ? 'cobrada ✅' : 'seña actualizada ✅';
-          toast(`Movimiento registrado · Reparación ${modeMsg}`, 'success');
+          toastMsg = `Movimiento registrado · Reparación ${repairUpdate.cobrado ? 'cobrada ✅' : 'seña actualizada ✅'}`;
         } catch (repErr) {
           console.error('Repair update error:', repErr);
           toast('Movimiento guardado, pero falló la actualización de la reparación', 'error');
         }
       }
-      // Descontar stock después de guardar el movimiento (no bloqueante si falla)
-      else if (stockUpdate) {
+
+      // CRIT-03/04: stock se descuenta siempre (independiente de repairUpdate) con increment atómico
+      if (stockUpdate) {
         try {
           await db.collection(stockUpdate.collection).doc(stockUpdate.id).update({
-            [stockUpdate.stockField]: stockUpdate.newStock
+            [stockUpdate.stockField]: firebase.firestore.FieldValue.increment(-stockUpdate.qty)
           });
-          toast(`Movimiento + stock − ${stockUpdate.qty} u. ✅`, 'success');
+          toastMsg += ` · stock −${stockUpdate.qty} u.`;
         } catch (stockErr) {
           console.error('Stock decrement error:', stockErr);
           toast('Movimiento guardado, pero falló el descuento de stock', 'error');
         }
-      } else {
-        toast('Movimiento registrado', 'success');
       }
+
+      toast(toastMsg + (toastMsg === 'Movimiento registrado' ? '' : ''), 'success');
     }
     _clearSaleItem(false);
     _clearRepairItem(false);
@@ -1722,10 +1861,7 @@ async function saveCierreParcial() {
 // ══════════════════════════════════════════
 //  UTILS
 // ══════════════════════════════════════════
-
-function esc(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+// LOW-03: esc() defined in utils.js — duplicate removed
 
 function fmt(n) {
   return '$' + Math.abs(Math.round(n)).toLocaleString('es-AR');
@@ -1738,6 +1874,135 @@ function toast(msg, type = 'success') {
   document.body.appendChild(el);
   setTimeout(() => el.classList.add('show'), 10);
   setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
+}
+
+// ══════════════════════════════════════════
+//  REPORTE DE CIERRE DEL DÍA
+// ══════════════════════════════════════════
+
+const REPORTE_WA = '5491140689253';
+
+function _buildReporteText() {
+  const fechaStr = new Date(currentDate + 'T12:00:00').toLocaleDateString('es-AR', {
+    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+  });
+
+  const apertura  = ARQUEO?.total || 0;
+  const ingMovs   = MOVIMIENTOS.filter(m => m.tipo === 'ingreso');
+  const egMovs    = MOVIMIENTOS.filter(m => m.tipo === 'egreso');
+  const retiros   = egMovs.filter(m => m.categoria === RETIRO_CAT);
+  const gastos    = egMovs.filter(m => m.categoria !== RETIRO_CAT);
+
+  const totalIng  = ingMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const totalEg   = egMovs.reduce((s,  m) => s + (Number(m.monto) || 0), 0);
+  const ingEfec   = ingMovs.reduce((s, m) => s + _efecMonto(m), 0);
+  const ingDig    = totalIng - ingEfec;
+  const egEfec    = egMovs.reduce((s,  m) => s + _efecMonto(m), 0);
+  const esperado  = apertura + ingEfec - egEfec;
+  const contado   = CIERRE?.contado ?? null;
+  const diferencia = contado !== null ? contado - esperado : null;
+
+  // Desglose ingresos por categoría
+  const ingPorCat = {};
+  ingMovs.forEach(m => {
+    const c = m.categoria || 'Otro';
+    ingPorCat[c] = (ingPorCat[c] || 0) + (Number(m.monto) || 0);
+  });
+  // Desglose egresos por categoría (sin retiros)
+  const egPorCat = {};
+  gastos.forEach(m => {
+    const c = m.categoria || 'Otro';
+    egPorCat[c] = (egPorCat[c] || 0) + (Number(m.monto) || 0);
+  });
+  const totalRetiros = retiros.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+
+  const pad = (lbl, val, w = 22) => {
+    const l = String(lbl);
+    const v = String(val);
+    return l + ' '.repeat(Math.max(1, w - l.length)) + v;
+  };
+  const fmt2 = n => '$' + Math.round(n).toLocaleString('es-AR');
+  const line = '─'.repeat(30);
+
+  let txt = '';
+  txt += `🔐 *Cierre del día — TechPoint*\n`;
+  txt += `📅 ${fechaStr}\n`;
+  txt += `${line}\n`;
+  txt += `\n💼 *RESUMEN*\n`;
+  txt += pad('📂 Apertura:', fmt2(apertura)) + '\n';
+  txt += pad('📈 Ingresos:', fmt2(totalIng)) + '\n';
+  if (ingDig > 0 && ingEfec > 0) {
+    txt += pad('   💵 Efectivo:', fmt2(ingEfec)) + '\n';
+    txt += pad('   💳 Digital:', fmt2(ingDig)) + '\n';
+  } else if (ingDig > 0) {
+    txt += pad('   💳 Digital:', fmt2(ingDig)) + '\n';
+  }
+  if (totalEg > 0) txt += pad('📉 Egresos/Gastos:', fmt2(totalEg)) + '\n';
+  if (totalRetiros > 0) txt += pad('↩️ Retiros:', fmt2(totalRetiros)) + '\n';
+  txt += `${line}\n`;
+  txt += pad('💰 Esperado en caja:', fmt2(esperado)) + '\n';
+  if (contado !== null) {
+    txt += pad('🧮 Contado:', fmt2(contado)) + '\n';
+    if (diferencia === 0) {
+      txt += pad('✅ Diferencia:', '$0 ✅') + '\n';
+    } else {
+      const difSign = diferencia > 0 ? '+' : '';
+      txt += pad('⚠️ Diferencia:', difSign + fmt2(diferencia)) + '\n';
+    }
+  }
+
+  // Desglose ingresos
+  const catIng = Object.entries(ingPorCat).sort((a, b) => b[1] - a[1]);
+  if (catIng.length > 0) {
+    txt += `\n📦 *INGRESOS POR CATEGORÍA*\n`;
+    catIng.forEach(([c, v]) => { txt += pad(`• ${c}:`, fmt2(v)) + '\n'; });
+  }
+
+  // Desglose egresos/gastos
+  const catEg = Object.entries(egPorCat).sort((a, b) => b[1] - a[1]);
+  if (catEg.length > 0) {
+    txt += `\n💸 *GASTOS / EGRESOS*\n`;
+    catEg.forEach(([c, v]) => { txt += pad(`• ${c}:`, fmt2(v)) + '\n'; });
+  }
+
+  // Cierres parciales
+  if (CIERRES_PARCIALES.length > 0) {
+    txt += `\n🔄 *TURNOS*\n`;
+    CIERRES_PARCIALES.forEach(cp => {
+      const h = cp.periodoDesdeHora ? `${cp.periodoDesdeHora}` : '';
+      txt += `• ${cp.vendedor || '—'} — ${h} → +${fmt2(cp.ingresosPeriodo || 0)}\n`;
+    });
+  }
+
+  txt += `\n${line}\n`;
+  txt += `_TechPoint · generado automáticamente_`;
+  return txt;
+}
+
+function openReporteModal() {
+  const txt = _buildReporteText();
+  const pre = document.getElementById('reporte-texto');
+  if (pre) pre.textContent = txt;
+
+  const waBtn = document.getElementById('reporte-wa-btn');
+  if (waBtn) {
+    waBtn.href = `https://wa.me/${REPORTE_WA}?text=${encodeURIComponent(txt)}`;
+  }
+
+  document.getElementById('reporte-overlay').classList.remove('hidden');
+  document.getElementById('reporte-modal').classList.remove('hidden');
+}
+
+function closeReporteModal() {
+  document.getElementById('reporte-overlay').classList.add('hidden');
+  document.getElementById('reporte-modal').classList.add('hidden');
+}
+
+function _reporteCopiar() {
+  const txt = document.getElementById('reporte-texto')?.textContent || '';
+  navigator.clipboard.writeText(txt)
+    .then(() => toast('📋 Copiado al portapapeles', 'success'))
+    .catch(() => toast('No se pudo copiar — copiá el texto manualmente', 'error'));
 }
 
 // ══════════════════════════════════════════

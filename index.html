@@ -217,6 +217,9 @@
               <button class="hdr-drop-item" onclick="openPedidosModal()">
                 📋 Pedido de mercadería
               </button>
+              <button class="hdr-drop-item" onclick="openStockWizard();closeRep2Menu()">
+                🧙 Control de stock guiado
+              </button>
             </div>
           </div>
           <button class="hdr-btn" onclick="openBulkImport()" title="Carga masiva">📦</button>
@@ -274,7 +277,28 @@
       <div class="hdr-top">
         <div class="hdr-brand"><h1>🏠 Inicio</h1></div>
         <div class="hdr-actions">
-          <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro"><span class="dark-icon">🌙</span></button>
+          <div class="hdr-menu-wrap">
+            <button class="hdr-btn hdr-menu-btn" id="dash-menu-btn" onclick="toggleDashMenu()" title="Opciones">⋮</button>
+            <div id="dash-menu-dropdown" class="hdr-dropdown hidden">
+              <button class="hdr-drop-item dark-toggle-btn" onclick="toggleDarkMode();closeDashMenu()">
+                <span class="dark-icon">🌙</span> Modo oscuro/claro
+              </button>
+              <button class="hdr-drop-item owner-lock-btn" onclick="toggleOwnerLock();closeDashMenu()">
+                <span class="lock-icon">🔒</span> Modo dueño
+              </button>
+              <div class="hdr-drop-sep"></div>
+              <button class="hdr-drop-item" onclick="window.location.href='caja.html';closeDashMenu()">
+                💰 Ir a caja
+              </button>
+              <button class="hdr-drop-item" onclick="window.location.href='pos.html';closeDashMenu()">
+                🛒 Punto de venta
+              </button>
+              <div class="hdr-drop-sep"></div>
+              <button class="hdr-drop-item" onclick="(async()=>{ await signOut(); location.replace('login.html'); })()">
+                🚪 Cerrar sesión
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -1284,6 +1308,85 @@
   </div>
 </div>
 
+<!-- ═══════════ MODAL CONTROL DE STOCK GUIADO ═══════════ -->
+<div id="stockwiz-modal" class="modal-overlay hidden">
+  <div class="modal-card stockwiz-card">
+    <div class="modal-header">
+      <h3>🧙 Control de stock</h3>
+      <button class="modal-close" onclick="closeStockWizard()">✕</button>
+    </div>
+
+    <!-- Paso 0: filtros antes de empezar -->
+    <div id="stockwiz-step-filter" class="stockwiz-body">
+      <p class="stockwiz-intro">Vamos a recorrer los repuestos uno por uno. Podés ajustar <b>cantidad</b>, <b>precio</b> y <b>calidad</b> de cada uno, u omitir.</p>
+      <div class="fi"><label>Tipo</label>
+        <select id="stockwiz-f-tipo"><option value="">Todos</option></select>
+      </div>
+      <div class="fi"><label>Marca</label>
+        <select id="stockwiz-f-marca"><option value="">Todas</option></select>
+      </div>
+      <div class="fi fi-checkbox">
+        <label><input type="checkbox" id="stockwiz-f-bajo"> Solo bajo stock</label>
+      </div>
+      <div class="fi fi-checkbox">
+        <label><input type="checkbox" id="stockwiz-f-sincalidad"> Solo sin calidad cargada</label>
+      </div>
+      <div id="stockwiz-count" class="stockwiz-count">— repuestos seleccionados</div>
+      <div class="stockwiz-btns">
+        <button class="btn-secondary" onclick="closeStockWizard()">Cancelar</button>
+        <button class="btn-primary" id="stockwiz-start-btn" onclick="_stockwizStart()">▶ Empezar</button>
+      </div>
+    </div>
+
+    <!-- Paso 1: wizard repuesto por repuesto -->
+    <div id="stockwiz-step-item" class="stockwiz-body hidden">
+      <div class="stockwiz-progress">
+        <div class="stockwiz-progress-bar"><div id="stockwiz-progress-fill"></div></div>
+        <span id="stockwiz-progress-txt">1 / 1</span>
+      </div>
+
+      <div class="stockwiz-item-info">
+        <div id="stockwiz-item-nombre" class="stockwiz-item-nombre"></div>
+        <div id="stockwiz-item-meta" class="stockwiz-item-meta"></div>
+      </div>
+
+      <div class="fi"><label>Cantidad <span class="stockwiz-current" id="stockwiz-cur-cant"></span></label>
+        <input type="number" id="stockwiz-fi-cant" inputmode="numeric" min="0">
+      </div>
+      <div class="fi"><label>Precio venta (ARS) <span class="stockwiz-current" id="stockwiz-cur-pv"></span></label>
+        <input type="number" id="stockwiz-fi-pv" inputmode="decimal" min="0" step="0.01">
+      </div>
+      <div class="fi"><label>Calidad <span class="stockwiz-current" id="stockwiz-cur-cal"></span></label>
+        <select id="stockwiz-fi-cal">
+          <option value="">— Sin especificar</option>
+          <option value="Original">Original</option>
+          <option value="AAA">AAA</option>
+          <option value="Compatible">Compatible</option>
+          <option value="OLED">OLED</option>
+          <option value="INCELL">INCELL</option>
+        </select>
+      </div>
+
+      <div class="stockwiz-btns">
+        <button class="btn-secondary" id="stockwiz-prev-btn" onclick="_stockwizPrev()">◀ Anterior</button>
+        <button class="btn-secondary" onclick="_stockwizSkip()">Omitir →</button>
+        <button class="btn-primary" onclick="_stockwizSaveNext()">💾 Guardar y siguiente</button>
+      </div>
+      <div class="stockwiz-finish-row">
+        <button class="btn-link" onclick="_stockwizFinish()">Finalizar antes</button>
+      </div>
+    </div>
+
+    <!-- Paso 2: resumen final -->
+    <div id="stockwiz-step-done" class="stockwiz-body hidden">
+      <div class="stockwiz-done-ico">✅</div>
+      <h4 class="stockwiz-done-title">¡Control completado!</h4>
+      <div id="stockwiz-done-stats" class="stockwiz-done-stats"></div>
+      <button class="btn-primary" onclick="closeStockWizard()" style="width:100%;margin-top:12px">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ MODAL CARGA MASIVA ═══════════ -->
 <div id="bulk-modal" class="modal-overlay hidden">
   <div class="modal-card bulk-card">
@@ -1671,6 +1774,14 @@
       <div class="act-empty">Cargando actividad...</div>
     </div>
   </div>
+</div>
+
+<!-- ═══════════ BOTTOM SHEET (menú deslizante) ═══════════ -->
+<div id="sheet-overlay" class="sheet-overlay hidden" onclick="closeSheet()"></div>
+<div id="sheet" class="sheet hidden" role="dialog" aria-modal="true">
+  <div class="sheet-handle" onclick="closeSheet()"></div>
+  <div class="sheet-title" id="sheet-title"></div>
+  <div class="sheet-items" id="sheet-items"></div>
 </div>
 </body>
 </html>

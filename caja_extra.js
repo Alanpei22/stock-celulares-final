@@ -489,11 +489,13 @@ async function _loadCajaDueno() {
   const list = document.getElementById('cd-movs-list');
   list.innerHTML = '<p style="text-align:center;padding:16px;color:var(--t2)">Cargando...</p>';
   try {
+    // MED-16: cargar TODOS los movimientos para saldo correcto; mostrar solo los últimos 80
     const snap = await db.collection('caja_dueno_movimientos')
-      .orderBy('ts', 'desc').limit(80).get();
-    const movs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const totalIng = movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-    const totalEg  = movs.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+      .orderBy('ts', 'desc').get();
+    const allMovs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const movs = allMovs.slice(0, 80); // solo mostrar los últimos 80 en pantalla
+    const totalIng = allMovs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const totalEg  = allMovs.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
     const saldo = totalIng - totalEg;
 
     const saldoEl = document.getElementById('cd-saldo-val');

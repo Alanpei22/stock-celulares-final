@@ -17,10 +17,12 @@ let pendingGarantiaRef = null;
 let repRenderTimer;
 let _repairsListener   = null; // referencia al unsubscribe de onSnapshot
 let _repairsLoaded     = false; // true tras el primer snapshot
+let _repEscHandler     = null; // LOW-12: stored reference so it can be removed
 
 // Expone cleanup para que auth.js pueda cancelar el listener en logout
 window._repairsCleanup = function() {
   if (_repairsListener) { _repairsListener(); _repairsListener = null; }
+  if (_repEscHandler)   { document.removeEventListener('keydown', _repEscHandler); _repEscHandler = null; } // LOW-12
   _repairsLoaded = false;
   REPAIRS = [];
 };
@@ -125,8 +127,9 @@ function initRepairs() {
   loadWaNotifyNumber();
   listenRepairs();
 
-  // Cerrar modales con ESC (repairs)
-  document.addEventListener('keydown', function _repEsc(e) {
+  // Cerrar modales con ESC (repairs) — LOW-12: store reference to allow removal
+  if (_repEscHandler) document.removeEventListener('keydown', _repEscHandler);
+  _repEscHandler = function(e) {
     if (e.key !== 'Escape') return;
     const order = [
       { id: 'cobro-overlay',    fn: closeCobroModal    },
@@ -142,7 +145,8 @@ function initRepairs() {
       const el = document.getElementById(id);
       if (el && !el.classList.contains('hidden')) { fn(); return; }
     }
-  });
+  };
+  document.addEventListener('keydown', _repEscHandler);
 }
 
 // ── Filtro rápido desde stat bar ──────────
@@ -778,6 +782,17 @@ async function saveRepair() {
     } else {
       // Usar nOrden ingresado por el usuario (o auto si está vacío)
       const ordenInputVal = parseInt(document.getElementById('rep-fi-orden').value) || 0;
+
+      // CRIT-06: verificar que el número manual no esté ya en uso
+      if (ordenInputVal > 0) {
+        const dupSnap = await db.collection('repairs').where('nOrden', '==', ordenInputVal).limit(1).get();
+        if (!dupSnap.empty) {
+          toast(`⚠️ Ya existe una reparación con el N°${ordenInputVal}`, 'error');
+          btn.disabled = false;
+          return;
+        }
+      }
+
       const metaRef = db.collection('config').doc('repairsMeta');
       let nOrden;
       await db.runTransaction(async t => {
@@ -816,8 +831,7 @@ async function saveRepair() {
       });
       triggerWaNotify('ingreso', { marca, modelo, nOrden, arreglo, nombre, monto });
       closeRepairForm();
-      // Ofrecer imprimir ticket inmediatamente
-      REPAIRS.push({ ...newDoc });
+      // Ofrecer imprimir ticket inmediatamente — MED-11: no local push, onSnapshot adds it
       _showPrintPrompt(id);
       return;
     }
@@ -914,8 +928,8 @@ function openRepairDetail(id) {
     </div>` : ''}
     ${saldo !== null ? `<div class="det-row">
       <span class="det-label">Saldo</span>
-      <span class="det-val" style="color:var(--warn);font-weight:700">$ ${saldo.toLocaleString('es-AR')}</span>
-    </div>` : ''}
+      <span class="det-val" style="color:${saldo < 0 ? 'var(--grn2)' : 'var(--warn)'};font-weight:700">$ ${saldo.toLocaleString('es-AR')}${saldo < 0 ? ' <em style="font-weight:normal;font-size:.85em">(crédito)</em>' : ''}</span>
+    </div>` : ''} <!-- MED-15 -->
     ${r.costo ? `<div class="det-row">
       <span class="det-label">Costo repuesto</span>
       <span class="det-val">$ ${r.costo.toLocaleString('es-AR')}</span>
@@ -1159,7 +1173,7 @@ function openCobroModal(r) {
   }
   // Reset método de pago a Efectivo
   document.querySelectorAll('.cobro-metodo-btn').forEach(b => b.classList.remove('cobro-m-active'));
-  document.querySelector('.cobro-metodo-btn[data-m="Efectivo"]').classList.add('cobro-m-active');
+  document.querySelector('.cobro-metodo-btn[data-m="Efectivo"]')?.classList.add('cobro-m-active'); // HIGH-09: null guard
   // Abrir overlay (el modal está adentro del overlay ahora)
   document.getElementById('cobro-overlay').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -1182,7 +1196,7 @@ async function confirmarCobro() {
   closeCobroModal();
   try {
     const batch  = db.batch();
-    const hoy    = todayAR();          // ← zona horaria Argentina (fix)
+    const hoy    = _todayAR();         // ← zona horaria Argentina
     const ahora  = new Date().toISOString();
     const monto  = Number(r.monto)  || 0;
     const costo  = Number(r.costo)  || 0;
@@ -1245,7 +1259,7 @@ function repairWhatsApp(id) {
 
   let phone = String(r.tlf).replace(/\D/g, '');
   if (phone.length === 10)                      phone = '549' + phone;
-  else if (phone.length === 11 && phone.startsWith('0')) phone = '54' + phone.slice(1);
+  else if (phone.length === 11 && phone.startsWith('0')) phone = '549' + phone.slice(1); // LOW-08: always add mobile 9
   else if (!phone.startsWith('54'))             phone = '549' + phone;
 
   const nombre = r.nombre ? r.nombre.split(' ')[0] : '';
@@ -1278,7 +1292,7 @@ function sendPresupuestoWA(id) {
 
   let phone = String(r.tlf).replace(/\D/g, '');
   if (phone.length === 10)                             phone = '549' + phone;
-  else if (phone.length === 11 && phone.startsWith('0')) phone = '54' + phone.slice(1);
+  else if (phone.length === 11 && phone.startsWith('0')) phone = '549' + phone.slice(1); // LOW-08
   else if (!phone.startsWith('54'))                    phone = '549' + phone;
 
   const nombre = r.nombre ? r.nombre.split(' ')[0] : 'cliente';
@@ -2548,7 +2562,7 @@ function repairWhatsAppText(id, msg) {
   if (!r || !r.tlf) { toast('No hay teléfono registrado', 'error'); return; }
   let phone = String(r.tlf).replace(/\D/g, '');
   if (phone.length === 10)                            phone = '549' + phone;
-  else if (phone.length === 11 && phone.startsWith('0')) phone = '54' + phone.slice(1);
+  else if (phone.length === 11 && phone.startsWith('0')) phone = '549' + phone.slice(1); // LOW-08
   else if (!phone.startsWith('54'))                   phone = '549' + phone;
   window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
 }

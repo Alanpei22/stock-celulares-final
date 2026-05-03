@@ -437,59 +437,113 @@ function initApp() {
   if (typeof initPedidos === 'function') initPedidos();
 }
 
-// ── Menú desplegable header ───────────────────────────────
+// ══════════════════════════════════════════
+//  BOTTOM SHEET — menú deslizante reutilizable
+// ══════════════════════════════════════════
+let _sheetItems = [];
+
+function openSheet(title, items) {
+  _sheetItems = items.filter(it => !it.hide);
+  const titleEl = document.getElementById('sheet-title');
+  const cont    = document.getElementById('sheet-items');
+  const overlay = document.getElementById('sheet-overlay');
+  const sheet   = document.getElementById('sheet');
+  if (!titleEl || !cont || !overlay || !sheet) return;
+
+  titleEl.textContent = title || '';
+  cont.innerHTML = _sheetItems.map((it, i) => {
+    if (it.divider) return '<div class="sheet-sep"></div>';
+    const cls = 'sheet-item' + (it.danger ? ' sheet-item--danger' : '');
+    return `<button class="${cls}" type="button" data-i="${i}" onclick="_sheetItemClick(${i})">
+      <span class="sheet-item-icon">${it.icon || ''}</span>
+      <span class="sheet-item-label">${it.label}</span>
+      ${it.sub ? `<span class="sheet-item-sub">${it.sub}</span>` : ''}
+    </button>`;
+  }).join('');
+
+  overlay.classList.remove('hidden');
+  sheet.classList.remove('hidden');
+  // Trigger transition
+  requestAnimationFrame(() => sheet.classList.add('sheet--open'));
+}
+
+function closeSheet() {
+  const overlay = document.getElementById('sheet-overlay');
+  const sheet   = document.getElementById('sheet');
+  if (!sheet) return;
+  sheet.classList.remove('sheet--open');
+  setTimeout(() => {
+    overlay?.classList.add('hidden');
+    sheet.classList.add('hidden');
+  }, 280);
+}
+
+function _sheetItemClick(i) {
+  const it = _sheetItems[i];
+  if (!it) return;
+  closeSheet();
+  if (it.onClick) setTimeout(() => it.onClick(), 220);
+}
+
+// ── Menús por sección (cada uno construye sus items) ─────
 function toggleHdrMenu() {
-  const menu = document.getElementById('hdr-menu-dropdown');
-  if (!menu) return;
-  const isOpen = !menu.classList.contains('hidden');
-  menu.classList.toggle('hidden', isOpen);
-  if (!isOpen) {
-    setTimeout(() => document.addEventListener('click', _closeHdrMenuOutside, { once: true }), 0);
-  }
+  openSheet('Stock', [
+    { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
+    { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
+    { divider: true },
+    { icon: '📊', label: 'Estadísticas', onClick: () => document.getElementById('stats-btn')?.click() },
+    { icon: '⚙️', label: 'Configuración', onClick: () => document.getElementById('settings-btn')?.click() },
+    { icon: '💾', label: 'Exportar stock', onClick: () => document.getElementById('export-btn')?.click() },
+    { divider: true },
+    { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
+  ]);
 }
-function closeHdrMenu() {
-  const menu = document.getElementById('hdr-menu-dropdown');
-  if (menu) menu.classList.add('hidden');
-}
-function _closeHdrMenuOutside(e) {
-  const menu = document.getElementById('hdr-menu-dropdown');
-  const btn  = document.getElementById('hdr-menu-btn');
-  if (menu && !menu.contains(e.target) && e.target !== btn) {
-    menu.classList.add('hidden');
-  }
-}
+function closeHdrMenu() { closeSheet(); }
 
-// ── Menú reparaciones ─────────────────────────────────────
 function toggleRepMenu() {
-  const dd = document.getElementById('rep-menu-dropdown');
-  if (!dd) return;
-  dd.classList.toggle('hidden');
-  if (!dd.classList.contains('hidden')) {
-    setTimeout(() => document.addEventListener('click', _closeRepMenuOutside, { once: true }), 0);
-  }
+  openSheet('Reparaciones', [
+    { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
+    { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
+    { divider: true },
+    { icon: '👥', label: 'Personal técnico', onClick: () => (typeof openPersonalModal === 'function') && openPersonalModal() },
+    { icon: '📊', label: 'Estadísticas', onClick: () => document.getElementById('rep-stats-btn')?.click() },
+    { icon: '📋', label: 'Actividad reciente', onClick: () => (typeof openActivityFeed === 'function') && openActivityFeed() },
+    { icon: '🟢', label: 'WhatsApp pendientes', onClick: () => (typeof sendPendingWA === 'function') && sendPendingWA() },
+    { divider: true },
+    { icon: '💾', label: 'Importar historial', onClick: () => document.getElementById('rep-import-btn')?.click() },
+    { divider: true },
+    { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
+  ]);
 }
-function closeRepMenu() { document.getElementById('rep-menu-dropdown')?.classList.add('hidden'); }
-function _closeRepMenuOutside(e) {
-  const dd = document.getElementById('rep-menu-dropdown');
-  const btn = document.getElementById('rep-menu-btn');
-  if (dd && !dd.contains(e.target) && e.target !== btn) dd.classList.add('hidden');
-}
+function closeRepMenu() { closeSheet(); }
 
-// ── Menú repuestos ────────────────────────────────────────
 function toggleRep2Menu() {
-  const dd = document.getElementById('rep2-menu-dropdown');
-  if (!dd) return;
-  dd.classList.toggle('hidden');
-  if (!dd.classList.contains('hidden')) {
-    setTimeout(() => document.addEventListener('click', _closeRep2MenuOutside, { once: true }), 0);
-  }
+  openSheet('Repuestos', [
+    { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
+    { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
+    { divider: true },
+    { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: () => (typeof openStockWizard === 'function') && openStockWizard() },
+    { icon: '💵', label: 'Carga rápida de costos', onClick: () => location.href = 'carga-costos.html' },
+    { icon: '📊', label: 'Exportar / Importar Excel', onClick: () => location.href = 'bulk-edit-repuestos.html' },
+    { icon: '📋', label: 'Pedido de mercadería', onClick: () => (typeof openPedidosModal === 'function') && openPedidosModal() },
+    { divider: true },
+    { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
+  ]);
 }
-function closeRep2Menu() { document.getElementById('rep2-menu-dropdown')?.classList.add('hidden'); }
-function _closeRep2MenuOutside(e) {
-  const dd = document.getElementById('rep2-menu-dropdown');
-  const btn = document.getElementById('rep2-menu-btn');
-  if (dd && !dd.contains(e.target) && e.target !== btn) dd.classList.add('hidden');
+function closeRep2Menu() { closeSheet(); }
+
+function toggleDashMenu() {
+  openSheet('Inicio', [
+    { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
+    { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
+    { divider: true },
+    { icon: '💰', label: 'Ir a caja', onClick: () => location.href = 'caja.html' },
+    { icon: '🛒', label: 'Punto de venta', onClick: () => location.href = 'pos.html' },
+    { divider: true },
+    { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
+  ]);
 }
+function closeDashMenu() { closeSheet(); }
 
 // ── Secciones ─────────────────────────────────────────────
 function switchSection(section) {
