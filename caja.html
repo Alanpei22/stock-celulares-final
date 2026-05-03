@@ -30,26 +30,7 @@
         <h1>💰 Caja Diaria</h1>
       </div>
       <div class="hdr-actions">
-        <div class="hdr-menu-wrap">
-          <button class="hdr-btn hdr-menu-btn" id="caja-menu-btn" onclick="toggleCajaMenu()" title="Opciones">⋮</button>
-          <div id="caja-menu-dropdown" class="hdr-dropdown hidden">
-            <button class="hdr-drop-item dark-toggle-btn" onclick="toggleDarkMode();closeCajaMenu()">
-              <span class="dark-icon">🌙</span> Modo oscuro/claro
-            </button>
-            <button class="hdr-drop-item owner-lock-btn" onclick="openCajaOwnerPin();closeCajaMenu()">
-              <span class="lock-icon">🔒</span> Modo dueño
-            </button>
-            <div class="hdr-drop-sep"></div>
-            <button class="hdr-drop-item" onclick="reopenArqueo();closeCajaMenu()">🧾 Arqueo de caja</button>
-            <button class="hdr-drop-item" onclick="openCierreParcialModal()">🔄 Cierre de turno</button>
-            <button class="hdr-drop-item" id="cierre-btn" onclick="openCierreModal();closeCajaMenu()">🔐 Cerrar caja del día</button>
-            <button class="hdr-drop-item" onclick="openReporteModal();closeCajaMenu()">📋 Reporte del día</button>
-            <button class="hdr-drop-item owner-only" onclick="openCajaHistorial();closeCajaMenu()">📊 Historial / Stats</button>
-            <button class="hdr-drop-item owner-only" onclick="openCajaDueno();closeCajaMenu()">📦 Caja Dueño</button>
-            <div class="hdr-drop-sep"></div>
-            <button class="hdr-drop-item" onclick="(async()=>{ await signOut(); location.replace('login.html'); })()">🚪 Cerrar sesión</button>
-          </div>
-        </div>
+        <button class="hdr-btn hdr-menu-btn" id="caja-menu-btn" onclick="toggleCajaMenu()" title="Opciones">⋮</button>
       </div>
     </div>
   </header>
@@ -67,7 +48,11 @@
     <div class="caja-stat caja-stat--ing"><span class="caja-stat-num" id="stat-ingresos">$0</span><span class="caja-stat-lbl">Ingresos</span></div>
     <div class="caja-stat caja-stat--eg"><span class="caja-stat-num" id="stat-egresos">$0</span><span class="caja-stat-lbl">Egresos</span></div>
     <div class="caja-stat caja-stat--ef"><span class="caja-stat-num" id="stat-efectivo">$0</span><span class="caja-stat-lbl">Efectivo en caja</span></div>
-    <div class="caja-stat caja-stat--neto"><span class="caja-stat-num" id="stat-neto">$0</span><span class="caja-stat-lbl">Neto del día</span></div>
+    <div class="caja-stat caja-stat--neto">
+      <span class="caja-stat-num" id="stat-neto">$0</span>
+      <span class="caja-stat-lbl">Neto del día</span>
+      <span class="stat-vs-yest hidden" id="stat-vs-yest"></span>
+    </div>
   </div>
 
   <!-- Desglose del día -->
@@ -111,6 +96,22 @@
         <div class="cres-detail-item"><span id="cres-d-mov">0</span><span>Movimientos</span></div>
         <div class="cres-detail-item"><span id="cres-d-aper">$0</span><span>Apertura</span></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Buscador + filtros de movimientos -->
+  <div class="mov-search-wrap" id="mov-search-wrap">
+    <div class="mov-search-input-wrap">
+      <span class="mov-search-ico">🔍</span>
+      <input id="mov-search" type="search" placeholder="Buscar por descripción, categoría, método..." autocomplete="off">
+      <button class="mov-search-clear hidden" id="mov-search-clear" onclick="_clearMovSearch()" type="button">✕</button>
+    </div>
+    <div class="mov-filter-chips" id="mov-filter-chips">
+      <button class="mov-fchip mov-fchip-active" data-f="all" onclick="_setMovFilter('all')">Todos</button>
+      <button class="mov-fchip" data-f="ingreso" onclick="_setMovFilter('ingreso')">+ Ingresos</button>
+      <button class="mov-fchip" data-f="egreso" onclick="_setMovFilter('egreso')">− Egresos</button>
+      <button class="mov-fchip" data-f="efectivo" onclick="_setMovFilter('efectivo')">💵 Efectivo</button>
+      <button class="mov-fchip" data-f="digital" onclick="_setMovFilter('digital')">💳 Digital</button>
     </div>
   </div>
 

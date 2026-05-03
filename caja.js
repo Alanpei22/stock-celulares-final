@@ -26,6 +26,7 @@ let MOVIMIENTOS = [];
 let ARQUEO = null;
 let _movTipo = 'ingreso'; // HIGH-02: track tipo via module variable
 let _cajaChicaFecha = null; // fecha del preset de caja chica encontrado
+let _dateToken = 0; // BUG-FIX: token que se incrementa al cambiar de fecha; los async viejos descartan su resultado si ya cambió
 // Fecha en horario Argentina (UTC-3)
 const _todayAR = () => new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
 let currentDate = _todayAR();
@@ -105,6 +106,7 @@ function initApp() {
   listenMovimientos();
   loadArqueo();
   loadCierre();
+  _loadYesterdayStats().then(() => renderStats()); // Feature 6: vs ayer
   listenCierresParciales();        // ← turnos/cierres parciales
   listenCajaRepuestos();           // ← repuestos para autocomplete
   listenCajaRepairs();             // ← reparaciones para autocomplete
@@ -112,14 +114,7 @@ function initApp() {
   ensureDolar(db);                 // ← cotización para calcular costo en pesos
   if (typeof initInventario === 'function') initInventario();
 
-  // HIGH-01: registrar listener del dropdown una sola vez (y reemplazarlo si ya existe)
-  if (_cajaMenuClickHandler) document.removeEventListener('click', _cajaMenuClickHandler);
-  _cajaMenuClickHandler = e => {
-    const btn = document.getElementById('caja-menu-btn');
-    const dd  = document.getElementById('caja-menu-dropdown');
-    if (dd && btn && !btn.contains(e.target) && !dd.contains(e.target)) dd.classList.add('hidden');
-  };
-  document.addEventListener('click', _cajaMenuClickHandler);
+  // (HIGH-01 obsoleto: dropdown HTML zombie removido, ahora usamos bottom sheet)
 
   // MED-12: patch closeCajaDuenoPrompt una sola vez (flag para evitar acumulación en re-login)
   if (typeof closeCajaDuenoPrompt === 'function' && !closeCajaDuenoPrompt._patched) {
@@ -134,6 +129,33 @@ function initApp() {
   // MED-01: refresh automático cuando el reloj pasa medianoche
   _scheduleMedianoche();
 }
+
+// BUG-FIX: detectar cambio de día cuando la PWA vuelve a primer plano
+// (los setTimeout no son confiables en mobile background)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const realToday = _todayAR();
+  if (currentDate === realToday) return;
+  // Solo refrescar si estábamos viendo el día "anterior" (el que era hoy cuando se durmió)
+  // Si el usuario navegó manualmente a otro día, no tocar.
+  // Heurística simple: si currentDate < realToday, refrescamos.
+  if (currentDate < realToday) {
+    currentDate = realToday;
+    _dateToken++;
+    updateDateLabel();
+    if (movListener) { movListener(); movListener = null; }
+    if (_parcialListener) { _parcialListener(); _parcialListener = null; }
+    MOVIMIENTOS = []; CIERRES_PARCIALES = [];
+    ARQUEO = null; CIERRE = null;
+    listenMovimientos();
+    listenCierresParciales();
+    loadArqueo();
+    loadCierre();
+    _yesterdayNeto = null;
+    _loadYesterdayStats().then(() => renderStats());
+    toast('📅 Nuevo día — caja actualizada', 'info');
+  }
+});
 
 let _medianochTimer = null;
 function _scheduleMedianoche() {
@@ -158,6 +180,8 @@ function _scheduleMedianoche() {
     listenMovimientos();
     loadArqueo();
     loadCierre();
+    _yesterdayNeto = null;
+    _loadYesterdayStats().then(() => renderStats());
     toast('📅 Nuevo día iniciado', 'info');
     _scheduleMedianoche(); // reprogramar para la próxima medianoche
   }, msHastaMedianoche + 1000); // +1s de margen
@@ -183,6 +207,7 @@ function nextDay() {
 
 function setDate(date) {
   currentDate = date;
+  _dateToken++; // invalida cualquier load async pendiente del día anterior
   updateDateLabel();
   if (movListener) { movListener(); movListener = null; }
   if (_parcialListener) { _parcialListener(); _parcialListener = null; }
@@ -194,6 +219,8 @@ function setDate(date) {
   listenCierresParciales();
   loadArqueo();
   loadCierre();
+  _yesterdayNeto = null; // Feature 6: invalidar comparativa al cambiar de fecha
+  _loadYesterdayStats().then(() => renderStats());
 }
 
 function updateDateLabel() {
@@ -226,8 +253,10 @@ function updateDateLabel() {
 // ══════════════════════════════════════════
 
 async function loadArqueo() {
+  const myToken = _dateToken;
   try {
     const doc = await db.collection('caja_arqueos').doc(currentDate).get();
+    if (myToken !== _dateToken) return; // BUG-FIX: la fecha cambió mientras esperábamos
     if (doc.exists) {
       ARQUEO = doc.data();
     } else {
@@ -478,6 +507,9 @@ function renderStats() {
   const netoEl = document.getElementById('stat-neto');
   if (netoEl) { netoEl.textContent = fmt(neto); netoEl.style.color = neto >= 0 ? '#10b981' : '#ef4444'; }
 
+  // Feature 6: comparativa "vs ayer" (usa _yesterdayNeto cargado por _loadYesterdayStats)
+  _renderVsYesterday(neto);
+
   // Desglose del día — usa _efecMonto para respetar el split
   const reparac   = ingMovs.filter(m => m.categoria === 'Reparación').reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const ventaEfec = ingMovs.filter(m => m.categoria !== 'Reparación').reduce((s, m) => s + _efecMonto(m), 0);
@@ -494,6 +526,59 @@ function renderStats() {
     if (retEl) retEl.textContent = fmt(totalRetiros);
   }
   updateCajaResumen();
+}
+
+// ── Feature 6: Comparativa vs ayer ──
+let _yesterdayNeto = null; // null = no cargado todavía
+
+async function _loadYesterdayStats() {
+  // Solo cargar si estamos viendo HOY (no tiene sentido comparar días arbitrarios)
+  if (currentDate !== _todayAR()) { _yesterdayNeto = null; _renderVsYesterday(0); return; }
+  const myToken = _dateToken;
+  try {
+    const yDate = new Date(currentDate + 'T12:00:00');
+    yDate.setDate(yDate.getDate() - 1);
+    const yesterday = yDate.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
+    const snap = await db.collection('caja_movimientos').where('fecha', '==', yesterday).get();
+    if (myToken !== _dateToken) return; // BUG-FIX: ignorar respuesta vieja
+    let yIng = 0, yGastos = 0;
+    snap.docs.forEach(d => {
+      const m = d.data();
+      const monto = Number(m.monto) || 0;
+      if (m.tipo === 'ingreso') yIng += monto;
+      else if (m.categoria !== RETIRO_CAT) yGastos += monto;
+    });
+    _yesterdayNeto = yIng - yGastos;
+  } catch (e) {
+    if (myToken !== _dateToken) return;
+    console.error('Vs ayer:', e);
+    _yesterdayNeto = null;
+  }
+}
+
+function _renderVsYesterday(todayNeto) {
+  const el = document.getElementById('stat-vs-yest');
+  if (!el) return;
+  if (_yesterdayNeto === null || currentDate !== _todayAR()) {
+    el.classList.add('hidden');
+    return;
+  }
+  // Si ayer fue 0, no podemos calcular % — mostrar diferencia absoluta
+  if (Math.abs(_yesterdayNeto) < 1) {
+    el.classList.remove('hidden');
+    el.classList.remove('vs-up','vs-down','vs-eq');
+    el.classList.add(todayNeto > 0 ? 'vs-up' : todayNeto < 0 ? 'vs-down' : 'vs-eq');
+    el.textContent = todayNeto === 0 ? '— sin ref.' : 'vs ayer $0';
+    return;
+  }
+  const diff = todayNeto - _yesterdayNeto;
+  const pct = Math.round((diff / Math.abs(_yesterdayNeto)) * 100);
+  el.classList.remove('hidden','vs-up','vs-down','vs-eq');
+  if (pct === 0)      el.classList.add('vs-eq');
+  else if (pct > 0)   el.classList.add('vs-up');
+  else                el.classList.add('vs-down');
+  const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '=';
+  el.textContent = `${arrow} ${Math.abs(pct)}% vs ayer`;
 }
 
 let _cajaResumenOpen = false;
@@ -540,23 +625,103 @@ function toggleCajaResumen() {
   if (chevron) chevron.textContent = _cajaResumenOpen ? '▲' : '▼'; // LOW-15: ▲=expanded, ▼=collapsed
 }
 
+// Estado de búsqueda + filtro (Feature 5)
+let _movSearchQuery = '';
+let _movFilterType  = 'all'; // all | ingreso | egreso | efectivo | digital
+
+function _setMovFilter(filter) {
+  _movFilterType = filter;
+  document.querySelectorAll('.mov-fchip').forEach(b => {
+    b.classList.toggle('mov-fchip-active', b.dataset.f === filter);
+  });
+  renderMovimientos();
+}
+
+function _clearMovSearch() {
+  _movSearchQuery = '';
+  const inp = document.getElementById('mov-search');
+  if (inp) inp.value = '';
+  document.getElementById('mov-search-clear')?.classList.add('hidden');
+  renderMovimientos();
+}
+
+function _initMovSearch() {
+  const inp = document.getElementById('mov-search');
+  const clr = document.getElementById('mov-search-clear');
+  if (!inp || inp._initialized) return;
+  inp._initialized = true;
+  let timer;
+  inp.addEventListener('input', () => {
+    _movSearchQuery = inp.value.trim().toLowerCase();
+    clr?.classList.toggle('hidden', !_movSearchQuery);
+    clearTimeout(timer);
+    timer = setTimeout(renderMovimientos, 80);
+  });
+}
+
+function _movMatchesFilter(m) {
+  if (_movFilterType === 'all') return true;
+  if (_movFilterType === 'ingreso') return m.tipo === 'ingreso';
+  if (_movFilterType === 'egreso')  return m.tipo === 'egreso';
+  if (_movFilterType === 'efectivo') return _efecMonto(m) > 0;
+  if (_movFilterType === 'digital')  return ((Number(m.monto) || 0) - _efecMonto(m)) > 0;
+  return true;
+}
+
+function _movMatchesSearch(m) {
+  if (!_movSearchQuery) return true;
+  const txt = [m.descripcion, m.categoria, m.metodoPago, m.metodoPago2, m.vendedor, m.itemNombre]
+    .filter(Boolean).join(' ').toLowerCase();
+  return txt.includes(_movSearchQuery);
+}
+
 function renderMovimientos() {
   const list  = document.getElementById('caja-list');
   const empty = document.getElementById('caja-empty');
+  const searchWrap = document.getElementById('mov-search-wrap');
   if (!list) return;
+
+  // Init search lazy
+  _initMovSearch();
+
+  // Mostrar/ocultar la barra de búsqueda según haya o no movimientos
+  if (searchWrap) {
+    searchWrap.style.display = MOVIMIENTOS.length >= 4 ? '' : 'none';
+  }
 
   if (!MOVIMIENTOS.length && !CIERRES_PARCIALES.length) {
     list.innerHTML = '';
-    if (empty) empty.style.display = '';
+    if (empty) {
+      empty.style.display = '';
+      empty.innerHTML = '<div class="empty-icon">💸</div><p>Sin movimientos hoy</p><p class="empty-sub">Tocá + para registrar</p>';
+    }
     return;
   }
+
+  // Aplicar búsqueda + filtro a los MOVIMIENTOS (no a los turnos)
+  const filteredMovs = MOVIMIENTOS.filter(m => _movMatchesFilter(m) && _movMatchesSearch(m));
+  const isFiltering = _movSearchQuery || _movFilterType !== 'all';
+
+  if (isFiltering && filteredMovs.length === 0) {
+    list.innerHTML = '';
+    if (empty) {
+      empty.style.display = '';
+      empty.innerHTML = `<div class="empty-icon">🔍</div><p>Sin resultados</p><p class="empty-sub">Probá con otra búsqueda o filtro</p>
+        <button class="btn-primary" style="margin-top:10px;padding:8px 18px;border-radius:10px;border:none;background:#C8965A;color:#fff;font-weight:700;cursor:pointer" onclick="_clearMovSearch();_setMovFilter('all')">Limpiar</button>`;
+    }
+    return;
+  }
+
   if (empty) empty.style.display = 'none';
 
-  // Mezclar movimientos + cierres parciales ordenados por tiempo
-  const items = [
-    ...MOVIMIENTOS.map(m => ({ ...m, _type: 'mov' })),
-    ...CIERRES_PARCIALES.map(c => ({ ...c, _type: 'turno' })),
-  ].sort((a, b) => {
+  // Si hay filtro activo, no mostrar separadores de turno (no tienen sentido)
+  const items = isFiltering
+    ? filteredMovs.map(m => ({ ...m, _type: 'mov' }))
+    : [
+        ...MOVIMIENTOS.map(m => ({ ...m, _type: 'mov' })),
+        ...CIERRES_PARCIALES.map(c => ({ ...c, _type: 'turno' })),
+      ];
+  items.sort((a, b) => {
     const ka = a._type === 'turno' ? a.timestamp : a.createdAt;
     const kb = b._type === 'turno' ? b.timestamp : b.createdAt;
     return (ka || '').localeCompare(kb || '');
@@ -1410,8 +1575,13 @@ async function saveMov() {
     data.metodoPago2 = metodo2;
     data.monto2 = splitAmt;
   }
-  // Vendedor activo (para reportes por turno) — MED-14: ARQUEO.vendedor tiene prioridad sobre localStorage
-  const vendedorActivo = ARQUEO?.vendedor || localStorage.getItem('cajaVendedor') || '';
+  // BUG-FIX: si hubo cierres parciales, el último vendedor es quien sigue de cajero.
+  // Sino: localStorage (actualizado en arqueo/turno) > ARQUEO.vendedor como fallback.
+  let vendedorActivo = '';
+  if (CIERRES_PARCIALES && CIERRES_PARCIALES.length > 0) {
+    vendedorActivo = CIERRES_PARCIALES[CIERRES_PARCIALES.length - 1].vendedor || '';
+  }
+  if (!vendedorActivo) vendedorActivo = localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '';
   if (vendedorActivo) data.vendedor = vendedorActivo;
 
   // ── Item seleccionado del autocomplete (solo en INGRESO y al CREAR, no editar) ──
@@ -1524,13 +1694,102 @@ function deleteMov() {
   const id = editingMovId;
   requireCajaOwnerPin(async () => {
     try {
+      // Capturar data antes de borrar (para undo + revertir stock)
+      const docSnap = await db.collection('caja_movimientos').doc(id).get();
+      if (!docSnap.exists) { toast('Movimiento no encontrado', 'error'); return; }
+      const movData = docSnap.data();
+
       await db.collection('caja_movimientos').doc(id).delete();
-      toast('Movimiento eliminado', 'success');
       closeMovForm();
+
+      // Revertir stock si era venta de inventario (Feature 1)
+      let stockReturned = 0;
+      let stockColl = null, stockField = null;
+      if (movData.itemId && movData.itemSource && movData.itemQty > 0 && movData.tipo === 'ingreso') {
+        stockColl  = movData.itemSource === 'producto' ? 'productos' : 'repuestos';
+        stockField = movData.itemSource === 'producto' ? 'stock' : 'cantidad';
+        try {
+          await db.collection(stockColl).doc(movData.itemId).update({
+            [stockField]: firebase.firestore.FieldValue.increment(movData.itemQty)
+          });
+          stockReturned = movData.itemQty;
+        } catch (stockErr) { console.error('Stock revert:', stockErr); }
+      }
+
+      // Revertir seña si correspondía (simétrico al increment del save)
+      let senaReverted = 0;
+      if (movData.esSena && movData.repairId && movData.monto > 0) {
+        try {
+          await db.collection('repairs').doc(movData.repairId).update({
+            sena: firebase.firestore.FieldValue.increment(-Number(movData.monto))
+          });
+          senaReverted = Number(movData.monto);
+        } catch {}
+      }
+
+      // Toast con undo (Feature 7)
+      const parts = ['🗑 Eliminado'];
+      if (stockReturned > 0) parts.push(`Stock +${stockReturned} u.`);
+      if (senaReverted > 0)  parts.push(`Seña −${fmt(senaReverted).slice(1)}`);
+      _showUndoToast({
+        msg: parts.join(' · '),
+        onUndo: async () => {
+          try {
+            await db.collection('caja_movimientos').doc(id).set(movData);
+            if (stockReturned > 0) {
+              await db.collection(stockColl).doc(movData.itemId).update({
+                [stockField]: firebase.firestore.FieldValue.increment(-stockReturned)
+              });
+            }
+            if (senaReverted > 0) {
+              await db.collection('repairs').doc(movData.repairId).update({
+                sena: firebase.firestore.FieldValue.increment(senaReverted)
+              });
+            }
+            toast('↩️ Movimiento restaurado', 'success');
+          } catch (undoErr) {
+            console.error('Undo:', undoErr);
+            toast('No se pudo deshacer', 'error');
+          }
+        }
+      });
     } catch (e) {
+      console.error('deleteMov:', e);
       toast('Error al eliminar', 'error');
     }
   }, 'PIN de dueño para eliminar el movimiento');
+}
+
+// ── Undo toast (Feature 7) ──
+let _undoToastEl = null;
+let _undoToastTimer = null;
+function _showUndoToast({ msg, onUndo, duration = 6000 }) {
+  // Cancelar toast anterior
+  if (_undoToastEl) { _undoToastEl.remove(); _undoToastEl = null; }
+  if (_undoToastTimer) { clearTimeout(_undoToastTimer); _undoToastTimer = null; }
+
+  const el = document.createElement('div');
+  el.className = 'undo-toast';
+  el.innerHTML = `
+    <span class="undo-toast-msg">${esc(msg)}</span>
+    <button class="undo-toast-btn" type="button">↩️ Deshacer</button>
+    <div class="undo-toast-bar"></div>
+  `;
+  document.body.appendChild(el);
+  _undoToastEl = el;
+  requestAnimationFrame(() => el.classList.add('show'));
+
+  el.querySelector('.undo-toast-btn').addEventListener('click', () => {
+    if (_undoToastTimer) clearTimeout(_undoToastTimer);
+    el.classList.remove('show');
+    setTimeout(() => { el.remove(); if (_undoToastEl === el) _undoToastEl = null; }, 320);
+    if (onUndo) onUndo();
+  });
+
+  _undoToastTimer = setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => { el.remove(); if (_undoToastEl === el) _undoToastEl = null; }, 320);
+  }, duration);
 }
 
 // ══════════════════════════════════════════
@@ -1538,10 +1797,15 @@ function deleteMov() {
 // ══════════════════════════════════════════
 
 async function loadCierre() {
+  const myToken = _dateToken;
   try {
     const doc = await db.collection('caja_cierres').doc(currentDate).get();
+    if (myToken !== _dateToken) return; // BUG-FIX: fecha cambió mientras esperábamos
     CIERRE = doc.exists ? doc.data() : null;
-  } catch(e) { CIERRE = null; }
+  } catch(e) {
+    if (myToken !== _dateToken) return;
+    CIERRE = null;
+  }
   renderCierreStatus();
 }
 
@@ -1721,6 +1985,31 @@ async function saveCierre() {
     contado += cant * d;
   });
   const diferencia = contado - esperado;
+
+  // BUG-FIX: confirmación si hay diferencia grande
+  if (Math.abs(diferencia) > 500) {
+    const signo = diferencia > 0 ? 'sobra' : 'falta';
+    const ok = confirm(
+      `⚠️ Diferencia importante en el cierre\n\n` +
+      `Esperado: $${esperado.toLocaleString('es-AR')}\n` +
+      `Contado:  $${contado.toLocaleString('es-AR')}\n` +
+      `${signo === 'sobra' ? 'Sobran' : 'Faltan'}: $${Math.abs(diferencia).toLocaleString('es-AR')}\n\n` +
+      `¿Estás seguro de querer cerrar con esta diferencia?`
+    );
+    if (!ok) return;
+  }
+
+  // BUG-FIX: si ya hay un cierre del día, confirmar antes de sobreescribir
+  if (CIERRE) {
+    const ok = confirm(
+      `⚠️ Ya hay un cierre registrado para hoy:\n` +
+      `   Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}\n` +
+      `   Diferencia: $${(CIERRE.diferencia || 0).toLocaleString('es-AR')}\n\n` +
+      `¿Sobrescribir con el nuevo cierre?`
+    );
+    if (!ok) return;
+  }
+
   try {
     await db.collection('caja_cierres').doc(currentDate).set({
       fecha: currentDate, billetes, contado, esperado, diferencia,

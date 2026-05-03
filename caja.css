@@ -1,5 +1,101 @@
 /* caja.css — Premium Redesign · Warm accent · Inter font */
 
+/* ── COMPARATIVA "vs ayer" ──────────────────────────────── */
+.stat-vs-yest {
+  display:inline-block; margin-top:3px;
+  font-size:.7rem; font-weight:800;
+  padding:1px 7px; border-radius:8px;
+  letter-spacing:-.01em;
+}
+.stat-vs-yest.hidden { display:none; }
+.stat-vs-yest.vs-up   { background:rgba(16,185,129,.15); color:#059669; }
+.stat-vs-yest.vs-down { background:rgba(239,68,68,.15); color:#dc2626; }
+.stat-vs-yest.vs-eq   { background:rgba(150,150,150,.15); color:var(--t2); }
+
+/* ── BÚSQUEDA + FILTROS MOVIMIENTOS ─────────────────────── */
+.mov-search-wrap {
+  padding:8px 12px 6px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.mov-search-input-wrap {
+  position:relative; display:flex; align-items:center;
+  background:var(--card,#fff); border:1.5px solid var(--border,#e3e1de);
+  border-radius:14px; padding:0 12px;
+  transition:all 200ms;
+}
+.mov-search-input-wrap:focus-within { border-color:#C8965A; box-shadow:0 0 0 4px rgba(200,150,90,.1); }
+.mov-search-ico { font-size:.95rem; opacity:.6; flex-shrink:0; }
+#mov-search {
+  flex:1; padding:9px 10px;
+  border:none; background:transparent;
+  font-size:.92rem; color:var(--t1,#1a1a1a);
+  outline:none;
+}
+#mov-search::placeholder { color:var(--t3); }
+.mov-search-clear {
+  width:24px; height:24px; border-radius:50%;
+  background:rgba(0,0,0,.08); color:var(--t1);
+  border:none; cursor:pointer; font-size:.7rem; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.mov-search-clear.hidden { display:none; }
+.mov-filter-chips {
+  display:flex; gap:6px; overflow-x:auto;
+  padding-bottom:2px; -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.mov-filter-chips::-webkit-scrollbar { display:none; }
+.mov-fchip {
+  flex-shrink:0; padding:6px 12px;
+  background:var(--card,#fff); color:var(--t2,#666);
+  border:1.5px solid var(--border,#e3e1de);
+  border-radius:14px; font-size:.78rem; font-weight:700;
+  cursor:pointer; transition:all 150ms;
+}
+.mov-fchip:active { transform:scale(.95); }
+.mov-fchip.mov-fchip-active {
+  background:#C8965A; color:#fff; border-color:#C8965A;
+}
+body.dark .mov-search-input-wrap { background:#1c1c1e; border-color:rgba(255,255,255,.1); }
+body.dark .mov-search-clear { background:rgba(255,255,255,.1); color:#f2f2f7; }
+body.dark .mov-fchip { background:#1c1c1e; border-color:rgba(255,255,255,.1); color:#aaa; }
+body.dark .mov-fchip.mov-fchip-active { background:#C8965A; color:#fff; }
+
+/* ── UNDO TOAST ─────────────────────────────────────────── */
+.undo-toast {
+  position:fixed; bottom:max(80px, calc(env(safe-area-inset-bottom) + 80px));
+  left:50%; transform:translateX(-50%) translateY(120px);
+  background:#1a1a1a; color:#fff;
+  padding:14px 18px; border-radius:14px;
+  display:flex; align-items:center; gap:14px;
+  z-index:5000;
+  box-shadow:0 12px 40px rgba(0,0,0,.4);
+  opacity:0; transition:all 320ms cubic-bezier(.32,.72,0,1);
+  font-size:.92rem; font-weight:600;
+  min-width:280px; max-width:90vw;
+  overflow:hidden;
+}
+.undo-toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+.undo-toast-msg { flex:1; line-height:1.3; }
+.undo-toast-btn {
+  background:#10B981; color:#fff;
+  border:none; padding:8px 14px;
+  border-radius:10px; font-weight:800; font-size:.85rem;
+  cursor:pointer; flex-shrink:0;
+  transition:all 150ms;
+}
+.undo-toast-btn:active { background:#059669; transform:scale(.95); }
+.undo-toast-bar {
+  position:absolute; bottom:0; left:0; height:3px;
+  background:#10B981; width:100%;
+  transform-origin:left;
+  animation:undo-countdown 6s linear forwards;
+}
+@keyframes undo-countdown {
+  from { transform:scaleX(1); }
+  to   { transform:scaleX(0); }
+}
+
 /* ── BOTTOM SHEET (menú deslizante) ─────────────────────── */
 .sheet-overlay {
   position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1300;
