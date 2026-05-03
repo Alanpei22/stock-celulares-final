@@ -1308,82 +1308,152 @@
   </div>
 </div>
 
-<!-- ═══════════ MODAL CONTROL DE STOCK GUIADO ═══════════ -->
-<div id="stockwiz-modal" class="modal-overlay hidden">
-  <div class="modal-card stockwiz-card">
-    <div class="modal-header">
-      <h3>🧙 Control de stock</h3>
-      <button class="modal-close" onclick="closeStockWizard()">✕</button>
-    </div>
+<!-- ═══════════ CONTROL DE STOCK GUIADO ═══════════ -->
+<div id="stockwiz-modal" class="swz-overlay hidden">
+  <div class="swz-screen">
 
-    <!-- Paso 0: filtros antes de empezar -->
-    <div id="stockwiz-step-filter" class="stockwiz-body">
-      <p class="stockwiz-intro">Vamos a recorrer los repuestos uno por uno. Podés ajustar <b>cantidad</b>, <b>precio</b> y <b>calidad</b> de cada uno, u omitir.</p>
-      <div class="fi"><label>Tipo</label>
-        <select id="stockwiz-f-tipo"><option value="">Todos</option></select>
+    <!-- ── PASO 0: FILTROS ── -->
+    <div id="stockwiz-step-filter" class="swz-step">
+      <div class="swz-hdr">
+        <button class="swz-close" onclick="closeStockWizard()" aria-label="Cerrar">✕</button>
+        <div class="swz-hdr-title">🧙 Control de stock</div>
+        <div class="swz-hdr-spacer"></div>
       </div>
-      <div class="fi"><label>Marca</label>
-        <select id="stockwiz-f-marca"><option value="">Todas</option></select>
-      </div>
-      <div class="fi fi-checkbox">
-        <label><input type="checkbox" id="stockwiz-f-bajo"> Solo bajo stock</label>
-      </div>
-      <div class="fi fi-checkbox">
-        <label><input type="checkbox" id="stockwiz-f-sincalidad"> Solo sin calidad cargada</label>
-      </div>
-      <div id="stockwiz-count" class="stockwiz-count">— repuestos seleccionados</div>
-      <div class="stockwiz-btns">
-        <button class="btn-secondary" onclick="closeStockWizard()">Cancelar</button>
-        <button class="btn-primary" id="stockwiz-start-btn" onclick="_stockwizStart()">▶ Empezar</button>
-      </div>
-    </div>
+      <div class="swz-body">
+        <div class="swz-intro-card">
+          <div class="swz-intro-ico">📦</div>
+          <h3 class="swz-intro-title">¿Qué querés revisar?</h3>
+          <p class="swz-intro-sub">Te voy a mostrar los repuestos uno por uno. Ajustás cantidad, precio y calidad — o pasás al siguiente.</p>
+        </div>
 
-    <!-- Paso 1: wizard repuesto por repuesto -->
-    <div id="stockwiz-step-item" class="stockwiz-body hidden">
-      <div class="stockwiz-progress">
-        <div class="stockwiz-progress-bar"><div id="stockwiz-progress-fill"></div></div>
-        <span id="stockwiz-progress-txt">1 / 1</span>
-      </div>
+        <div class="swz-filter-group">
+          <label class="swz-label">Tipo</label>
+          <select id="stockwiz-f-tipo" class="swz-select"><option value="">Todos los tipos</option></select>
+        </div>
 
-      <div class="stockwiz-item-info">
-        <div id="stockwiz-item-nombre" class="stockwiz-item-nombre"></div>
-        <div id="stockwiz-item-meta" class="stockwiz-item-meta"></div>
-      </div>
+        <div class="swz-filter-group">
+          <label class="swz-label">Marca</label>
+          <select id="stockwiz-f-marca" class="swz-select"><option value="">Todas las marcas</option></select>
+        </div>
 
-      <div class="fi"><label>Cantidad <span class="stockwiz-current" id="stockwiz-cur-cant"></span></label>
-        <input type="number" id="stockwiz-fi-cant" inputmode="numeric" min="0">
-      </div>
-      <div class="fi"><label>Precio venta (ARS) <span class="stockwiz-current" id="stockwiz-cur-pv"></span></label>
-        <input type="number" id="stockwiz-fi-pv" inputmode="decimal" min="0" step="0.01">
-      </div>
-      <div class="fi"><label>Calidad <span class="stockwiz-current" id="stockwiz-cur-cal"></span></label>
-        <select id="stockwiz-fi-cal">
-          <option value="">— Sin especificar</option>
-          <option value="Original">Original</option>
-          <option value="AAA">AAA</option>
-          <option value="Compatible">Compatible</option>
-          <option value="OLED">OLED</option>
-          <option value="INCELL">INCELL</option>
-        </select>
-      </div>
+        <div class="swz-toggle-group">
+          <label class="swz-toggle">
+            <input type="checkbox" id="stockwiz-f-bajo">
+            <span class="swz-toggle-ui"></span>
+            <span class="swz-toggle-text">
+              <span class="swz-toggle-lbl">⚠️ Solo bajo stock</span>
+              <span class="swz-toggle-sub">Cantidad menor o igual al mínimo</span>
+            </span>
+          </label>
+          <label class="swz-toggle">
+            <input type="checkbox" id="stockwiz-f-sincalidad">
+            <span class="swz-toggle-ui"></span>
+            <span class="swz-toggle-text">
+              <span class="swz-toggle-lbl">🏷️ Solo sin calidad</span>
+              <span class="swz-toggle-sub">Repuestos sin calidad cargada</span>
+            </span>
+          </label>
+        </div>
 
-      <div class="stockwiz-btns">
-        <button class="btn-secondary" id="stockwiz-prev-btn" onclick="_stockwizPrev()">◀ Anterior</button>
-        <button class="btn-secondary" onclick="_stockwizSkip()">Omitir →</button>
-        <button class="btn-primary" onclick="_stockwizSaveNext()">💾 Guardar y siguiente</button>
+        <div id="stockwiz-count" class="swz-count">— repuestos</div>
       </div>
-      <div class="stockwiz-finish-row">
-        <button class="btn-link" onclick="_stockwizFinish()">Finalizar antes</button>
+      <div class="swz-footer">
+        <button class="swz-btn swz-btn-primary" id="stockwiz-start-btn" onclick="_stockwizStart()">▶ Empezar control</button>
       </div>
     </div>
 
-    <!-- Paso 2: resumen final -->
-    <div id="stockwiz-step-done" class="stockwiz-body hidden">
-      <div class="stockwiz-done-ico">✅</div>
-      <h4 class="stockwiz-done-title">¡Control completado!</h4>
-      <div id="stockwiz-done-stats" class="stockwiz-done-stats"></div>
-      <button class="btn-primary" onclick="closeStockWizard()" style="width:100%;margin-top:12px">Cerrar</button>
+    <!-- ── PASO 1: ITEM POR ITEM ── -->
+    <div id="stockwiz-step-item" class="swz-step hidden">
+      <div class="swz-hdr">
+        <button class="swz-close" onclick="_stockwizConfirmExit()" aria-label="Salir">✕</button>
+        <div class="swz-progress">
+          <div class="swz-progress-track"><div id="stockwiz-progress-fill" class="swz-progress-fill"></div></div>
+          <span id="stockwiz-progress-txt" class="swz-progress-txt">1 / 1</span>
+        </div>
+        <button class="swz-skip-top" onclick="_stockwizSkip()" title="Omitir este">⏭</button>
+      </div>
+
+      <div class="swz-body">
+        <!-- Card del repuesto -->
+        <div class="swz-item-card">
+          <div id="stockwiz-item-icon" class="swz-item-icon">🔧</div>
+          <div id="stockwiz-item-nombre" class="swz-item-nombre">—</div>
+          <div id="stockwiz-item-meta" class="swz-item-meta">—</div>
+          <div id="stockwiz-item-tags" class="swz-item-tags"></div>
+        </div>
+
+        <!-- Cantidad: stepper grande -->
+        <div class="swz-field" id="stockwiz-fld-cant">
+          <div class="swz-field-hdr">
+            <span class="swz-field-lbl">📦 Cantidad</span>
+            <span id="stockwiz-cur-cant" class="swz-field-cur"></span>
+          </div>
+          <div class="swz-stepper">
+            <button class="swz-step-btn" onclick="_stockwizStep('cant', -1)" type="button">−</button>
+            <input type="number" id="stockwiz-fi-cant" inputmode="numeric" min="0" class="swz-step-input">
+            <button class="swz-step-btn" onclick="_stockwizStep('cant', 1)" type="button">+</button>
+          </div>
+          <div class="swz-quick-row">
+            <button class="swz-chip" onclick="_stockwizStep('cant', 1)">+1</button>
+            <button class="swz-chip" onclick="_stockwizStep('cant', 5)">+5</button>
+            <button class="swz-chip" onclick="_stockwizStep('cant', 10)">+10</button>
+            <button class="swz-chip swz-chip-danger" onclick="_stockwizSetCant(0)">0</button>
+          </div>
+        </div>
+
+        <!-- Precio: input grande con $ -->
+        <div class="swz-field" id="stockwiz-fld-pv">
+          <div class="swz-field-hdr">
+            <span class="swz-field-lbl">💵 Precio venta</span>
+            <span id="stockwiz-cur-pv" class="swz-field-cur"></span>
+          </div>
+          <div class="swz-money-input">
+            <span class="swz-money-prefix">$</span>
+            <input type="number" id="stockwiz-fi-pv" inputmode="decimal" min="0" step="0.01" class="swz-money-field" placeholder="0">
+          </div>
+        </div>
+
+        <!-- Calidad: chips -->
+        <div class="swz-field" id="stockwiz-fld-cal">
+          <div class="swz-field-hdr">
+            <span class="swz-field-lbl">⭐ Calidad</span>
+            <span id="stockwiz-cur-cal" class="swz-field-cur"></span>
+          </div>
+          <div class="swz-quality-grid" id="stockwiz-cal-grid">
+            <button class="swz-q-chip" data-cal="" onclick="_stockwizSetCal('')">—</button>
+            <button class="swz-q-chip" data-cal="Original" onclick="_stockwizSetCal('Original')">Original</button>
+            <button class="swz-q-chip" data-cal="AAA" onclick="_stockwizSetCal('AAA')">AAA</button>
+            <button class="swz-q-chip" data-cal="Compatible" onclick="_stockwizSetCal('Compatible')">Compatible</button>
+            <button class="swz-q-chip" data-cal="OLED" onclick="_stockwizSetCal('OLED')">OLED</button>
+            <button class="swz-q-chip" data-cal="INCELL" onclick="_stockwizSetCal('INCELL')">INCELL</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="swz-footer swz-footer-actions">
+        <button class="swz-btn swz-btn-back" id="stockwiz-prev-btn" onclick="_stockwizPrev()" title="Anterior">◀</button>
+        <button class="swz-btn swz-btn-skip" onclick="_stockwizSkip()">Omitir</button>
+        <button class="swz-btn swz-btn-primary swz-btn-save" onclick="_stockwizSaveNext()">💾 Guardar</button>
+      </div>
     </div>
+
+    <!-- ── PASO 2: RESUMEN FINAL ── -->
+    <div id="stockwiz-step-done" class="swz-step hidden">
+      <div class="swz-hdr">
+        <div class="swz-hdr-spacer"></div>
+        <div class="swz-hdr-title">✅ Listo</div>
+        <button class="swz-close" onclick="closeStockWizard()" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="swz-body swz-done-body">
+        <div class="swz-done-ico">🎉</div>
+        <h3 class="swz-done-title">¡Control completado!</h3>
+        <div id="stockwiz-done-stats" class="swz-done-stats"></div>
+      </div>
+      <div class="swz-footer">
+        <button class="swz-btn swz-btn-primary" onclick="closeStockWizard()">Cerrar</button>
+      </div>
+    </div>
+
   </div>
 </div>
 

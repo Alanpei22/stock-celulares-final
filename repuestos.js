@@ -491,20 +491,26 @@ function deleteRepuesto(id) {
 }
 
 // ══════════════════════════════════════════
-//  CONTROL DE STOCK GUIADO (WIZARD)
+//  CONTROL DE STOCK GUIADO (WIZARD v2)
 // ══════════════════════════════════════════
 
 const STOCKWIZ_TIPOS = ['Pantalla','Batería','Conector','Flex','Táctil','Cámara','Parlante','Micrófono','Marco','Otro'];
 
+const STOCKWIZ_ICONS = {
+  'Pantalla':'📱','Batería':'🔋','Conector':'🔌','Flex':'🔗',
+  'Táctil':'👆','Cámara':'📷','Parlante':'🔊','Micrófono':'🎤',
+  'Marco':'🖼️','Otro':'🔧'
+};
+
 let _stockwizList = [];
 let _stockwizIdx  = 0;
 let _stockwizStats = { actualizados: 0, omitidos: 0 };
+let _stockwizKbHandler = null;
 
 function openStockWizard() {
   // Llenar selects de filtro
   const tSel = document.getElementById('stockwiz-f-tipo');
   const mSel = document.getElementById('stockwiz-f-marca');
-  // limpiar opciones (excepto la primera)
   while (tSel.options.length > 1) tSel.remove(1);
   while (mSel.options.length > 1) mSel.remove(1);
   STOCKWIZ_TIPOS.forEach(t => {
@@ -517,7 +523,7 @@ function openStockWizard() {
     o.value = m; o.textContent = m; mSel.appendChild(o);
   });
 
-  // Reset filtros
+  // Reset
   tSel.value = ''; mSel.value = '';
   document.getElementById('stockwiz-f-bajo').checked = false;
   document.getElementById('stockwiz-f-sincalidad').checked = false;
@@ -530,7 +536,7 @@ function openStockWizard() {
   document.getElementById('stockwiz-step-done').classList.add('hidden');
   document.getElementById('stockwiz-modal').classList.remove('hidden');
 
-  // Listeners para actualizar el contador en vivo
+  // Listeners para contador en vivo
   ['stockwiz-f-tipo','stockwiz-f-marca','stockwiz-f-bajo','stockwiz-f-sincalidad'].forEach(id => {
     const el = document.getElementById(id);
     if (el && !el._wizListener) {
@@ -539,10 +545,36 @@ function openStockWizard() {
     }
   });
   _stockwizUpdateCount();
+
+  // Atajos de teclado
+  if (!_stockwizKbHandler) {
+    _stockwizKbHandler = e => {
+      if (document.getElementById('stockwiz-modal')?.classList.contains('hidden')) return;
+      if (e.key === 'Escape') { closeStockWizard(); return; }
+      if (!document.getElementById('stockwiz-step-item')?.classList.contains('hidden')) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _stockwizSaveNext(); }
+        else if (e.key === 'ArrowRight' && e.altKey) { e.preventDefault(); _stockwizSkip(); }
+        else if (e.key === 'ArrowLeft'  && e.altKey) { e.preventDefault(); _stockwizPrev(); }
+      }
+    };
+    document.addEventListener('keydown', _stockwizKbHandler);
+  }
 }
 
 function closeStockWizard() {
   document.getElementById('stockwiz-modal').classList.add('hidden');
+  if (_stockwizKbHandler) {
+    document.removeEventListener('keydown', _stockwizKbHandler);
+    _stockwizKbHandler = null;
+  }
+}
+
+function _stockwizConfirmExit() {
+  const restantes = _stockwizList.length - _stockwizIdx;
+  if (_stockwizStats.actualizados > 0 && restantes > 0) {
+    if (!confirm(`Te quedan ${restantes} repuestos por revisar. ¿Salir igual?`)) return;
+  }
+  closeStockWizard();
 }
 
 function _stockwizFilterList() {
@@ -567,13 +599,15 @@ function _stockwizUpdateCount() {
   const list = _stockwizFilterList();
   const el = document.getElementById('stockwiz-count');
   const btn = document.getElementById('stockwiz-start-btn');
-  if (el) el.textContent = `${list.length} repuesto${list.length !== 1 ? 's' : ''} ${list.length === 1 ? 'seleccionado' : 'seleccionados'}`;
+  if (el) el.textContent = list.length === 0
+    ? 'Ningún repuesto coincide'
+    : `${list.length} repuesto${list.length !== 1 ? 's' : ''} para revisar`;
   if (btn) btn.disabled = list.length === 0;
 }
 
 function _stockwizStart() {
   _stockwizList = _stockwizFilterList();
-  if (!_stockwizList.length) { toast('No hay repuestos que coincidan con el filtro', 'info'); return; }
+  if (!_stockwizList.length) { toast('No hay repuestos que coincidan', 'info'); return; }
   _stockwizIdx = 0;
   _stockwizStats = { actualizados: 0, omitidos: 0 };
   document.getElementById('stockwiz-step-filter').classList.add('hidden');
@@ -588,29 +622,94 @@ function _stockwizRender() {
   const num = _stockwizIdx + 1;
 
   // Progreso
-  document.getElementById('stockwiz-progress-fill').style.width = ((num - 1) / total * 100) + '%';
+  document.getElementById('stockwiz-progress-fill').style.width = (num / total * 100) + '%';
   document.getElementById('stockwiz-progress-txt').textContent = `${num} / ${total}`;
 
   // Info repuesto
+  document.getElementById('stockwiz-item-icon').textContent = STOCKWIZ_ICONS[r.tipo] || '🔧';
   document.getElementById('stockwiz-item-nombre').textContent = r.nombre || '(sin nombre)';
   const meta = [r.tipo, r.marca, r.modelo].filter(Boolean).join(' · ');
   document.getElementById('stockwiz-item-meta').textContent = meta || '—';
 
-  // Valores actuales (mostrar como hint)
-  document.getElementById('stockwiz-cur-cant').textContent = `(actual: ${Number(r.cantidad) || 0})`;
-  document.getElementById('stockwiz-cur-pv').textContent   = `(actual: $${Number(r.precioVenta || 0).toLocaleString('es-AR')})`;
-  document.getElementById('stockwiz-cur-cal').textContent  = `(actual: ${r.calidad || '—'})`;
+  // Tags (info adicional: stock bajo, sin precio, etc)
+  const tags = [];
+  const cant = Number(r.cantidad) || 0;
+  const sm   = Number(r.stockMin) || 0;
+  if (sm > 0 && cant <= sm) tags.push(`<span class="swz-tag swz-tag-bajo">⚠️ Bajo stock (mín ${sm})</span>`);
+  if (cant === 0)           tags.push(`<span class="swz-tag swz-tag-bajo">Sin stock</span>`);
+  if (cant > sm && cant > 0) tags.push(`<span class="swz-tag swz-tag-stock">${cant} u.</span>`);
+  document.getElementById('stockwiz-item-tags').innerHTML = tags.join('');
 
-  // Pre-cargar inputs con valores actuales (más cómodo: solo cambia lo que quiere)
-  document.getElementById('stockwiz-fi-cant').value = Number(r.cantidad) || 0;
-  document.getElementById('stockwiz-fi-pv').value   = Number(r.precioVenta) || 0;
-  document.getElementById('stockwiz-fi-cal').value  = r.calidad || '';
+  // Valores actuales
+  document.getElementById('stockwiz-cur-cant').textContent = `Actual: ${cant}`;
+  document.getElementById('stockwiz-cur-pv').textContent   = `Actual: $${Number(r.precioVenta || 0).toLocaleString('es-AR')}`;
+  document.getElementById('stockwiz-cur-cal').textContent  = `Actual: ${r.calidad || '—'}`;
 
-  // Botón anterior deshabilitado en el primero
+  // Pre-cargar inputs
+  const cantInput = document.getElementById('stockwiz-fi-cant');
+  const pvInput   = document.getElementById('stockwiz-fi-pv');
+  cantInput.value = cant;
+  pvInput.value   = Number(r.precioVenta) || 0;
+
+  // Marcar chip de calidad activo
+  document.querySelectorAll('#stockwiz-cal-grid .swz-q-chip').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.cal === (r.calidad || ''));
+  });
+
+  // Quitar marcas de "campo cambiado"
+  ['stockwiz-fld-cant','stockwiz-fld-pv','stockwiz-fld-cal'].forEach(id => {
+    document.getElementById(id)?.classList.remove('swz-field-changed');
+  });
+
+  // Listeners para detectar cambios y marcar
+  cantInput.oninput = () => {
+    const v = parseInt(cantInput.value);
+    document.getElementById('stockwiz-fld-cant').classList.toggle('swz-field-changed',
+      !isNaN(v) && v !== (Number(r.cantidad) || 0));
+  };
+  pvInput.oninput = () => {
+    const v = parseFloat(pvInput.value);
+    document.getElementById('stockwiz-fld-pv').classList.toggle('swz-field-changed',
+      !isNaN(v) && v !== (Number(r.precioVenta) || 0));
+  };
+
+  // Botón anterior
   document.getElementById('stockwiz-prev-btn').disabled = (_stockwizIdx === 0);
 
-  // Foco en cantidad
-  setTimeout(() => document.getElementById('stockwiz-fi-cant')?.select?.(), 80);
+  // Scroll al inicio
+  document.querySelector('#stockwiz-step-item .swz-body')?.scrollTo(0, 0);
+}
+
+function _stockwizStep(field, delta) {
+  if (field === 'cant') {
+    const inp = document.getElementById('stockwiz-fi-cant');
+    const cur = parseInt(inp.value) || 0;
+    inp.value = Math.max(0, cur + delta);
+    inp.dispatchEvent(new Event('input'));
+  }
+}
+
+function _stockwizSetCant(val) {
+  const inp = document.getElementById('stockwiz-fi-cant');
+  inp.value = val;
+  inp.dispatchEvent(new Event('input'));
+}
+
+function _stockwizSetCal(cal) {
+  document.querySelectorAll('#stockwiz-cal-grid .swz-q-chip').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.cal === cal);
+  });
+  // Marcar campo como cambiado si difiere del actual
+  const r = _stockwizList[_stockwizIdx];
+  if (r) {
+    document.getElementById('stockwiz-fld-cal').classList.toggle('swz-field-changed',
+      cal !== (r.calidad || ''));
+  }
+}
+
+function _stockwizGetCal() {
+  const active = document.querySelector('#stockwiz-cal-grid .swz-q-chip.active');
+  return active ? active.dataset.cal : '';
 }
 
 function _stockwizPrev() {
@@ -629,16 +728,14 @@ async function _stockwizSaveNext() {
 
   const cant = parseInt(document.getElementById('stockwiz-fi-cant').value);
   const pv   = parseFloat(document.getElementById('stockwiz-fi-pv').value);
-  const cal  = document.getElementById('stockwiz-fi-cal').value;
+  const cal  = _stockwizGetCal();
 
-  // Solo guardar campos que el usuario modificó (vs valor actual)
   const update = {};
   if (!isNaN(cant) && cant !== (Number(r.cantidad) || 0)) update.cantidad = cant;
   if (!isNaN(pv)   && pv   !== (Number(r.precioVenta) || 0)) update.precioVenta = pv;
   if (cal !== (r.calidad || '')) update.calidad = cal;
 
   if (Object.keys(update).length === 0) {
-    // Nada cambió → contar como omitido
     _stockwizStats.omitidos++;
     _stockwizIdx++;
     _stockwizRender();
@@ -647,14 +744,13 @@ async function _stockwizSaveNext() {
 
   try {
     await db.collection('repuestos').doc(r.id).set(update, { merge: true });
-    // Actualizar copia local para que si vuelve atrás vea el nuevo valor
     Object.assign(r, update);
     _stockwizStats.actualizados++;
     _stockwizIdx++;
     _stockwizRender();
   } catch (e) {
     console.error('stockwiz save:', e);
-    toast('Error al guardar — intentá de nuevo', 'error');
+    toast('Error al guardar', 'error');
   }
 }
 
@@ -665,10 +761,22 @@ function _stockwizFinish() {
   const total = _stockwizList.length;
   const restantes = Math.max(0, total - _stockwizIdx);
   document.getElementById('stockwiz-done-stats').innerHTML = `
-    ✏️ Actualizados: <b>${stats.actualizados}</b><br>
-    ⏭ Omitidos: <b>${stats.omitidos}</b><br>
-    📦 Sin revisar: <b>${restantes}</b><br>
-    📊 Total: <b>${total}</b>
+    <div class="swz-done-stat">
+      <span class="swz-done-stat-lbl">✏️ Actualizados</span>
+      <span class="swz-done-stat-val swz-good">${stats.actualizados}</span>
+    </div>
+    <div class="swz-done-stat">
+      <span class="swz-done-stat-lbl">⏭ Omitidos</span>
+      <span class="swz-done-stat-val">${stats.omitidos}</span>
+    </div>
+    <div class="swz-done-stat">
+      <span class="swz-done-stat-lbl">📦 Sin revisar</span>
+      <span class="swz-done-stat-val">${restantes}</span>
+    </div>
+    <div class="swz-done-stat">
+      <span class="swz-done-stat-lbl">📊 Total recorrido</span>
+      <span class="swz-done-stat-val">${stats.actualizados + stats.omitidos} / ${total}</span>
+    </div>
   `;
 }
 
