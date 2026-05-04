@@ -55,7 +55,7 @@ export default async function handler(req, res) {
         pushKey: 'cierrePendiente',
         title: '⏰ Cierre de caja pendiente',
         body: 'Pasaron las 19:30 y todavía no cerraste la caja del día.',
-        url: '/caja.html',
+        url: '/caja.html?action=cierre',
         requireInteraction: true,
       }),
     });

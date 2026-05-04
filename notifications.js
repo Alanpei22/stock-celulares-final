@@ -174,7 +174,7 @@ async function _checkCierrePendiente() {
     icon: '⏰',
     title: 'Cierre pendiente',
     msg: `Son las ${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')} y todavía no cerraste la caja del día.`,
-    cta: { label: 'Cerrar caja ahora', href: 'caja.html' },
+    cta: { label: 'Cerrar caja ahora', href: 'caja.html?action=cierre' },
   };
 }
 

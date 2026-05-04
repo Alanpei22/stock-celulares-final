@@ -114,6 +114,9 @@ function initApp() {
   ensureDolar(db);                 // ← cotización para calcular costo en pesos
   if (typeof initInventario === 'function') initInventario();
 
+  // ── URL action handler (?action=cierre desde notifs/banners) ──
+  _handleUrlAction();
+
   // ── Notifications boot (Fase 1) ──
   if (typeof loadNotifConfig === 'function') {
     loadNotifConfig().then(() => {
@@ -147,6 +150,34 @@ function initApp() {
 
   // MED-01: refresh automático cuando el reloj pasa medianoche
   _scheduleMedianoche();
+}
+
+// Maneja URL params como ?action=cierre, ?action=arqueo, etc.
+// Disparado desde notificaciones push y banners.
+function _handleUrlAction() {
+  try {
+    const params = new URLSearchParams(location.search);
+    const action = params.get('action');
+    if (!action) return;
+    // Limpiar el param de la URL (sin recargar)
+    params.delete('action');
+    const newSearch = params.toString();
+    history.replaceState({}, '', location.pathname + (newSearch ? '?' + newSearch : ''));
+    // Esperar a que arqueo/cierre cargue antes de abrir el modal
+    const tryAct = (retry = 0) => {
+      if (action === 'cierre') {
+        if (typeof openCierreModal === 'function') openCierreModal();
+        else if (retry < 10) setTimeout(() => tryAct(retry + 1), 300);
+      } else if (action === 'arqueo') {
+        if (typeof reopenArqueo === 'function') reopenArqueo();
+        else if (retry < 10) setTimeout(() => tryAct(retry + 1), 300);
+      } else if (action === 'reporte') {
+        if (typeof openReporteModal === 'function') openReporteModal();
+        else if (retry < 10) setTimeout(() => tryAct(retry + 1), 300);
+      }
+    };
+    setTimeout(() => tryAct(0), 600);
+  } catch (e) { console.error('handleUrlAction:', e); }
 }
 
 // BUG-FIX: detectar cambio de día cuando la PWA vuelve a primer plano
