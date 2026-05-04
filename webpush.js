@@ -8,7 +8,7 @@
 // VAPID PUBLIC KEY: se inyecta en build/runtime.
 // Para empezar, queda hardcodeada acá. La privada vive solo en Vercel (env var).
 // Para generar las claves: `npx web-push generate-vapid-keys`
-const VAPID_PUBLIC_KEY = window.VAPID_PUBLIC_KEY || ''; // TODO: pegar la public key acá o setear window.VAPID_PUBLIC_KEY antes
+const VAPID_PUBLIC_KEY = 'BFagfRF0p-1d8Dhs6UxsbA7_AMEDFFaahbZiDwwwNhJkav_eF3Gs9jv2ciC0j37ipMRlXbieBbaArwtbqszbwW4';
 
 function _urlB64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
