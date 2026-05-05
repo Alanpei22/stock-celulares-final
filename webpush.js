@@ -155,52 +155,100 @@ async function sendTestPush() {
 // ══════════════════════════════════════════
 
 let _crossDeviceListener = null;
-let _crossDeviceLastSeen = null;
+let _crossDeviceListenerRepairs = null;
+let _crossDeviceStartTs = null;
 
 function startCrossDeviceListener() {
-  if (_crossDeviceListener) return;
   if (typeof db === 'undefined' || !db) return;
-  if (Notification.permission !== 'granted') return;
+  // El popup in-page funciona siempre (no requiere permiso de push).
+  // El push del SO solo se envía si Notification.permission === 'granted'.
 
-  // Snapshot de los últimos movimientos creados HOY, para detectar nuevos
+  _crossDeviceStartTs = new Date().toISOString();
   const today = new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
-  _crossDeviceLastSeen = new Date().toISOString();
 
-  _crossDeviceListener = db.collection('caja_movimientos')
-    .where('fecha', '==', today)
-    .where('createdAt', '>', _crossDeviceLastSeen)
-    .onSnapshot(snap => {
-      const cfg = (typeof getNotifConfig === 'function') ? getNotifConfig() : null;
-      if (!cfg) return;
-      snap.docChanges().forEach(change => {
-        if (change.type !== 'added') return;
-        const m = change.doc.data();
-        // No notificar nuestros propios movimientos
-        if (m._sourceDevice === getDeviceId()) return;
-        const monto = Number(m.monto) || 0;
+  // ── 1) Movimientos del día (cobros + señas) ──
+  if (!_crossDeviceListener) {
+    _crossDeviceListener = db.collection('caja_movimientos')
+      .where('fecha', '==', today)
+      .where('createdAt', '>', _crossDeviceStartTs)
+      .onSnapshot(snap => {
+        const cfg = (typeof getNotifConfig === 'function') ? getNotifConfig() : null;
+        snap.docChanges().forEach(change => {
+          if (change.type !== 'added') return;
+          const m = change.doc.data();
+          // No notificar nuestros propios movimientos
+          if (m._sourceDevice === getDeviceId()) return;
+          const monto = Number(m.monto) || 0;
+          const montoStr = '$' + monto.toLocaleString('es-AR');
 
-        // Cobro remoto (ingreso de otro)
-        if (m.tipo === 'ingreso' && cfg.push.cobrosRemotos) {
-          _showLocalNotif({
-            title: `💰 Cobro registrado en otro dispositivo`,
-            body: `${m.categoria || 'Movimiento'} · $${monto.toLocaleString('es-AR')}${m.descripcion ? ' — ' + m.descripcion : ''}`,
-            tag: 'cobro-' + change.doc.id,
-          });
-        }
-        // Seña nueva
-        if (m.esSena && cfg.push.senasNuevas) {
-          _showLocalNotif({
-            title: `🪙 Nueva seña`,
-            body: `Reparación N°${m.repairNOrden || '?'} · $${monto.toLocaleString('es-AR')}`,
-            tag: 'sena-' + change.doc.id,
-          });
-        }
-      });
-    }, err => console.error('[push] cross-device:', err));
+          // ── COBRO (ingreso) ──
+          if (m.tipo === 'ingreso') {
+            const titulo = m.esSena ? '🪙 Nueva seña' : '💰 Cobro recibido';
+            const bodyParts = [];
+            if (m.categoria) bodyParts.push(m.categoria);
+            if (m.descripcion) bodyParts.push(m.descripcion);
+            else if (m.itemNombre) bodyParts.push(m.itemNombre);
+            else if (m.repairNOrden) bodyParts.push(`Reparación N°${m.repairNOrden}`);
+            const body = `${montoStr} · ${m.metodoPago || 'Efectivo'}\n${bodyParts.join(' · ')}${m.vendedor ? '\nVendedor: ' + m.vendedor : ''}`;
+
+            // Popup in-page (siempre)
+            if (typeof showLivePopup === 'function') {
+              showLivePopup({
+                icon: m.esSena ? '🪙' : '💰',
+                title: titulo,
+                body,
+                duration: 30000,
+                tag: 'cobro-' + change.doc.id,
+                onClick: () => location.href = 'caja.html',
+              });
+            }
+            // Push del SO (solo si está activado)
+            if (cfg && Notification.permission === 'granted') {
+              if (m.esSena && cfg.push.senasNuevas) {
+                _showLocalNotif({ title: titulo, body, tag: 'sena-' + change.doc.id });
+              } else if (!m.esSena && cfg.push.cobrosRemotos) {
+                _showLocalNotif({ title: titulo, body, tag: 'cobro-' + change.doc.id });
+              }
+            }
+          }
+        });
+      }, err => console.error('[live] mov listener:', err));
+  }
+
+  // ── 2) Reparaciones nuevas ──
+  if (!_crossDeviceListenerRepairs) {
+    _crossDeviceListenerRepairs = db.collection('repairs')
+      .where('fechaIngreso', '>', _crossDeviceStartTs)
+      .onSnapshot(snap => {
+        snap.docChanges().forEach(change => {
+          if (change.type !== 'added') return;
+          const r = change.doc.data();
+          if (r._sourceDevice === getDeviceId()) return;
+          const titulo = '🔧 Nueva reparación';
+          const bodyParts = [];
+          if (r.nOrden) bodyParts.push('N°' + r.nOrden);
+          if (r.marca || r.modelo) bodyParts.push((r.marca || '') + ' ' + (r.modelo || '')).trim();
+          if (r.arreglo) bodyParts.push(r.arreglo);
+          const body = bodyParts.join(' · ') + (r.nombre ? '\nCliente: ' + r.nombre : '');
+
+          if (typeof showLivePopup === 'function') {
+            showLivePopup({
+              icon: '🔧',
+              title: titulo,
+              body,
+              duration: 30000,
+              tag: 'rep-' + change.doc.id,
+              onClick: () => location.href = 'index.html',
+            });
+          }
+        });
+      }, err => console.error('[live] repairs listener:', err));
+  }
 }
 
 function stopCrossDeviceListener() {
   if (_crossDeviceListener) { _crossDeviceListener(); _crossDeviceListener = null; }
+  if (_crossDeviceListenerRepairs) { _crossDeviceListenerRepairs(); _crossDeviceListenerRepairs = null; }
 }
 
 function _showLocalNotif({ title, body, tag, url }) {

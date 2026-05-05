@@ -820,6 +820,8 @@ async function saveRepair() {
         seguimientoAck: false
       };
       if (foto) newDoc.foto = foto;
+      // Tag con device para que el cross-device listener no nos notifique a nosotros mismos
+      if (typeof getDeviceId === 'function') newDoc._sourceDevice = getDeviceId();
       await db.collection('repairs').doc(id).set(newDoc);
       toast('Reparación N°' + nOrden + ' registrada', 'success');
       logActivity({

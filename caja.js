@@ -1699,7 +1699,11 @@ async function saveMov() {
       await db.collection('caja_movimientos').doc(editingMovId).update(data);
       toast('Movimiento actualizado', 'success');
     } else {
-      await db.collection('caja_movimientos').add({ ...data, createdAt: new Date().toISOString() });
+      await db.collection('caja_movimientos').add({
+        ...data,
+        createdAt: new Date().toISOString(),
+        _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
+      });
 
       let toastMsg = 'Movimiento registrado';
 

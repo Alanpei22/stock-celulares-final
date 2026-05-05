@@ -2493,6 +2493,77 @@ body.dark .sell-caja-toggle { background: #3A3A3C; }
 .det-close-footer:active { opacity: .7; }
 
 /* ══════════════════════════════════════════
+   LIVE POPUPS (esquina inferior derecha)
+   ══════════════════════════════════════════ */
+.live-popup-stack {
+  position:fixed;
+  bottom:max(16px, env(safe-area-inset-bottom));
+  right:16px;
+  z-index:5500;
+  display:flex; flex-direction:column; gap:10px;
+  pointer-events:none;
+  max-width:340px; width:calc(100vw - 32px);
+}
+@media (max-width:480px) {
+  .live-popup-stack { left:12px; right:12px; max-width:none; bottom:max(80px, env(safe-area-inset-bottom)); }
+}
+.live-popup {
+  background:var(--card,#fff);
+  border:1px solid var(--border,#e3e1de);
+  border-left:4px solid #10B981;
+  border-radius:14px;
+  padding:14px 36px 14px 14px;
+  display:flex; align-items:flex-start; gap:12px;
+  box-shadow:0 12px 40px rgba(0,0,0,.18);
+  pointer-events:auto;
+  position:relative;
+  overflow:hidden;
+  transform:translateX(420px); opacity:0;
+  transition:transform 380ms cubic-bezier(.32,.72,0,1), opacity 380ms;
+}
+.live-popup.show { transform:translateX(0); opacity:1; }
+.live-popup.dismiss { transform:translateX(420px); opacity:0; }
+.live-popup-icon {
+  font-size:1.6rem; flex-shrink:0; line-height:1.1;
+  width:36px; height:36px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(16,185,129,.12);
+}
+.live-popup-body { flex:1; min-width:0; }
+.live-popup-title {
+  font-weight:800; font-size:.95rem;
+  color:var(--t1,#1a1a1a); margin-bottom:3px;
+  line-height:1.25;
+}
+.live-popup-msg {
+  font-size:.82rem; color:var(--t2,#666);
+  line-height:1.4; white-space:pre-line;
+}
+.live-popup-close {
+  position:absolute; top:8px; right:8px;
+  width:24px; height:24px; border-radius:50%;
+  background:transparent; border:none;
+  color:var(--t3,#999); cursor:pointer;
+  font-size:.8rem; opacity:.6;
+  display:flex; align-items:center; justify-content:center;
+  transition:opacity 150ms;
+}
+.live-popup-close:hover { opacity:1; background:var(--bg1,#f3f3f3); }
+.live-popup-bar {
+  position:absolute; bottom:0; left:0; height:3px;
+  background:#10B981;
+  width:100%;
+  transform-origin:left;
+  animation:live-popup-countdown linear forwards;
+}
+@keyframes live-popup-countdown {
+  from { transform:scaleX(1); }
+  to   { transform:scaleX(0); }
+}
+body.dark .live-popup { background:#1c1c1e; border-color:rgba(255,255,255,.08); box-shadow:0 12px 40px rgba(0,0,0,.5); }
+body.dark .live-popup-icon { background:rgba(16,185,129,.18); }
+
+/* ══════════════════════════════════════════
    NOTIFICATION BANNERS (in-app)
    ══════════════════════════════════════════ */
 .notif-banners {

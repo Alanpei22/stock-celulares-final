@@ -464,5 +464,83 @@ function _suggestDeviceName() {
   return 'Mi dispositivo';
 }
 
+// ══════════════════════════════════════════
+//  LIVE POPUPS (esquina inferior derecha, 30s)
+//  Para cobros y reparaciones en tiempo real.
+// ══════════════════════════════════════════
+
+function _ensureLivePopupStack() {
+  let stack = document.getElementById('live-popup-stack');
+  if (!stack) {
+    stack = document.createElement('div');
+    stack.id = 'live-popup-stack';
+    stack.className = 'live-popup-stack';
+    document.body.appendChild(stack);
+  }
+  return stack;
+}
+
+/**
+ * Muestra un popup en la esquina inferior derecha durante N segundos.
+ * @param {Object} opts
+ * @param {string} opts.title — título principal
+ * @param {string} [opts.body] — texto descriptivo
+ * @param {string} [opts.icon] — emoji
+ * @param {string} [opts.color] — accent color (default: verde)
+ * @param {Function|string} [opts.onClick] — callback al click (o URL string)
+ * @param {number} [opts.duration=30000] — ms hasta auto-dismiss
+ * @param {string} [opts.tag] — para deduplicar; si ya existe uno con mismo tag, se reemplaza
+ */
+function showLivePopup(opts) {
+  const { title, body, icon, color, onClick, duration = 30000, tag } = opts || {};
+  if (!title) return;
+
+  const stack = _ensureLivePopupStack();
+  // Deduplicar por tag
+  if (tag) {
+    stack.querySelectorAll(`[data-tag="${CSS.escape(tag)}"]`).forEach(el => el.remove());
+  }
+
+  const el = document.createElement('div');
+  el.className = 'live-popup';
+  if (tag) el.dataset.tag = tag;
+  if (color) el.style.borderLeftColor = color;
+  el.innerHTML = `
+    <div class="live-popup-icon">${icon || '🔔'}</div>
+    <div class="live-popup-body">
+      <div class="live-popup-title">${esc(title)}</div>
+      ${body ? `<div class="live-popup-msg">${esc(body).replace(/\n/g, '<br>')}</div>` : ''}
+    </div>
+    <button class="live-popup-close" type="button" aria-label="Cerrar">✕</button>
+    <div class="live-popup-bar" style="animation-duration:${duration}ms"></div>
+  `;
+  el.querySelector('.live-popup-close').addEventListener('click', e => {
+    e.stopPropagation();
+    _dismissLivePopup(el);
+  });
+  if (onClick) {
+    const body = el.querySelector('.live-popup-body');
+    body.style.cursor = 'pointer';
+    body.addEventListener('click', () => {
+      if (typeof onClick === 'function') onClick();
+      else if (typeof onClick === 'string') location.href = onClick;
+      _dismissLivePopup(el);
+    });
+  }
+  stack.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+
+  const autoTimer = setTimeout(() => _dismissLivePopup(el), duration);
+  el._autoTimer = autoTimer;
+}
+
+function _dismissLivePopup(el) {
+  if (!el || !el.parentNode) return;
+  if (el._autoTimer) clearTimeout(el._autoTimer);
+  el.classList.remove('show');
+  el.classList.add('dismiss');
+  setTimeout(() => { try { el.remove(); } catch {} }, 380);
+}
+
 // Expose for debug
-window._notifDebug = { getNotifConfig, checkAllInAppAlerts, NOTIF_DEFAULTS };
+window._notifDebug = { getNotifConfig, checkAllInAppAlerts, NOTIF_DEFAULTS, showLivePopup };
