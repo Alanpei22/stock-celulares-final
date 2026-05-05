@@ -93,9 +93,45 @@ function _renderNotifConfig() {
   const devId = document.getElementById('ncfg-device-id');
   if (devId) devId.textContent = getDeviceId();
 
+  // ── Toggles de POPUPS (per-device, localStorage) ──
+  const popupCfg = (typeof getPopupConfig === 'function') ? getPopupConfig() : null;
+  if (popupCfg) {
+    document.querySelectorAll('[data-popup-key]').forEach(input => {
+      const key = input.getAttribute('data-popup-key');
+      input.checked = !!popupCfg[key];
+      input.onchange = () => {
+        if (typeof setPopupConfig === 'function') setPopupConfig(key, input.checked);
+        _updatePopupRowsEnabled();
+      };
+    });
+  }
+  _updatePopupRowsEnabled();
+
   _updatePushStatus();
   _updateRowsEnabled();
   _updateThresholdLabels();
+}
+
+function _updatePopupRowsEnabled() {
+  const popupCfg = (typeof getPopupConfig === 'function') ? getPopupConfig() : null;
+  if (!popupCfg) return;
+  document.querySelectorAll('[data-popup-deps="enabled"] .notifcfg-row').forEach(row => {
+    row.classList.toggle('disabled', !popupCfg.enabled);
+  });
+}
+
+function _testPopup() {
+  if (typeof showLivePopup !== 'function') {
+    if (typeof toast === 'function') toast('Popup no disponible', 'error');
+    return;
+  }
+  showLivePopup({
+    icon: '🧪',
+    title: 'Popup de prueba',
+    body: 'Si ves esto abajo a la derecha, los popups están activos en este dispositivo.\nDuración: 30 seg.',
+    duration: 30000,
+    tag: 'test-popup',
+  });
 }
 
 function _suggestDeviceNameFromUA() {

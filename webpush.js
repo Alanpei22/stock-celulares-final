@@ -191,8 +191,10 @@ function startCrossDeviceListener() {
             else if (m.repairNOrden) bodyParts.push(`Reparación N°${m.repairNOrden}`);
             const body = `${montoStr} · ${m.metodoPago || 'Efectivo'}\n${bodyParts.join(' · ')}${m.vendedor ? '\nVendedor: ' + m.vendedor : ''}`;
 
-            // Popup in-page (siempre)
-            if (typeof showLivePopup === 'function') {
+            // Popup in-page — respeta config por dispositivo
+            const popupCfg = (typeof getPopupConfig === 'function') ? getPopupConfig() : { enabled: true, cobros: true, senas: true };
+            const wantsPopup = popupCfg.enabled && (m.esSena ? popupCfg.senas : popupCfg.cobros);
+            if (wantsPopup && typeof showLivePopup === 'function') {
               showLivePopup({
                 icon: m.esSena ? '🪙' : '💰',
                 title: titulo,
@@ -231,7 +233,9 @@ function startCrossDeviceListener() {
           if (r.arreglo) bodyParts.push(r.arreglo);
           const body = bodyParts.join(' · ') + (r.nombre ? '\nCliente: ' + r.nombre : '');
 
-          if (typeof showLivePopup === 'function') {
+          // Popup in-page — respeta config por dispositivo
+          const popupCfg = (typeof getPopupConfig === 'function') ? getPopupConfig() : { enabled: true, reparaciones: true };
+          if (popupCfg.enabled && popupCfg.reparaciones && typeof showLivePopup === 'function') {
             showLivePopup({
               icon: '🔧',
               title: titulo,

@@ -465,6 +465,28 @@ function _suggestDeviceName() {
 }
 
 // ══════════════════════════════════════════
+//  POPUP CONFIG (por dispositivo, en localStorage)
+// ══════════════════════════════════════════
+const POPUP_DEFAULTS = { enabled: true, cobros: true, senas: true, reparaciones: true };
+
+function getPopupConfig() {
+  const get = (k, def) => {
+    const v = localStorage.getItem('popups.' + k);
+    if (v === null) return def;
+    return v === '1';
+  };
+  return {
+    enabled:      get('enabled',      POPUP_DEFAULTS.enabled),
+    cobros:       get('cobros',       POPUP_DEFAULTS.cobros),
+    senas:        get('senas',        POPUP_DEFAULTS.senas),
+    reparaciones: get('reparaciones', POPUP_DEFAULTS.reparaciones),
+  };
+}
+function setPopupConfig(key, val) {
+  localStorage.setItem('popups.' + key, val ? '1' : '0');
+}
+
+// ══════════════════════════════════════════
 //  LIVE POPUPS (esquina inferior derecha, 30s)
 //  Para cobros y reparaciones en tiempo real.
 // ══════════════════════════════════════════

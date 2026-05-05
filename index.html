@@ -1925,6 +1925,54 @@
         <button class="notifcfg-test" id="ncfg-test-push" onclick="_testPush()">🧪 Enviar push de prueba</button>
       </div>
 
+      <!-- ── Sección: POPUPS EN PANTALLA (por dispositivo) ── -->
+      <div class="notifcfg-section">
+        <div class="notifcfg-section-hdr">
+          <div class="notifcfg-section-icon">🟢</div>
+          <div>
+            <div class="notifcfg-section-title">Popups en pantalla</div>
+            <div class="notifcfg-section-sub">Aparecen abajo a la derecha por 30 seg cuando algo ocurre. <b>Configurá cada dispositivo desde su propio navegador.</b></div>
+          </div>
+        </div>
+
+        <div class="notifcfg-row notifcfg-master">
+          <div class="notifcfg-row-text">
+            <span class="notifcfg-row-lbl">Mostrar popups en este dispositivo</span>
+            <span class="notifcfg-row-sub">Master para activar/desactivar todos</span>
+          </div>
+          <label class="notifcfg-toggle">
+            <input type="checkbox" data-popup-key="enabled">
+            <span class="notifcfg-toggle-ui"></span>
+          </label>
+        </div>
+
+        <div class="notifcfg-sub-group" data-popup-deps="enabled">
+          <div class="notifcfg-row">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">💰 Cobros nuevos</span>
+              <span class="notifcfg-row-sub">Cuando se registra un ingreso desde otro dispositivo</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-popup-key="cobros"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">🪙 Señas de reparación</span>
+              <span class="notifcfg-row-sub">Cuando se cobra una seña desde otro dispositivo</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-popup-key="senas"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+          <div class="notifcfg-row">
+            <div class="notifcfg-row-text">
+              <span class="notifcfg-row-lbl">🔧 Nuevas reparaciones</span>
+              <span class="notifcfg-row-sub">Cuando alguien ingresa una reparación nueva</span>
+            </div>
+            <label class="notifcfg-toggle"><input type="checkbox" data-popup-key="reparaciones"><span class="notifcfg-toggle-ui"></span></label>
+          </div>
+        </div>
+
+        <button class="notifcfg-test" onclick="_testPopup()" style="background:#10B981">🧪 Mostrar popup de prueba</button>
+      </div>
+
       <!-- ── Sección 2: AVISOS IN-APP ── -->
       <div class="notifcfg-section">
         <div class="notifcfg-section-hdr">
