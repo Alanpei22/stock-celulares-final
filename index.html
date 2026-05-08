@@ -1147,14 +1147,17 @@
 
 <!-- MODAL ESTADÍSTICAS REPARACIONES -->
 <div id="rep-stats-modal" class="modal-overlay hidden">
-  <div class="modal-card stats-card">
-    <div class="modal-header">
-      <h3>📊 Estadísticas de Reparaciones</h3>
+  <div class="modal-card stats-card rstats-card">
+    <div class="modal-header rstats-hdr">
+      <h3>📊 Reparaciones</h3>
       <button class="modal-close" id="rep-stats-close">✕</button>
     </div>
-    <div class="stats-tabs">
-      <button class="stats-tab stats-tab--active" id="stats-tab-mes" onclick="switchRepairStatsTab('mes')">Mensual</button>
-      <button class="stats-tab" id="stats-tab-anual" onclick="switchRepairStatsTab('anual')">Anual</button>
+    <div class="rstats-period-bar">
+      <button class="rstats-period rstats-period--active" data-period="mes"     onclick="switchRepairStatsTab('mes')">Este mes</button>
+      <button class="rstats-period" data-period="mes-1"   onclick="switchRepairStatsTab('mes-1')">Mes pasado</button>
+      <button class="rstats-period" data-period="ult-30"  onclick="switchRepairStatsTab('ult-30')">Últimos 30d</button>
+      <button class="rstats-period" data-period="ult-90"  onclick="switchRepairStatsTab('ult-90')">Últimos 90d</button>
+      <button class="rstats-period" data-period="anual"   onclick="switchRepairStatsTab('anual')">Año</button>
     </div>
     <div class="modal-body" id="rep-stats-body"></div>
   </div>

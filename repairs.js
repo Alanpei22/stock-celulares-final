@@ -1604,10 +1604,13 @@ function closeHistoryModal() {
 // ── Estadísticas ──────────────────────────
 let repStatsTab = 'mes';
 
+// ══════════════════════════════════════════
+//  ESTADÍSTICAS DE REPARACIONES — v2 redesign
+// ══════════════════════════════════════════
+
 function openRepairStats() {
   repStatsTab = 'mes';
-  document.getElementById('stats-tab-mes').classList.add('stats-tab--active');
-  document.getElementById('stats-tab-anual').classList.remove('stats-tab--active');
+  _renderStatsPeriodBar('mes');
   document.getElementById('rep-stats-body').innerHTML = buildRepairStatsHTML('mes');
   document.getElementById('rep-stats-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -1620,24 +1623,426 @@ function closeRepairStats() {
 
 function switchRepairStatsTab(tab) {
   repStatsTab = tab;
-  document.getElementById('stats-tab-mes').classList.toggle('stats-tab--active', tab === 'mes');
-  document.getElementById('stats-tab-anual').classList.toggle('stats-tab--active', tab === 'anual');
+  _renderStatsPeriodBar(tab);
   document.getElementById('rep-stats-body').innerHTML = buildRepairStatsHTML(tab);
+  document.getElementById('rep-stats-body').scrollTop = 0;
 }
 
-function buildRepairStatsHTML(tab) {
-  const now = new Date();
-  const thisYear  = now.getFullYear();
-  const thisMonth = thisYear + '-' + String(now.getMonth() + 1).padStart(2, '0');
+function _renderStatsPeriodBar(tab) {
+  document.querySelectorAll('.rstats-period').forEach(b => {
+    b.classList.toggle('rstats-period--active', b.dataset.period === tab);
+  });
+}
 
+// ── Helpers de período ──────────────────────
+function _periodRange(tab) {
+  const now = new Date();
+  const ms = 86400 * 1000;
+  let from, to, label, prevFrom, prevTo, prevLabel;
   if (tab === 'mes') {
-    return buildStatsMonthHTML(now, thisMonth);
-  } else {
-    return buildStatsAnnualHTML(now, thisYear, thisMonth);
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+    to   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    label = from.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    prevFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    prevTo   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    prevLabel = prevFrom.toLocaleDateString('es-AR', { month: 'long' });
+  } else if (tab === 'mes-1') {
+    from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    to   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    label = from.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    prevFrom = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    prevTo   = new Date(now.getFullYear(), now.getMonth() - 1, 0, 23, 59, 59);
+    prevLabel = prevFrom.toLocaleDateString('es-AR', { month: 'long' });
+  } else if (tab === 'ult-30') {
+    from = new Date(now.getTime() - 30 * ms);
+    to   = now;
+    label = 'Últimos 30 días';
+    prevFrom = new Date(now.getTime() - 60 * ms);
+    prevTo   = new Date(now.getTime() - 30 * ms);
+    prevLabel = '30 días previos';
+  } else if (tab === 'ult-90') {
+    from = new Date(now.getTime() - 90 * ms);
+    to   = now;
+    label = 'Últimos 90 días';
+    prevFrom = new Date(now.getTime() - 180 * ms);
+    prevTo   = new Date(now.getTime() - 90 * ms);
+    prevLabel = '90 días previos';
+  } else { // 'anual'
+    from = new Date(now.getFullYear(), 0, 1);
+    to   = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+    label = String(now.getFullYear());
+    prevFrom = new Date(now.getFullYear() - 1, 0, 1);
+    prevTo   = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
+    prevLabel = String(now.getFullYear() - 1);
+  }
+  return { from, to, label, prevFrom, prevTo, prevLabel };
+}
+
+function _calcStatsForPeriod(from, to) {
+  const fromTs = from.getTime();
+  const toTs   = to.getTime();
+  const reps = REPAIRS.filter(r => {
+    if (!r.fechaIngreso) return false;
+    const t = new Date(r.fechaIngreso).getTime();
+    return t >= fromTs && t <= toTs;
+  });
+  const ingresadas = reps.length;
+  const entregadas = reps.filter(r => r.estado === 'entregado');
+  const canceladas = reps.filter(r => r.estado === 'cancelado' || r.estado === 'no_van');
+  const reparando  = reps.filter(r => r.estado === 'reparando');
+  const listas     = reps.filter(r => r.estado === 'listo');
+  const noVan      = reps.filter(r => r.estado === 'no_van');
+
+  // Recaudado y ganancia: SOLO entregadas (el dinero entra cuando se entrega)
+  const recaudado  = entregadas.reduce((s, r) => s + (Number(r.monto) || 0), 0);
+  const conCosto   = entregadas.filter(r => r.costo > 0);
+  const ganancia   = conCosto.reduce((s, r) => s + (Number(r.monto) || 0) - (Number(r.costo) || 0), 0);
+  const senas      = reps.reduce((s, r) => s + (Number(r.sena) || 0), 0);
+  const ticketProm = entregadas.length > 0 ? Math.round(recaudado / entregadas.length) : 0;
+  const garantias  = reps.filter(r => r.esGarantia).length;
+
+  // Tiempos
+  const tEntregadas = entregadas.filter(r => r.fechaIngreso && r.fechaEntrega);
+  const tListas     = REPAIRS.filter(r => {
+    if (!r.fechaIngreso || !Array.isArray(r.estadoHistorial)) return false;
+    const t = new Date(r.fechaIngreso).getTime();
+    if (t < fromTs || t > toTs) return false;
+    return r.estadoHistorial.some(h => h.estado === 'listo');
+  });
+  const avgIngresoListo = tListas.length > 0
+    ? tListas.reduce((s, r) => {
+        const fListo = r.estadoHistorial.find(h => h.estado === 'listo')?.fecha;
+        return s + (fListo ? (new Date(fListo) - new Date(r.fechaIngreso)) / 86400000 : 0);
+      }, 0) / tListas.length
+    : 0;
+  const avgListoEntrega = tEntregadas.length > 0
+    ? tEntregadas.reduce((s, r) => {
+        const fListo = r.estadoHistorial?.find(h => h.estado === 'listo')?.fecha;
+        if (!fListo) return s;
+        return s + Math.max(0, (new Date(r.fechaEntrega) - new Date(fListo)) / 86400000);
+      }, 0) / tEntregadas.length
+    : 0;
+  const avgTotal = tEntregadas.length > 0
+    ? tEntregadas.reduce((s, r) => s + (new Date(r.fechaEntrega) - new Date(r.fechaIngreso)) / 86400000, 0) / tEntregadas.length
+    : 0;
+
+  // Tasas
+  const tasaEntrega    = ingresadas > 0 ? entregadas.length / ingresadas : 0;
+  const tasaCancel     = ingresadas > 0 ? canceladas.length / ingresadas : 0;
+
+  // Top marcas
+  const marcas = {};
+  reps.forEach(r => { if (r.marca) marcas[r.marca] = (marcas[r.marca] || 0) + 1; });
+  const topMarcas = Object.entries(marcas).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  // Top arreglos
+  const arreglos = {};
+  reps.forEach(r => { if (r.arreglo) arreglos[r.arreglo] = (arreglos[r.arreglo] || 0) + 1; });
+  const topArreglos = Object.entries(arreglos).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  // Top técnicos (por entregadas)
+  const tecnicos = {};
+  entregadas.forEach(r => {
+    const t = r.tecnico || '—';
+    if (!tecnicos[t]) tecnicos[t] = { count: 0, ingresos: 0, tiempos: [] };
+    tecnicos[t].count++;
+    tecnicos[t].ingresos += Number(r.monto) || 0;
+    if (r.fechaIngreso && r.fechaEntrega) {
+      tecnicos[t].tiempos.push((new Date(r.fechaEntrega) - new Date(r.fechaIngreso)) / 86400000);
+    }
+  });
+  const topTecnicos = Object.entries(tecnicos)
+    .map(([nombre, t]) => ({
+      nombre, count: t.count, ingresos: t.ingresos,
+      tiempoProm: t.tiempos.length > 0 ? t.tiempos.reduce((a,b)=>a+b,0)/t.tiempos.length : 0
+    }))
+    .sort((a, b) => b.count - a.count).slice(0, 5);
+
+  return {
+    ingresadas, entregadas: entregadas.length, canceladas: canceladas.length,
+    reparando: reparando.length, listas: listas.length, noVan: noVan.length,
+    recaudado, ganancia, senas, ticketProm, garantias,
+    avgIngresoListo, avgListoEntrega, avgTotal,
+    tasaEntrega, tasaCancel,
+    topMarcas, topArreglos, topTecnicos,
+    conCosto: conCosto.length,
+  };
+}
+
+function _delta(now, prev) {
+  if (!prev || prev === 0) return now > 0 ? { pct: null, sign: 'up', label: 'nuevo' } : { pct: 0, sign: 'eq', label: '—' };
+  const diff = ((now - prev) / Math.abs(prev)) * 100;
+  const pct = Math.round(diff);
+  return { pct, sign: pct > 0 ? 'up' : pct < 0 ? 'down' : 'eq', label: (pct > 0 ? '+' : '') + pct + '%' };
+}
+
+function _fmtDays(d) {
+  if (d <= 0) return '—';
+  if (d < 1) return Math.round(d * 24) + 'h';
+  return d < 10 ? d.toFixed(1) + ' días' : Math.round(d) + ' días';
+}
+
+function _fmtMoney(n) { return '$' + Math.round(n).toLocaleString('es-AR'); }
+
+function buildRepairStatsHTML(tab) {
+  const r = _periodRange(tab);
+  const cur  = _calcStatsForPeriod(r.from, r.to);
+  const prev = _calcStatsForPeriod(r.prevFrom, r.prevTo);
+
+  const dRecaudado = _delta(cur.recaudado, prev.recaudado);
+  const dIng = _delta(cur.ingresadas, prev.ingresadas);
+  const dEntr = _delta(cur.entregadas, prev.entregadas);
+
+  // ── HERO KPI ──
+  const heroHtml = `
+    <div class="rstats-hero">
+      <div class="rstats-hero-label">Recaudado · ${esc(r.label)}</div>
+      <div class="rstats-hero-num">${_fmtMoney(cur.recaudado)}</div>
+      <div class="rstats-hero-delta vs-${dRecaudado.sign}">
+        ${dRecaudado.sign === 'up' ? '▲' : dRecaudado.sign === 'down' ? '▼' : '='} ${dRecaudado.label} vs ${esc(r.prevLabel)}
+        <span class="rstats-hero-prev">(${_fmtMoney(prev.recaudado)})</span>
+      </div>
+      ${cur.ganancia > 0 ? `
+        <div class="rstats-hero-sub">
+          📈 Ganancia: <b>${_fmtMoney(cur.ganancia)}</b>
+          ${cur.recaudado > 0 ? `<span class="rstats-hero-pct">(${Math.round((cur.ganancia/cur.recaudado)*100)}% margen)</span>` : ''}
+          <small style="color:var(--t3);font-weight:400">— sobre ${cur.conCosto}/${cur.entregadas} con costo</small>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  // ── ESTADO ACTUAL DEL TALLER (no afectado por período) ──
+  const reparandoNow = REPAIRS.filter(r => r.estado === 'reparando').length;
+  const listoNow     = REPAIRS.filter(r => r.estado === 'listo').length;
+  const demoradosNow = REPAIRS.filter(r => {
+    if (r.estado !== 'reparando') return false;
+    const t = r.fechaIngreso ? (Date.now() - new Date(r.fechaIngreso)) / 86400000 : 0;
+    return t > 3;
+  }).length;
+
+  const estadoHtml = `
+    <h4 class="rstats-section-title">Estado actual del taller</h4>
+    <div class="rstats-status">
+      <button class="rstats-status-card" onclick="closeRepairStats();_filterRepairsByEstado('reparando')">
+        <div class="rstats-status-num">${reparandoNow}</div>
+        <div class="rstats-status-lbl">🔧 En reparación</div>
+      </button>
+      <button class="rstats-status-card rstats-status-card--ok" onclick="closeRepairStats();_filterRepairsByEstado('listo')">
+        <div class="rstats-status-num">${listoNow}</div>
+        <div class="rstats-status-lbl">✅ Listas</div>
+      </button>
+      <button class="rstats-status-card${demoradosNow > 0 ? ' rstats-status-card--warn' : ''}" onclick="closeRepairStats();_filterRepairsByEstado('demoradas')">
+        <div class="rstats-status-num">${demoradosNow}</div>
+        <div class="rstats-status-lbl">⚠️ Demoradas +3d</div>
+      </button>
+    </div>
+  `;
+
+  // ── EMBUDO DEL PERÍODO ──
+  const total = cur.ingresadas || 1;
+  const w = (n) => Math.max(2, Math.round((n / total) * 100));
+  const embudoHtml = cur.ingresadas > 0 ? `
+    <h4 class="rstats-section-title">Embudo del período</h4>
+    <div class="rstats-funnel">
+      <div class="rstats-funnel-row"><span class="rstats-funnel-lbl">📥 Ingresadas</span>
+        <div class="rstats-funnel-bar"><div class="rstats-funnel-fill" style="width:${w(cur.ingresadas)}%;background:#3b82f6"></div></div>
+        <span class="rstats-funnel-val">${cur.ingresadas}</span></div>
+      <div class="rstats-funnel-row"><span class="rstats-funnel-lbl">🔧 Reparando</span>
+        <div class="rstats-funnel-bar"><div class="rstats-funnel-fill" style="width:${w(cur.reparando)}%;background:#f59e0b"></div></div>
+        <span class="rstats-funnel-val">${cur.reparando}</span></div>
+      <div class="rstats-funnel-row"><span class="rstats-funnel-lbl">✅ Listas</span>
+        <div class="rstats-funnel-bar"><div class="rstats-funnel-fill" style="width:${w(cur.listas)}%;background:#06b6d4"></div></div>
+        <span class="rstats-funnel-val">${cur.listas}</span></div>
+      <div class="rstats-funnel-row"><span class="rstats-funnel-lbl">📦 Entregadas</span>
+        <div class="rstats-funnel-bar"><div class="rstats-funnel-fill" style="width:${w(cur.entregadas)}%;background:#10b981"></div></div>
+        <span class="rstats-funnel-val">${cur.entregadas}</span></div>
+      ${cur.canceladas > 0 ? `
+      <div class="rstats-funnel-row"><span class="rstats-funnel-lbl">❌ Canceladas</span>
+        <div class="rstats-funnel-bar"><div class="rstats-funnel-fill" style="width:${w(cur.canceladas)}%;background:#ef4444"></div></div>
+        <span class="rstats-funnel-val">${cur.canceladas}</span></div>` : ''}
+    </div>
+    <div class="rstats-rates">
+      <div class="rstats-rate"><span class="rstats-rate-lbl">Tasa de entrega</span><span class="rstats-rate-val">${Math.round(cur.tasaEntrega*100)}%</span></div>
+      <div class="rstats-rate"><span class="rstats-rate-lbl">Tasa de cancelación</span><span class="rstats-rate-val">${Math.round(cur.tasaCancel*100)}%</span></div>
+      <div class="rstats-rate"><span class="rstats-rate-lbl">Ticket promedio</span><span class="rstats-rate-val">${_fmtMoney(cur.ticketProm)}</span></div>
+    </div>
+  ` : '';
+
+  // ── KPI MINIS ──
+  const minisHtml = `
+    <h4 class="rstats-section-title">Resumen del período</h4>
+    <div class="rstats-mini-grid">
+      <div class="rstats-mini">
+        <div class="rstats-mini-num">${cur.ingresadas}</div>
+        <div class="rstats-mini-lbl">📥 Ingresadas</div>
+        <div class="rstats-mini-delta vs-${dIng.sign}">${dIng.label}</div>
+      </div>
+      <div class="rstats-mini">
+        <div class="rstats-mini-num">${cur.entregadas}</div>
+        <div class="rstats-mini-lbl">📦 Entregadas</div>
+        <div class="rstats-mini-delta vs-${dEntr.sign}">${dEntr.label}</div>
+      </div>
+      ${cur.senas > 0 ? `<div class="rstats-mini"><div class="rstats-mini-num">${_fmtMoney(cur.senas)}</div><div class="rstats-mini-lbl">🤝 Señas</div></div>` : ''}
+      ${cur.garantias > 0 ? `<div class="rstats-mini rstats-mini-warn"><div class="rstats-mini-num">${cur.garantias}</div><div class="rstats-mini-lbl">🛡️ Garantías</div></div>` : ''}
+    </div>
+  `;
+
+  // ── TIEMPOS PROMEDIO ──
+  const tiemposHtml = cur.entregadas > 0 ? `
+    <h4 class="rstats-section-title">Tiempos promedio</h4>
+    <div class="rstats-times">
+      <div class="rstats-time"><div class="rstats-time-num">${_fmtDays(cur.avgIngresoListo)}</div><div class="rstats-time-lbl">Ingreso → Listo</div><div class="rstats-time-sub">tiempo de taller</div></div>
+      <div class="rstats-time"><div class="rstats-time-num">${_fmtDays(cur.avgListoEntrega)}</div><div class="rstats-time-lbl">Listo → Entregado</div><div class="rstats-time-sub">demora del cliente</div></div>
+      <div class="rstats-time rstats-time-total"><div class="rstats-time-num">${_fmtDays(cur.avgTotal)}</div><div class="rstats-time-lbl">Total ciclo</div><div class="rstats-time-sub">ingreso → entrega</div></div>
+    </div>
+  ` : '';
+
+  // ── TENDENCIA 12 MESES (siempre, no depende del periodo) ──
+  const trendHtml = _build12mTrendHTML();
+
+  // ── TOPS ──
+  const topsHtml = (cur.topMarcas.length || cur.topArreglos.length) ? `
+    <div class="rstats-tops">
+      ${cur.topMarcas.length > 0 ? `
+        <div class="rstats-top-col">
+          <h4 class="rstats-section-title">🏆 Top marcas</h4>
+          ${cur.topMarcas.map(([marca, count], i) => {
+            const pct = Math.round((count / cur.ingresadas) * 100);
+            return `<div class="rstats-top-row">
+              <span class="rstats-top-rank">${i + 1}</span>
+              <span class="rstats-top-name">${esc(marca)}</span>
+              <div class="rstats-top-bar"><div class="rstats-top-fill" style="width:${pct}%"></div></div>
+              <span class="rstats-top-count">${count}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      ` : ''}
+      ${cur.topArreglos.length > 0 ? `
+        <div class="rstats-top-col">
+          <h4 class="rstats-section-title">🔧 Top arreglos</h4>
+          ${cur.topArreglos.map(([arr, count], i) => {
+            const pct = Math.round((count / cur.ingresadas) * 100);
+            return `<div class="rstats-top-row">
+              <span class="rstats-top-rank">${i + 1}</span>
+              <span class="rstats-top-name">${esc(arr)}</span>
+              <div class="rstats-top-bar"><div class="rstats-top-fill" style="width:${pct}%;background:#10B981"></div></div>
+              <span class="rstats-top-count">${count}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      ` : ''}
+    </div>
+  ` : '';
+
+  // ── TÉCNICOS ──
+  const tecnicosHtml = cur.topTecnicos.length > 0 ? `
+    <h4 class="rstats-section-title">👤 Top técnicos</h4>
+    <div class="rstats-tecs">
+      ${cur.topTecnicos.map(t => `
+        <div class="rstats-tec-row">
+          <div class="rstats-tec-name">${esc(t.nombre)}</div>
+          <div class="rstats-tec-stats">
+            <span><b>${t.count}</b> entregadas</span>
+            <span>${_fmtMoney(t.ingresos)}</span>
+            ${t.tiempoProm > 0 ? `<span>${_fmtDays(t.tiempoProm)} prom.</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  // ── DEMORADAS ACCIONABLES ──
+  const demoradasList = REPAIRS.filter(r => {
+    if (r.estado !== 'reparando' && r.estado !== 'listo') return false;
+    if (!r.fechaIngreso) return false;
+    const dias = (Date.now() - new Date(r.fechaIngreso)) / 86400000;
+    return dias > 3;
+  }).map(r => ({
+    ...r,
+    diasIng: Math.round((Date.now() - new Date(r.fechaIngreso)) / 86400000),
+  })).sort((a, b) => b.diasIng - a.diasIng).slice(0, 8);
+
+  const demoradasHtml = demoradasList.length > 0 ? `
+    <h4 class="rstats-section-title rstats-section-warn">⚠️ Demoradas (${demoradasList.length})</h4>
+    <div class="rstats-demoradas">
+      ${demoradasList.map(r => `
+        <div class="rstats-demorada">
+          <div class="rstats-demorada-info">
+            <div class="rstats-demorada-name">N°${r.nOrden || '?'} · ${esc(r.marca || '')} ${esc(r.modelo || '')}</div>
+            <div class="rstats-demorada-meta">${esc(r.nombre || '—')} · ${r.diasIng} días · ${esc(r.estado === 'listo' ? '✅ Lista' : '🔧 Reparando')}</div>
+          </div>
+          ${r.tlf ? `<button class="rstats-demorada-wa" onclick="closeRepairStats();sendWAToCustomer('${esc(r.id)}')">🟢</button>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  return heroHtml + estadoHtml + embudoHtml + minisHtml + tiemposHtml + trendHtml + topsHtml + tecnicosHtml + demoradasHtml;
+}
+
+function _build12mTrendHTML() {
+  const now = new Date();
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+    const reps = REPAIRS.filter(r => {
+      if (!r.fechaIngreso) return false;
+      const t = new Date(r.fechaIngreso);
+      return t >= d && t <= monthEnd;
+    });
+    const entregadas = reps.filter(r => r.estado === 'entregado').length;
+    const ingresos = reps.filter(r => r.estado === 'entregado').reduce((s, r) => s + (Number(r.monto) || 0), 0);
+    months.push({
+      key,
+      label: d.toLocaleDateString('es-AR', { month: 'short' }),
+      total: reps.length,
+      entregadas,
+      ingresos,
+    });
+  }
+  const max = Math.max(1, ...months.map(m => m.total));
+
+  return `
+    <h4 class="rstats-section-title">📈 Tendencia 12 meses</h4>
+    <div class="rstats-trend">
+      ${months.map(m => {
+        const h1 = (m.total / max) * 100;
+        const h2 = (m.entregadas / max) * 100;
+        return `<div class="rstats-trend-col" title="${m.label}: ${m.total} ingresadas, ${m.entregadas} entregadas, ${_fmtMoney(m.ingresos)}">
+          <div class="rstats-trend-bars">
+            <div class="rstats-trend-bar rstats-trend-ing" style="height:${h1}%"></div>
+            <div class="rstats-trend-bar rstats-trend-ent" style="height:${h2}%"></div>
+          </div>
+          <div class="rstats-trend-num">${m.total}</div>
+          <div class="rstats-trend-lbl">${m.label}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="rstats-trend-legend">
+      <span><i style="background:#3b82f6"></i> Ingresadas</span>
+      <span><i style="background:#10B981"></i> Entregadas</span>
+    </div>
+  `;
+}
+
+function _filterRepairsByEstado(estado) {
+  // Ir a la sección reparaciones y aplicar filtro
+  if (typeof switchSection === 'function') switchSection('repairs');
+  const sel = document.getElementById('rep-f-estado');
+  if (sel) {
+    sel.value = estado === 'demoradas' ? 'reparando' : estado;
+    if (typeof renderRepairs === 'function') renderRepairs();
   }
 }
 
-function buildStatsMonthHTML(now, thisMonth) {
+function sendWAToCustomer(repairId) {
+  if (typeof sendWA === 'function') sendWA(repairId);
+}
+
+function buildStatsMonthHTML_LEGACY(now, thisMonth) {
   const reparando = REPAIRS.filter(r => r.estado === 'reparando').length;
   const listo     = REPAIRS.filter(r => r.estado === 'listo').length;
   const demorados = REPAIRS.filter(r => r.estado === 'reparando' && r.fechaIngreso &&
@@ -1686,7 +2091,7 @@ function buildStatsMonthHTML(now, thisMonth) {
   `;
 }
 
-function buildStatsAnnualHTML(now, thisYear, thisMonth) {
+function buildStatsAnnualHTML_LEGACY(now, thisYear, thisMonth) {
   const yearReps = REPAIRS.filter(r => r.fechaIngreso && r.fechaIngreso.startsWith(String(thisYear)));
   const yearTotal    = yearReps.length;
   const yearIngreso  = yearReps.reduce((s, r) => s + (r.monto || 0), 0);
