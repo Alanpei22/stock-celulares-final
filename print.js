@@ -575,3 +575,123 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 <div class="half">${block('COPIA')}</div>
 </body></html>`;
 }
+
+// ══════════════════════════════════════════
+//  VENTA DE EQUIPO — ficha imprimible (Stock)
+// ══════════════════════════════════════════
+function printVentaTicket(stockId) {
+  const p = (typeof STOCK !== 'undefined') ? STOCK.find(x => x.id === stockId) : null;
+  if (!p) { alert('Equipo no encontrado'); return; }
+  const businessName = (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint';
+  const fechaVenta = p.fecha_venta ? new Date(p.fecha_venta).toLocaleDateString('es-AR', { timeZone:'America/Argentina/Buenos_Aires', day:'2-digit', month:'2-digit', year:'numeric' }) : _today();
+  const horaVenta = p.fecha_venta ? new Date(p.fecha_venta).toLocaleTimeString('es-AR', { timeZone:'America/Argentina/Buenos_Aires', hour:'2-digit', minute:'2-digit' }) : '';
+  let fGarantia = null;
+  if (p.garantiaHasta) {
+    fGarantia = new Date(p.garantiaHasta).toLocaleDateString('es-AR', { timeZone:'America/Argentina/Buenos_Aires', day:'2-digit', month:'2-digit', year:'numeric' });
+  } else if (p.garantiaMeses > 0) {
+    const d = new Date();
+    d.setMonth(d.getMonth() + p.garantiaMeses);
+    fGarantia = d.toLocaleDateString('es-AR', { timeZone:'America/Argentina/Buenos_Aires', day:'2-digit', month:'2-digit', year:'numeric' });
+  }
+
+  const cfg = (typeof getConfig === 'function') ? getConfig() : null;
+  const tlfNeg = cfg?.telefonoNegocio || cfg?.tlfNegocio || '';
+  let waLink = '';
+  if (tlfNeg) {
+    const phone = String(tlfNeg).replace(/\D/g, '');
+    const msg = encodeURIComponent(`Hola! Te escribo por mi compra de ${p.marca} ${p.modelo}. Garantía:`);
+    waLink = `https://wa.me/${phone}?text=${msg}`;
+  }
+  const qrSrc = waLink ? `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(waLink)}` : '';
+
+  const block = (label) => `
+    <div class="t80">
+      <div class="hdr">
+        <div class="biz">${businessName}</div>
+        <div class="copy-lbl">${label}</div>
+        <div class="ticket-title">COMPROBANTE DE VENTA</div>
+      </div>
+      <div class="meta">
+        <span>📅 ${fechaVenta}${horaVenta ? ' · ' + horaVenta : ''}</span>
+        ${p.vendedor ? `<span>👤 ${_pr(p.vendedor)}</span>` : ''}
+      </div>
+      <div class="prod">
+        <div class="prod-marca">📱 ${_pr(p.marca)} ${_pr(p.modelo)}</div>
+        ${p.estado ? `<div class="prod-line">Condición: <b>${_pr(p.estado)}</b></div>` : ''}
+        ${p.almacenamiento ? `<div class="prod-line">Almacenamiento: <b>${_pr(p.almacenamiento)}</b></div>` : ''}
+        ${p.ram ? `<div class="prod-line">RAM: <b>${_pr(p.ram)}</b></div>` : ''}
+        ${p.bateria ? `<div class="prod-line">🔋 Batería: <b>${p.bateria}%</b></div>` : ''}
+        ${p.imei ? `<div class="prod-line">IMEI: <code>${_pr(p.imei)}</code></div>` : ''}
+        ${p.notas ? `<div class="prod-line obs">📝 ${_pr(p.notas)}</div>` : ''}
+      </div>
+      <div class="precio-box">
+        <span class="precio-lbl">Precio</span>
+        <span class="precio-val">${_prMoney(p.precio)}</span>
+      </div>
+      ${p.forma_pago ? `<div class="meta"><span>💳 Forma de pago: <b>${_pr(p.forma_pago)}</b></span></div>` : ''}
+      ${p.garantiaMeses > 0 ? `
+        <div class="garantia-box">
+          <div class="garantia-item hl">🛡️ GARANTÍA: ${p.garantiaMeses} ${p.garantiaMeses === 1 ? 'mes' : 'meses'}</div>
+          ${fGarantia ? `<div class="garantia-item">Vence: <b>${fGarantia}</b></div>` : ''}
+          <div class="garantia-item">Conservar este comprobante para hacer válida la garantía.</div>
+          <div class="garantia-item">No cubre golpes, humedad ni mal uso.</div>
+        </div>
+      ` : `
+        <div class="garantia-box no-warn">
+          <div class="garantia-item no">⚠️ VENTA SIN GARANTÍA</div>
+        </div>
+      `}
+      ${qrSrc ? `
+        <div class="qr-section">
+          <img src="${qrSrc}" alt="QR WhatsApp" width="100" height="100">
+          <div class="qr-text">Escaneá para contactarnos por WhatsApp</div>
+        </div>
+      ` : ''}
+      <div class="firmas">
+        <div class="firma-box"><div class="firma-space"></div>Firma vendedor</div>
+        <div class="firma-box"><div class="firma-space"></div>Firma cliente</div>
+      </div>
+      <div class="footer">¡Gracias por tu compra! · ${businessName}</div>
+    </div>`;
+
+  const css = `
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin:0; padding:0; color:#0f172a; background:#fff; }
+    .t80 { width: 76mm; margin: 0 auto; padding: 6mm 4mm; box-sizing: border-box; }
+    .hdr { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 8px; }
+    .biz { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
+    .copy-lbl { display: inline-block; padding: 2px 8px; background: #0f172a; color: #fff; border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.05em; margin: 4px 0; }
+    .ticket-title { font-size: 11px; font-weight: 700; color: #475569; margin-top: 2px; }
+    .meta { display: flex; justify-content: space-between; font-size: 9px; color: #475569; margin-bottom: 6px; gap: 8px; }
+    .prod { border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px; margin-bottom: 8px; background: #f8fafc; }
+    .prod-marca { font-size: 13px; font-weight: 800; margin-bottom: 4px; color: #0f172a; }
+    .prod-line { font-size: 10px; color: #334155; margin-bottom: 2px; line-height: 1.45; }
+    .prod-line code { background: #e2e8f0; padding: 1px 4px; border-radius: 3px; font-size: 9px; }
+    .prod-line.obs { color: #1e40af; font-style: italic; }
+    .precio-box { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #0f172a; color: #fff; border-radius: 4px; margin-bottom: 6px; }
+    .precio-lbl { font-size: 10px; opacity: 0.85; }
+    .precio-val { font-size: 16px; font-weight: 800; }
+    .garantia-box { border: 1px solid #d1fae5; border-radius: 4px; padding: 6px 8px; background: #f0fdf4; margin: 6px 0; }
+    .garantia-box.no-warn { border-color: #fecaca; background: #fef2f2; }
+    .garantia-item { font-size: 9px; margin-bottom: 2px; line-height: 1.4; color: #166534; }
+    .garantia-item.hl { font-weight: 700; font-size: 10.5px; }
+    .garantia-item.no { color: #991b1b; font-weight: 700; font-size: 10px; text-align: center; }
+    .qr-section { text-align: center; margin: 8px 0; padding: 6px; border: 1px dashed #cbd5e1; border-radius: 4px; }
+    .qr-section img { display: block; margin: 0 auto 4px; }
+    .qr-text { font-size: 8px; color: #475569; }
+    .firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0 6px; }
+    .firma-box { border-top: 1.5px solid #0f172a; padding-top: 3px; font-size: 8px; color: #64748b; text-align: center; }
+    .firma-space { height: 22px; }
+    .footer { text-align: center; font-size: 9px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 6px; margin-top: 8px; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  `;
+
+  const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>Venta — ${_pr(p.marca)} ${_pr(p.modelo)}</title>
+<style>${css}</style></head><body>
+${block('ORIGINAL — Cliente')}
+<div style="page-break-after:always;height:0"></div>
+${block('COPIA — Negocio')}
+</body></html>`;
+
+  _openPrint(html, `Venta ${p.marca} ${p.modelo}`);
+}

@@ -291,6 +291,26 @@ async function _checkDiferenciaCierre() {
   } catch { return null; }
 }
 
+function _checkReservasVencidas() {
+  if (typeof STOCK === 'undefined' || !Array.isArray(STOCK)) return null;
+  const today = _todayARNotif();
+  const vencidas = STOCK.filter(p => {
+    if (!p.reservado || p.vendido) return false;
+    if (!p.reservaFechaLimite) return false;
+    return p.reservaFechaLimite < today;
+  });
+  if (!vencidas.length) return null;
+  return {
+    key: 'reservasVencidas',
+    level: 'warn',
+    icon: '⏰',
+    title: `${vencidas.length} reserva${vencidas.length !== 1 ? 's' : ''} vencida${vencidas.length !== 1 ? 's' : ''}`,
+    msg: vencidas.slice(0, 3).map(p => `• ${p.marca} ${p.modelo} — ${p.reservaCliente || '?'} (venció ${p.reservaFechaLimite})`).join('\n'),
+    cta: { label: 'Ver stock', href: 'index.html#stock' },
+    count: vencidas.length,
+  };
+}
+
 function _checkFechaRetiroVencida() {
   if (typeof REPAIRS === 'undefined' || !Array.isArray(REPAIRS)) return null;
   const today = _todayARNotif();
@@ -371,6 +391,11 @@ async function checkAllInAppAlerts(context = 'dashboard') {
     }
     if (cfg.fechaRetiroVencida) {
       const b = _checkFechaRetiroVencida();
+      if (b && !isDismissed(b.key)) banners.push(b);
+    }
+    // Reservas vencidas (se reusa el toggle fechaRetiroVencida por simplicidad)
+    if (cfg.fechaRetiroVencida) {
+      const b = _checkReservasVencidas();
       if (b && !isDismissed(b.key)) banners.push(b);
     }
     if (cfg.diferenciaCierre) {

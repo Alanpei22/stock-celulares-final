@@ -79,16 +79,11 @@ async function autoBackup() {
   const today = new Date().toISOString().slice(0, 10);
   if (localStorage.getItem('lastAutoBackup') === today) return;
   try {
+    // BUG-FIX: backup completo (snapshot puro del documento)
     const backupData = {
       fecha: new Date().toISOString(),
       stock_count: STOCK.length,
-      stock: STOCK.map(p => ({
-        marca: p.marca || '', modelo: p.modelo || '',
-        almacenamiento: p.almacenamiento || '',
-        estado: p.estado || '', precio: p.precio || 0,
-        ubicacion: p.ubicacion || '', vendido: p.vendido || false,
-        imei: p.imei || '', fecha: p.fecha || ''
-      }))
+      stock: STOCK.map(p => ({ ...p })),
     };
     await db.collection('backups').doc(today).set(backupData);
     localStorage.setItem('lastAutoBackup', today);
@@ -525,6 +520,7 @@ function toggleHdrMenu() {
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
     { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
     { divider: true },
+    { icon: '☑️', label: 'Selección múltiple', sub: 'Editar varios equipos a la vez', onClick: enterBatchMode },
     { icon: '📊', label: 'Estadísticas', onClick: () => document.getElementById('stats-btn')?.click() },
     { icon: '⚙️', label: 'Configuración', onClick: () => document.getElementById('settings-btn')?.click() },
     { icon: '💾', label: 'Exportar stock', onClick: () => document.getElementById('export-btn')?.click() },
@@ -831,7 +827,7 @@ function render() {
       : '';
 
     return `
-      <div class="card ${stCls}${p.vendido ? ' card-sold' : ''}" onclick="openDetail('${p.id}')">
+      <div class="card ${stCls}${p.vendido ? ' card-sold' : ''}${(typeof _batchSelected !== 'undefined' && _batchSelected.has(p.id)) ? ' card-selected' : ''}" data-stock-id="${p.id}" onclick="(typeof isBatchMode === 'function' && isBatchMode()) ? toggleBatchSelection('${p.id}') : openDetail('${p.id}')">
         <div class="card-top">
           <div class="card-info">
             <span class="card-marca">📱 ${esc(p.marca)}</span>
@@ -842,6 +838,8 @@ function render() {
             ${ubiBadge}
             <span class="badge ${badgeCls[p.estado] || ''}">${esc(p.estado)}</span>
             ${p.vendido ? '<span class="badge bg-sold">VENDIDO</span>' : ''}
+            ${p.reservado && !p.vendido ? '<span class="badge bg-reservado">⏳ RESERVADO</span>' : ''}
+            ${p.garantiaMeses > 0 && !p.vendido ? `<span class="badge bg-garantia">🛡️ ${p.garantiaMeses}m</span>` : ''}
           </div>
         </div>
         <div class="card-bottom">
@@ -883,6 +881,8 @@ function openForm(id) {
     document.getElementById('fi-notas').value     = p.notas         || '';
     document.getElementById('fi-ubicacion').value = p.ubicacion     || '';
     document.getElementById('fi-bateria').value   = p.bateria       || '';
+    if (document.getElementById('fi-costo'))    document.getElementById('fi-costo').value    = p.costo || '';
+    if (document.getElementById('fi-garantia')) document.getElementById('fi-garantia').value = p.garantiaMeses || '0';
     _updateBateriaVisibility(p.marca || '');
     // Restaurar modo USD si el equipo fue cargado en dólares
     if (p.moneda === 'usd' && p.precioUSD) {
@@ -903,6 +903,8 @@ function openForm(id) {
     document.getElementById('fi-ram').value       = '';
     document.getElementById('fi-ubicacion').value = '';
     document.getElementById('fi-bateria').value   = '';
+    if (document.getElementById('fi-costo'))    document.getElementById('fi-costo').value = '';
+    if (document.getElementById('fi-garantia')) document.getElementById('fi-garantia').value = '0';
     _updateBateriaVisibility('');
     if (btnM) { btnM.textContent = 'ARS $'; btnM.classList.remove('btn-moneda--usd'); }
     if (helper) helper.textContent = '';
@@ -920,7 +922,7 @@ function closeForm() {
   editingId = null;
 }
 
-function savePhone() {
+async function savePhone() {
   // Conversión USD→ARS si corresponde
   if (monedaMode === 'usd') {
     const usdVal = parseFloat(document.getElementById('fi-precio').value) || 0;
@@ -940,41 +942,68 @@ function savePhone() {
   const imei      = document.getElementById('fi-imei').value.trim();
   const notas     = document.getElementById('fi-notas').value.trim();
   const ubicacion = document.getElementById('fi-ubicacion').value;
+  const costo     = parseInt(document.getElementById('fi-costo')?.value) || 0;
+  const garantiaMeses = parseInt(document.getElementById('fi-garantia')?.value) || 0;
 
   if (!marca) { toast('Ingresá la marca', 'error'); return; }
   if (!modelo) { toast('Ingresá el modelo', 'error'); return; }
   if (!estado) { toast('Seleccioná el estado', 'error'); return; }
   if (!precio || precio <= 0) { toast('Ingresá un precio válido', 'error'); return; }
   if (imei && !/^\d{15}$/.test(imei)) { toast('El IMEI debe tener 15 dígitos', 'error'); return; }
-  if (imei) {
-    const dup = STOCK.find(x => x.imei === imei && x.id !== editingId);
-    if (dup) { toast('Ya existe un equipo con ese IMEI', 'error'); return; }
-  }
 
-  const bateria  = parseInt(document.getElementById('fi-bateria').value) || null;
-  const esUSD    = window._precioUSD !== null;
-  const precioUSD = window._precioUSD;
-  window._precioUSD = null;
-  monedaMode = 'ars';
+  const saveBtn = document.getElementById('form-save');
+  if (saveBtn) saveBtn.disabled = true;
 
-  if (editingId) {
-    const existing = STOCK.find(x => x.id === editingId);
-    if (!existing) { closeForm(); return; }
-    const upd = { ...existing, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion };
-    if (bateria) upd.bateria = bateria; else delete upd.bateria;
-    if (esUSD) { upd.precioUSD = precioUSD; upd.moneda = 'usd'; }
-    else { delete upd.precioUSD; upd.moneda = 'ars'; }
-    db.collection('stock').doc(editingId).set(upd);
-    toast('Equipo actualizado', 'success');
-  } else {
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const newDoc = { id, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion, fecha: new Date().toISOString(), vendido: false };
-    if (bateria) newDoc.bateria = bateria;
-    if (esUSD) { newDoc.precioUSD = precioUSD; newDoc.moneda = 'usd'; }
-    db.collection('stock').doc(id).set(newDoc);
-    toast('Equipo agregado al stock', 'success');
+  try {
+    // BUG-FIX: chequeo de IMEI duplicado en Firestore (no solo array local)
+    if (imei) {
+      const dupSnap = await db.collection('stock').where('imei', '==', imei).limit(2).get();
+      const dup = dupSnap.docs.find(d => d.id !== editingId);
+      if (dup) { toast('Ya existe un equipo con ese IMEI', 'error'); return; }
+    }
+
+    const bateria  = parseInt(document.getElementById('fi-bateria').value) || null;
+    const esUSD    = window._precioUSD !== null;
+    const precioUSD = window._precioUSD;
+    window._precioUSD = null;
+    monedaMode = 'ars';
+
+    if (editingId) {
+      const existing = STOCK.find(x => x.id === editingId);
+      if (!existing) { closeForm(); return; }
+      const upd = { ...existing, marca, modelo, estado, precio, almacenamiento: storage, ram, imei, notas, ubicacion };
+      if (bateria) upd.bateria = bateria; else delete upd.bateria;
+      if (esUSD) { upd.precioUSD = precioUSD; upd.moneda = 'usd'; }
+      else { delete upd.precioUSD; upd.moneda = 'ars'; }
+      // Costo y garantía
+      if (costo > 0) upd.costo = costo; else delete upd.costo;
+      if (garantiaMeses > 0) upd.garantiaMeses = garantiaMeses; else delete upd.garantiaMeses;
+      // BUG-FIX: await + try/catch
+      await db.collection('stock').doc(editingId).set(upd);
+      toast('Equipo actualizado ✅', 'success');
+    } else {
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const newDoc = {
+        id, marca, modelo, estado, precio,
+        almacenamiento: storage, ram, imei, notas, ubicacion,
+        fecha: new Date().toISOString(),
+        vendido: false,
+        _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
+      };
+      if (bateria) newDoc.bateria = bateria;
+      if (esUSD) { newDoc.precioUSD = precioUSD; newDoc.moneda = 'usd'; }
+      if (costo > 0) newDoc.costo = costo;
+      if (garantiaMeses > 0) newDoc.garantiaMeses = garantiaMeses;
+      await db.collection('stock').doc(id).set(newDoc);
+      toast('Equipo agregado al stock ✅', 'success');
+    }
+    closeForm();
+  } catch (e) {
+    console.error('savePhone:', e);
+    toast('Error al guardar — revisá la conexión', 'error');
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
   }
-  closeForm();
 }
 
 // ── Detalle ───────────────────────────────────────────────
@@ -1010,7 +1039,19 @@ function openDetail(id) {
     ${fechaVta ? `<div class="det-row"><span class="det-label">Venta</span><span class="det-val">${fechaVta}</span></div>` : ''}
     ${p.vendedor ? `<div class="det-row"><span class="det-label">Vendedor</span><span class="det-val">${esc(p.vendedor)}</span></div>` : ''}
     ${p.forma_pago ? `<div class="det-row"><span class="det-label">Forma de pago</span><span class="det-val">${esc(p.forma_pago)}</span></div>` : ''}
+    ${(typeof OWNER_MODE !== 'undefined' && OWNER_MODE && p.costo > 0) ? `
+      <div class="det-row owner-only"><span class="det-label">💵 Costo</span><span class="det-val" style="color:#dc2626">$ ${p.costo.toLocaleString('es-AR')}</span></div>
+      ${p.precio > 0 ? `<div class="det-row owner-only"><span class="det-label">📊 Ganancia</span><span class="det-val" style="color:#10b981;font-weight:800">$ ${(p.precio - p.costo).toLocaleString('es-AR')} <small style="color:var(--t3);font-weight:400">(${Math.round(((p.precio - p.costo) / p.precio) * 100)}%)</small></span></div>` : ''}
+    ` : ''}
+    ${p.garantiaMeses > 0 ? `<div class="det-row"><span class="det-label">🛡️ Garantía</span><span class="det-val">${p.garantiaMeses} ${p.garantiaMeses === 1 ? 'mes' : 'meses'}${p.garantiaHasta ? ` <small style="color:var(--t3)">— vence ${fmtDate(p.garantiaHasta)}</small>` : ''}</span></div>` : ''}
+    ${p.reservado ? `
+      <div class="det-row det-row--full" style="background:rgba(245,158,11,.1);padding:10px 12px;border-radius:10px;border:1px solid rgba(245,158,11,.3)">
+        <span class="det-label" style="color:#92400e;font-weight:700">⏳ RESERVADO</span>
+        <span class="det-val">${esc(p.reservaCliente || 'Cliente')} · Seña $${(p.reservaSena || 0).toLocaleString('es-AR')}${p.reservaFechaLimite ? ` · Hasta ${fmtDate(p.reservaFechaLimite)}` : ''}</span>
+      </div>
+    ` : ''}
     ${p.notas ? `<div class="det-row det-row--full"><span class="det-label">Notas</span><span class="det-val">${esc(p.notas)}</span></div>` : ''}
+    ${(p.fotos && p.fotos.length) || !p.vendido ? `<div class="det-row det-row--full"><span class="det-label">📷 Fotos</span></div>${typeof buildPhotoGalleryHTML === 'function' ? buildPhotoGalleryHTML(p) : ''}` : ''}
     ${!p.vendido && p.precio ? buildPriceTable(p.precio) : ''}
     ${p.vendido ? '<div class="det-sold-badge">VENDIDO</div>' : ''}
   `;
@@ -1018,7 +1059,10 @@ function openDetail(id) {
   document.getElementById('det-actions').innerHTML = `
     ${!p.vendido ? `<button class="btn-whatsapp" onclick="shareWhatsApp('${p.id}')">🟢 WhatsApp</button>` : ''}
     <button class="btn-copy" onclick="copyInfo('${p.id}')">📋 Copiar</button>
-    ${!p.vendido ? `<button class="btn-edit" onclick="closeDetail();openForm('${p.id}')">✏️ Editar</button>` : ''}
+    ${p.vendido ? `<button class="btn-edit" onclick="printVentaTicket('${p.id}')">🖨 Imprimir ficha</button>` : ''}
+    ${!p.vendido && !p.reservado ? `<button class="btn-edit" onclick="closeDetail();openForm('${p.id}')">✏️ Editar</button>` : ''}
+    ${!p.vendido && !p.reservado ? `<button class="btn-edit" onclick="openReservarModal('${p.id}')" style="background:#f59e0b;color:#fff">⏳ Reservar</button>` : ''}
+    ${p.reservado ? `<button class="btn-edit" onclick="cancelarReserva('${p.id}')" style="background:#fef3c7;color:#92400e">✕ Cancelar reserva</button>` : ''}
     ${!p.vendido ? `<button class="btn-sell" onclick="markSold('${p.id}')">💰 Vendido</button>` : `<button class="btn-unsell" onclick="markUnsold('${p.id}')">↩️ Reactivar</button>`}
     <button class="btn-delete" onclick="deletePhone('${p.id}')">🗑️</button>
   `;
@@ -1162,24 +1206,67 @@ function copyInfo(id) {
 // ── Acciones ──────────────────────────────────────────────
 function markSold(id) { openSellModal(id); }
 
-function markUnsold(id) {
+async function markUnsold(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
+  // BUG-FIX: revertir movimiento de caja asociado
+  let revertedCaja = false;
+  try {
+    const movs = await db.collection('caja_movimientos').where('stockId', '==', id).get();
+    if (!movs.empty) {
+      const ok = confirm(
+        `Este equipo tiene ${movs.size} movimiento(s) en caja por la venta.\n\n¿Eliminar también el movimiento de caja al reactivar?`
+      );
+      if (ok) {
+        const batch = db.batch();
+        movs.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        revertedCaja = true;
+      }
+    }
+  } catch (e) { console.error('markUnsold revert caja:', e); }
+
   const updated = { ...p, vendido: false };
   delete updated.fecha_venta;
   delete updated.vendedor;
   delete updated.forma_pago;
-  db.collection('stock').doc(id).set(updated);
-  closeDetail();
-  toast('Reactivado al stock', 'success');
+  delete updated.garantiaHasta;
+  try {
+    await db.collection('stock').doc(id).set(updated);
+    closeDetail();
+    toast(revertedCaja ? 'Reactivado · caja revertida ✅' : 'Reactivado al stock ✅', 'success');
+  } catch (e) {
+    console.error('markUnsold:', e);
+    toast('Error al reactivar', 'error');
+  }
 }
-function deletePhone(id) {
+
+async function deletePhone(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
   if (!confirm('¿Eliminar ' + p.marca + ' ' + p.modelo + '?')) return;
-  db.collection('stock').doc(id).delete();
-  closeDetail();
-  toast('Equipo eliminado', 'info');
+  // BUG-FIX: si está vendido y tiene mov en caja, ofrecer revertir
+  let revertedCaja = false;
+  try {
+    if (p.vendido) {
+      const movs = await db.collection('caja_movimientos').where('stockId', '==', id).get();
+      if (!movs.empty) {
+        const ok = confirm(`El equipo tiene ${movs.size} movimiento(s) en caja.\n\n¿Eliminar también esos movimientos?`);
+        if (ok) {
+          const batch = db.batch();
+          movs.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          revertedCaja = true;
+        }
+      }
+    }
+    await db.collection('stock').doc(id).delete();
+    closeDetail();
+    toast(revertedCaja ? 'Eliminado · caja revertida' : 'Equipo eliminado', 'info');
+  } catch (e) {
+    console.error('deletePhone:', e);
+    toast('Error al eliminar', 'error');
+  }
 }
 
 // ── Modal Venta ───────────────────────────────────────────
@@ -1199,7 +1286,7 @@ function closeSellModal() {
   pendingSellId = null;
 }
 
-function confirmSell() {
+async function confirmSell() {
   const id = pendingSellId;
   if (!id) return;
   const p          = STOCK.find(x => x.id === id);
@@ -1208,50 +1295,207 @@ function confirmSell() {
   const regCaja    = document.getElementById('sell-caja-check')?.checked ?? true;
 
   const ahora = new Date().toISOString();
-  const batch = db.batch();
+  const confirmBtn = document.getElementById('sell-confirm');
+  if (confirmBtn) confirmBtn.disabled = true;
 
-  // ── Marcar equipo como vendido ──
-  batch.update(db.collection('stock').doc(id), {
-    vendido: true,
-    fecha_venta: ahora,
-    vendedor,
-    forma_pago: formaPago
-  });
+  try {
+    const batch = db.batch();
 
-  // ── Registrar en caja (si toggle activo y tiene precio) ──
-  if (regCaja && p?.precio > 0) {
-    const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' ');
-    const desc  = `Venta: ${p.marca} ${p.modelo}${specs ? ' ' + specs : ''}`;
-    const movRef = db.collection('caja_movimientos').doc();
-    batch.set(movRef, {
-      tipo: 'ingreso',
-      categoria: 'Venta',
-      descripcion: desc,
-      monto: p.precio,
-      metodoPago: formaPago,
-      fecha: todayAR(),
-      createdAt: ahora,
-      stockId: id
-    });
-  }
+    // ── Marcar equipo como vendido ──
+    const stockUpdate = {
+      vendido: true,
+      fecha_venta: ahora,
+      vendedor,
+      forma_pago: formaPago,
+    };
+    // Garantía: calcular fechaHasta si tiene meses configurados
+    if (p?.garantiaMeses > 0) {
+      const fHasta = new Date();
+      fHasta.setMonth(fHasta.getMonth() + p.garantiaMeses);
+      stockUpdate.garantiaHasta = fHasta.toISOString();
+    }
+    batch.update(db.collection('stock').doc(id), stockUpdate);
 
-  batch.commit().catch(e => console.error('confirmSell batch:', e));
+    // ── Registrar en caja (si toggle activo y tiene precio) ──
+    let movRefId = null;
+    if (regCaja && p?.precio > 0) {
+      const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' ');
+      const desc  = `Venta: ${p.marca} ${p.modelo}${specs ? ' ' + specs : ''}`;
+      const movRef = db.collection('caja_movimientos').doc();
+      movRefId = movRef.id;
+      // Snapshot del costo para reportar margen real
+      const movData = {
+        tipo: 'ingreso',
+        categoria: 'Venta',
+        descripcion: desc,
+        monto: p.precio,
+        metodoPago: formaPago,
+        fecha: todayAR(),
+        createdAt: ahora,
+        stockId: id,
+        vendedor: vendedor || null,
+        _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
+      };
+      // Costo + ganancia (solo si hay costo cargado)
+      if (p.costo > 0) {
+        movData.costoARSUnit = p.costo;
+        movData.costoARSTotal = p.costo;
+        movData.gananciaARS = p.precio - p.costo;
+      }
+      batch.set(movRef, movData);
+    }
 
-  // ── Log de actividad ──
-  if (p) {
-    db.collection('actividad').add({
+    // BUG-FIX: log de actividad dentro del batch (atomicidad)
+    const actRef = db.collection('actividad').doc();
+    batch.set(actRef, {
       tipo: 'venta',
       desc: `Venta: ${p.marca} ${p.modelo}${p.almacenamiento ? ' '+p.almacenamiento : ''} — $${(p.precio||0).toLocaleString('es-AR')}`,
       tecnico: vendedor || null,
       repairId: null,
-      extra: { stockId: id, precio: p.precio, formaPago, marca: p.marca, modelo: p.modelo },
-      fecha: ahora
-    }).catch(() => {});
-  }
+      extra: { stockId: id, precio: p.precio, formaPago, marca: p.marca, modelo: p.modelo, movId: movRefId },
+      fecha: ahora,
+    });
 
-  closeSellModal();
-  closeDetail();
-  toast(regCaja ? 'Venta registrada en caja ✅' : 'Venta registrada ✅', 'success');
+    // BUG-FIX: await + propagación de error (no swallow silencioso)
+    await batch.commit();
+
+    closeSellModal();
+    closeDetail();
+    toast(regCaja ? 'Venta registrada en caja ✅' : 'Venta registrada ✅', 'success');
+  } catch (e) {
+    console.error('confirmSell:', e);
+    toast('Error al registrar la venta — intentá de nuevo', 'error');
+  } finally {
+    if (confirmBtn) confirmBtn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════
+//  F10 — Reservar equipo
+// ══════════════════════════════════════════
+let pendingReservaId = null;
+
+function openReservarModal(id) {
+  pendingReservaId = id;
+  // Reset form
+  document.getElementById('rsv-cliente').value = '';
+  document.getElementById('rsv-tlf').value = '';
+  document.getElementById('rsv-sena').value = '';
+  // Default: 7 días desde hoy
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  document.getElementById('rsv-fecha').value = d.toISOString().slice(0, 10);
+  document.getElementById('rsv-caja-check').checked = true;
+
+  document.getElementById('reservar-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('rsv-cliente').focus(), 200);
+}
+
+function closeReservarModal() {
+  document.getElementById('reservar-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+  pendingReservaId = null;
+}
+
+async function confirmReserva() {
+  const id = pendingReservaId;
+  if (!id) return;
+  const p = STOCK.find(x => x.id === id);
+  if (!p) return;
+
+  const cliente = document.getElementById('rsv-cliente').value.trim();
+  const tlf     = document.getElementById('rsv-tlf').value.trim();
+  const sena    = parseInt(document.getElementById('rsv-sena').value) || 0;
+  const fechaLimite = document.getElementById('rsv-fecha').value;
+  const regCaja = document.getElementById('rsv-caja-check').checked;
+
+  if (!cliente) { toast('Ingresá el nombre del cliente', 'error'); return; }
+
+  try {
+    const ahora = new Date().toISOString();
+    const batch = db.batch();
+
+    // 1) Marcar equipo como reservado
+    const stockUpd = {
+      reservado: true,
+      reservaCliente: cliente,
+      reservaTelefono: tlf || null,
+      reservaSena: sena,
+      reservaFechaLimite: fechaLimite || null,
+      reservaCreadaEn: ahora,
+    };
+    batch.update(db.collection('stock').doc(id), stockUpd);
+
+    // 2) Si hay seña > 0 y se quiere registrar en caja → crear movimiento
+    if (regCaja && sena > 0) {
+      const movRef = db.collection('caja_movimientos').doc();
+      batch.set(movRef, {
+        tipo: 'ingreso',
+        categoria: 'Seña venta',
+        descripcion: `Seña ${p.marca} ${p.modelo} — ${cliente}`,
+        monto: sena,
+        metodoPago: 'Efectivo',
+        fecha: todayAR(),
+        createdAt: ahora,
+        stockId: id,
+        esSena: true,
+        senaTipo: 'venta',
+        _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
+      });
+    }
+
+    // 3) Log
+    const actRef = db.collection('actividad').doc();
+    batch.set(actRef, {
+      tipo: 'reserva',
+      desc: `Reserva: ${p.marca} ${p.modelo} — ${cliente}${sena > 0 ? ' · seña $' + sena.toLocaleString('es-AR') : ''}`,
+      tecnico: null,
+      extra: { stockId: id, cliente, sena, fechaLimite },
+      fecha: ahora,
+    });
+
+    await batch.commit();
+    closeReservarModal();
+    closeDetail();
+    toast('⏳ Equipo reservado para ' + cliente, 'success');
+  } catch (e) {
+    console.error('confirmReserva:', e);
+    toast('Error al reservar', 'error');
+  }
+}
+
+async function cancelarReserva(id) {
+  const p = STOCK.find(x => x.id === id);
+  if (!p) return;
+  let mensaje = `¿Cancelar reserva de ${p.marca} ${p.modelo}?`;
+  if (p.reservaSena > 0) {
+    mensaje += `\n\nSe revertirá la seña de $${p.reservaSena.toLocaleString('es-AR')} en caja (si fue registrada).`;
+  }
+  if (!confirm(mensaje)) return;
+
+  try {
+    const batch = db.batch();
+    batch.update(db.collection('stock').doc(id), {
+      reservado: firebase.firestore.FieldValue.delete(),
+      reservaCliente: firebase.firestore.FieldValue.delete(),
+      reservaTelefono: firebase.firestore.FieldValue.delete(),
+      reservaSena: firebase.firestore.FieldValue.delete(),
+      reservaFechaLimite: firebase.firestore.FieldValue.delete(),
+      reservaCreadaEn: firebase.firestore.FieldValue.delete(),
+    });
+
+    // Borrar mov de seña asociado
+    const movs = await db.collection('caja_movimientos').where('stockId', '==', id).where('esSena', '==', true).get();
+    movs.docs.forEach(d => batch.delete(d.ref));
+
+    await batch.commit();
+    closeDetail();
+    toast('Reserva cancelada' + (movs.size > 0 ? ' · seña revertida' : ''), 'info');
+  } catch (e) {
+    console.error('cancelarReserva:', e);
+    toast('Error al cancelar reserva', 'error');
+  }
 }
 
 // ── Modal Estadísticas ────────────────────────────────────

@@ -106,6 +106,20 @@
       <div id="stock-lowqty-list" class="lowstock-list hidden"></div>
     </div>
 
+    <!-- Toolbar selección múltiple (oculta hasta activar batch mode) -->
+    <div id="batch-toolbar" class="batch-toolbar hidden">
+      <div class="batch-toolbar-info">
+        <button class="batch-close" onclick="exitBatchMode()" title="Salir">✕</button>
+        <span class="batch-count" id="batch-count">0 seleccionados</span>
+      </div>
+      <div class="batch-toolbar-actions">
+        <button class="batch-action-btn" onclick="batchSelectAll()">☑ Todos</button>
+        <button class="batch-action-btn" onclick="batchChangeUbicacion()">📍 Ubicación</button>
+        <button class="batch-action-btn" onclick="batchDescuento()">💸 Descuento %</button>
+        <button class="batch-action-btn" onclick="batchExportWA()">🟢 Exportar WA</button>
+      </div>
+    </div>
+
     <div class="list-wrap">
       <div id="list"></div>
       <div class="empty-state" id="empty" style="display:none">
@@ -486,6 +500,20 @@
           <label class="fl">IMEI</label>
           <input id="fi-imei" class="fi" type="text" placeholder="123456789012345" maxlength="15" inputmode="numeric">
         </div>
+        <div class="fg owner-only">
+          <label class="fl">💵 Costo (ARS) <small style="color:var(--t3);font-weight:400">— privado, no se muestra al cliente</small></label>
+          <input id="fi-costo" class="fi" type="number" placeholder="60000" min="0" inputmode="numeric">
+        </div>
+        <div class="fg">
+          <label class="fl">🛡️ Garantía (meses)</label>
+          <select id="fi-garantia" class="fs">
+            <option value="0">Sin garantía</option>
+            <option value="1">1 mes</option>
+            <option value="3">3 meses</option>
+            <option value="6">6 meses</option>
+            <option value="12">12 meses</option>
+          </select>
+        </div>
         <div class="fg fg--full">
           <label class="fl">Notas</label>
           <textarea id="fi-notas" class="fi fi-area" placeholder="Accesorios, detalles, color…" rows="2"></textarea>
@@ -494,6 +522,49 @@
       <div class="form-actions">
         <button class="btn-secondary" id="form-cancel">Cancelar</button>
         <button class="btn-primary" id="form-save">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RESERVAR EQUIPO -->
+<div id="reservar-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>⏳ Reservar equipo</h3>
+      <button class="modal-close" onclick="closeReservarModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 14px;color:var(--t2);font-size:.88rem">Marcá este equipo como reservado para un cliente. No aparecerá disponible hasta que la reserva se complete o cancele.</p>
+      <div class="fg fg--full">
+        <label class="fl">Cliente *</label>
+        <input id="rsv-cliente" class="fi" type="text" placeholder="Nombre del cliente" autocomplete="off">
+      </div>
+      <div class="fg fg--full">
+        <label class="fl">Teléfono</label>
+        <input id="rsv-tlf" class="fi" type="tel" placeholder="11 1234-5678" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label class="fl">Seña recibida (ARS)</label>
+        <input id="rsv-sena" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+      </div>
+      <div class="fg">
+        <label class="fl">Fecha límite</label>
+        <input id="rsv-fecha" class="fi" type="date">
+      </div>
+      <label class="sell-caja-row">
+        <div class="sell-caja-info">
+          <span class="sell-caja-title">📒 Registrar seña en caja</span>
+          <span class="sell-caja-sub">Crea un ingreso si la seña es &gt; 0</span>
+        </div>
+        <div class="sell-caja-toggle-wrap">
+          <input type="checkbox" id="rsv-caja-check" class="sell-caja-cb" checked>
+          <span class="sell-caja-toggle"></span>
+        </div>
+      </label>
+      <div class="form-actions" style="margin-top:8px">
+        <button class="btn-secondary" onclick="closeReservarModal()">Cancelar</button>
+        <button class="btn-primary" onclick="confirmReserva()" style="background:#f59e0b">⏳ Confirmar reserva</button>
       </div>
     </div>
   </div>
@@ -1764,6 +1835,7 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="repairs.js"></script>
 <script src="modulos_catalog.js"></script>
 <script src="repuestos.js"></script>
@@ -1771,6 +1843,7 @@
 <script src="notifications.js"></script>
 <script src="webpush.js"></script>
 <script src="app.js"></script>
+<script src="stock-extras.js"></script>
 <script src="print.js"></script>
 <script src="notif-settings.js"></script>
 
