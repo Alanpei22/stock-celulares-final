@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a0b2e">
+<title>TechPoint · Parts List</title>
+<link rel="manifest" href="data:application/manifest+json;base64,ewogICJuYW1lIjogIlRlY2hQb2ludCBSZXB1ZXN0b3MiLAogICJzaG9ydF9uYW1lIjogIlRlY2hQb2ludCIsCiAgInN0YXJ0X3VybCI6ICIuLyIsCiAgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsCiAgImJhY2tncm91bmRfY29sb3IiOiAiIzFhMGIyZSIsCiAgInRoZW1lX2NvbG9yIjogIiMxYTBiMmUiCn0=">
+<style>
+  :root {
+    --bg-deep: #0d0617;
+    --bg-card: #1a0b2e;
+    --bg-elev: #241141;
+    --purple: #6b2fb5;
+    --purple-glow: #8b4dd9;
+    --gold: #d4a44c;
+    --gold-bright: #e8bd6b;
+    --text: #f0e7ff;
+    --text-dim: #a89bc4;
+    --text-mute: #6b5d8a;
+    --border: #2d1b4e;
+    --success: #4ade80;
+    --danger: #f87171;
+    --warning: #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg-deep); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; overflow-x: hidden; }
+  body { background: radial-gradient(ellipse at top, #2a1257 0%, #0d0617 60%); padding-bottom: 100px; }
+
+  /* Header */
+  .header { position: sticky; top: 0; z-index: 100; background: rgba(13, 6, 23, 0.85); backdrop-filter: blur(20px); border-bottom: 1px solid var(--border); padding: 14px 16px; }
+  .header-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 1200px; margin: 0 auto; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-logo { width: 36px; height: 36px; background: linear-gradient(135deg, var(--purple), var(--gold)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 18px; color: white; box-shadow: 0 4px 12px rgba(107, 47, 181, 0.4); }
+  .brand-text { font-weight: 800; letter-spacing: -0.5px; font-size: 18px; }
+  .brand-text span { color: var(--gold); }
+  .admin-btn { background: transparent; border: 1px solid var(--border); color: var(--text-dim); padding: 8px 12px; border-radius: 8px; font-size: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+  .admin-btn:hover, .admin-btn.active { border-color: var(--gold); color: var(--gold); }
+
+  /* Search & filters */
+  .controls { padding: 14px 16px 0; max-width: 1200px; margin: 0 auto; }
+  .search-wrap { position: relative; margin-bottom: 12px; }
+  .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-mute); pointer-events: none; }
+  .search { width: 100%; padding: 14px 14px 14px 44px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-size: 15px; outline: none; transition: border-color 0.2s; }
+  .search:focus { border-color: var(--purple-glow); }
+  .search::placeholder { color: var(--text-mute); }
+
+  .filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; -ms-overflow-style: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .chip { flex-shrink: 0; padding: 8px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; color: var(--text-dim); font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; font-weight: 500; }
+  .chip:hover { color: var(--text); }
+  .chip.active { background: linear-gradient(135deg, var(--purple), #4a1f7d); color: white; border-color: var(--purple-glow); box-shadow: 0 4px 12px rgba(107, 47, 181, 0.3); }
+
+  .count { padding: 8px 16px 4px; color: var(--text-mute); font-size: 12px; max-width: 1200px; margin: 0 auto; }
+  .count strong { color: var(--gold); }
+
+  /* Product grid */
+  .products { padding: 8px 16px 16px; max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr; gap: 8px; }
+  @media (min-width: 600px) { .products { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 900px) { .products { grid-template-columns: 1fr 1fr 1fr; } }
+
+  .product { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; transition: all 0.2s; position: relative; overflow: hidden; }
+  .product::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: linear-gradient(180deg, var(--purple), var(--gold)); opacity: 0; transition: opacity 0.2s; }
+  .product:hover { border-color: var(--purple-glow); transform: translateY(-1px); }
+  .product:hover::before { opacity: 1; }
+  .product-cat { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--gold); font-weight: 600; margin-bottom: 4px; }
+  .product-name { font-weight: 600; font-size: 14px; margin-bottom: 10px; line-height: 1.3; color: var(--text); }
+  .product-prices { display: flex; gap: 12px; align-items: baseline; }
+  .price-block { flex: 1; }
+  .price-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-mute); margin-bottom: 2px; }
+  .price-efectivo { font-size: 20px; font-weight: 800; color: var(--gold-bright); letter-spacing: -0.5px; }
+  .price-transfer { font-size: 14px; font-weight: 600; color: var(--text-dim); }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-mute); }
+  .empty svg { margin-bottom: 16px; opacity: 0.5; }
+
+  /* Footer info */
+  .footer-info { text-align: center; padding: 24px 16px; color: var(--text-mute); font-size: 11px; max-width: 1200px; margin: 0 auto; }
+  .footer-info strong { color: var(--gold); }
+  .footer-info a { color: var(--purple-glow); text-decoration: none; }
+
+  /* Modal base */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); z-index: 200; display: none; align-items: flex-start; justify-content: center; padding: 20px; overflow-y: auto; }
+  .modal-bg.show { display: flex; }
+  .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 900px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); margin: auto 0; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+  .modal-header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--bg-card); border-radius: 16px 16px 0 0; z-index: 10; }
+  .modal-title { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 10px; }
+  .modal-close { background: transparent; border: none; color: var(--text-dim); cursor: pointer; padding: 6px; border-radius: 6px; }
+  .modal-close:hover { background: var(--bg-elev); color: var(--text); }
+  .modal-body { padding: 20px; }
+
+  /* Login */
+  .login-form { display: flex; flex-direction: column; gap: 12px; }
+  .login-form input { padding: 12px 14px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 15px; outline: none; }
+  .login-form input:focus { border-color: var(--purple-glow); }
+  .login-form button { padding: 12px; background: linear-gradient(135deg, var(--purple), #4a1f7d); border: none; border-radius: 8px; color: white; font-weight: 600; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+  .login-form button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(107, 47, 181, 0.4); }
+  .login-error { color: var(--danger); font-size: 13px; text-align: center; min-height: 18px; }
+  .login-hint { font-size: 12px; color: var(--text-mute); text-align: center; margin-top: 8px; }
+
+  /* Admin tabs */
+  .tabs { display: flex; gap: 4px; padding: 12px 20px 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .tab { padding: 10px 14px; background: transparent; border: none; color: var(--text-dim); font-weight: 600; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+  .tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+  .tab-panel { display: none; padding: 20px; }
+  .tab-panel.active { display: block; }
+
+  /* Markup editor */
+  .markup-row { display: grid; grid-template-columns: 1fr 100px 100px; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .markup-row:last-child { border-bottom: none; }
+  .markup-label { font-size: 13px; font-weight: 500; }
+  .markup-input { padding: 8px 10px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; outline: none; text-align: right; }
+  .markup-input:focus { border-color: var(--gold); }
+  .markup-suffix { color: var(--text-mute); font-size: 12px; text-align: center; }
+
+  /* Product editor table */
+  .editor-controls { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .editor-search { flex: 1; min-width: 200px; padding: 10px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; }
+  .editor-select { padding: 10px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; }
+  .editor-list { max-height: 60vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .editor-item { display: grid; grid-template-columns: 1fr 110px 110px 36px; gap: 8px; padding: 10px 12px; align-items: center; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .editor-item:last-child { border-bottom: none; }
+  .editor-item-info { min-width: 0; }
+  .editor-item-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .editor-item-cat { font-size: 10px; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.5px; }
+  .editor-item-input { padding: 6px 8px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; outline: none; text-align: right; width: 100%; }
+  .editor-item-input:focus { border-color: var(--gold); }
+  .editor-item-input.cost { color: var(--text-dim); }
+  .editor-item-input.price { color: var(--gold-bright); font-weight: 700; }
+  .editor-item-del { background: transparent; border: 1px solid var(--border); color: var(--danger); border-radius: 6px; cursor: pointer; padding: 6px; }
+  .editor-item-del:hover { background: rgba(248, 113, 113, 0.1); }
+
+  .editor-header { display: grid; grid-template-columns: 1fr 110px 110px 36px; gap: 8px; padding: 8px 12px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-mute); border-bottom: 1px solid var(--border); background: var(--bg-deep); position: sticky; top: 0; z-index: 1; }
+  .editor-header div { text-align: right; }
+  .editor-header div:first-child { text-align: left; }
+
+  /* Add product */
+  .add-form { display: grid; grid-template-columns: 1fr 1fr 100px 100px auto; gap: 8px; margin-bottom: 12px; }
+  .add-form input, .add-form select { padding: 10px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; }
+  .add-form button { padding: 10px 14px; background: linear-gradient(135deg, var(--gold), #b8862c); border: none; border-radius: 8px; color: var(--bg-deep); font-weight: 700; cursor: pointer; font-size: 13px; }
+  @media (max-width: 600px) { .add-form { grid-template-columns: 1fr 1fr; } }
+
+  /* Buttons */
+  .btn-primary { padding: 10px 16px; background: linear-gradient(135deg, var(--gold), #b8862c); border: none; border-radius: 8px; color: var(--bg-deep); font-weight: 700; cursor: pointer; font-size: 13px; }
+  .btn-secondary { padding: 10px 16px; background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .btn-danger { padding: 10px 16px; background: rgba(248, 113, 113, 0.1); border: 1px solid var(--danger); color: var(--danger); border-radius: 8px; cursor: pointer; font-size: 13px; }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--bg-elev); border: 1px solid var(--gold); color: var(--gold); padding: 12px 20px; border-radius: 8px; font-size: 14px; z-index: 300; opacity: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .info-box { background: var(--bg-deep); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 12px; color: var(--text-dim); margin-bottom: 16px; line-height: 1.5; }
+  .info-box strong { color: var(--gold); }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-logo">T</div>
+      <div class="brand-text">Tech<span>Point</span></div>
+    </div>
+    <button class="admin-btn" id="adminBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Admin
+    </button>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="search-wrap">
+    <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" class="search" id="search" placeholder="Search model, brand, part...">
+  </div>
+  <div class="filters" id="filters"></div>
+</div>
+
+<div class="count" id="count"></div>
+<div class="products" id="products"></div>
+
+<div class="footer-info">
+  Prices updated: <strong id="lastUpdate"></strong><br>
+  Transfer payments include a 5% surcharge · Subject to availability<br>
+  <strong>TechPoint</strong> · Urquiza 4741 Local 22, Caseros · WhatsApp 11 7239-2511
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="modal-bg" id="loginModal">
+  <div class="modal" style="max-width: 380px;">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Admin access
+      </div>
+      <button class="modal-close" onclick="closeLogin()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form class="login-form" onsubmit="event.preventDefault(); doLogin();">
+        <input type="password" id="passInput" placeholder="Password" autocomplete="current-password">
+        <div class="login-error" id="loginError"></div>
+        <button type="submit">Sign in</button>
+        <div class="login-hint">TechPoint authorized staff only</div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN MODAL -->
+<div class="modal-bg" id="adminModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Admin Panel · TechPoint
+      </div>
+      <button class="modal-close" onclick="closeAdmin()">✕</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="prices">Prices</button>
+      <button class="tab" data-tab="markup">Markup</button>
+      <button class="tab" data-tab="add">Add</button>
+      <button class="tab" data-tab="data">Data</button>
+    </div>
+
+    <!-- TAB: PRICES -->
+    <div class="tab-panel active" data-panel="prices">
+      <div class="info-box">
+        Edit the <strong>cost</strong> (what you pay your supplier) or the <strong>sale price</strong> directly. If you change the cost, the price is recalculated using the category markup. If you change the sale price, it is set as fixed and the markup is ignored for that product.
+      </div>
+      <div class="editor-controls">
+        <input type="text" class="editor-search" id="editorSearch" placeholder="Filter products...">
+        <select class="editor-select" id="editorCat">
+          <option value="">All categories</option>
+        </select>
+      </div>
+      <div class="editor-list" id="editorList">
+        <div class="editor-header">
+          <div>Product</div>
+          <div>Cost</div>
+          <div>Sale (cash)</div>
+          <div></div>
+        </div>
+        <div id="editorItems"></div>
+      </div>
+      <div class="actions">
+        <button class="btn-primary" onclick="recalcAll()">Recalculate all from markup</button>
+      </div>
+    </div>
+
+    <!-- TAB: MARKUP -->
+    <div class="tab-panel" data-panel="markup">
+      <div class="info-box">
+        Markup per category over cost. When changed, you can <strong>apply to all</strong> products in that category (overrides manual prices) or only affect future new products.
+      </div>
+      <div id="markupList"></div>
+      <div class="actions">
+        <button class="btn-primary" onclick="applyAllMarkups()">Apply markups to ALL products</button>
+      </div>
+    </div>
+
+    <!-- TAB: ADD -->
+    <div class="tab-panel" data-panel="add">
+      <div class="info-box">Add a new part. The sale price is calculated automatically using the category markup.</div>
+      <div class="add-form">
+        <input type="text" id="newName" placeholder="Product name">
+        <select id="newCat"></select>
+        <input type="number" id="newCost" placeholder="Cost">
+        <input type="number" id="newPrice" placeholder="Sale (opt)">
+        <button onclick="addProduct()">+ Add</button>
+      </div>
+    </div>
+
+    <!-- TAB: DATA -->
+    <div class="tab-panel" data-panel="data">
+      <div class="info-box">
+        <strong>Export:</strong> downloads a JSON file with all your prices. Save it as a backup.<br>
+        <strong>Import:</strong> replaces all data with a previously exported JSON file.<br>
+        <strong>Reset:</strong> restores the original list.<br>
+        <strong>Password:</strong> change your admin panel access password.
+      </div>
+      <div class="actions" style="margin-top: 0; padding-top: 0; border: none;">
+        <button class="btn-primary" onclick="exportData()">Export JSON</button>
+        <button class="btn-secondary" onclick="document.getElementById('importFile').click()">Import JSON</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        <button class="btn-secondary" onclick="changePassword()">Change password</button>
+        <button class="btn-danger" onclick="resetAll()">Full reset</button>
+      </div>
+      <div style="margin-top: 20px; font-size: 12px; color: var(--text-mute);">
+        Last modified: <span id="modDate">—</span><br>
+        Products loaded: <span id="prodCount">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// =============== INITIAL DATA ===============
+const INITIAL_CATEGORIES = {
+  'iphone_alto':    { label: 'iPhone high-end',           markup: 30 },
+  'iphone_bajo':    { label: 'iPhone low-end',            markup: 45 },
+  'samsung_alto':   { label: 'Samsung high-end',          markup: 40 },
+  'samsung_bajo':   { label: 'Samsung low-end',           markup: 50 },
+  'motorola':       { label: 'Motorola',                  markup: 45 },
+  'xiaomi':         { label: 'Xiaomi',                    markup: 45 },
+  'otros_modulos':  { label: 'TCL/Alcatel/ZTE/LG/Huawei', markup: 50 },
+  'bateria':        { label: 'Batteries',                 markup: 60 },
+  'placa_carga':    { label: 'Charging boards',           markup: 70 },
+  'tapa':           { label: 'Back covers',               markup: 70 },
+  'flex':           { label: 'Main flex',                 markup: 60 },
+  'accesorio':      { label: 'Technical accessories',     markup: 50 }
+};
+
+// Base list (1/3/2026) - cost in pesos
+const INITIAL_PRODUCTS = [
+  // === MOTOROLA MODULES ===
+  { n:'Motorola E6 i / E6s OLED', c:12000, cat:'motorola' },
+  { n:'Motorola E6 Play OLED', c:12000, cat:'motorola' },
+  { n:'Motorola E6 Plus OLED', c:12000, cat:'motorola' },
+  { n:'Motorola E7 / E7i Power OLED', c:12000, cat:'motorola' },
+  { n:'Motorola E13 OLED', c:12000, cat:'motorola' },
+  { n:'Motorola E15 / G05 / G15 OLED', c:14000, cat:'motorola' },
+  { n:'Motorola E20 OLED', c:12000, cat:'motorola' },
+  { n:'Motorola E22 / E22i OLED', c:12000, cat:'motorola' },
+  { n:'Motorola E40 OLED', c:12000, cat:'motorola' },
+  { n:'Motorola G5 Plus OLED', c:8000, cat:'motorola' },
+  { n:'Motorola G5s Plus OLED', c:12000, cat:'motorola' },
+  { n:'Motorola G6 Play c/marco OLED', c:15000, cat:'motorola' },
+  { n:'Motorola G7 / G7 Plus OLED', c:13000, cat:'motorola' },
+  { n:'Motorola G7 Play OLED', c:12000, cat:'motorola' },
+  { n:'Motorola G7 Power OLED', c:12000, cat:'motorola' },
+  { n:'Motorola G8 OLED', c:14000, cat:'motorola' },
+  { n:'Motorola G8 Play / One Macro OLED', c:12000, cat:'motorola' },
+  { n:'Motorola G8 Plus OLED', c:14000, cat:'motorola' },
+  { n:'Motorola G8 Power OLED', c:15500, cat:'motorola' },
+  { n:'Motorola G9 / G9 Play / E7 Plus OLED', c:11000, cat:'motorola' },
+  { n:'Motorola G9 Plus OLED', c:14000, cat:'motorola' },
+  { n:'Motorola G9 Power OLED', c:15000, cat:'motorola' },
+  { n:'Motorola G10 / G20 / G30 OLED', c:12000, cat:'motorola' },
+  { n:'Motorola G13 / G23 / G53 OLED', c:12000, cat:'motorola' },
+  { n:'Motorola G14 / G54 / G62 5G OLED', c:15000, cat:'motorola' },
+  { n:'Motorola G22 / E32 OLED', c:12000, cat:'motorola' },
+  { n:'Motorola G24 / G04 / G04S / G24 Power / E14 OLED', c:13000, cat:'motorola' },
+  { n:'Motorola G31 / G41 / G71 OLED', c:35000, cat:'motorola' },
+  { n:'Motorola G32 / G73 OLED', c:13000, cat:'motorola' },
+  { n:'Motorola G42 OLED', c:45000, cat:'motorola' },
+  { n:'Motorola G51 / G60 / G60s OLED', c:15000, cat:'motorola' },
+  { n:'Motorola G52 / G72 / G82 / Edge 30 OLED', c:48000, cat:'motorola' },
+  { n:'Motorola G52 c/marco OLED', c:55000, cat:'motorola' },
+  { n:'Motorola G200 OLED', c:22000, cat:'motorola' },
+  { n:'Motorola Edge 30 Ultra ORIGINAL', c:100000, cat:'motorola' },
+  { n:'Motorola Edge 30 Pro ORIGINAL', c:100000, cat:'motorola' },
+  { n:'Motorola One OLED', c:12000, cat:'motorola' },
+  { n:'Motorola One Hyper OLED', c:10000, cat:'motorola' },
+  { n:'Motorola One Fusion OLED', c:12000, cat:'motorola' },
+  { n:'Motorola Z Play OLED', c:22000, cat:'motorola' },
+
+  // === SAMSUNG MODULES ===
+  { n:'Samsung J4 Plus / J4 Core / J6 Plus OLED', c:10000, cat:'samsung_bajo' },
+  { n:'Samsung J5 Prime Blanco OLED', c:8500, cat:'samsung_bajo' },
+  { n:'Samsung J5 Prime Negro OLED', c:8500, cat:'samsung_bajo' },
+  { n:'Samsung J6 OLED', c:25000, cat:'samsung_alto' },
+  { n:'Samsung J7 Prime Blanco OLED', c:9500, cat:'samsung_bajo' },
+  { n:'Samsung J7 Prime Negro OLED', c:9500, cat:'samsung_bajo' },
+  { n:'Samsung J7 2016 OLED', c:25000, cat:'samsung_alto' },
+  { n:'Samsung J700 Incell', c:13000, cat:'samsung_bajo' },
+  { n:'Samsung J8 OLED', c:35000, cat:'samsung_alto' },
+  { n:'Samsung A01 Core OLED', c:10000, cat:'samsung_bajo' },
+  { n:'Samsung A01 M OLED', c:9000, cat:'samsung_bajo' },
+  { n:'Samsung A02s / A03 / A03s / A04E OLED', c:12000, cat:'samsung_bajo' },
+  { n:'Samsung A03 c/marco OLED', c:14000, cat:'samsung_bajo' },
+  { n:'Samsung A03 Core OLED', c:11000, cat:'samsung_bajo' },
+  { n:'Samsung A04 OLED', c:11000, cat:'samsung_bajo' },
+  { n:'Samsung A04s OLED', c:10000, cat:'samsung_bajo' },
+  { n:'Samsung A05 OLED', c:10000, cat:'samsung_bajo' },
+  { n:'Samsung A06 OLED', c:14000, cat:'samsung_bajo' },
+  { n:'Samsung A10 / M10 OLED', c:9000, cat:'samsung_bajo' },
+  { n:'Samsung A10s OLED', c:9000, cat:'samsung_bajo' },
+  { n:'Samsung A11 OLED', c:10000, cat:'samsung_bajo' },
+  { n:'Samsung A12 / A02 / M12 OLED', c:11000, cat:'samsung_bajo' },
+  { n:'Samsung A13 / A23 OLED', c:14000, cat:'samsung_bajo' },
+  { n:'Samsung A14 5G OLED', c:12000, cat:'samsung_bajo' },
+  { n:'Samsung A20 c/marco OLED', c:30000, cat:'samsung_alto' },
+  { n:'Samsung A20s OLED', c:11000, cat:'samsung_bajo' },
+  { n:'Samsung A21s OLED', c:11000, cat:'samsung_bajo' },
+  { n:'Samsung A22 4G c/marco OLED', c:32000, cat:'samsung_alto' },
+  { n:'Samsung A22 5G OLED', c:11000, cat:'samsung_bajo' },
+  { n:'Samsung A25 c/marco OLED', c:40000, cat:'samsung_alto' },
+  { n:'Samsung A30s c/marco OLED', c:30000, cat:'samsung_alto' },
+  { n:'Samsung A30 / A50 c/marco OLED', c:30000, cat:'samsung_alto' },
+  { n:'Samsung A31 c/marco OLED', c:33000, cat:'samsung_alto' },
+  { n:'Samsung A32 4G c/marco OLED', c:38000, cat:'samsung_alto' },
+  { n:'Samsung A53 c/marco AMOLED', c:44000, cat:'samsung_alto' },
+  { n:'Samsung A72 c/marco ORIGINAL', c:145000, cat:'samsung_alto' },
+
+  // === IPHONE MODULES ===
+  { n:'iPhone 6G', c:12500, cat:'iphone_bajo' },
+  { n:'iPhone 6G Plus', c:12500, cat:'iphone_bajo' },
+  { n:'iPhone 6S', c:12500, cat:'iphone_bajo' },
+  { n:'iPhone 6S Plus Blanco', c:12500, cat:'iphone_bajo' },
+  { n:'iPhone 6S Plus Negro', c:13000, cat:'iphone_bajo' },
+  { n:'iPhone 7', c:13000, cat:'iphone_bajo' },
+  { n:'iPhone 7 Plus', c:12500, cat:'iphone_bajo' },
+  { n:'iPhone 8 / SE 2020', c:13000, cat:'iphone_bajo' },
+  { n:'iPhone 8 Plus Negro', c:14000, cat:'iphone_bajo' },
+  { n:'iPhone 8 Plus Blanco', c:14000, cat:'iphone_bajo' },
+  { n:'iPhone X', c:39500, cat:'iphone_bajo' },
+  { n:'iPhone XR', c:40000, cat:'iphone_bajo' },
+  { n:'iPhone XS', c:40000, cat:'iphone_bajo' },
+  { n:'iPhone XS Max', c:40000, cat:'iphone_bajo' },
+  { n:'iPhone 11', c:38000, cat:'iphone_bajo' },
+  { n:'iPhone 11 Pro', c:38000, cat:'iphone_bajo' },
+  { n:'iPhone 11 Pro Max', c:40000, cat:'iphone_bajo' },
+  { n:'iPhone 12 / 12 Pro', c:68000, cat:'iphone_alto' },
+  { n:'iPhone 12 Pro Max', c:93000, cat:'iphone_alto' },
+  { n:'iPhone 13', c:72000, cat:'iphone_alto' },
+  { n:'iPhone 13 Pro Max', c:80000, cat:'iphone_alto' },
+  { n:'iPhone 14', c:83500, cat:'iphone_alto' },
+  { n:'iPhone 14 Pro', c:86000, cat:'iphone_alto' },
+  { n:'iPhone 14 Pro Max', c:105000, cat:'iphone_alto' },
+  { n:'iPhone 15', c:117000, cat:'iphone_alto' },
+  { n:'iPhone 15 Pro', c:250000, cat:'iphone_alto' },
+  { n:'iPhone 15 Pro Max', c:300000, cat:'iphone_alto' },
+
+  // === XIAOMI MODULES ===
+  { n:'Xiaomi 10C / Poco C40 OLED', c:13000, cat:'xiaomi' },
+  { n:'Xiaomi 12C OLED', c:13000, cat:'xiaomi' },
+  { n:'Xiaomi 13C / C65 OLED', c:13000, cat:'xiaomi' },
+  { n:'Xiaomi 14C / Poco C75 OLED', c:16000, cat:'xiaomi' },
+  { n:'Xiaomi Note 7 / Note 7 Pro OLED', c:10000, cat:'xiaomi' },
+  { n:'Xiaomi Note 8 OLED', c:13000, cat:'xiaomi' },
+  { n:'Xiaomi Note 8 c/marco OLED', c:22000, cat:'xiaomi' },
+  { n:'Xiaomi Note 8 Pro OLED', c:13000, cat:'xiaomi' },
+  { n:'Xiaomi Note 8T OLED', c:13000, cat:'xiaomi' },
+  { n:'Xiaomi Note 9 OLED', c:14000, cat:'xiaomi' },
+  { n:'Xiaomi Note 9S / Note 9 Pro OLED', c:15000, cat:'xiaomi' },
+  { n:'Xiaomi Note 9T OLED', c:14000, cat:'xiaomi' },
+  { n:'Xiaomi Note 11 / 11S / 12S / M4 Pro 4G OLED', c:39000, cat:'xiaomi' },
+  { n:'Xiaomi Note 12 4G OLED', c:36000, cat:'xiaomi' },
+  { n:'Xiaomi Note 13 4G OLED', c:60000, cat:'xiaomi' },
+  { n:'Xiaomi Mi 8 OLED', c:18000, cat:'xiaomi' },
+  { n:'Xiaomi Mi 9T OLED', c:40000, cat:'xiaomi' },
+  { n:'Xiaomi A2 Lite OLED', c:13500, cat:'xiaomi' },
+
+  // === TCL / ALCATEL / ZTE MODULES ===
+  { n:'Alcatel/TCL 10 SE / 3X / 5X OLED', c:13000, cat:'otros_modulos' },
+  { n:'Alcatel/TCL 20B OLED', c:14000, cat:'otros_modulos' },
+  { n:'Alcatel/TCL 20SE OLED', c:13000, cat:'otros_modulos' },
+  { n:'Alcatel/TCL 30SE / 30E / 3H+ / 5H+ OLED', c:13000, cat:'otros_modulos' },
+  { n:'Alcatel/TCL 20E / 20Y / 3H / 5H OLED', c:13000, cat:'otros_modulos' },
+  { n:'TCL 40SE OLED', c:16000, cat:'otros_modulos' },
+  { n:'TCL 405 / 408 OLED', c:15000, cat:'otros_modulos' },
+  { n:'TCL 505 OLED', c:15000, cat:'otros_modulos' },
+  { n:'Huawei Mate 20 Lite OLED', c:12000, cat:'otros_modulos' },
+  { n:'Huawei P9 Lite OLED', c:15000, cat:'otros_modulos' },
+  { n:'ZTE A33 Plus Blade OLED', c:19000, cat:'otros_modulos' },
+  { n:'ZTE V50 Vita OLED', c:15000, cat:'otros_modulos' },
+  { n:'ZTE A51 / A71 OLED', c:15000, cat:'otros_modulos' },
+  { n:'ZTE A72s Blade / V40 Vita OLED', c:16000, cat:'otros_modulos' },
+  { n:'ZTE A73 Blade OLED', c:15000, cat:'otros_modulos' },
+  { n:'LG K42 OLED', c:12000, cat:'otros_modulos' },
+  { n:'LG K61 c/marco OLED', c:13000, cat:'otros_modulos' },
+
+  // === CHARGING BOARDS ===
+  { n:'Placa carga Samsung A02s', c:4500, cat:'placa_carga' },
+  { n:'Placa carga Samsung A04', c:5000, cat:'placa_carga' },
+  { n:'Placa carga Samsung A04s', c:4500, cat:'placa_carga' },
+  { n:'Placa carga Samsung A05', c:4500, cat:'placa_carga' },
+  { n:'Placa carga Samsung A12', c:5000, cat:'placa_carga' },
+  { n:'Placa carga Samsung A14 4G', c:5500, cat:'placa_carga' },
+  { n:'Placa carga Samsung A21s', c:5000, cat:'placa_carga' },
+  { n:'Placa carga Samsung A31', c:5500, cat:'placa_carga' },
+  { n:'Placa carga Samsung A50', c:8000, cat:'placa_carga' },
+  { n:'Placa carga Samsung A51', c:5500, cat:'placa_carga' },
+  { n:'Placa carga Motorola E6 Plus', c:5500, cat:'placa_carga' },
+  { n:'Placa carga Motorola E7', c:5000, cat:'placa_carga' },
+  { n:'Placa carga Motorola E7i Power', c:4500, cat:'placa_carga' },
+  { n:'Placa carga Motorola E7 Plus', c:4500, cat:'placa_carga' },
+  { n:'Placa carga Motorola E13', c:4000, cat:'placa_carga' },
+  { n:'Placa carga Motorola E15', c:5000, cat:'placa_carga' },
+  { n:'Placa carga Motorola E32', c:4000, cat:'placa_carga' },
+  { n:'Placa carga Motorola E20', c:4000, cat:'placa_carga' },
+  { n:'Placa carga Motorola G04', c:5500, cat:'placa_carga' },
+  { n:'Placa carga Motorola G10', c:5500, cat:'placa_carga' },
+  { n:'Placa carga Motorola G13', c:5500, cat:'placa_carga' },
+  { n:'Placa carga Motorola G22', c:5500, cat:'placa_carga' },
+  { n:'Placa carga Motorola G32', c:5500, cat:'placa_carga' },
+  { n:'Placa carga Motorola G41', c:4000, cat:'placa_carga' },
+  { n:'Placa carga Motorola G60s', c:5500, cat:'placa_carga' },
+  { n:'Placa carga TCL 20SE', c:6000, cat:'placa_carga' },
+  { n:'Placa carga iPhone 8', c:9500, cat:'placa_carga' },
+
+  // === BATTERIES ===
+  { n:'Batería Samsung A02s / A03 / A03s / A04 / A04E / A03 Core', c:11000, cat:'bateria' },
+  { n:'Batería Samsung A04s / A21s / A02 / A12 / M12', c:11000, cat:'bateria' },
+  { n:'Batería Samsung A13', c:11000, cat:'bateria' },
+  { n:'Batería Samsung A15', c:13500, cat:'bateria' },
+  { n:'Batería Samsung A22', c:12000, cat:'bateria' },
+  { n:'Batería Samsung A30 / A50', c:12000, cat:'bateria' },
+  { n:'Batería Samsung A32 / A34 / A54', c:11000, cat:'bateria' },
+  { n:'Batería Samsung A52 / S20FE', c:11000, cat:'bateria' },
+  { n:'Batería Samsung A53', c:11000, cat:'bateria' },
+  { n:'Batería Motorola G8 Plus / G7 Power / E7 Plus / One Fusion', c:12500, cat:'bateria' },
+  { n:'Batería Motorola G9 Play / G20 / G30 / G50 / G31 / G51 / E30 / E40 (JK50)', c:0, cat:'bateria' },
+  { n:'Batería Motorola G04 / G04S / G24 / G34 (QF50)', c:15500, cat:'bateria' },
+  { n:'Batería Motorola G8 / G8 Play / One Macro / E7 (KG40)', c:11000, cat:'bateria' },
+  { n:'Batería Motorola E6 Play / E6S / E6i (KS40)', c:12000, cat:'bateria' },
+  { n:'Batería Motorola E22 (NH40)', c:12000, cat:'bateria' },
+  { n:'Batería Motorola E20 (NT40)', c:11500, cat:'bateria' },
+  { n:'Batería Motorola G42 (ND42)', c:12500, cat:'bateria' },
+  { n:'Batería Motorola E32 / G22 / E13 / G13 (NH50)', c:11000, cat:'bateria' },
+  { n:'Batería Motorola G32 / G41', c:12000, cat:'bateria' },
+
+  // === BACK COVERS ===
+  { n:'Tapa Motorola E7 Plus Azul', c:7000, cat:'tapa' },
+  { n:'Tapa Samsung A11 Azul', c:7000, cat:'tapa' },
+
+  // === FLEX ===
+  { n:'Flex main Samsung A21s', c:1000, cat:'flex' },
+  { n:'Flex main Samsung A51', c:1000, cat:'flex' },
+
+  // === TECHNICAL ACCESSORIES ===
+  { n:'Pegamentos', c:2500, cat:'accesorio' },
+  { n:'Herramientas caja', c:10000, cat:'accesorio' },
+  { n:'Alcohol isopropílico', c:1500, cat:'accesorio' }
+];
+
+// =============== STATE ===============
+const STORAGE_KEY = 'techpoint_repuestos_v1';
+const PASS_KEY = 'techpoint_admin_pass';
+const TRANSFER_RECARGO = 0.05;
+const DEFAULT_PASSWORD = 'techpoint2026';
+
+let state = loadState();
+let isAdmin = false;
+let activeCategory = 'all';
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return {
+    categories: JSON.parse(JSON.stringify(INITIAL_CATEGORIES)),
+    products: INITIAL_PRODUCTS.map((p, i) => ({
+      id: i + 1,
+      name: p.n,
+      cost: p.c,
+      cat: p.cat,
+      price: Math.round(p.c * (1 + INITIAL_CATEGORIES[p.cat].markup / 100)),
+      manual: false
+    })),
+    lastUpdate: new Date().toISOString(),
+    nextId: INITIAL_PRODUCTS.length + 1
+  };
+}
+
+function saveState() {
+  state.lastUpdate = new Date().toISOString();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function getPassword() {
+  return localStorage.getItem(PASS_KEY) || DEFAULT_PASSWORD;
+}
+
+// =============== HELPERS ===============
+function formatARS(n) {
+  if (!n || n <= 0) return '—';
+  return '$' + Math.round(n).toLocaleString('es-AR');
+}
+
+function formatDate(iso) {
+  try {
+    return new Date(iso).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch { return '—'; }
+}
+
+function calcPrice(cost, cat) {
+  const markup = (state.categories[cat] && state.categories[cat].markup) || 0;
+  return Math.round(cost * (1 + markup / 100));
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// =============== PUBLIC RENDER ===============
+function renderFilters() {
+  const wrap = document.getElementById('filters');
+  const cats = Object.entries(state.categories);
+  wrap.innerHTML = `<button class="chip ${activeCategory==='all'?'active':''}" data-cat="all">All</button>` +
+    cats.map(([k, v]) => `<button class="chip ${activeCategory===k?'active':''}" data-cat="${k}">${v.label}</button>`).join('');
+  wrap.querySelectorAll('.chip').forEach(b => {
+    b.onclick = () => { activeCategory = b.dataset.cat; renderFilters(); renderProducts(); };
+  });
+}
+
+function renderProducts() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  const list = state.products.filter(p => {
+    if (p.cost <= 0 && p.price <= 0) return false;
+    if (activeCategory !== 'all' && p.cat !== activeCategory) return false;
+    if (q && !p.name.toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a, b) => a.name.localeCompare(b.name, 'en'));
+
+  document.getElementById('count').innerHTML = `<strong>${list.length}</strong> products`;
+
+  const grid = document.getElementById('products');
+  if (list.length === 0) {
+    grid.innerHTML = `<div class="empty" style="grid-column: 1/-1;">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <div>No results</div></div>`;
+    return;
+  }
+
+  grid.innerHTML = list.map(p => {
+    const efec = p.price;
+    const transfer = Math.round(efec * (1 + TRANSFER_RECARGO));
+    return `<div class="product">
+      <div class="product-cat">${state.categories[p.cat]?.label || p.cat}</div>
+      <div class="product-name">${p.name}</div>
+      <div class="product-prices">
+        <div class="price-block">
+          <div class="price-label">Cash</div>
+          <div class="price-efectivo">${formatARS(efec)}</div>
+        </div>
+        <div class="price-block">
+          <div class="price-label">Transfer</div>
+          <div class="price-transfer">${formatARS(transfer)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('lastUpdate').textContent = formatDate(state.lastUpdate);
+}
+
+// =============== ADMIN ===============
+function openLogin() {
+  document.getElementById('loginModal').classList.add('show');
+  setTimeout(() => document.getElementById('passInput').focus(), 100);
+}
+function closeLogin() {
+  document.getElementById('loginModal').classList.remove('show');
+  document.getElementById('passInput').value = '';
+  document.getElementById('loginError').textContent = '';
+}
+function doLogin() {
+  const input = document.getElementById('passInput').value;
+  if (input === getPassword()) {
+    isAdmin = true;
+    closeLogin();
+    openAdmin();
+  } else {
+    document.getElementById('loginError').textContent = 'Incorrect password';
+  }
+}
+
+function openAdmin() {
+  if (!isAdmin) { openLogin(); return; }
+  document.getElementById('adminModal').classList.add('show');
+  renderEditor();
+  renderMarkups();
+  renderAddCats();
+  renderDataInfo();
+}
+function closeAdmin() {
+  document.getElementById('adminModal').classList.remove('show');
+}
+
+function renderEditor() {
+  const sel = document.getElementById('editorCat');
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">All categories</option>' +
+    Object.entries(state.categories).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+  sel.value = currentVal;
+
+  const q = document.getElementById('editorSearch').value.toLowerCase().trim();
+  const catFilter = sel.value;
+  const list = state.products.filter(p => {
+    if (catFilter && p.cat !== catFilter) return false;
+    if (q && !p.name.toLowerCase().includes(q)) return false;
+    return true;
+  }).sort((a, b) => a.name.localeCompare(b.name, 'en'));
+
+  const items = document.getElementById('editorItems');
+  if (list.length === 0) {
+    items.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-mute); font-size: 13px;">No results</div>';
+    return;
+  }
+  items.innerHTML = list.map(p => `
+    <div class="editor-item">
+      <div class="editor-item-info">
+        <div class="editor-item-name">${p.name}</div>
+        <div class="editor-item-cat">${state.categories[p.cat]?.label || p.cat}${p.manual ? ' · manual' : ''}</div>
+      </div>
+      <input type="number" class="editor-item-input cost" value="${p.cost}" onchange="updateCost(${p.id}, this.value)" title="Cost">
+      <input type="number" class="editor-item-input price" value="${p.price}" onchange="updatePrice(${p.id}, this.value)" title="Cash sale price">
+      <button class="editor-item-del" onclick="deleteProduct(${p.id})" title="Delete">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function updateCost(id, val) {
+  const p = state.products.find(x => x.id === id);
+  if (!p) return;
+  p.cost = parseFloat(val) || 0;
+  if (!p.manual) p.price = calcPrice(p.cost, p.cat);
+  saveState();
+  renderEditor();
+  renderProducts();
+  toast('Cost updated');
+}
+function updatePrice(id, val) {
+  const p = state.products.find(x => x.id === id);
+  if (!p) return;
+  p.price = parseFloat(val) || 0;
+  p.manual = true;
+  saveState();
+  renderEditor();
+  renderProducts();
+  toast('Price set manually');
+}
+function deleteProduct(id) {
+  if (!confirm('Delete this product?')) return;
+  state.products = state.products.filter(x => x.id !== id);
+  saveState();
+  renderEditor();
+  renderProducts();
+  toast('Product deleted');
+}
+
+function renderMarkups() {
+  const wrap = document.getElementById('markupList');
+  wrap.innerHTML = Object.entries(state.categories).map(([k, v]) => `
+    <div class="markup-row">
+      <div class="markup-label">${v.label}</div>
+      <input type="number" class="markup-input" value="${v.markup}" onchange="updateMarkup('${k}', this.value)">
+      <div class="markup-suffix">%</div>
+    </div>
+  `).join('');
+}
+function updateMarkup(catKey, val) {
+  state.categories[catKey].markup = parseFloat(val) || 0;
+  saveState();
+  toast(`Markup ${state.categories[catKey].label}: ${val}%`);
+}
+function applyAllMarkups() {
+  if (!confirm('This will recalculate ALL prices from cost + markup. Prices marked as manual will also be overwritten. Continue?')) return;
+  state.products.forEach(p => {
+    p.price = calcPrice(p.cost, p.cat);
+    p.manual = false;
+  });
+  saveState();
+  renderEditor();
+  renderProducts();
+  toast('Markups applied to all products');
+}
+function recalcAll() { applyAllMarkups(); }
+
+function renderAddCats() {
+  const sel = document.getElementById('newCat');
+  sel.innerHTML = Object.entries(state.categories).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+}
+function addProduct() {
+  const name = document.getElementById('newName').value.trim();
+  const cat = document.getElementById('newCat').value;
+  const cost = parseFloat(document.getElementById('newCost').value) || 0;
+  const price = parseFloat(document.getElementById('newPrice').value) || 0;
+  if (!name) { toast('Name is required'); return; }
+  const finalPrice = price > 0 ? price : calcPrice(cost, cat);
+  state.products.push({
+    id: state.nextId++,
+    name, cost, cat,
+    price: finalPrice,
+    manual: price > 0
+  });
+  saveState();
+  document.getElementById('newName').value = '';
+  document.getElementById('newCost').value = '';
+  document.getElementById('newPrice').value = '';
+  renderEditor();
+  renderProducts();
+  toast('Product added');
+}
+
+function renderDataInfo() {
+  document.getElementById('modDate').textContent = formatDate(state.lastUpdate);
+  document.getElementById('prodCount').textContent = state.products.length;
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `techpoint_parts_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Backup downloaded');
+}
+function importData(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!imported.products || !imported.categories) throw new Error('Invalid format');
+      if (!confirm('Replace all current data with the imported file?')) return;
+      state = imported;
+      saveState();
+      renderEditor(); renderMarkups(); renderAddCats(); renderFilters(); renderProducts(); renderDataInfo();
+      toast('Data imported');
+    } catch (err) {
+      toast('Error: invalid file');
+    }
+  };
+  reader.readAsText(file);
+  ev.target.value = '';
+}
+function resetAll() {
+  if (!confirm('Reset everything to the original list? All changes will be lost.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  state = loadState();
+  saveState();
+  renderEditor(); renderMarkups(); renderAddCats(); renderFilters(); renderProducts(); renderDataInfo();
+  toast('Data restored');
+}
+function changePassword() {
+  const current = prompt('Current password:');
+  if (current !== getPassword()) { toast('Incorrect current password'); return; }
+  const newPass = prompt('New password (min. 4 characters):');
+  if (!newPass || newPass.length < 4) { toast('Password too short'); return; }
+  const confirmPass = prompt('Repeat new password:');
+  if (newPass !== confirmPass) { toast('Passwords do not match'); return; }
+  localStorage.setItem(PASS_KEY, newPass);
+  toast('Password updated');
+}
+
+// =============== EVENTS ===============
+document.getElementById('search').addEventListener('input', renderProducts);
+document.getElementById('editorSearch').addEventListener('input', renderEditor);
+document.getElementById('editorCat').addEventListener('change', renderEditor);
+document.getElementById('adminBtn').addEventListener('click', () => {
+  if (isAdmin) openAdmin();
+  else openLogin();
+});
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelector(`.tab-panel[data-panel="${t.dataset.tab}"]`).classList.add('active');
+  };
+});
+
+document.querySelectorAll('.modal-bg').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
+});
+
+// =============== INIT ===============
+renderFilters();
+renderProducts();
+</script>
+</body>
+</html>
