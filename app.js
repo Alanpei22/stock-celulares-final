@@ -470,8 +470,12 @@ function _initBannersAutoRefresh() {
 //  BOTTOM SHEET — menú deslizante reutilizable
 // ══════════════════════════════════════════
 let _sheetItems = [];
+let _sheetHideTimer = null; // BUG-FIX: cancelable para evitar que un close en transición tape un open nuevo
 
 function openSheet(title, items) {
+  // Cancelar cualquier close pendiente — si se abre un sheet nuevo, no debemos ocultarlo
+  if (_sheetHideTimer) { clearTimeout(_sheetHideTimer); _sheetHideTimer = null; }
+
   _sheetItems = items.filter(it => !it.hide);
   const titleEl = document.getElementById('sheet-title');
   const cont    = document.getElementById('sheet-items');
@@ -501,9 +505,11 @@ function closeSheet() {
   const sheet   = document.getElementById('sheet');
   if (!sheet) return;
   sheet.classList.remove('sheet--open');
-  setTimeout(() => {
+  if (_sheetHideTimer) clearTimeout(_sheetHideTimer);
+  _sheetHideTimer = setTimeout(() => {
     overlay?.classList.add('hidden');
     sheet.classList.add('hidden');
+    _sheetHideTimer = null;
   }, 280);
 }
 

@@ -835,8 +835,12 @@ function _renderTurnoSep(c) {
 //  BOTTOM SHEET — menú deslizante reutilizable
 // ══════════════════════════════════════════
 let _sheetItems = [];
+let _sheetHideTimer = null; // BUG-FIX: cancelable
 
 function openSheet(title, items) {
+  // Cancelar cualquier close pendiente
+  if (_sheetHideTimer) { clearTimeout(_sheetHideTimer); _sheetHideTimer = null; }
+
   _sheetItems = items.filter(it => !it.hide);
   const titleEl = document.getElementById('sheet-title');
   const cont    = document.getElementById('sheet-items');
@@ -865,9 +869,11 @@ function closeSheet() {
   const sheet   = document.getElementById('sheet');
   if (!sheet) return;
   sheet.classList.remove('sheet--open');
-  setTimeout(() => {
+  if (_sheetHideTimer) clearTimeout(_sheetHideTimer);
+  _sheetHideTimer = setTimeout(() => {
     overlay?.classList.add('hidden');
     sheet.classList.add('hidden');
+    _sheetHideTimer = null;
   }, 280);
 }
 
