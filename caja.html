@@ -660,6 +660,49 @@
   </div>
 </div>
 
+<!-- ═══════════ MODAL: REPORTE FINANCIERO ═══════════ -->
+<div id="finrep-overlay" class="nota-overlay hidden" onclick="closeFinanzasReport()"></div>
+<div id="finrep-modal" class="arqueo-modal hidden" style="max-width:440px">
+  <div class="nota-modal-hdr">
+    <span>📄 Reporte financiero</span>
+    <button onclick="closeFinanzasReport()">✕</button>
+  </div>
+  <p class="arqueo-sub">Exportá un PDF con todas las finanzas del período que elijas.</p>
+
+  <div class="finrep-presets">
+    <button class="finrep-preset" data-preset="mes" onclick="_finrepPreset('mes')">Este mes</button>
+    <button class="finrep-preset" data-preset="mes-1" onclick="_finrepPreset('mes-1')">Mes pasado</button>
+    <button class="finrep-preset" data-preset="anio" onclick="_finrepPreset('anio')">Este año</button>
+    <button class="finrep-preset" data-preset="ult-30" onclick="_finrepPreset('ult-30')">Últimos 30d</button>
+  </div>
+
+  <div class="finrep-dates">
+    <div class="finrep-date-fld">
+      <label>Desde</label>
+      <input type="date" id="finrep-from">
+    </div>
+    <div class="finrep-date-fld">
+      <label>Hasta</label>
+      <input type="date" id="finrep-to">
+    </div>
+  </div>
+
+  <div class="finrep-include">
+    <div class="finrep-include-title">Incluir en el reporte:</div>
+    <label class="finrep-chk"><input type="checkbox" id="finrep-inc-caja" checked> 📒 Caja diaria (ingresos / egresos)</label>
+    <label class="finrep-chk"><input type="checkbox" id="finrep-inc-ventas" checked> 📱 Ventas de equipos</label>
+    <label class="finrep-chk"><input type="checkbox" id="finrep-inc-reparaciones" checked> 🔧 Reparaciones</label>
+    <label class="finrep-chk"><input type="checkbox" id="finrep-inc-dueno" checked> 📦 Caja Dueño</label>
+  </div>
+
+  <div id="finrep-status" class="finrep-status"></div>
+
+  <div style="display:flex;gap:10px;margin-top:14px">
+    <button class="btn-secondary" onclick="closeFinanzasReport()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" id="finrep-generate" onclick="generarFinanzasPDF()" style="flex:2">📄 Generar PDF</button>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -669,6 +712,7 @@
 <script src="caja.js"></script>
 <script src="caja_extra.js"></script>
 <script src="inventario.js"></script>
+<script src="finanzas-report.js"></script>
 <script src="notifications.js"></script>
 <script src="webpush.js"></script>
 <script>

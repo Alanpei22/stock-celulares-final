@@ -898,6 +898,7 @@ function toggleCajaMenu() {
     { divider: true, hide: !isOwner },
     { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
     { icon: '📦', label: 'Caja Dueño', hide: !isOwner, onClick: openCajaDueno },
+    { icon: '📄', label: 'Reporte financiero', sub: 'Exportar a PDF por período', hide: !isOwner, onClick: () => (typeof openFinanzasReport === 'function') && openFinanzasReport() },
     { divider: true },
     { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
   ]);
