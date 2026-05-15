@@ -1322,21 +1322,75 @@ function sendPresupuestoWA(id) {
   window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
-// ── WhatsApp resumen pendientes ───────────
-function sendPendingWA() {
-  const sorted = [...REPAIRS]
-    .sort((a, b) => (b.nOrden || 0) - (a.nOrden || 0))
-    .slice(0, 100);
+// ══════════════════════════════════════════
+//  WHATSAPP — resumen de pendientes
+// ══════════════════════════════════════════
 
-  const reparando = sorted.filter(r => r.estado === 'reparando');
-  const listos    = sorted.filter(r => r.estado === 'listo');
+// Helper: lista actualizada de pendientes (reparando + listos)
+// CORRIGE: filtrar PRIMERO por estado, después ordenar por fecha (oldest first = más urgente).
+// Ignora pendientes muy viejos (más de 6 meses) — probablemente abandonados.
+function _getPendientesData() {
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 6);
+  const cutoffTs = cutoff.getTime();
+
+  const reparando = REPAIRS.filter(r =>
+    r.estado === 'reparando' &&
+    r.fechaIngreso &&
+    new Date(r.fechaIngreso).getTime() >= cutoffTs
+  ).sort((a, b) => (a.fechaIngreso || '').localeCompare(b.fechaIngreso || ''));
+
+  const listos = REPAIRS.filter(r =>
+    r.estado === 'listo' &&
+    r.fechaIngreso &&
+    new Date(r.fechaIngreso).getTime() >= cutoffTs
+  ).sort((a, b) => {
+    // Para listos: priorizar los que más tiempo llevan listos (fechaListo más vieja)
+    const aListo = a.estadoHistorial?.find(h => h.estado === 'listo')?.fecha || a.fechaIngreso;
+    const bListo = b.estadoHistorial?.find(h => h.estado === 'listo')?.fecha || b.fechaIngreso;
+    return (aListo || '').localeCompare(bListo || '');
+  });
+
+  return { reparando, listos };
+}
+
+function sendPendingWA() {
+  const { reparando, listos } = _getPendientesData();
 
   if (reparando.length === 0 && listos.length === 0) {
     toast('No hay equipos pendientes', 'info');
     return;
   }
 
-  // Mostrar popup de selección
+  // Usar bottom sheet (consistente con el resto de la app)
+  if (typeof openSheet === 'function') {
+    const items = [];
+    if (reparando.length > 0) items.push({
+      icon: '🔧',
+      label: 'En reparación',
+      sub: `${reparando.length} equipo${reparando.length !== 1 ? 's' : ''}`,
+      onClick: () => buildAndSendPendingWA('reparando')
+    });
+    if (listos.length > 0) items.push({
+      icon: '✅',
+      label: 'Listos para retirar',
+      sub: `${listos.length} equipo${listos.length !== 1 ? 's' : ''} — avisar al cliente`,
+      onClick: () => buildAndSendPendingWA('listo')
+    });
+    if (reparando.length > 0 && listos.length > 0) {
+      items.push({ divider: true });
+      items.push({
+        icon: '📋',
+        label: 'Todos los pendientes',
+        sub: `${reparando.length + listos.length} equipos en total`,
+        onClick: () => buildAndSendPendingWA('ambos')
+      });
+    }
+    openSheet('Enviar pendientes por WhatsApp', items);
+    return;
+  }
+
+  // Fallback: popup flotante (legacy, por si no hay openSheet)
   closePendingMenu();
   const menu = document.createElement('div');
   menu.id = 'pending-wa-menu';
@@ -1358,43 +1412,63 @@ function closePendingMenu() {
 }
 
 function buildAndSendPendingWA(tipo) {
-  const sorted = [...REPAIRS]
-    .sort((a, b) => (b.nOrden || 0) - (a.nOrden || 0))
-    .slice(0, 100);
-
-  const reparando = sorted.filter(r => r.estado === 'reparando');
-  const listos    = sorted.filter(r => r.estado === 'listo');
+  const { reparando, listos } = _getPendientesData();
 
   const fmtLine = r => {
-    const partes = [`N°${r.nOrden || '?'}`, `${r.marca} ${r.modelo}`, r.arreglo].filter(Boolean);
+    const dias = r.fechaIngreso
+      ? Math.floor((Date.now() - new Date(r.fechaIngreso).getTime()) / 86400000)
+      : 0;
+    const diasStr = dias === 0 ? 'hoy' : dias === 1 ? '1 día' : dias + ' días';
+    const urgent = dias > 7 ? '🚨 ' : dias > 3 ? '⚠️ ' : '';
+
+    const partes = [`N°${r.nOrden || '?'}`, `${r.marca || ''} ${r.modelo || ''}`.trim()];
+    if (r.arreglo) partes.push(r.arreglo);
     if (r.nombre) partes.push(r.nombre);
-    return '• ' + partes.join(' | ');
+    return `${urgent}• ${partes.join(' | ')}\n   ⏱ ${diasStr}`;
+  };
+
+  // Para "listos": calcular días desde que está listo, no desde el ingreso
+  const fmtLineListo = r => {
+    const fListo = r.estadoHistorial?.find(h => h.estado === 'listo')?.fecha || r.fechaIngreso;
+    const dias = fListo
+      ? Math.floor((Date.now() - new Date(fListo).getTime()) / 86400000)
+      : 0;
+    const diasStr = dias === 0 ? 'hoy' : dias === 1 ? '1 día' : dias + ' días';
+    const urgent = dias > 7 ? '🚨 ' : dias > 3 ? '⚠️ ' : '';
+
+    const partes = [`N°${r.nOrden || '?'}`, `${r.marca || ''} ${r.modelo || ''}`.trim()];
+    if (r.arreglo) partes.push(r.arreglo);
+    if (r.nombre) partes.push(r.nombre);
+    return `${urgent}• ${partes.join(' | ')}\n   ✅ listo hace ${diasStr}`;
   };
 
   let msg = '';
   const fecha = new Date().toLocaleDateString('es-AR');
+  const businessName = window._DAKI_NAME || 'TechPoint';
 
   if (tipo === 'reparando') {
-    msg = `🔧 *EN REPARACIÓN (${reparando.length})*\n_${fecha}_\n\n`;
-    msg += reparando.map(fmtLine).join('\n');
+    msg = `🔧 *EN REPARACIÓN (${reparando.length})* — ${businessName}\n_${fecha}_\n\n`;
+    msg += reparando.map(fmtLine).join('\n\n');
+    msg += `\n\n_Ordenado por antigüedad — primero los más viejos_`;
   } else if (tipo === 'listo') {
-    msg = `✅ *LISTOS PARA RETIRAR (${listos.length})*\n_${fecha}_\n\n`;
-    msg += listos.map(fmtLine).join('\n');
+    msg = `✅ *LISTOS PARA RETIRAR (${listos.length})* — ${businessName}\n_${fecha}_\n\n`;
+    msg += listos.map(fmtLineListo).join('\n\n');
   } else {
-    msg = `📋 *EQUIPOS PENDIENTES*\n_${fecha}_`;
+    msg = `📋 *EQUIPOS PENDIENTES* — ${businessName}\n_${fecha}_`;
     if (reparando.length > 0) {
-      msg += `\n\n🔧 *En reparación (${reparando.length})*\n`;
-      msg += reparando.map(fmtLine).join('\n');
+      msg += `\n\n🔧 *En reparación (${reparando.length})*\n\n`;
+      msg += reparando.map(fmtLine).join('\n\n');
     }
     if (listos.length > 0) {
-      msg += `\n\n✅ *Listos para retirar (${listos.length})*\n`;
-      msg += listos.map(fmtLine).join('\n');
+      msg += `\n\n\n✅ *Listos para retirar (${listos.length})*\n\n`;
+      msg += listos.map(fmtLineListo).join('\n\n');
     }
-    msg += `\n\n_Total: ${reparando.length + listos.length} equipos_`;
+    msg += `\n\n_Total: ${reparando.length + listos.length} equipos pendientes_`;
   }
 
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
+
 
 // ── Eliminar ──────────────────────────────
 async function deleteRepair(id) {
