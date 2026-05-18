@@ -114,6 +114,9 @@ function initApp() {
   ensureDolar(db);                 // ← cotización para calcular costo en pesos
   if (typeof initInventario === 'function') initInventario();
 
+  // Estado colapsado/expandido del panel de detalle de caja
+  _initCajaDetailState();
+
   // ── URL action handler (?action=cierre desde notifs/banners) ──
   _handleUrlAction();
 
@@ -557,6 +560,14 @@ function renderStats() {
   const netoEl = document.getElementById('stat-neto');
   if (netoEl) { netoEl.textContent = fmt(neto); netoEl.style.color = neto >= 0 ? '#10b981' : '#ef4444'; }
 
+  // Quick bar (siempre visible)
+  set('qb-efectivo', efectivoEnCaja);
+  const qbNeto = document.getElementById('qb-neto');
+  if (qbNeto) {
+    qbNeto.textContent = (neto < 0 ? '−' : '') + fmt(neto);
+    qbNeto.style.color = neto >= 0 ? '#10b981' : '#ef4444';
+  }
+
   // Feature 6: comparativa "vs ayer" (usa _yesterdayNeto cargado por _loadYesterdayStats)
   _renderVsYesterday(neto);
 
@@ -673,6 +684,27 @@ function toggleCajaResumen() {
   const chevron = document.getElementById('cres-chevron');
   if (detail)  detail.classList.toggle('hidden', !_cajaResumenOpen);
   if (chevron) chevron.textContent = _cajaResumenOpen ? '▲' : '▼'; // LOW-15: ▲=expanded, ▼=collapsed
+}
+
+// Panel de detalle de caja (stats + desglose) — colapsable, recuerda preferencia
+function toggleCajaDetail() {
+  const panel = document.getElementById('caja-detail-panel');
+  const chevron = document.getElementById('cqb-chevron');
+  if (!panel) return;
+  const willOpen = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', !willOpen);
+  if (chevron) chevron.textContent = willOpen ? '▴' : '▾';
+  try { localStorage.setItem('cajaDetailOpen', willOpen ? '1' : '0'); } catch {}
+}
+
+// Aplica el estado guardado al cargar (colapsado por defecto)
+function _initCajaDetailState() {
+  const panel = document.getElementById('caja-detail-panel');
+  const chevron = document.getElementById('cqb-chevron');
+  if (!panel) return;
+  const open = localStorage.getItem('cajaDetailOpen') === '1';
+  panel.classList.toggle('hidden', !open);
+  if (chevron) chevron.textContent = open ? '▴' : '▾';
 }
 
 // Estado de búsqueda + filtro (Feature 5)

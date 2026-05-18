@@ -373,11 +373,34 @@ body.dark .invwiz-card .fi input { background:#1c1c1e; border-color:rgba(255,255
 }
 .date-nav-btn:hover { background: var(--bg1, #F1F0EE); }
 
+/* ── QUICK BAR (resumen compacto siempre visible) ── */
+.caja-quickbar {
+ display: flex; align-items: center; gap: 10px;
+ margin: 8px 12px; padding: 10px 14px;
+ background: var(--card, #FFFFFF);
+ border: 1px solid var(--border, #E3E1DE);
+ border-radius: 16px;
+ cursor: pointer; transition: all 150ms;
+ box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.caja-quickbar:active { transform: scale(.99); }
+.cqb-item { flex: 1; min-width: 0; text-align: center; }
+.cqb-num { display: block; font-size: 1.35rem; font-weight: 900; letter-spacing: -.02em; color: var(--t1, #1A1A1A); line-height: 1; }
+.cqb-num--ef { color: var(--t1, #1A1A1A); }
+.cqb-lbl { display: block; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #8A8A8A; margin-top: 4px; }
+.cqb-sep { width: 1px; align-self: stretch; background: var(--border, #E3E1DE); margin: 2px 0; }
+.cqb-chevron { font-size: .9rem; color: #8A8A8A; flex-shrink: 0; transition: transform 150ms; }
+body.dark .caja-quickbar { background: #1c1c1e; border-color: rgba(255,255,255,.08); }
+
+/* ── Panel de detalle colapsable ── */
+.caja-detail-panel { transition: opacity 150ms; }
+.caja-detail-panel.hidden { display: none; }
+
 .caja-stats {
  display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
  padding: .75rem; background: var(--bg1, #F1F0EE);
  border-radius: 18px; border: 1px solid var(--border, #E3E1DE);
- margin: .5rem .75rem;
+ margin: .5rem .75rem 0;
 }
 .caja-stat {
  grid-column: span 2; background: var(--card, #FFFFFF);

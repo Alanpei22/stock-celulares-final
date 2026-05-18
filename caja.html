@@ -45,60 +45,35 @@
     <button class="date-nav-btn" id="next-day-btn" onclick="nextDay()">▶</button>
   </div>
 
-  <!-- Stats (2 rows) -->
-  <div class="caja-stats">
-    <div class="caja-stat"><span class="caja-stat-num" id="stat-apertura">$0</span><span class="caja-stat-lbl">Apertura</span></div>
-    <div class="caja-stat caja-stat--ing"><span class="caja-stat-num" id="stat-ingresos">$0</span><span class="caja-stat-lbl">Ingresos</span></div>
-    <div class="caja-stat caja-stat--eg"><span class="caja-stat-num" id="stat-egresos">$0</span><span class="caja-stat-lbl">Egresos</span></div>
-    <div class="caja-stat caja-stat--ef"><span class="caja-stat-num" id="stat-efectivo">$0</span><span class="caja-stat-lbl">Efectivo en caja</span></div>
-    <div class="caja-stat caja-stat--neto">
-      <span class="caja-stat-num" id="stat-neto">$0</span>
-      <span class="caja-stat-lbl">Neto del día</span>
-      <span class="stat-vs-yest hidden" id="stat-vs-yest"></span>
+  <!-- Quick bar: siempre visible, compacta. Tap para desplegar el detalle -->
+  <div class="caja-quickbar" id="caja-quickbar" onclick="toggleCajaDetail()">
+    <div class="cqb-item">
+      <span class="cqb-num cqb-num--ef" id="qb-efectivo">$0</span>
+      <span class="cqb-lbl">💵 Efectivo en caja</span>
     </div>
+    <div class="cqb-sep"></div>
+    <div class="cqb-item">
+      <span class="cqb-num" id="qb-neto">$0</span>
+      <span class="cqb-lbl">📊 Neto del día <span class="stat-vs-yest hidden" id="stat-vs-yest"></span></span>
+    </div>
+    <span class="cqb-chevron" id="cqb-chevron">▾</span>
   </div>
 
-  <!-- Desglose del día -->
-  <div class="caja-desglose">
-    <div class="desglose-item">
-      <span class="desglose-num" id="desglose-efectivo">$0</span>
-      <span class="desglose-lbl">💵 Ef. ventas</span>
+  <!-- Detalle colapsable: stats completas + desglose -->
+  <div id="caja-detail-panel" class="caja-detail-panel hidden">
+    <div class="caja-stats">
+      <div class="caja-stat"><span class="caja-stat-num" id="stat-apertura">$0</span><span class="caja-stat-lbl">Apertura</span></div>
+      <div class="caja-stat caja-stat--ing"><span class="caja-stat-num" id="stat-ingresos">$0</span><span class="caja-stat-lbl">Ingresos</span></div>
+      <div class="caja-stat caja-stat--eg"><span class="caja-stat-num" id="stat-egresos">$0</span><span class="caja-stat-lbl">Egresos</span></div>
+      <div class="caja-stat caja-stat--ef"><span class="caja-stat-num" id="stat-efectivo">$0</span><span class="caja-stat-lbl">Efectivo en caja</span></div>
+      <div class="caja-stat caja-stat--neto"><span class="caja-stat-num" id="stat-neto">$0</span><span class="caja-stat-lbl">Neto del día</span></div>
     </div>
-    <div class="desglose-item">
-      <span class="desglose-num" id="desglose-digital">$0</span>
-      <span class="desglose-lbl">💳 Digital</span>
-    </div>
-    <div class="desglose-item">
-      <span class="desglose-num" id="desglose-reparac">$0</span>
-      <span class="desglose-lbl">🔧 Reparac.</span>
-    </div>
-    <div class="desglose-item">
-      <span class="desglose-num desglose-num--gasto" id="desglose-gastos">$0</span>
-      <span class="desglose-lbl">💸 Gastos</span>
-    </div>
-    <div class="desglose-item" id="desglose-retiros-wrap" style="display:none">
-      <span class="desglose-num desglose-num--retiro" id="desglose-retiros">$0</span>
-      <span class="desglose-lbl">🏧 Retiro</span>
-    </div>
-  </div>
-
-  <!-- Resumen del día (colapsable) -->
-  <div id="caja-resumen-bar" class="caja-resumen-bar hidden" onclick="toggleCajaResumen()">
-    <div class="caja-resumen-row">
-      <span class="caja-resumen-item caja-resumen-ing" id="cres-ing">+$0</span>
-      <span class="caja-resumen-sep">·</span>
-      <span class="caja-resumen-item caja-resumen-eg" id="cres-eg">−$0</span>
-      <span class="caja-resumen-sep">·</span>
-      <span class="caja-resumen-item" id="cres-neto-wrap">Neto: <strong id="cres-neto">$0</strong></span>
-      <span class="caja-resumen-chevron" id="cres-chevron">▲</span>
-    </div>
-    <div id="caja-resumen-detail" class="caja-resumen-detail hidden">
-      <div class="cres-detail-grid">
-        <div class="cres-detail-item"><span id="cres-d-ef">$0</span><span>💵 Efectivo</span></div>
-        <div class="cres-detail-item"><span id="cres-d-dig">$0</span><span>💳 Digital</span></div>
-        <div class="cres-detail-item"><span id="cres-d-mov">0</span><span>Movimientos</span></div>
-        <div class="cres-detail-item"><span id="cres-d-aper">$0</span><span>Apertura</span></div>
-      </div>
+    <div class="caja-desglose">
+      <div class="desglose-item"><span class="desglose-num" id="desglose-efectivo">$0</span><span class="desglose-lbl">💵 Ef. ventas</span></div>
+      <div class="desglose-item"><span class="desglose-num" id="desglose-digital">$0</span><span class="desglose-lbl">💳 Digital</span></div>
+      <div class="desglose-item"><span class="desglose-num" id="desglose-reparac">$0</span><span class="desglose-lbl">🔧 Reparac.</span></div>
+      <div class="desglose-item"><span class="desglose-num desglose-num--gasto" id="desglose-gastos">$0</span><span class="desglose-lbl">💸 Gastos</span></div>
+      <div class="desglose-item" id="desglose-retiros-wrap" style="display:none"><span class="desglose-num desglose-num--retiro" id="desglose-retiros">$0</span><span class="desglose-lbl">🏧 Retiro</span></div>
     </div>
   </div>
 
