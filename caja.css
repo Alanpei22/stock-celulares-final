@@ -97,6 +97,36 @@ body.dark .live-popup-icon { background:rgba(16,185,129,.18); }
 body.dark .notif-banner { background:#1c1c1e; border-color:rgba(255,255,255,.08); }
 body.dark .nb-icon { background:rgba(255,255,255,.06); }
 
+/* Banner COMPACTO (1 línea) — usado en la página de caja */
+.notif-banner-compact {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 10px 8px 12px;
+  border-radius:12px;
+  text-decoration:none;
+  background:var(--card,#fff);
+  border:1px solid var(--border,#e3e1de);
+  border-left:4px solid #f59e0b;
+  box-shadow:0 1px 4px rgba(0,0,0,.04);
+  animation:nb-slide-in 320ms cubic-bezier(.32,.72,0,1);
+}
+.notif-banner-compact.nb-critical { border-left-color:#ef4444; background:linear-gradient(90deg, rgba(239,68,68,.07), transparent); }
+.notif-banner-compact.nb-warn     { border-left-color:#f59e0b; background:linear-gradient(90deg, rgba(245,158,11,.06), transparent); }
+.notif-banner-compact.nb-info     { border-left-color:#3b82f6; }
+.notif-banner-compact:active { transform:scale(.99); }
+.nbc-icon { font-size:1.15rem; flex-shrink:0; }
+.nbc-text { flex:1; font-size:.85rem; font-weight:800; color:var(--t1,#1a1a1a); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nbc-text::after {
+  content:' ›'; color:var(--t3,#999); font-weight:700;
+}
+.nbc-dismiss {
+  width:24px; height:24px; border-radius:50%; flex-shrink:0;
+  background:transparent; border:none; color:var(--t3,#999);
+  cursor:pointer; font-size:.78rem; opacity:.55;
+  display:flex; align-items:center; justify-content:center;
+}
+.nbc-dismiss:active { opacity:1; background:var(--bg1,#f3f3f3); }
+body.dark .notif-banner-compact { background:#1c1c1e; border-color:rgba(255,255,255,.08); }
+
 /* ── COMPARATIVA "vs ayer" ──────────────────────────────── */
 .stat-vs-yest {
   display:inline-block; margin-top:3px;

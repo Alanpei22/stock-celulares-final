@@ -418,8 +418,26 @@ async function renderInAppBanners(containerId = 'notif-banners', context = 'dash
     return;
   }
   cont.classList.remove('hidden');
+
+  // En la página de CAJA los banners van compactos (1 línea) para no comerse
+  // el espacio de la lista de movimientos.
+  const compact = (context === 'caja');
+
   cont.innerHTML = banners.map(b => {
     const lvlCls = b.level === 'critical' ? 'nb-critical' : b.level === 'warn' ? 'nb-warn' : 'nb-info';
+
+    if (compact) {
+      const href = b.cta?.href || '#';
+      const onClk = b.cta?.onClick ? ` onclick="${b.cta.onClick};return false"` : '';
+      return `
+        <a class="notif-banner-compact ${lvlCls}" href="${href}"${onClk} data-key="${esc(b.key)}">
+          <span class="nbc-icon">${b.icon || '🔔'}</span>
+          <span class="nbc-text">${esc(b.title)}</span>
+          <button class="nbc-dismiss" onclick="event.preventDefault();event.stopPropagation();dismissBanner('${esc(b.key)}')" title="Descartar">✕</button>
+        </a>
+      `;
+    }
+
     const ctaHtml = b.cta
       ? `<a class="nb-cta" href="${b.cta.href || '#'}"${b.cta.onClick ? ` onclick="${b.cta.onClick};return false"` : ''}>${esc(b.cta.label)}</a>`
       : '';
