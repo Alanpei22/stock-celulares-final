@@ -670,7 +670,10 @@
     <select id="bulk-tipo" class="precio-input" onchange="_bulkOnTipoChange()"><option value="">—</option></select>
   </div>
 
-  <button class="bulk-paste-toggle" onclick="_bulkTogglePaste()">📥 Pegar lista de modelos</button>
+  <div class="bulk-import-row">
+    <button class="bulk-paste-toggle" onclick="_bulkTogglePaste()">📥 Pegar lista</button>
+    <button class="bulk-paste-toggle bulk-catalog-btn" onclick="_bulkImportCatalog()">📲 Traer del catálogo</button>
+  </div>
   <div id="bulk-paste-wrap" class="bulk-paste-wrap hidden">
     <textarea id="bulk-paste" class="bulk-paste-area" rows="6"
       placeholder="Un modelo por línea. Ejemplos:&#10;iPhone 14&#10;iPhone 13&#10;Samsung A54 = 18000&#10;Motorola G54 | 15000"></textarea>
@@ -769,6 +772,7 @@
 <script src="caja_extra.js"></script>
 <script src="inventario.js"></script>
 <script src="finanzas-report.js"></script>
+<script src="modulos_catalog.js"></script>
 <script src="precios.js"></script>
 <script src="notifications.js"></script>
 <script src="webpush.js"></script>

@@ -924,12 +924,16 @@ body.dark .precio-input { background:#1c1c1e; border-color:rgba(255,255,255,.1);
 /* ── EDICIÓN MASIVA DE PRECIOS (tipo Excel) ── */
 .bulk-tipo-row { margin:8px 0; }
 .bulk-tipo-row label { display:block; font-size:.78rem; font-weight:700; color:var(--t2,#666); margin-bottom:5px; }
+.bulk-import-row { display:flex; gap:8px; margin:4px 0; }
+.bulk-import-row .bulk-paste-toggle { flex:1; margin:0; }
 .bulk-paste-toggle {
   width:100%; padding:9px; margin:4px 0;
   background:var(--bg1,#f3f3f3); color:var(--t1,#1a1a1a);
   border:1.5px dashed var(--border,#e3e1de); border-radius:11px;
-  font-size:.85rem; font-weight:700; cursor:pointer;
+  font-size:.82rem; font-weight:700; cursor:pointer;
 }
+.bulk-catalog-btn { border-style:solid; border-color:#C8965A; color:#C8965A; }
+body.dark .bulk-catalog-btn { border-color:#D4A76A; color:#D4A76A; }
 .bulk-paste-wrap { margin:8px 0; padding:10px; background:var(--bg1,#f3f3f3); border-radius:12px; }
 .bulk-paste-wrap.hidden { display:none; }
 .bulk-paste-area {

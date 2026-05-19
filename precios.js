@@ -382,6 +382,42 @@ function _bulkTogglePaste() {
   document.getElementById('bulk-paste-wrap')?.classList.toggle('hidden');
 }
 
+// Importar modelos del catálogo de proveedor (modulos_catalog.js)
+function _bulkImportCatalog() {
+  if (typeof MODULOS_CATALOG === 'undefined' || !Array.isArray(MODULOS_CATALOG)) {
+    toast('Catálogo no disponible', 'error');
+    return;
+  }
+  const tipoActual = _bulkTipo || '';
+  const ok = confirm(
+    `Se van a traer ${MODULOS_CATALOG.length} modelos del catálogo de pantallas/módulos.\n\n` +
+    `Tipo destino: "${tipoActual}"\n` +
+    `Los precios quedan en 0 para que los completes.\n\n¿Continuar?`
+  );
+  if (!ok) return;
+
+  const existentes = new Set(_bulkRows.filter(r => !r._deleted).map(r => (r.equipo || '').toLowerCase().trim()));
+  let agregados = 0, duplicados = 0;
+
+  MODULOS_CATALOG.forEach(entry => {
+    // entry = [marca, nombre, precio, notas]
+    const marca = entry[0] || '';
+    const nombre = entry[1] || '';
+    const equipo = `${marca} ${nombre}`.trim();
+    const key = equipo.toLowerCase().trim();
+    if (!equipo) return;
+    if (existentes.has(key)) { duplicados++; return; }
+    existentes.add(key);
+    _bulkRows.push({ id: null, equipo, precio: 0, nota: '', _dirty: true, _isNew: true, _deleted: false });
+    agregados++;
+  });
+
+  renderBulkTable();
+  let msg = `${agregados} modelo(s) del catálogo agregados`;
+  if (duplicados) msg += ` · ${duplicados} ya estaban`;
+  toast(msg, 'success');
+}
+
 function _bulkUpdateCount() {
   const cambios = _bulkRows.filter(r => (r._dirty || r._deleted) && (r.id || !r._deleted)).length;
   const btn = document.getElementById('bulk-save-btn');
