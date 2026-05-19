@@ -635,6 +635,53 @@
   </div>
 </div>
 
+<!-- ═══════════ MODAL: LISTA DE PRECIOS ═══════════ -->
+<div id="precios-overlay" class="nota-overlay hidden" onclick="closePreciosModal()"></div>
+<div id="precios-modal" class="arqueo-modal hidden" style="max-width:460px">
+  <div class="nota-modal-hdr">
+    <span>💲 Precios de reparación</span>
+    <button onclick="closePreciosModal()">✕</button>
+  </div>
+  <div class="precios-search-wrap">
+    <span class="precios-search-ico">🔍</span>
+    <input id="precios-search" type="search" placeholder="Buscar tipo o equipo…" autocomplete="off">
+  </div>
+  <div class="precios-filter-chips" id="precios-filter-chips"></div>
+  <div id="precios-list" class="precios-list"></div>
+  <div id="precios-empty" class="precios-empty hidden"></div>
+  <button class="btn-primary" onclick="openPrecioForm()" style="width:100%;margin-top:10px">➕ Agregar precio</button>
+</div>
+
+<!-- ═══════════ MODAL: FORM PRECIO ═══════════ -->
+<div id="precio-form-overlay" class="nota-overlay hidden" onclick="closePrecioForm()"></div>
+<div id="precio-form-modal" class="arqueo-modal hidden" style="max-width:400px">
+  <div class="nota-modal-hdr">
+    <span id="precio-form-title">➕ Nuevo precio</span>
+    <button onclick="closePrecioForm()">✕</button>
+  </div>
+  <div class="precio-fg">
+    <label>Tipo de arreglo</label>
+    <select id="precio-fi-tipo" class="precio-input"><option value="">Seleccionar…</option></select>
+  </div>
+  <div class="precio-fg">
+    <label>Equipo (marca + modelo)</label>
+    <input id="precio-fi-equipo" class="precio-input" type="text" placeholder="iPhone 14, Samsung A54…" autocomplete="off">
+  </div>
+  <div class="precio-fg">
+    <label>Precio (ARS)</label>
+    <input id="precio-fi-precio" class="precio-input" type="number" placeholder="25000" min="0" inputmode="numeric">
+  </div>
+  <div class="precio-fg">
+    <label>Nota (opcional)</label>
+    <input id="precio-fi-nota" class="precio-input" type="text" placeholder="Calidad AAA, incluye colocación…" autocomplete="off">
+  </div>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button id="precio-form-del" class="btn-danger" onclick="deletePrecio()" style="display:none">🗑</button>
+    <button class="btn-secondary" onclick="closePrecioForm()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" onclick="savePrecio()" style="flex:2">💾 Guardar</button>
+  </div>
+</div>
+
 <!-- ═══════════ MODAL: REPORTE FINANCIERO ═══════════ -->
 <div id="finrep-overlay" class="nota-overlay hidden" onclick="closeFinanzasReport()"></div>
 <div id="finrep-modal" class="arqueo-modal hidden" style="max-width:440px">
@@ -688,6 +735,7 @@
 <script src="caja_extra.js"></script>
 <script src="inventario.js"></script>
 <script src="finanzas-report.js"></script>
+<script src="precios.js"></script>
 <script src="notifications.js"></script>
 <script src="webpush.js"></script>
 <script>

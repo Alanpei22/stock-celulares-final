@@ -927,6 +927,7 @@ function toggleCajaMenu() {
     { icon: '🔄', label: 'Cierre de turno', sub: 'Cambio de cajero', onClick: openCierreParcialModal },
     { icon: '🔐', label: CIERRE ? 'Cierre registrado' : 'Cerrar caja del día', sub: CIERRE ? `Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}` : null, onClick: openCierreModal },
     { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', onClick: openReporteModal },
+    { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
     { divider: true, hide: !isOwner },
     { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
     { icon: '📦', label: 'Caja Dueño', hide: !isOwner, onClick: openCajaDueno },

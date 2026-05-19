@@ -845,6 +845,69 @@ body.dark .rlb-title { color: #F2F2F7; }
 body.dark .mov-sug-item--repair { background: rgba(200,150,90,.07); border-left-color: #D4A76A; }
 body.dark .sug-saldo-chip { background: rgba(212,167,106,.15); color: #D4A76A; }
 
+/* ── LISTA DE PRECIOS DE REPARACIÓN ── */
+.precios-search-wrap {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg1,#f3f3f3); border-radius:12px;
+  padding:0 12px; margin:8px 0;
+}
+.precios-search-ico { font-size:.9rem; opacity:.6; }
+#precios-search {
+  flex:1; padding:10px 6px; border:none; background:transparent;
+  font-size:.92rem; color:var(--t1,#1a1a1a); outline:none;
+}
+.precios-filter-chips {
+  display:flex; gap:6px; overflow-x:auto; padding-bottom:4px;
+  -webkit-overflow-scrolling:touch; scrollbar-width:none;
+}
+.precios-filter-chips::-webkit-scrollbar { display:none; }
+.precio-chip {
+  flex-shrink:0; padding:6px 12px; border-radius:12px;
+  background:var(--bg1,#f3f3f3); color:var(--t2,#666);
+  border:1.5px solid transparent;
+  font-size:.78rem; font-weight:700; cursor:pointer; white-space:nowrap;
+  transition:all 150ms;
+}
+.precio-chip--active { background:#C8965A; color:#fff; }
+.precios-list { max-height:48vh; overflow-y:auto; margin-top:8px; -webkit-overflow-scrolling:touch; }
+.precio-grupo-hdr {
+  font-size:.74rem; font-weight:800; text-transform:uppercase;
+  letter-spacing:.05em; color:var(--t2,#666);
+  padding:10px 4px 4px; position:sticky; top:0;
+  background:var(--card,#fff);
+}
+.precio-row {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:10px 12px; border-radius:10px;
+  border:1px solid var(--border,#e3e1de); margin-bottom:6px;
+  cursor:pointer; transition:all 150ms; background:var(--card,#fff);
+}
+.precio-row:active { transform:scale(.99); background:var(--bg1,#f3f3f3); }
+.precio-row-info { flex:1; min-width:0; }
+.precio-row-equipo { display:block; font-size:.9rem; font-weight:700; color:var(--t1,#1a1a1a); }
+.precio-row-nota { display:block; font-size:.74rem; color:var(--t3,#999); margin-top:1px; }
+.precio-row-precio { font-size:1.05rem; font-weight:900; color:#10b981; white-space:nowrap; }
+.precios-empty { text-align:center; padding:32px 16px; color:var(--t3,#999); }
+.precios-empty.hidden { display:none; }
+.precios-empty-ico { font-size:2.6rem; display:block; margin-bottom:8px; }
+.precios-empty-sub { font-size:.8rem; margin-top:4px; }
+.precio-fg { margin-bottom:12px; }
+.precio-fg label { display:block; font-size:.78rem; font-weight:700; color:var(--t2,#666); margin-bottom:5px; }
+.precio-input {
+  width:100%; padding:11px 12px; border-radius:11px;
+  border:1.5px solid var(--border,#e3e1de); background:var(--card,#fff);
+  color:var(--t1,#1a1a1a); font-size:.95rem; box-sizing:border-box;
+}
+.precio-input:focus { outline:none; border-color:#C8965A; box-shadow:0 0 0 4px rgba(200,150,90,.1); }
+body.dark .precios-search-wrap { background:rgba(255,255,255,.06); }
+body.dark .precio-chip { background:rgba(255,255,255,.06); color:#aaa; }
+body.dark .precio-chip--active { background:#C8965A; color:#fff; }
+body.dark .precio-row { background:#1c1c1e; border-color:rgba(255,255,255,.08); }
+body.dark .precio-row:active { background:rgba(255,255,255,.04); }
+body.dark .precio-grupo-hdr { background:var(--card,#2c2c2e); }
+body.dark .precio-row-precio { color:#34D399; }
+body.dark .precio-input { background:#1c1c1e; border-color:rgba(255,255,255,.1); color:#f2f2f7; }
+
 /* ── REPORTE FINANCIERO (modal) ── */
 .finrep-presets { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0; }
 .finrep-preset {
