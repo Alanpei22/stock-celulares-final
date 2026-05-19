@@ -240,3 +240,215 @@ async function deletePrecio() {
 function _escP(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+// ══════════════════════════════════════════
+//  EDICIÓN MASIVA (tipo Excel)
+// ══════════════════════════════════════════
+let _bulkRows = [];      // [{ id|null, equipo, precio, nota, _deleted }]
+let _bulkTipo = '';
+
+function openPreciosBulk() {
+  initPrecios();
+  // Llenar select de tipos
+  const sel = document.getElementById('bulk-tipo');
+  if (sel && sel.options.length <= 1) {
+    PRECIO_TIPOS.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t; o.textContent = t;
+      sel.appendChild(o);
+    });
+  }
+  _bulkTipo = sel ? (sel.value || PRECIO_TIPOS[0]) : PRECIO_TIPOS[0];
+  if (sel && !sel.value) sel.value = _bulkTipo;
+  _bulkLoadRows();
+  // Cerrar el modal de lista si estaba abierto
+  closePreciosModal();
+  document.getElementById('precios-bulk-overlay').classList.remove('hidden');
+  document.getElementById('precios-bulk-modal').classList.remove('hidden');
+}
+
+function closePreciosBulk() {
+  document.getElementById('precios-bulk-overlay').classList.add('hidden');
+  document.getElementById('precios-bulk-modal').classList.add('hidden');
+}
+
+function _bulkOnTipoChange() {
+  const sel = document.getElementById('bulk-tipo');
+  // Avisar si hay cambios sin guardar
+  const hayCambios = _bulkRows.some(r => r._dirty || r._isNew || r._deleted);
+  if (hayCambios && !confirm('Cambiaste de tipo. Se perderán los cambios sin guardar. ¿Continuar?')) {
+    sel.value = _bulkTipo;
+    return;
+  }
+  _bulkTipo = sel.value;
+  _bulkLoadRows();
+}
+
+function _bulkLoadRows() {
+  _bulkRows = PRECIOS
+    .filter(p => p.tipo === _bulkTipo)
+    .sort((a, b) => (a.equipo || '').localeCompare(b.equipo || ''))
+    .map(p => ({ id: p.id, equipo: p.equipo || '', precio: p.precio || 0, nota: p.nota || '', _dirty: false, _isNew: false, _deleted: false }));
+  renderBulkTable();
+}
+
+function renderBulkTable() {
+  const cont = document.getElementById('bulk-table');
+  if (!cont) return;
+  const visibles = _bulkRows.filter(r => !r._deleted);
+
+  if (!visibles.length) {
+    cont.innerHTML = '<div class="bulk-empty">Sin modelos para este tipo.<br>Pegá una lista arriba para empezar.</div>';
+    _bulkUpdateCount();
+    return;
+  }
+
+  let html = `<div class="bulk-row bulk-row--hdr">
+    <span class="bulk-c-equipo">Equipo</span>
+    <span class="bulk-c-precio">Precio</span>
+    <span class="bulk-c-del"></span>
+  </div>`;
+
+  _bulkRows.forEach((r, idx) => {
+    if (r._deleted) return;
+    html += `<div class="bulk-row${r._isNew ? ' bulk-row--new' : ''}">
+      <input class="bulk-in bulk-c-equipo" type="text" value="${_escP(r.equipo)}"
+        oninput="_bulkEdit(${idx},'equipo',this.value)" placeholder="Equipo">
+      <input class="bulk-in bulk-c-precio" type="number" inputmode="numeric" min="0"
+        value="${r.precio || ''}" placeholder="0"
+        oninput="_bulkEdit(${idx},'precio',this.value)">
+      <button class="bulk-del" onclick="_bulkRemoveRow(${idx})" title="Quitar">✕</button>
+    </div>`;
+  });
+  cont.innerHTML = html;
+  _bulkUpdateCount();
+}
+
+function _bulkEdit(idx, field, value) {
+  const r = _bulkRows[idx];
+  if (!r) return;
+  if (field === 'precio') r.precio = parseInt(value) || 0;
+  else r[field] = value;
+  r._dirty = true;
+  _bulkUpdateCount();
+}
+
+function _bulkRemoveRow(idx) {
+  const r = _bulkRows[idx];
+  if (!r) return;
+  if (r._isNew) {
+    // Fila nueva sin guardar → quitar del array
+    _bulkRows.splice(idx, 1);
+  } else {
+    r._deleted = true;
+  }
+  renderBulkTable();
+}
+
+function _bulkAddPasted() {
+  const ta = document.getElementById('bulk-paste');
+  if (!ta) return;
+  const lines = ta.value.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) { toast('Pegá al menos un modelo', 'info'); return; }
+
+  let agregados = 0, duplicados = 0;
+  const existentes = new Set(_bulkRows.filter(r => !r._deleted).map(r => (r.equipo || '').toLowerCase().trim()));
+
+  lines.forEach(line => {
+    // Soportar formatos: "iPhone 14", "iPhone 14 = 25000", "iPhone 14 | 25000", "iPhone 14<TAB>25000"
+    let equipo = line, precio = 0;
+    const m = line.match(/^(.+?)\s*(?:=|\||\t)\s*(\d[\d.]*)\s*$/);
+    if (m) {
+      equipo = m[1].trim();
+      precio = parseInt(m[2].replace(/\./g, '')) || 0;
+    }
+    const key = equipo.toLowerCase().trim();
+    if (!equipo) return;
+    if (existentes.has(key)) { duplicados++; return; }
+    existentes.add(key);
+    _bulkRows.push({ id: null, equipo, precio, nota: '', _dirty: true, _isNew: true, _deleted: false });
+    agregados++;
+  });
+
+  ta.value = '';
+  document.getElementById('bulk-paste-wrap').classList.add('hidden');
+  renderBulkTable();
+  let msg = `${agregados} modelo(s) agregado(s)`;
+  if (duplicados) msg += ` · ${duplicados} ya estaban`;
+  toast(msg, 'success');
+}
+
+function _bulkTogglePaste() {
+  document.getElementById('bulk-paste-wrap')?.classList.toggle('hidden');
+}
+
+function _bulkUpdateCount() {
+  const cambios = _bulkRows.filter(r => (r._dirty || r._deleted) && (r.id || !r._deleted)).length;
+  const btn = document.getElementById('bulk-save-btn');
+  if (btn) {
+    btn.textContent = cambios > 0 ? `💾 Guardar todo (${cambios})` : '💾 Guardar todo';
+    btn.disabled = cambios === 0;
+  }
+}
+
+async function saveBulkPrecios() {
+  // Validar
+  const aGuardar = _bulkRows.filter(r => !r._deleted);
+  for (const r of aGuardar) {
+    if (!r.equipo || !r.equipo.trim()) {
+      toast('Hay un equipo sin nombre — completalo o quitalo', 'error');
+      return;
+    }
+  }
+
+  const btn = document.getElementById('bulk-save-btn');
+  if (btn) btn.disabled = true;
+
+  try {
+    let batch = db.batch();
+    let ops = 0;
+    let creados = 0, actualizados = 0, eliminados = 0;
+
+    const commitIfNeeded = async () => {
+      if (ops >= 400) { await batch.commit(); batch = db.batch(); ops = 0; }
+    };
+
+    for (const r of _bulkRows) {
+      if (r._deleted && r.id) {
+        batch.delete(db.collection('precios_reparaciones').doc(r.id));
+        ops++; eliminados++;
+        await commitIfNeeded();
+      } else if (r._isNew && !r._deleted) {
+        const ref = db.collection('precios_reparaciones').doc();
+        batch.set(ref, {
+          tipo: _bulkTipo, equipo: r.equipo.trim(),
+          precio: r.precio || 0, nota: r.nota || '',
+          updatedAt: new Date().toISOString(),
+        });
+        ops++; creados++;
+        await commitIfNeeded();
+      } else if (r._dirty && r.id && !r._deleted) {
+        batch.set(db.collection('precios_reparaciones').doc(r.id), {
+          tipo: _bulkTipo, equipo: r.equipo.trim(),
+          precio: r.precio || 0, nota: r.nota || '',
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+        ops++; actualizados++;
+        await commitIfNeeded();
+      }
+    }
+    if (ops > 0) await batch.commit();
+
+    const partes = [];
+    if (creados) partes.push(`${creados} nuevo(s)`);
+    if (actualizados) partes.push(`${actualizados} editado(s)`);
+    if (eliminados) partes.push(`${eliminados} borrado(s)`);
+    toast('✅ Guardado: ' + (partes.join(' · ') || 'sin cambios'), 'success');
+    closePreciosBulk();
+  } catch (e) {
+    console.error('saveBulkPrecios:', e);
+    toast('Error al guardar — intentá de nuevo', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}

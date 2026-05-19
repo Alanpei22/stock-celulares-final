@@ -106,6 +106,8 @@
   <!-- FAB Speed Dial -->
   <div class="fab-backdrop hidden" id="fab-backdrop" onclick="closeFabMenu()"></div>
   <div class="fab-wrap" id="fab-wrap">
+    <!-- Botón directo de precios (arriba del FAB +) -->
+    <button class="fab-precios" id="fab-precios" onclick="openPreciosModal()" title="Precios de reparación">💲</button>
     <div class="fab-actions hidden" id="fab-actions">
       <div class="fab-action-row">
         <span class="fab-lbl">Egreso</span>
@@ -649,7 +651,39 @@
   <div class="precios-filter-chips" id="precios-filter-chips"></div>
   <div id="precios-list" class="precios-list"></div>
   <div id="precios-empty" class="precios-empty hidden"></div>
-  <button class="btn-primary" onclick="openPrecioForm()" style="width:100%;margin-top:10px">➕ Agregar precio</button>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <button class="btn-secondary" onclick="openPreciosBulk()" style="flex:1">📋 Carga masiva</button>
+    <button class="btn-primary" onclick="openPrecioForm()" style="flex:1">➕ Agregar precio</button>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: EDICIÓN MASIVA DE PRECIOS (tipo Excel) ═══════════ -->
+<div id="precios-bulk-overlay" class="nota-overlay hidden" onclick="closePreciosBulk()"></div>
+<div id="precios-bulk-modal" class="arqueo-modal hidden" style="max-width:520px">
+  <div class="nota-modal-hdr">
+    <span>📋 Carga masiva de precios</span>
+    <button onclick="closePreciosBulk()">✕</button>
+  </div>
+
+  <div class="bulk-tipo-row">
+    <label>Tipo de arreglo</label>
+    <select id="bulk-tipo" class="precio-input" onchange="_bulkOnTipoChange()"><option value="">—</option></select>
+  </div>
+
+  <button class="bulk-paste-toggle" onclick="_bulkTogglePaste()">📥 Pegar lista de modelos</button>
+  <div id="bulk-paste-wrap" class="bulk-paste-wrap hidden">
+    <textarea id="bulk-paste" class="bulk-paste-area" rows="6"
+      placeholder="Un modelo por línea. Ejemplos:&#10;iPhone 14&#10;iPhone 13&#10;Samsung A54 = 18000&#10;Motorola G54 | 15000"></textarea>
+    <p class="bulk-paste-hint">Opcional: agregá el precio con <code>=</code> o <code>|</code> — ej: <code>iPhone 14 = 25000</code></p>
+    <button class="btn-primary" onclick="_bulkAddPasted()" style="width:100%">➕ Agregar a la tabla</button>
+  </div>
+
+  <div id="bulk-table" class="bulk-table"></div>
+
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button class="btn-secondary" onclick="closePreciosBulk()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" id="bulk-save-btn" onclick="saveBulkPrecios()" style="flex:2" disabled>💾 Guardar todo</button>
+  </div>
 </div>
 
 <!-- ═══════════ MODAL: FORM PRECIO ═══════════ -->

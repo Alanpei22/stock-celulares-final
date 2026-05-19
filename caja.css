@@ -554,6 +554,19 @@ body.dark .cqb-chevron { background: #D4A76A; color: #1a1a1a; }
 .fab { width: 58px; height: 58px; border: none; border-radius: 18px; background: #C8965A; color: #fff; font-size: 1.7rem; cursor: pointer; box-shadow: 0 6px 24px rgba(200,150,90,0.35); transition: transform 200ms; display: flex; align-items: center; justify-content: center; line-height: 1; }
 .fab:active { transform: scale(0.97); }
 .fab.fab-open { transform: rotate(45deg); }
+/* Botón directo de precios — arriba del FAB + */
+.fab-precios {
+  width: 48px; height: 48px; border: none; border-radius: 16px;
+  background: var(--card, #fff); color: #C8965A;
+  font-size: 1.3rem; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+  border: 1.5px solid #C8965A;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 200ms;
+  align-self: flex-end;
+}
+.fab-precios:active { transform: scale(0.92); }
+body.dark .fab-precios { background: #1c1c1e; border-color: #D4A76A; color: #D4A76A; }
 .fab-backdrop { position: fixed; inset: 0; z-index: 899; background: rgba(0,0,0,0.25); backdrop-filter: blur(4px); }
 .fab-backdrop.hidden { display: none; }
 
@@ -907,6 +920,59 @@ body.dark .precio-row:active { background:rgba(255,255,255,.04); }
 body.dark .precio-grupo-hdr { background:var(--card,#2c2c2e); }
 body.dark .precio-row-precio { color:#34D399; }
 body.dark .precio-input { background:#1c1c1e; border-color:rgba(255,255,255,.1); color:#f2f2f7; }
+
+/* ── EDICIÓN MASIVA DE PRECIOS (tipo Excel) ── */
+.bulk-tipo-row { margin:8px 0; }
+.bulk-tipo-row label { display:block; font-size:.78rem; font-weight:700; color:var(--t2,#666); margin-bottom:5px; }
+.bulk-paste-toggle {
+  width:100%; padding:9px; margin:4px 0;
+  background:var(--bg1,#f3f3f3); color:var(--t1,#1a1a1a);
+  border:1.5px dashed var(--border,#e3e1de); border-radius:11px;
+  font-size:.85rem; font-weight:700; cursor:pointer;
+}
+.bulk-paste-wrap { margin:8px 0; padding:10px; background:var(--bg1,#f3f3f3); border-radius:12px; }
+.bulk-paste-wrap.hidden { display:none; }
+.bulk-paste-area {
+  width:100%; box-sizing:border-box; padding:10px;
+  border:1.5px solid var(--border,#e3e1de); border-radius:10px;
+  font-size:.88rem; font-family:inherit; resize:vertical;
+  background:var(--card,#fff); color:var(--t1,#1a1a1a);
+}
+.bulk-paste-hint { font-size:.72rem; color:var(--t3,#999); margin:6px 0 8px; }
+.bulk-paste-hint code { background:var(--card,#fff); padding:1px 5px; border-radius:4px; font-size:.92em; }
+.bulk-table { max-height:46vh; overflow-y:auto; margin-top:10px; -webkit-overflow-scrolling:touch; }
+.bulk-row {
+  display:grid; grid-template-columns:1fr 100px 32px;
+  gap:6px; align-items:center; margin-bottom:5px;
+}
+.bulk-row--hdr {
+  font-size:.7rem; font-weight:800; text-transform:uppercase;
+  letter-spacing:.05em; color:var(--t3,#999); margin-bottom:6px;
+  position:sticky; top:0; background:var(--card,#fff); padding-bottom:4px;
+}
+.bulk-row--hdr .bulk-c-precio { text-align:center; }
+.bulk-in {
+  padding:9px 10px; border:1.5px solid var(--border,#e3e1de);
+  border-radius:9px; font-size:.88rem; box-sizing:border-box;
+  background:var(--card,#fff); color:var(--t1,#1a1a1a);
+}
+.bulk-in:focus { outline:none; border-color:#C8965A; }
+.bulk-c-precio { text-align:right; font-weight:700; }
+.bulk-row--new .bulk-in { border-color:#10B981; background:rgba(16,185,129,.05); }
+.bulk-del {
+  width:32px; height:36px; border:none; border-radius:9px;
+  background:rgba(239,68,68,.1); color:#dc2626;
+  cursor:pointer; font-size:.8rem; font-weight:700;
+}
+.bulk-del:active { transform:scale(.9); }
+.bulk-empty { text-align:center; padding:28px 16px; color:var(--t3,#999); font-size:.85rem; line-height:1.6; }
+body.dark .bulk-paste-toggle { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.12); color:#f2f2f7; }
+body.dark .bulk-paste-wrap { background:rgba(255,255,255,.04); }
+body.dark .bulk-paste-area,
+body.dark .bulk-in { background:#1c1c1e; border-color:rgba(255,255,255,.1); color:#f2f2f7; }
+body.dark .bulk-paste-hint code { background:#1c1c1e; }
+body.dark .bulk-row--hdr { background:var(--card,#2c2c2e); }
+body.dark .bulk-row--new .bulk-in { background:rgba(16,185,129,.1); border-color:#34D399; }
 
 /* ── REPORTE FINANCIERO (modal) ── */
 .finrep-presets { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0; }
