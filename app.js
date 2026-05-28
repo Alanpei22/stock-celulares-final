@@ -331,12 +331,13 @@ function initApp() {
 
 // ── Secciones ─────────────────────────────────────────────
 function switchSection(section) {
-  ['stock', 'repairs', 'repuestos'].forEach(s => {
+  ['stock', 'repairs', 'repuestos', 'precios'].forEach(s => {
     const sec = document.getElementById(s + '-section');
     const btn = document.getElementById('nav-' + s);
     if (sec) sec.classList.toggle('section-hidden', s !== section);
     if (btn) btn.classList.toggle('active', s === section);
   });
+  if (section === 'precios') initPrecios();
 }
 
 // ── Render ────────────────────────────────────────────────

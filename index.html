@@ -206,6 +206,41 @@
     </div>
   </section>
 
+  <!-- ── SECCIÓN PRECIOS PROVEEDOR ── -->
+  <section id="precios-section" class="main-section section-hidden">
+    <header>
+      <div class="hdr-top">
+        <div class="hdr-brand"><h1>🏷️ Precios CPARTS</h1></div>
+        <div class="hdr-actions">
+          <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
+          <button class="hdr-btn owner-lock-btn" onclick="toggleOwnerLock()" title="Modo dueño">🔒</button>
+          <button class="hdr-btn" id="cp-sync-btn" title="Sincronizar precios">🔄</button>
+          <button class="hdr-btn" onclick="(async()=>{ await signOut(); location.replace('login.html'); })()" title="Cerrar sesión">🚪</button>
+        </div>
+      </div>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="cp-search" type="search" placeholder="Buscar repuesto o código..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="filters">
+        <select class="pill" id="cp-f-cat"><option value="">Todas las categorías</option></select>
+      </div>
+      <div class="cp-sync-bar" id="cp-sync-info"></div>
+    </header>
+    <div class="stats-bar">
+      <div class="stat"><span class="stat-num" id="cp-total">—</span><span class="stat-lbl">Items</span></div>
+      <div class="stat"><span class="stat-num cp-sinstock-num" id="cp-sinstock">—</span><span class="stat-lbl">Sin stock</span></div>
+      <div class="stat"><span class="stat-num" id="cp-cats">—</span><span class="stat-lbl">Categorías</span></div>
+    </div>
+    <div class="list-wrap">
+      <div id="cp-list"></div>
+      <div class="empty-state" id="cp-empty" style="display:none">
+        <span class="empty-ico">🔍</span>
+        <p class="empty-txt">Sin resultados</p>
+      </div>
+    </div>
+  </section>
+
   <!-- ── BOTTOM NAV ── -->
   <nav class="bottom-nav">
     <button class="nav-btn active" id="nav-stock" onclick="switchSection('stock')">
@@ -225,6 +260,10 @@
         <span class="nav-badge rep2-nav-badge" id="nav-badge-repuestos" style="display:none">0</span>
       </span>
       <span class="nav-lbl">Repuestos</span>
+    </button>
+    <button class="nav-btn" id="nav-precios" onclick="switchSection('precios')">
+      <span class="nav-ico">🏷️</span>
+      <span class="nav-lbl">Precios</span>
     </button>
     <button class="nav-btn" id="nav-caja" onclick="window.location.href='caja.html'">
       <span class="nav-ico">💰</span>
@@ -1015,6 +1054,7 @@
 <script src="repuestos.js"></script>
 <script src="app.js"></script>
 <script src="print.js"></script>
+<script src="precios.js"></script>
 
 <!-- ── AI CHAT FLOTANTE ── -->
 <button class="ai-fab" onclick="toggleAiChat()" title="Asistente IA">✨</button>
