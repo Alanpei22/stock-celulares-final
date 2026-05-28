@@ -1978,3 +1978,141 @@ body.dark .toast { background: #1e293b; color: #e2e8f0; box-shadow: 0 4px 20px r
 .cobro-desc { display: block; font-size: .82rem; color: var(--t2); margin-bottom: .25rem; }
 .cobro-monto { display: block; font-size: 1.6rem; font-weight: 900; color: var(--t1); }
 .cobro-m-active { background: var(--acc) !important; border-color: var(--acc) !important; color: #fff !important; }
+
+/* ══════════════════════════════════════════════════════
+   MÓDULO PRECIOS CPARTS
+   ══════════════════════════════════════════════════════ */
+
+/* Barra de sincronización */
+.cp-sync-bar {
+  font-size: .72rem;
+  color: #64748b;
+  padding: 2px 16px 4px;
+  text-align: right;
+}
+
+/* Badge sin stock en stats */
+.cp-sinstock-num { color: #ef4444; }
+
+/* Loading */
+.cp-loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: #64748b;
+  font-size: .9rem;
+}
+
+/* Texto de ayuda en el error */
+.cp-help-text {
+  font-size: .78rem;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+
+/* Grupo por categoría */
+.cp-group { margin-bottom: 8px; }
+
+.cp-group-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 16px;
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: #64748b;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.cp-group-count {
+  font-size: .68rem;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #475569;
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+/* Item individual */
+.cp-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background .1s;
+}
+.cp-item:active { background: #f8fafc; }
+
+.cp-item--out { opacity: .55; }
+
+.cp-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.cp-item-name {
+  font-size: .85rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.3;
+  flex: 1;
+}
+
+.cp-item-bot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: .78rem;
+}
+
+.cp-code { color: #94a3b8; font-size: .72rem; }
+
+.cp-price {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: .85rem;
+}
+
+.cp-mayor {
+  color: #64748b;
+  font-size: .78rem;
+}
+
+/* Badges de stock */
+.cp-badge {
+  font-size: .65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cp-badge--ok  { background: #d1fae5; color: #065f46; }
+.cp-badge--low { background: #fef3c7; color: #92400e; }
+.cp-badge--out { background: #fee2e2; color: #991b1b; }
+
+/* ── Dark mode ──────────────────────────────────────── */
+body.dark .cp-sync-bar     { color: #475569; }
+body.dark .cp-group-hdr    { background: #1e293b; color: #475569; border-color: #334155; }
+body.dark .cp-group-count  { background: #334155; color: #94a3b8; }
+body.dark .cp-item         { border-color: #1e293b; }
+body.dark .cp-item:active  { background: #1e293b; }
+body.dark .cp-item-name    { color: #e2e8f0; }
+body.dark .cp-price        { color: #f1f5f9; }
+body.dark .cp-mayor        { color: #64748b; }
+body.dark .cp-code         { color: #475569; }
+body.dark .cp-badge--ok    { background: #052e16; color: #34d399; }
+body.dark .cp-badge--low   { background: #1c1700; color: #fbbf24; }
+body.dark .cp-badge--out   { background: #2d0b0b; color: #f87171; }
+body.dark .cp-loading      { color: #475569; }
+body.dark .cp-sinstock-num { color: #f87171; }
