@@ -2388,6 +2388,15 @@ function _reporteCopiar() {
     .catch(() => toast('No se pudo copiar — copiá el texto manualmente', 'error'));
 }
 
+function _reporteImprimirTermica() {
+  const txt = document.getElementById('reporte-texto')?.textContent || '';
+  if (!txt) { toast('Nada para imprimir', 'info'); return; }
+  if (typeof imprimirTermica !== 'function') { toast('Módulo de impresión no cargó', 'error'); return; }
+  // Limpiar marcadores de WhatsApp para el ticket
+  const limpio = (typeof reporteToTermica === 'function') ? reporteToTermica(txt) : txt;
+  imprimirTermica(limpio, { title: 'Reporte de caja' });
+}
+
 // ══════════════════════════════════════════
 //  BOOT
 // ══════════════════════════════════════════

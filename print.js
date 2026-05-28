@@ -695,3 +695,73 @@ ${block('COPIA — Negocio')}
 
   _openPrint(html, `Venta ${p.marca} ${p.modelo}`);
 }
+
+// ══════════════════════════════════════════
+//  TICKETS TÉRMICOS 58mm (Bluetooth vía RawBT)
+// ══════════════════════════════════════════
+function printRepairTermica() {
+  const rep = window._printRep;
+  if (!rep) { alert('No hay reparación seleccionada'); return; }
+  if (typeof imprimirTermica !== 'function') { alert('Módulo de impresión térmica no cargó'); return; }
+  const biz = (window._DAKI_NAME) || 'TechPoint';
+  const L = (typeof termLine === 'function') ? termLine : (c='-') => c.repeat(32);
+  const C = (typeof termCenter === 'function') ? termCenter : (t) => t;
+  const LR = (typeof termLR === 'function') ? termLR : (a,b) => a + ' ' + b;
+  const W = (typeof termWrap === 'function') ? termWrap : (t) => t;
+
+  const lines = [];
+  lines.push(C(biz));
+  lines.push(C('TICKET DE INGRESO'));
+  lines.push(L('='));
+  lines.push(LR('Orden:', 'N' + (rep.nOrden || '?')));
+  lines.push(LR('Fecha:', _today()));
+  lines.push(L('-'));
+  lines.push(W('Equipo: ' + (rep.marca || '') + ' ' + (rep.modelo || '')));
+  if (rep.arreglo)   lines.push(W('Arreglo: ' + rep.arreglo));
+  if (rep.condicion) lines.push(W('Estado: ' + rep.condicion));
+  if (rep.nombre)    lines.push(W('Cliente: ' + rep.nombre));
+  if (rep.tlf)       lines.push(LR('Tel:', rep.tlf));
+  lines.push(L('-'));
+  if (rep.monto)  lines.push(LR('Presupuesto:', '$' + Number(rep.monto).toLocaleString('es-AR')));
+  if (rep.sena)   lines.push(LR('Sena:', '$' + Number(rep.sena).toLocaleString('es-AR')));
+  if (rep.monto)  lines.push(LR('Saldo:', '$' + Math.max(0,(Number(rep.monto)||0)-(Number(rep.sena)||0)).toLocaleString('es-AR')));
+  lines.push(L('='));
+  lines.push(C('Conserve este ticket'));
+  lines.push(C('para retirar su equipo'));
+
+  imprimirTermica(lines.join('\n'), { title: 'Ingreso N' + (rep.nOrden||'') });
+}
+
+function printDeliveryTermica() {
+  const rep = window._printRep;
+  if (!rep) { alert('No hay reparación seleccionada'); return; }
+  if (typeof imprimirTermica !== 'function') { alert('Módulo de impresión térmica no cargó'); return; }
+  const biz = (window._DAKI_NAME) || 'TechPoint';
+  const L = (typeof termLine === 'function') ? termLine : (c='-') => c.repeat(32);
+  const C = (typeof termCenter === 'function') ? termCenter : (t) => t;
+  const LR = (typeof termLR === 'function') ? termLR : (a,b) => a + ' ' + b;
+  const W = (typeof termWrap === 'function') ? termWrap : (t) => t;
+
+  const lines = [];
+  lines.push(C(biz));
+  lines.push(C('COMPROBANTE DE ENTREGA'));
+  lines.push(L('='));
+  lines.push(LR('Orden:', 'N' + (rep.nOrden || '?')));
+  lines.push(LR('Fecha:', _today()));
+  lines.push(L('-'));
+  lines.push(W('Equipo: ' + (rep.marca || '') + ' ' + (rep.modelo || '')));
+  if (rep.arreglo) lines.push(W('Trabajo: ' + rep.arreglo));
+  if (rep.nombre)  lines.push(W('Cliente: ' + rep.nombre));
+  lines.push(L('-'));
+  if (rep.monto) lines.push(LR('Total:', '$' + Number(rep.monto).toLocaleString('es-AR')));
+  lines.push(L('-'));
+  // Garantía 30 días por defecto si no hay otra
+  const garFin = _garantiaFin(rep.garantiaDias || 30);
+  lines.push(C('GARANTIA'));
+  lines.push(W('Valida hasta: ' + (garFin || '-')));
+  lines.push(W('No cubre golpes, humedad ni mal uso.'));
+  lines.push(L('='));
+  lines.push(C('Gracias por su confianza'));
+
+  imprimirTermica(lines.join('\n'), { title: 'Entrega N' + (rep.nOrden||'') });
+}
