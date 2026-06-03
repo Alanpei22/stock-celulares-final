@@ -38,8 +38,8 @@ function initPrecios() {
       if (!document.getElementById('precios-modal')?.classList.contains('hidden')) {
         renderPreciosList();
       }
-      // Re-render del tab Reparaciones si está visible
-      if (document.getElementById('rep-tab') && !document.getElementById('rep-tab').classList.contains('section-hidden')) {
+      // Re-render del tab Reparaciones (barato, mantiene el DOM listo aunque esté oculto)
+      if (document.getElementById('rep-tab-list')) {
         _renderReparTab();
       }
     }, err => {
@@ -263,7 +263,7 @@ function openPreciosBulk() {
     });
   }
   _bulkTipo = sel ? (sel.value || PRECIO_TIPOS[0]) : PRECIO_TIPOS[0];
-  if (sel && !sel.value) sel.value = _bulkTipo;
+  if (sel) sel.value = _bulkTipo; // sincronizar siempre el select con el estado
   _bulkLoadRows();
   // Cerrar el modal de lista si estaba abierto
   closePreciosModal();
@@ -393,6 +393,16 @@ let _reparOpenModelos = new Set();
 
 function openReparTab() {
   initPrecios();
+  // Si PRECIOS aún no cargó, mostrar placeholder de carga
+  if (!PRECIOS || PRECIOS.length === 0) {
+    const empty = document.getElementById('rep-tab-empty');
+    const cont = document.getElementById('rep-tab-list');
+    if (cont) cont.innerHTML = '';
+    if (empty) {
+      empty.classList.remove('hidden');
+      empty.innerHTML = '<span class="rep-empty-ico">⏳</span><p>Cargando precios…</p>';
+    }
+  }
   _renderReparTab();
 }
 
@@ -481,34 +491,24 @@ function _toggleRepModelo(equipo) {
 }
 
 function _addServicioAModelo(equipo) {
-  // Abrir el form pre-llenado con el equipo
-  _precioEditId = null;
-  // Llenar select de tipos
-  const tipoSel = document.getElementById('precio-fi-tipo');
-  if (tipoSel && tipoSel.options.length <= 1) {
-    PRECIO_TIPOS.forEach(t => {
-      const o = document.createElement('option');
-      o.value = t; o.textContent = t;
-      tipoSel.appendChild(o);
-    });
-  }
-  document.getElementById('precio-form-title').textContent = '➕ Servicio para ' + equipo;
-  document.getElementById('precio-fi-tipo').value = '';
-  document.getElementById('precio-fi-equipo').value = equipo;
-  document.getElementById('precio-fi-precio').value = '';
-  document.getElementById('precio-fi-nota').value = '';
-  const delBtn = document.getElementById('precio-form-del');
-  if (delBtn) delBtn.style.display = 'none';
-  document.getElementById('precio-form-overlay').classList.remove('hidden');
-  document.getElementById('precio-form-modal').classList.remove('hidden');
-  setTimeout(() => document.getElementById('precio-fi-tipo')?.focus(), 120);
+  // Reutilizar openPrecioForm con un equipo pre-llenado
+  openPrecioForm(null);
+  // Override post-apertura: setear equipo y título contextual
+  setTimeout(() => {
+    const eq = document.getElementById('precio-fi-equipo');
+    if (eq) eq.value = equipo;
+    const title = document.getElementById('precio-form-title');
+    if (title) title.textContent = '➕ Servicio para ' + equipo;
+    // Foco en el select de tipo (no en equipo, que ya está cargado)
+    document.getElementById('precio-fi-tipo')?.focus();
+  }, 130);
 }
 
 async function _deleteModeloComplete(equipo) {
   const items = PRECIOS.filter(p => p.equipo === equipo);
   if (!items.length) return;
-  if (!confirm(`¿Eliminar el modelo "${equipo}" y sus ${items.length} servicio${items.length !== 1 ? 's' : ''}?`)) return;
   const doDelete = async () => {
+    if (!confirm(`¿Eliminar el modelo "${equipo}" y sus ${items.length} servicio${items.length !== 1 ? 's' : ''}?`)) return;
     try {
       const batch = db.batch();
       items.forEach(p => batch.delete(db.collection('precios_reparaciones').doc(p.id)));
@@ -519,6 +519,7 @@ async function _deleteModeloComplete(equipo) {
       toast('Error al eliminar', 'error');
     }
   };
+  // PIN primero (si aplica), luego el confirm va adentro
   if (typeof requireCajaOwnerPin === 'function') {
     requireCajaOwnerPin(doDelete, 'PIN de dueño para eliminar el modelo');
   } else {

@@ -97,9 +97,10 @@ function imprimirTermica(text, opts = {}) {
 // Convierte el texto del reporte (con *negritas* de WhatsApp y emojis)
 // a un formato más limpio para ticket de 58mm.
 function reporteToTermica(rawText) {
-  // Quitar marcadores de WhatsApp (* _) y normalizar
-  let t = String(rawText || '')
+  // Quitar marcadores de WhatsApp (* _) y envolver líneas a 32 chars
+  const sinMarkdown = String(rawText || '')
     .replace(/\*/g, '')
     .replace(/_/g, '');
-  return t;
+  // Wrap por línea respetando saltos existentes
+  return sinMarkdown.split('\n').map(line => termWrap(line)).join('\n');
 }
