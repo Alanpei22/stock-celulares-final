@@ -187,6 +187,25 @@
     </div>
   </div><!-- /inv-tab -->
 
+  <!-- ── TAB: REPARACIONES (catálogo de precios) ── -->
+  <div id="rep-tab" class="caja-pg-tab section-hidden">
+    <header>
+      <div class="hdr-top">
+        <div class="hdr-brand"><h1>🔧 Reparaciones</h1></div>
+        <div class="hdr-actions">
+          <button class="hdr-btn" onclick="openPreciosBulk()" title="Carga masiva">📋</button>
+          <button class="hdr-btn" onclick="openNewModeloModal()" title="Nuevo modelo">＋</button>
+        </div>
+      </div>
+      <div class="search-wrap" style="padding:0 12px 8px">
+        <span class="search-icon">🔍</span>
+        <input id="rep-tab-search" type="search" placeholder="Buscar modelo o servicio…" autocomplete="off" oninput="_renderReparTab()">
+      </div>
+    </header>
+    <div id="rep-tab-list" class="rep-tab-list"></div>
+    <div id="rep-tab-empty" class="rep-tab-empty hidden"></div>
+  </div>
+
   <!-- ── BOTTOM NAV ── -->
   <nav class="bottom-nav caja-bottom-nav">
     <button class="nav-btn active" id="cnav-caja" onclick="switchCajaTab('caja')">
@@ -196,6 +215,10 @@
     <button class="nav-btn" id="cnav-inv" onclick="switchCajaTab('inventario')">
       <span class="nav-ico">🏷️</span>
       <span class="nav-lbl">Inventario</span>
+    </button>
+    <button class="nav-btn" id="cnav-rep" onclick="switchCajaTab('reparaciones')">
+      <span class="nav-ico">🔧</span>
+      <span class="nav-lbl">Reparaciones</span>
     </button>
     <button class="nav-btn" onclick="window.location.href='pos.html'">
       <span class="nav-ico">🛒</span>
@@ -780,8 +803,8 @@
 <script src="webpush.js"></script>
 <script>
 function switchCajaTab(tab) {
-  const tabs = { caja: 'caja-tab', inventario: 'inv-tab' };
-  const btns = { caja: 'cnav-caja', inventario: 'cnav-inv' };
+  const tabs = { caja: 'caja-tab', inventario: 'inv-tab', reparaciones: 'rep-tab' };
+  const btns = { caja: 'cnav-caja', inventario: 'cnav-inv', reparaciones: 'cnav-rep' };
   Object.keys(tabs).forEach(t => {
     const sec = document.getElementById(tabs[t]);
     const btn = document.getElementById(btns[t]);
@@ -793,8 +816,30 @@ function switchCajaTab(tab) {
   if (fab) fab.style.display = tab === 'caja' ? '' : 'none';
   if (backdrop) backdrop.style.display = 'none';
   if (tab === 'inventario') focusInvScan();
+  if (tab === 'reparaciones' && typeof openReparTab === 'function') openReparTab();
 }
 </script>
+
+<!-- ═══════════ MODAL: NUEVO MODELO DE REPARACIÓN ═══════════ -->
+<div id="newmod-overlay" class="nota-overlay hidden" onclick="closeNewModeloModal()"></div>
+<div id="newmod-modal" class="arqueo-modal hidden" style="max-width:420px">
+  <div class="nota-modal-hdr">
+    <span>➕ Nuevo modelo</span>
+    <button onclick="closeNewModeloModal()">✕</button>
+  </div>
+  <div class="precio-fg">
+    <label>Modelo (marca + nombre)</label>
+    <input id="newmod-equipo" class="precio-input" type="text" placeholder="iPhone 14, Samsung A54…" autocomplete="off">
+  </div>
+  <div class="precio-fg">
+    <label>Crear servicios con precio 0 (los completás después):</label>
+    <div id="newmod-svcs" class="newmod-svcs"></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <button class="btn-secondary" onclick="closeNewModeloModal()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" onclick="confirmNewModelo()" style="flex:2">✅ Crear modelo</button>
+  </div>
+</div>
 
 <!-- ═══════════ BOTTOM SHEET (menú deslizante) ═══════════ -->
 <div id="sheet-overlay" class="sheet-overlay hidden" onclick="closeSheet()"></div>

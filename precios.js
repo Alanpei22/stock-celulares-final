@@ -38,6 +38,10 @@ function initPrecios() {
       if (!document.getElementById('precios-modal')?.classList.contains('hidden')) {
         renderPreciosList();
       }
+      // Re-render del tab Reparaciones si está visible
+      if (document.getElementById('rep-tab') && !document.getElementById('rep-tab').classList.contains('section-hidden')) {
+        _renderReparTab();
+      }
     }, err => {
       console.error('precios listener:', err);
       if (typeof toast === 'function') toast('Error cargando precios', 'error');
@@ -381,6 +385,207 @@ function _bulkAddPasted() {
 function _bulkTogglePaste() {
   document.getElementById('bulk-paste-wrap')?.classList.toggle('hidden');
 }
+
+// ══════════════════════════════════════════
+//  TAB REPARACIONES — vista por modelo
+// ══════════════════════════════════════════
+let _reparOpenModelos = new Set();
+
+function openReparTab() {
+  initPrecios();
+  _renderReparTab();
+}
+
+function _renderReparTab() {
+  const cont = document.getElementById('rep-tab-list');
+  const empty = document.getElementById('rep-tab-empty');
+  if (!cont) return;
+
+  const q = (document.getElementById('rep-tab-search')?.value || '').trim().toLowerCase();
+  let lista = PRECIOS;
+  if (q) {
+    lista = lista.filter(p =>
+      ((p.equipo||'') + ' ' + (p.tipo||'') + ' ' + (p.nota||'')).toLowerCase().includes(q)
+    );
+  }
+
+  // Agrupar por equipo
+  const grupos = {};
+  lista.forEach(p => {
+    const e = p.equipo || '(sin nombre)';
+    if (!grupos[e]) grupos[e] = [];
+    grupos[e].push(p);
+  });
+  const modelos = Object.keys(grupos).sort();
+
+  if (!modelos.length) {
+    cont.innerHTML = '';
+    if (empty) {
+      empty.classList.remove('hidden');
+      empty.innerHTML = q
+        ? `<span class="rep-empty-ico">🔍</span><p>Sin resultados para "${_escP(q)}"</p>`
+        : `<span class="rep-empty-ico">🔧</span>
+           <p>Todavía no cargaste ningún modelo.</p>
+           <p class="rep-empty-sub">Tocá ➕ arriba a la derecha para crear el primero,<br>o 📋 para carga masiva.</p>`;
+    }
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+
+  // Si hay búsqueda activa, abrir todos los modelos
+  const forceOpen = !!q;
+
+  cont.innerHTML = modelos.map(equipo => {
+    const items = grupos[equipo].sort((a, b) => (a.tipo || '').localeCompare(b.tipo || ''));
+    const isOpen = forceOpen || _reparOpenModelos.has(equipo);
+    const sinPrecio = items.filter(p => !p.precio || p.precio <= 0).length;
+    return `
+      <div class="rep-modelo${isOpen ? ' rep-modelo--open' : ''}">
+        <div class="rep-modelo-hdr" onclick="_toggleRepModelo('${_escP(equipo)}')">
+          <span class="rep-modelo-name">📱 ${_escP(equipo)}</span>
+          <span class="rep-modelo-meta">
+            ${items.length} servicio${items.length !== 1 ? 's' : ''}
+            ${sinPrecio > 0 ? `<span class="rep-modelo-warn">· ${sinPrecio} sin precio</span>` : ''}
+          </span>
+          <span class="rep-modelo-chev">${isOpen ? '▴' : '▾'}</span>
+        </div>
+        ${isOpen ? `
+          <div class="rep-modelo-body">
+            ${items.map(p => `
+              <div class="rep-svc-row" onclick="openPrecioForm('${_escP(p.id)}')">
+                <span class="rep-svc-ico">${PRECIO_TIPO_ICON[p.tipo] || '🔧'}</span>
+                <div class="rep-svc-info">
+                  <span class="rep-svc-name">${_escP(p.tipo || 'Otro')}</span>
+                  ${p.nota ? `<span class="rep-svc-nota">${_escP(p.nota)}</span>` : ''}
+                </div>
+                <span class="rep-svc-precio${(!p.precio || p.precio <= 0) ? ' rep-svc-precio--zero' : ''}">
+                  ${p.precio > 0 ? '$' + Number(p.precio).toLocaleString('es-AR') : 'sin precio'}
+                </span>
+              </div>`).join('')}
+            <button class="rep-svc-add" onclick="event.stopPropagation();_addServicioAModelo('${_escP(equipo)}')">
+              ➕ Agregar servicio a este modelo
+            </button>
+            <button class="rep-modelo-del" onclick="event.stopPropagation();_deleteModeloComplete('${_escP(equipo)}')">
+              🗑 Eliminar modelo completo
+            </button>
+          </div>
+        ` : ''}
+      </div>`;
+  }).join('');
+}
+
+function _toggleRepModelo(equipo) {
+  if (_reparOpenModelos.has(equipo)) _reparOpenModelos.delete(equipo);
+  else _reparOpenModelos.add(equipo);
+  _renderReparTab();
+}
+
+function _addServicioAModelo(equipo) {
+  // Abrir el form pre-llenado con el equipo
+  _precioEditId = null;
+  // Llenar select de tipos
+  const tipoSel = document.getElementById('precio-fi-tipo');
+  if (tipoSel && tipoSel.options.length <= 1) {
+    PRECIO_TIPOS.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t; o.textContent = t;
+      tipoSel.appendChild(o);
+    });
+  }
+  document.getElementById('precio-form-title').textContent = '➕ Servicio para ' + equipo;
+  document.getElementById('precio-fi-tipo').value = '';
+  document.getElementById('precio-fi-equipo').value = equipo;
+  document.getElementById('precio-fi-precio').value = '';
+  document.getElementById('precio-fi-nota').value = '';
+  const delBtn = document.getElementById('precio-form-del');
+  if (delBtn) delBtn.style.display = 'none';
+  document.getElementById('precio-form-overlay').classList.remove('hidden');
+  document.getElementById('precio-form-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('precio-fi-tipo')?.focus(), 120);
+}
+
+async function _deleteModeloComplete(equipo) {
+  const items = PRECIOS.filter(p => p.equipo === equipo);
+  if (!items.length) return;
+  if (!confirm(`¿Eliminar el modelo "${equipo}" y sus ${items.length} servicio${items.length !== 1 ? 's' : ''}?`)) return;
+  const doDelete = async () => {
+    try {
+      const batch = db.batch();
+      items.forEach(p => batch.delete(db.collection('precios_reparaciones').doc(p.id)));
+      await batch.commit();
+      toast('Modelo eliminado', 'info');
+    } catch (e) {
+      console.error('deleteModelo:', e);
+      toast('Error al eliminar', 'error');
+    }
+  };
+  if (typeof requireCajaOwnerPin === 'function') {
+    requireCajaOwnerPin(doDelete, 'PIN de dueño para eliminar el modelo');
+  } else {
+    doDelete();
+  }
+}
+
+// ── Modal "Nuevo modelo" ────────────────────
+function openNewModeloModal() {
+  const cont = document.getElementById('newmod-svcs');
+  if (cont) {
+    // Defaults marcados: los más comunes
+    const defaults = new Set(['Pantalla / Módulo', 'Batería', 'Pin de carga', 'Tapa / Carcasa']);
+    cont.innerHTML = PRECIO_TIPOS.map(t => `
+      <label class="newmod-svc">
+        <input type="checkbox" value="${_escP(t)}" ${defaults.has(t) ? 'checked' : ''}>
+        <span>${PRECIO_TIPO_ICON[t] || '🔧'} ${_escP(t)}</span>
+      </label>
+    `).join('');
+  }
+  document.getElementById('newmod-equipo').value = '';
+  document.getElementById('newmod-overlay').classList.remove('hidden');
+  document.getElementById('newmod-modal').classList.remove('hidden');
+  setTimeout(() => document.getElementById('newmod-equipo')?.focus(), 150);
+}
+
+function closeNewModeloModal() {
+  document.getElementById('newmod-overlay').classList.add('hidden');
+  document.getElementById('newmod-modal').classList.add('hidden');
+}
+
+async function confirmNewModelo() {
+  const equipo = document.getElementById('newmod-equipo').value.trim();
+  if (!equipo) { toast('Ingresá el nombre del modelo', 'error'); return; }
+  const checks = document.querySelectorAll('#newmod-svcs input[type="checkbox"]:checked');
+  if (!checks.length) { toast('Elegí al menos un servicio', 'error'); return; }
+
+  // Detectar duplicados por equipo+tipo
+  const existentes = new Set(PRECIOS
+    .filter(p => p.equipo === equipo)
+    .map(p => p.tipo));
+  const tipos = Array.from(checks).map(c => c.value).filter(t => !existentes.has(t));
+  if (!tipos.length) {
+    toast('Todos esos servicios ya existían para este modelo', 'info');
+    closeNewModeloModal();
+    return;
+  }
+
+  try {
+    const batch = db.batch();
+    tipos.forEach(tipo => {
+      const ref = db.collection('precios_reparaciones').doc();
+      batch.set(ref, {
+        tipo, equipo, precio: 0, nota: '',
+        updatedAt: new Date().toISOString(),
+      });
+    });
+    await batch.commit();
+    _reparOpenModelos.add(equipo); // abrir el modelo recién creado
+    toast(`✅ ${tipos.length} servicio(s) creado(s) para ${equipo}`, 'success');
+    closeNewModeloModal();
+  } catch (e) {
+    console.error('confirmNewModelo:', e);
+    toast('Error al crear el modelo', 'error');
+  }
+}
+
 
 // Importar modelos del catálogo de proveedor (modulos_catalog.js)
 function _bulkImportCatalog() {
