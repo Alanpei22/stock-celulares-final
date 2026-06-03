@@ -687,6 +687,23 @@ function _toggleRepModelo(equipo) {
   _renderReparTab();
 }
 
+// Mostrar/ocultar botón ✕ del buscador según haya texto
+function _repSearchToggleClear() {
+  const inp = document.getElementById('rep-tab-search');
+  const btn = document.getElementById('rep-search-clear');
+  if (!inp || !btn) return;
+  btn.classList.toggle('hidden', !inp.value);
+}
+
+function _repSearchClear() {
+  const inp = document.getElementById('rep-tab-search');
+  if (!inp) return;
+  inp.value = '';
+  _repSearchToggleClear();
+  _renderReparTab();
+  inp.focus();
+}
+
 // Importar TODOS los modelos del catálogo de proveedor al tab Reparaciones
 async function _reparImportCatalog() {
   if (typeof MODULOS_CATALOG === 'undefined' || !Array.isArray(MODULOS_CATALOG)) {

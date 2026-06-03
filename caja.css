@@ -982,6 +982,53 @@ body.dark .rep-add-variante { background:rgba(52,211,153,.1); color:#34D399; bor
 .precio-fg-row { display:flex; gap:10px; margin-bottom:12px; }
 .precio-fg-opt { font-size:.7rem; font-weight:500; color:var(--t3,#999); }
 
+/* ── Buscador del tab Reparaciones ── */
+.rep-search-wrap {
+  position: relative;
+  margin: 0 12px 10px;
+  display: flex; align-items: center;
+  background: var(--card, #fff);
+  border: 1.5px solid var(--border, #e3e1de);
+  border-radius: 14px;
+  padding: 0 12px 0 40px;
+  transition: all 180ms;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+.rep-search-wrap:focus-within {
+  border-color: #C8965A;
+  box-shadow: 0 0 0 4px rgba(200,150,90,.12);
+}
+.rep-search-ico {
+  position: absolute; left: 14px; top: 50%;
+  transform: translateY(-50%);
+  font-size: .95rem; opacity: .55; pointer-events: none;
+}
+.rep-search-input {
+  flex: 1; padding: 11px 0;
+  border: none; background: transparent;
+  font-size: .95rem; font-weight: 500;
+  color: var(--t1, #1a1a1a); outline: none;
+  -webkit-appearance: none; appearance: none;
+}
+.rep-search-input::placeholder { color: var(--t3, #999); }
+.rep-search-input::-webkit-search-decoration,
+.rep-search-input::-webkit-search-cancel-button,
+.rep-search-input::-webkit-search-results-button,
+.rep-search-input::-webkit-search-results-decoration { display: none; }
+.rep-search-clear {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(0,0,0,.08); color: var(--t1, #1a1a1a);
+  border: none; cursor: pointer; flex-shrink: 0;
+  font-size: .7rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  margin-left: 6px;
+}
+.rep-search-clear:active { background: rgba(0,0,0,.18); transform: scale(.92); }
+.rep-search-clear.hidden { display: none; }
+body.dark .rep-search-wrap { background: #1c1c1e; border-color: rgba(255,255,255,.1); }
+body.dark .rep-search-wrap:focus-within { border-color: #D4A76A; box-shadow: 0 0 0 4px rgba(212,167,106,.15); }
+body.dark .rep-search-clear { background: rgba(255,255,255,.12); color: #f2f2f7; }
+
 /* ── TAB REPARACIONES (vista por modelo) ── */
 .rep-tab-list { padding: 0 12px 100px; }
 .rep-tab-empty { text-align:center; padding:40px 20px; color:var(--t3,#999); }

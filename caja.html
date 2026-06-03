@@ -198,9 +198,10 @@
           <button class="hdr-btn" onclick="openNewModeloModal()" title="Nuevo modelo">＋</button>
         </div>
       </div>
-      <div class="search-wrap" style="padding:0 12px 8px">
-        <span class="search-icon">🔍</span>
-        <input id="rep-tab-search" type="search" placeholder="Buscar modelo o servicio…" autocomplete="off" oninput="_renderReparTab()">
+      <div class="rep-search-wrap">
+        <span class="rep-search-ico">🔍</span>
+        <input id="rep-tab-search" class="rep-search-input" type="search" placeholder="Buscar modelo o servicio…" autocomplete="off" oninput="_renderReparTab();_repSearchToggleClear()">
+        <button id="rep-search-clear" class="rep-search-clear hidden" onclick="_repSearchClear()" type="button" aria-label="Limpiar">✕</button>
       </div>
     </header>
     <div id="rep-tab-list" class="rep-tab-list"></div>
