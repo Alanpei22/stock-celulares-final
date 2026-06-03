@@ -524,7 +524,13 @@ function _renderModeloList() {
         <button class="rep-onboard-cta" onclick="_createExampleModel()">
           ✨ Crear este modelo de ejemplo
         </button>
-        <p class="rep-onboard-hint">Después podés editar los precios con un toque,<br>o crear más modelos con el botón ＋ de arriba.</p>
+
+        <div class="rep-onboard-or">— o —</div>
+
+        <button class="rep-onboard-cta rep-onboard-cta--catalog" onclick="_reparImportCatalog()">
+          📲 Importar 343 modelos del catálogo
+        </button>
+        <p class="rep-onboard-hint">El catálogo trae todas las pantallas de Samsung, Motorola, Xiaomi, iPhone, etc.<br>Después editás precios y agregás otros servicios (batería, pin, etc.) por modelo.</p>
       </div>`;
     return;
   }
@@ -679,6 +685,69 @@ function _toggleRepModelo(equipo) {
   if (_reparOpenModelos.has(equipo)) _reparOpenModelos.delete(equipo);
   else _reparOpenModelos.add(equipo);
   _renderReparTab();
+}
+
+// Importar TODOS los modelos del catálogo de proveedor al tab Reparaciones
+async function _reparImportCatalog() {
+  if (typeof MODULOS_CATALOG === 'undefined' || !Array.isArray(MODULOS_CATALOG)) {
+    toast('Catálogo no disponible', 'error');
+    return;
+  }
+  const total = MODULOS_CATALOG.length;
+  const ok = confirm(
+    `Importar ${total} modelos del catálogo de pantallas/módulos.\n\n` +
+    `Cada modelo se va a crear con la categoría "Pantalla / Módulo" en $0.\n` +
+    `Vos después completás los precios y agregás otras categorías (Batería, Pin de carga, etc.) por modelo.\n\n` +
+    `¿Continuar?`
+  );
+  if (!ok) return;
+
+  // Detectar duplicados existentes (mismo equipo + Pantalla/Módulo)
+  const existentes = new Set(PRECIOS
+    .filter(p => p.tipo === 'Pantalla / Módulo')
+    .map(p => (p.equipo || '').toLowerCase().trim()));
+
+  let creados = 0, dup = 0;
+  let batch = db.batch();
+  let ops = 0;
+
+  try {
+    for (const entry of MODULOS_CATALOG) {
+      const marca  = entry[0] || '';
+      const nombre = entry[1] || '';
+      const equipo = `${marca} ${nombre}`.trim();
+      const key = equipo.toLowerCase().trim();
+      if (!equipo) continue;
+      if (existentes.has(key)) { dup++; continue; }
+      existentes.add(key);
+
+      const ref = db.collection('precios_reparaciones').doc();
+      batch.set(ref, {
+        tipo: 'Pantalla / Módulo',
+        equipo,
+        precio: 0,
+        precioLista: null,
+        calidad: null,
+        tipoVariante: null,
+        nota: '',
+        updatedAt: new Date().toISOString(),
+      });
+      ops++; creados++;
+      if (ops >= 400) {
+        await batch.commit();
+        batch = db.batch();
+        ops = 0;
+      }
+    }
+    if (ops > 0) await batch.commit();
+
+    let msg = `✅ ${creados} modelo(s) creado(s)`;
+    if (dup > 0) msg += ` · ${dup} ya estaban`;
+    toast(msg, 'success');
+  } catch (e) {
+    console.error('reparImportCatalog:', e);
+    toast('Error durante la importación', 'error');
+  }
 }
 
 // Crear modelo de ejemplo para que el usuario arranque con algo
