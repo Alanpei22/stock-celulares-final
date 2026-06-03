@@ -858,6 +858,130 @@ body.dark .rlb-title { color: #F2F2F7; }
 body.dark .mov-sug-item--repair { background: rgba(200,150,90,.07); border-left-color: #D4A76A; }
 body.dark .sug-saldo-chip { background: rgba(212,167,106,.15); color: #D4A76A; }
 
+/* ── TAB REPARACIONES — Tarjeta de MODELO en la lista ── */
+.rep-modelo-card {
+  display:flex; align-items:center; gap:10px;
+  padding:14px 14px;
+  background:var(--card,#fff); border:1px solid var(--border,#e3e1de);
+  border-radius:14px; margin-bottom:8px;
+  cursor:pointer; transition:all 150ms;
+  box-shadow:0 1px 3px rgba(0,0,0,.04);
+}
+.rep-modelo-card:active { transform:scale(.99); background:var(--bg1,#f3f3f3); }
+.rep-modelo-card-main { display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
+.rep-modelo-card-icon { font-size:1.6rem; flex-shrink:0; }
+.rep-modelo-card-info { flex:1; min-width:0; }
+.rep-modelo-card-name { font-size:1rem; font-weight:800; color:var(--t1,#1a1a1a); margin-bottom:3px; }
+.rep-modelo-card-meta { font-size:.75rem; color:var(--t3,#999); margin-bottom:4px; }
+.rep-modelo-card-preview { font-size:.95rem; letter-spacing:3px; opacity:.65; }
+.rep-modelo-card-arrow { font-size:1.6rem; font-weight:700; color:var(--t3,#999); flex-shrink:0; }
+body.dark .rep-modelo-card { background:#1c1c1e; border-color:rgba(255,255,255,.08); }
+body.dark .rep-modelo-card:active { background:rgba(255,255,255,.04); }
+
+/* ── VISTA DETALLE de un modelo ── */
+.rep-detail-hdr {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 14px 14px;
+  background:var(--card,#fff);
+  border-radius:14px 14px 0 0;
+  margin-bottom:0;
+  position:sticky; top:0; z-index:5;
+  box-shadow:0 1px 0 var(--border,#e3e1de);
+}
+body.dark .rep-detail-hdr { background:#1c1c1e; box-shadow:0 1px 0 rgba(255,255,255,.08); }
+.rep-back-btn {
+  padding:8px 12px; background:var(--bg1,#f3f3f3); color:var(--t1,#1a1a1a);
+  border:none; border-radius:10px; font-size:.85rem; font-weight:700; cursor:pointer;
+  flex-shrink:0;
+}
+.rep-back-btn:active { transform:scale(.95); }
+body.dark .rep-back-btn { background:rgba(255,255,255,.08); color:#f2f2f7; }
+.rep-detail-model { flex:1; display:flex; align-items:center; gap:8px; min-width:0; }
+.rep-detail-model-ico { font-size:1.4rem; flex-shrink:0; }
+.rep-detail-model-name { font-size:1.05rem; font-weight:800; color:var(--t1,#1a1a1a); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rep-detail-del {
+  width:36px; height:36px; border-radius:50%;
+  background:rgba(239,68,68,.1); color:#dc2626;
+  border:none; cursor:pointer; font-size:.95rem; flex-shrink:0;
+}
+.rep-detail-del:active { transform:scale(.95); }
+body.dark .rep-detail-del { background:rgba(239,68,68,.18); color:#F87171; }
+
+/* Tabs horizontales scrolleables */
+.rep-detail-tabs {
+  display:flex; gap:6px; overflow-x:auto;
+  padding:10px 14px; margin-bottom:8px;
+  background:var(--card,#fff);
+  border-radius:0 0 14px 14px;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+  position:sticky; top:58px; z-index:4;
+}
+body.dark .rep-detail-tabs { background:#1c1c1e; }
+.rep-detail-tabs::-webkit-scrollbar { display:none; }
+.rep-detail-tab {
+  flex-shrink:0; padding:8px 14px;
+  background:transparent; border:1.5px solid var(--border,#e3e1de);
+  border-radius:12px;
+  display:flex; align-items:center; gap:6px;
+  font-size:.82rem; font-weight:700; color:var(--t2,#666);
+  cursor:pointer; transition:all 150ms; white-space:nowrap;
+}
+.rep-detail-tab:active { transform:scale(.96); }
+.rep-detail-tab--active {
+  background:var(--t1,#1a1a1a); color:var(--card,#fff); border-color:var(--t1,#1a1a1a);
+  box-shadow:0 2px 8px rgba(0,0,0,.18);
+}
+.rep-detail-tab-ico { font-size:1rem; }
+.rep-detail-tab--add { background:rgba(16,185,129,.1); color:#10b981; border-color:transparent; font-weight:900; font-size:1.05rem; padding:8px 12px; }
+body.dark .rep-detail-tab { border-color:rgba(255,255,255,.1); color:#aaa; }
+body.dark .rep-detail-tab--active { background:#fff; color:#0f172a; border-color:#fff; }
+body.dark .rep-detail-tab--add { background:rgba(52,211,153,.18); color:#34D399; }
+
+.rep-detail-body { padding:0 14px 24px; }
+.rep-detail-empty { padding:30px 16px; text-align:center; color:var(--t3,#999); font-size:.9rem; line-height:1.6; }
+
+/* Tarjeta de variante */
+.rep-variante-card {
+  display:flex; align-items:stretch; gap:14px;
+  padding:14px; margin-bottom:10px;
+  background:var(--card,#fff); border:1px solid var(--border,#e3e1de);
+  border-radius:14px; cursor:pointer;
+  transition:all 150ms;
+}
+.rep-variante-card:active { transform:scale(.99); background:var(--bg1,#f3f3f3); }
+body.dark .rep-variante-card { background:#1c1c1e; border-color:rgba(255,255,255,.08); }
+body.dark .rep-variante-card:active { background:rgba(255,255,255,.04); }
+.rep-variante-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.rep-var-line { font-size:.88rem; color:var(--t1,#1a1a1a); line-height:1.35; }
+.rep-var-lbl { color:var(--t3,#999); font-weight:500; }
+.rep-var-nota { font-size:.78rem; color:var(--t2,#666); font-style:italic; }
+.rep-var-empty { font-style:italic; color:var(--t3,#999); }
+.rep-variante-prices { display:flex; flex-direction:column; gap:4px; align-items:flex-end; justify-content:center; flex-shrink:0; }
+.rep-variante-price-row { display:flex; flex-direction:column; align-items:flex-end; gap:1px; min-width:90px; }
+.rep-variante-price-row--single { justify-content:center; }
+.rep-variante-price-lbl { font-size:.66rem; color:var(--t3,#999); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+.rep-variante-price-val { font-size:1rem; font-weight:900; color:var(--t1,#1a1a1a); }
+.rep-variante-price-val--ef { color:#10b981; }
+.rep-variante-price-val--lista { color:#ef4444; font-size:.92rem; }
+.rep-variante-price-val--zero { color:#f59e0b; font-size:.78rem; font-style:italic; }
+body.dark .rep-variante-price-val--ef { color:#34D399; }
+body.dark .rep-variante-price-val--lista { color:#F87171; }
+
+.rep-add-variante {
+  width:100%; padding:14px; margin-top:8px;
+  background:rgba(16,185,129,.08); color:#10b981;
+  border:1.5px dashed #10b981; border-radius:12px;
+  font-size:.92rem; font-weight:800; cursor:pointer;
+  transition:all 150ms;
+}
+.rep-add-variante:active { transform:scale(.98); background:rgba(16,185,129,.18); }
+body.dark .rep-add-variante { background:rgba(52,211,153,.1); color:#34D399; border-color:#34D399; }
+
+/* Row para 2 campos lado a lado en el form */
+.precio-fg-row { display:flex; gap:10px; margin-bottom:12px; }
+.precio-fg-opt { font-size:.7rem; font-weight:500; color:var(--t3,#999); }
+
 /* ── TAB REPARACIONES (vista por modelo) ── */
 .rep-tab-list { padding: 0 12px 100px; }
 .rep-tab-empty { text-align:center; padding:40px 20px; color:var(--t3,#999); }

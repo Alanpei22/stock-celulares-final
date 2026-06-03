@@ -164,21 +164,29 @@ function openPrecioForm(id) {
     });
   }
 
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+
   if (id) {
     const p = PRECIOS.find(x => x.id === id);
     if (!p) return;
-    title.textContent = '✏️ Editar precio';
-    document.getElementById('precio-fi-tipo').value = p.tipo || '';
-    document.getElementById('precio-fi-equipo').value = p.equipo || '';
-    document.getElementById('precio-fi-precio').value = p.precio ?? '';
-    document.getElementById('precio-fi-nota').value = p.nota || '';
+    title.textContent = '✏️ Editar';
+    set('precio-fi-tipo',         p.tipo || '');
+    set('precio-fi-equipo',       p.equipo || '');
+    set('precio-fi-calidad',      p.calidad || '');
+    set('precio-fi-tipovar',      p.tipoVariante || '');
+    set('precio-fi-precio',       p.precio ?? '');
+    set('precio-fi-precio-lista', p.precioLista ?? '');
+    set('precio-fi-nota',         p.nota || '');
     if (delBtn) delBtn.style.display = '';
   } else {
     title.textContent = '➕ Nuevo precio';
-    document.getElementById('precio-fi-tipo').value = '';
-    document.getElementById('precio-fi-equipo').value = '';
-    document.getElementById('precio-fi-precio').value = '';
-    document.getElementById('precio-fi-nota').value = '';
+    set('precio-fi-tipo',         '');
+    set('precio-fi-equipo',       '');
+    set('precio-fi-calidad',      '');
+    set('precio-fi-tipovar',      '');
+    set('precio-fi-precio',       '');
+    set('precio-fi-precio-lista', '');
+    set('precio-fi-nota',         '');
     if (delBtn) delBtn.style.display = 'none';
   }
 
@@ -194,16 +202,25 @@ function closePrecioForm() {
 }
 
 async function savePrecio() {
-  const tipo   = document.getElementById('precio-fi-tipo').value;
-  const equipo = document.getElementById('precio-fi-equipo').value.trim();
-  const precio = parseInt(document.getElementById('precio-fi-precio').value) || 0;
-  const nota   = document.getElementById('precio-fi-nota').value.trim();
+  const tipo         = document.getElementById('precio-fi-tipo').value;
+  const equipo       = document.getElementById('precio-fi-equipo').value.trim();
+  const calidad      = document.getElementById('precio-fi-calidad')?.value.trim() || '';
+  const tipoVariante = document.getElementById('precio-fi-tipovar')?.value.trim() || '';
+  const precio       = parseInt(document.getElementById('precio-fi-precio').value) || 0;
+  const precioLista  = parseInt(document.getElementById('precio-fi-precio-lista')?.value) || 0;
+  const nota         = document.getElementById('precio-fi-nota').value.trim();
 
   if (!tipo)   { toast('Elegí el tipo de arreglo', 'error'); return; }
   if (!equipo) { toast('Ingresá el equipo (marca y modelo)', 'error'); return; }
-  if (precio <= 0) { toast('Ingresá un precio válido', 'error'); return; }
+  if (precio <= 0) { toast('Ingresá un precio efectivo válido', 'error'); return; }
 
-  const data = { tipo, equipo, precio, nota, updatedAt: new Date().toISOString() };
+  const data = {
+    tipo, equipo, precio, nota,
+    calidad: calidad || null,
+    tipoVariante: tipoVariante || null,
+    precioLista: precioLista > 0 ? precioLista : null,
+    updatedAt: new Date().toISOString()
+  };
 
   try {
     if (_precioEditId) {
@@ -389,11 +406,12 @@ function _bulkTogglePaste() {
 // ══════════════════════════════════════════
 //  TAB REPARACIONES — vista por modelo
 // ══════════════════════════════════════════
-let _reparOpenModelos = new Set();
+let _reparView = 'list'; // 'list' | 'detail'
+let _reparDetailModelo = null;
+let _reparDetailCat = null;
 
 function openReparTab() {
   initPrecios();
-  // Si PRECIOS aún no cargó, mostrar placeholder de carga
   if (!PRECIOS || PRECIOS.length === 0) {
     const empty = document.getElementById('rep-tab-empty');
     const cont = document.getElementById('rep-tab-list');
@@ -406,7 +424,39 @@ function openReparTab() {
   _renderReparTab();
 }
 
+function _openModeloDetail(equipo) {
+  _reparView = 'detail';
+  _reparDetailModelo = equipo;
+  const items = PRECIOS.filter(p => p.equipo === equipo);
+  _reparDetailCat = items[0]?.tipo || PRECIO_TIPOS[0];
+  _renderReparTab();
+  // Scroll al top del tab
+  document.getElementById('rep-tab-list')?.scrollIntoView({ behavior: 'instant', block: 'start' });
+  window.scrollTo(0, 0);
+}
+
+function _closeModeloDetail() {
+  _reparView = 'list';
+  _reparDetailModelo = null;
+  _reparDetailCat = null;
+  _renderReparTab();
+}
+
+function _setReparDetailCat(cat) {
+  _reparDetailCat = cat;
+  _renderReparTab();
+}
+
 function _renderReparTab() {
+  const cont = document.getElementById('rep-tab-list');
+  if (!cont) return;
+  if (_reparView === 'detail' && _reparDetailModelo) {
+    return _renderModeloDetail();
+  }
+  return _renderModeloList();
+}
+
+function _renderModeloList() {
   const cont = document.getElementById('rep-tab-list');
   const empty = document.getElementById('rep-tab-empty');
   if (!cont) return;
@@ -480,51 +530,149 @@ function _renderReparTab() {
   }
   if (empty) empty.classList.add('hidden');
 
-  // Si hay búsqueda activa, abrir todos los modelos
-  const forceOpen = !!q;
-
   cont.innerHTML = modelos.map(equipo => {
-    const items = grupos[equipo].sort((a, b) => (a.tipo || '').localeCompare(b.tipo || ''));
-    const isOpen = forceOpen || _reparOpenModelos.has(equipo);
+    const items = grupos[equipo];
+    const categorias = [...new Set(items.map(p => p.tipo).filter(Boolean))];
     const sinPrecio = items.filter(p => !p.precio || p.precio <= 0).length;
+    // Preview de las primeras 4 categorías
+    const previewIcons = categorias.slice(0, 4).map(t => PRECIO_TIPO_ICON[t] || '🔧').join(' ');
     return `
-      <div class="rep-modelo${isOpen ? ' rep-modelo--open' : ''}">
-        <div class="rep-modelo-hdr" onclick="_toggleRepModelo('${_escP(equipo)}')">
-          <span class="rep-modelo-name">📱 ${_escP(equipo)}</span>
-          <span class="rep-modelo-meta">
-            ${items.length} servicio${items.length !== 1 ? 's' : ''}
-            ${sinPrecio > 0 ? `<span class="rep-modelo-warn">· ${sinPrecio} sin precio</span>` : ''}
-          </span>
-          <span class="rep-modelo-chev">${isOpen ? '▴' : '▾'}</span>
-        </div>
-        ${isOpen ? `
-          <div class="rep-modelo-body">
-            ${items.map(p => `
-              <div class="rep-svc-row">
-                <span class="rep-svc-ico" onclick="openPrecioForm('${_escP(p.id)}')" title="Editar todo">${PRECIO_TIPO_ICON[p.tipo] || '🔧'}</span>
-                <div class="rep-svc-info" onclick="openPrecioForm('${_escP(p.id)}')" title="Editar todo">
-                  <span class="rep-svc-name">${_escP(p.tipo || 'Otro')}</span>
-                  ${p.nota ? `<span class="rep-svc-nota">${_escP(p.nota)}</span>` : ''}
-                </div>
-                <div class="rep-svc-precio-wrap${(!p.precio || p.precio <= 0) ? ' rep-svc-precio-wrap--zero' : ''}">
-                  <span class="rep-svc-precio-prefix">$</span>
-                  <input class="rep-svc-precio-input" type="number" inputmode="numeric" min="0"
-                    data-id="${_escP(p.id)}" value="${p.precio || ''}" placeholder="0"
-                    onfocus="this.select()"
-                    onblur="_savePrecioInline('${_escP(p.id)}', this.value)"
-                    onkeydown="_onPrecioInlineKey(event)">
-                </div>
-              </div>`).join('')}
-            <button class="rep-svc-add" onclick="event.stopPropagation();_addServicioAModelo('${_escP(equipo)}')">
-              ➕ Agregar servicio a este modelo
-            </button>
-            <button class="rep-modelo-del" onclick="event.stopPropagation();_deleteModeloComplete('${_escP(equipo)}')">
-              🗑 Eliminar modelo completo
-            </button>
+      <div class="rep-modelo-card" onclick="_openModeloDetail('${_escP(equipo)}')">
+        <div class="rep-modelo-card-main">
+          <div class="rep-modelo-card-icon">📱</div>
+          <div class="rep-modelo-card-info">
+            <div class="rep-modelo-card-name">${_escP(equipo)}</div>
+            <div class="rep-modelo-card-meta">
+              <span>${items.length} servicio${items.length !== 1 ? 's' : ''}</span>
+              ${sinPrecio > 0 ? `<span class="rep-modelo-warn">· ${sinPrecio} sin precio</span>` : ''}
+            </div>
+            ${previewIcons ? `<div class="rep-modelo-card-preview">${previewIcons}</div>` : ''}
           </div>
-        ` : ''}
+        </div>
+        <div class="rep-modelo-card-arrow">›</div>
       </div>`;
   }).join('');
+}
+
+// ── Vista DETALLE de un modelo (tabs por categoría) ──
+function _renderModeloDetail() {
+  const cont = document.getElementById('rep-tab-list');
+  const empty = document.getElementById('rep-tab-empty');
+  if (!cont) return;
+  if (empty) empty.classList.add('hidden');
+
+  const equipo = _reparDetailModelo;
+  const items = PRECIOS.filter(p => p.equipo === equipo);
+  const presentes = [...new Set(items.map(p => p.tipo).filter(Boolean))];
+
+  // Si la categoría seleccionada ya no existe en este modelo (ej. recién la borraron), elegir otra
+  if (!presentes.includes(_reparDetailCat)) {
+    _reparDetailCat = presentes[0] || PRECIO_TIPOS[0];
+  }
+  const cat = _reparDetailCat;
+  const variantes = items.filter(p => p.tipo === cat);
+
+  cont.innerHTML = `
+    <div class="rep-detail-hdr">
+      <button class="rep-back-btn" onclick="_closeModeloDetail()">← Modelos</button>
+      <div class="rep-detail-model">
+        <span class="rep-detail-model-ico">📱</span>
+        <span class="rep-detail-model-name">${_escP(equipo)}</span>
+      </div>
+      <button class="rep-detail-del" onclick="_deleteModeloComplete('${_escP(equipo)}')" title="Eliminar modelo">🗑</button>
+    </div>
+
+    <div class="rep-detail-tabs">
+      ${presentes.map(t => `
+        <button class="rep-detail-tab${t === cat ? ' rep-detail-tab--active' : ''}" onclick="_setReparDetailCat('${_escP(t)}')">
+          <span class="rep-detail-tab-ico">${PRECIO_TIPO_ICON[t] || '🔧'}</span>
+          <span class="rep-detail-tab-name">${_escP(t)}</span>
+        </button>
+      `).join('')}
+      <button class="rep-detail-tab rep-detail-tab--add" onclick="_addCategoriaToModelo()" title="Agregar categoría">＋</button>
+    </div>
+
+    <div class="rep-detail-body">
+      ${variantes.length === 0 ? `
+        <div class="rep-detail-empty">
+          <p>Este modelo no tiene <b>${_escP(cat)}</b> cargado.</p>
+        </div>
+      ` : variantes.map(p => _renderVarianteCard(p)).join('')}
+      <button class="rep-add-variante" onclick="_addVariante('${_escP(equipo)}', '${_escP(cat)}')">
+        ➕ Agregar ${_escP(cat)}
+      </button>
+    </div>
+  `;
+}
+
+function _renderVarianteCard(p) {
+  const ef = Number(p.precio) || 0;
+  const lista = Number(p.precioLista) || 0;
+  const lineas = [];
+  if (p.calidad)      lineas.push(`<div class="rep-var-line"><span class="rep-var-lbl">Calidad:</span> ${_escP(p.calidad)}</div>`);
+  if (p.tipoVariante) lineas.push(`<div class="rep-var-line"><span class="rep-var-lbl">Tipo:</span> ${_escP(p.tipoVariante)}</div>`);
+  if (p.nota)         lineas.push(`<div class="rep-var-line rep-var-nota">${_escP(p.nota)}</div>`);
+  if (!lineas.length) lineas.push(`<div class="rep-var-line rep-var-empty">Sin variante</div>`);
+
+  return `
+    <div class="rep-variante-card" onclick="openPrecioForm('${_escP(p.id)}')">
+      <div class="rep-variante-info">
+        ${lineas.join('')}
+      </div>
+      <div class="rep-variante-prices">
+        ${lista > 0 ? `
+          <div class="rep-variante-price-row">
+            <span class="rep-variante-price-lbl">Desc efectivo</span>
+            <span class="rep-variante-price-val rep-variante-price-val--ef">$${ef.toLocaleString('es-AR')}</span>
+          </div>
+          <div class="rep-variante-price-row">
+            <span class="rep-variante-price-lbl">Lista</span>
+            <span class="rep-variante-price-val rep-variante-price-val--lista">$${lista.toLocaleString('es-AR')}</span>
+          </div>
+        ` : `
+          <div class="rep-variante-price-row rep-variante-price-row--single">
+            <span class="rep-variante-price-val${ef > 0 ? '' : ' rep-variante-price-val--zero'}">${ef > 0 ? '$' + ef.toLocaleString('es-AR') : 'sin precio'}</span>
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function _addVariante(equipo, categoria) {
+  openPrecioForm(null);
+  setTimeout(() => {
+    const tipoSel = document.getElementById('precio-fi-tipo');
+    if (tipoSel) tipoSel.value = categoria;
+    const eq = document.getElementById('precio-fi-equipo');
+    if (eq) eq.value = equipo;
+    const title = document.getElementById('precio-form-title');
+    if (title) title.textContent = `➕ ${categoria} para ${equipo}`;
+    document.getElementById('precio-fi-calidad')?.focus();
+  }, 130);
+}
+
+function _addCategoriaToModelo() {
+  const equipo = _reparDetailModelo;
+  const presentes = new Set(PRECIOS.filter(p => p.equipo === equipo).map(p => p.tipo));
+  const disponibles = PRECIO_TIPOS.filter(t => !presentes.has(t));
+  if (!disponibles.length) {
+    toast('Este modelo ya tiene todas las categorías', 'info');
+    return;
+  }
+  // Mostrar las categorías disponibles en el sheet si está cargado, sino prompt
+  if (typeof openSheet === 'function') {
+    openSheet('Agregar categoría', disponibles.map(t => ({
+      icon: PRECIO_TIPO_ICON[t] || '🔧',
+      label: t,
+      onClick: () => _addVariante(equipo, t),
+    })));
+    return;
+  }
+  const choice = prompt('¿Qué categoría agregás?\n\n' + disponibles.map((t, i) => (i + 1) + '. ' + t).join('\n') + '\n\nNúmero:');
+  const idx = parseInt(choice) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= disponibles.length) return;
+  _addVariante(equipo, disponibles[idx]);
 }
 
 function _toggleRepModelo(equipo) {

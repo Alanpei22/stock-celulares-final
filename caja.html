@@ -728,13 +728,29 @@
     <label>Equipo (marca + modelo)</label>
     <input id="precio-fi-equipo" class="precio-input" type="text" placeholder="iPhone 14, Samsung A54…" autocomplete="off">
   </div>
-  <div class="precio-fg">
-    <label>Precio (ARS)</label>
-    <input id="precio-fi-precio" class="precio-input" type="number" placeholder="25000" min="0" inputmode="numeric">
+  <div class="precio-fg-row">
+    <div class="precio-fg" style="flex:1">
+      <label>Calidad <span class="precio-fg-opt">(opcional)</span></label>
+      <input id="precio-fi-calidad" class="precio-input" type="text" placeholder="GenBueno, AAA, Original, OLED…" autocomplete="off">
+    </div>
+    <div class="precio-fg" style="flex:1">
+      <label>Tipo <span class="precio-fg-opt">(opcional)</span></label>
+      <input id="precio-fi-tipovar" class="precio-input" type="text" placeholder="Simple, c/marco…" autocomplete="off">
+    </div>
+  </div>
+  <div class="precio-fg-row">
+    <div class="precio-fg" style="flex:1">
+      <label>💵 Precio EFECTIVO</label>
+      <input id="precio-fi-precio" class="precio-input" type="number" placeholder="0" min="0" inputmode="numeric">
+    </div>
+    <div class="precio-fg" style="flex:1">
+      <label>📋 Precio LISTA <span class="precio-fg-opt">(opcional)</span></label>
+      <input id="precio-fi-precio-lista" class="precio-input" type="number" placeholder="0" min="0" inputmode="numeric">
+    </div>
   </div>
   <div class="precio-fg">
-    <label>Nota (opcional)</label>
-    <input id="precio-fi-nota" class="precio-input" type="text" placeholder="Calidad AAA, incluye colocación…" autocomplete="off">
+    <label>Nota <span class="precio-fg-opt">(opcional)</span></label>
+    <input id="precio-fi-nota" class="precio-input" type="text" placeholder="Color dorado, incluye colocación…" autocomplete="off">
   </div>
   <div style="display:flex;gap:8px;margin-top:8px">
     <button id="precio-form-del" class="btn-danger" onclick="deletePrecio()" style="display:none">🗑</button>
