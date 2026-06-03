@@ -429,15 +429,53 @@ function _renderReparTab() {
   const modelos = Object.keys(grupos).sort();
 
   if (!modelos.length) {
-    cont.innerHTML = '';
-    if (empty) {
-      empty.classList.remove('hidden');
-      empty.innerHTML = q
-        ? `<span class="rep-empty-ico">🔍</span><p>Sin resultados para "${_escP(q)}"</p>`
-        : `<span class="rep-empty-ico">🔧</span>
-           <p>Todavía no cargaste ningún modelo.</p>
-           <p class="rep-empty-sub">Tocá ➕ arriba a la derecha para crear el primero,<br>o 📋 para carga masiva.</p>`;
+    if (empty) empty.classList.add('hidden');
+    if (q) {
+      cont.innerHTML = `<div class="rep-tab-empty"><span class="rep-empty-ico">🔍</span><p>Sin resultados para "${_escP(q)}"</p></div>`;
+      return;
     }
+    // Estado vacío: mostrar PREVIEW de cómo se va a ver + botón crear ejemplo
+    cont.innerHTML = `
+      <div class="rep-onboard">
+        <h3 class="rep-onboard-title">🔧 Catálogo de reparaciones</h3>
+        <p class="rep-onboard-sub">Cargá cada modelo con sus servicios y precios para consultar al instante.</p>
+
+        <div class="rep-onboard-preview-lbl">↓ Así se va a ver una vez cargado ↓</div>
+        <div class="rep-modelo rep-modelo--open rep-onboard-preview">
+          <div class="rep-modelo-hdr">
+            <span class="rep-modelo-name">📱 iPhone 14 <span class="rep-onboard-tag">EJEMPLO</span></span>
+            <span class="rep-modelo-meta">4 servicios</span>
+            <span class="rep-modelo-chev">▴</span>
+          </div>
+          <div class="rep-modelo-body">
+            <div class="rep-svc-row rep-svc-row--demo">
+              <span class="rep-svc-ico">📱</span>
+              <div class="rep-svc-info"><span class="rep-svc-name">Pantalla / Módulo</span></div>
+              <span class="rep-svc-precio">$25.000</span>
+            </div>
+            <div class="rep-svc-row rep-svc-row--demo">
+              <span class="rep-svc-ico">🔋</span>
+              <div class="rep-svc-info"><span class="rep-svc-name">Batería</span></div>
+              <span class="rep-svc-precio">$15.000</span>
+            </div>
+            <div class="rep-svc-row rep-svc-row--demo">
+              <span class="rep-svc-ico">🔌</span>
+              <div class="rep-svc-info"><span class="rep-svc-name">Pin de carga</span></div>
+              <span class="rep-svc-precio">$12.000</span>
+            </div>
+            <div class="rep-svc-row rep-svc-row--demo">
+              <span class="rep-svc-ico">🛡️</span>
+              <div class="rep-svc-info"><span class="rep-svc-name">Tapa / Carcasa</span></div>
+              <span class="rep-svc-precio">$8.000</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="rep-onboard-cta" onclick="_createExampleModel()">
+          ✨ Crear este modelo de ejemplo
+        </button>
+        <p class="rep-onboard-hint">Después podés editar los precios con un toque,<br>o crear más modelos con el botón ＋ de arriba.</p>
+      </div>`;
     return;
   }
   if (empty) empty.classList.add('hidden');
@@ -462,15 +500,20 @@ function _renderReparTab() {
         ${isOpen ? `
           <div class="rep-modelo-body">
             ${items.map(p => `
-              <div class="rep-svc-row" onclick="openPrecioForm('${_escP(p.id)}')">
-                <span class="rep-svc-ico">${PRECIO_TIPO_ICON[p.tipo] || '🔧'}</span>
-                <div class="rep-svc-info">
+              <div class="rep-svc-row">
+                <span class="rep-svc-ico" onclick="openPrecioForm('${_escP(p.id)}')" title="Editar todo">${PRECIO_TIPO_ICON[p.tipo] || '🔧'}</span>
+                <div class="rep-svc-info" onclick="openPrecioForm('${_escP(p.id)}')" title="Editar todo">
                   <span class="rep-svc-name">${_escP(p.tipo || 'Otro')}</span>
                   ${p.nota ? `<span class="rep-svc-nota">${_escP(p.nota)}</span>` : ''}
                 </div>
-                <span class="rep-svc-precio${(!p.precio || p.precio <= 0) ? ' rep-svc-precio--zero' : ''}">
-                  ${p.precio > 0 ? '$' + Number(p.precio).toLocaleString('es-AR') : 'sin precio'}
-                </span>
+                <div class="rep-svc-precio-wrap${(!p.precio || p.precio <= 0) ? ' rep-svc-precio-wrap--zero' : ''}">
+                  <span class="rep-svc-precio-prefix">$</span>
+                  <input class="rep-svc-precio-input" type="number" inputmode="numeric" min="0"
+                    data-id="${_escP(p.id)}" value="${p.precio || ''}" placeholder="0"
+                    onfocus="this.select()"
+                    onblur="_savePrecioInline('${_escP(p.id)}', this.value)"
+                    onkeydown="_onPrecioInlineKey(event)">
+                </div>
               </div>`).join('')}
             <button class="rep-svc-add" onclick="event.stopPropagation();_addServicioAModelo('${_escP(equipo)}')">
               ➕ Agregar servicio a este modelo
@@ -488,6 +531,77 @@ function _toggleRepModelo(equipo) {
   if (_reparOpenModelos.has(equipo)) _reparOpenModelos.delete(equipo);
   else _reparOpenModelos.add(equipo);
   _renderReparTab();
+}
+
+// Crear modelo de ejemplo para que el usuario arranque con algo
+async function _createExampleModel() {
+  const equipo = 'iPhone 14';
+  const servicios = [
+    { tipo: 'Pantalla / Módulo', precio: 25000 },
+    { tipo: 'Batería',           precio: 15000 },
+    { tipo: 'Pin de carga',      precio: 12000 },
+    { tipo: 'Tapa / Carcasa',    precio: 8000  },
+  ];
+  // No duplicar si ya existe
+  const existentes = new Set(PRECIOS.filter(p => p.equipo === equipo).map(p => p.tipo));
+  const aCrear = servicios.filter(s => !existentes.has(s.tipo));
+  if (!aCrear.length) {
+    toast('El modelo de ejemplo ya existe', 'info');
+    _reparOpenModelos.add(equipo);
+    _renderReparTab();
+    return;
+  }
+  try {
+    const batch = db.batch();
+    aCrear.forEach(s => {
+      const ref = db.collection('precios_reparaciones').doc();
+      batch.set(ref, {
+        tipo: s.tipo, equipo, precio: s.precio, nota: '',
+        updatedAt: new Date().toISOString(),
+      });
+    });
+    await batch.commit();
+    _reparOpenModelos.add(equipo);
+    toast('✅ Modelo de ejemplo creado — editá los precios como quieras', 'success');
+  } catch (e) {
+    console.error('createExampleModel:', e);
+    toast('Error al crear el ejemplo', 'error');
+  }
+}
+
+// Edición inline del precio (sin abrir modal)
+async function _savePrecioInline(id, value) {
+  const p = PRECIOS.find(x => x.id === id);
+  if (!p) return;
+  const num = parseInt(value) || 0;
+  if (num === (Number(p.precio) || 0)) return; // sin cambio
+  // Marcar visualmente como guardando
+  const inp = document.querySelector(`.rep-svc-precio-input[data-id="${id}"]`);
+  if (inp) inp.classList.add('rep-svc-saving');
+  try {
+    await db.collection('precios_reparaciones').doc(id).update({
+      precio: num, updatedAt: new Date().toISOString(),
+    });
+    if (inp) {
+      inp.classList.remove('rep-svc-saving');
+      inp.classList.add('rep-svc-saved');
+      setTimeout(() => inp?.classList.remove('rep-svc-saved'), 900);
+    }
+  } catch (e) {
+    console.error('savePrecioInline:', e);
+    if (inp) inp.classList.remove('rep-svc-saving');
+    toast('Error al guardar el precio', 'error');
+  }
+}
+
+function _onPrecioInlineKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+  else if (e.key === 'Escape') {
+    const id = e.target.getAttribute('data-id');
+    const p = PRECIOS.find(x => x.id === id);
+    if (p) e.target.value = p.precio || '';
+    e.target.blur();
+  }
 }
 
 function _addServicioAModelo(equipo) {
