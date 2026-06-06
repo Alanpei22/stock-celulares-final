@@ -719,6 +719,21 @@ function closeFotoModal() {
   document.body.style.overflow = '';
 }
 
+// Quita claves cuyo valor es undefined (Firestore las rechaza)
+function _stripUndefined(obj) {
+  if (Array.isArray(obj)) return obj.map(_stripUndefined);
+  if (obj && typeof obj === 'object' && !(obj instanceof Date)) {
+    const out = {};
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
+      if (v === undefined) continue;
+      out[k] = _stripUndefined(v);
+    }
+    return out;
+  }
+  return obj;
+}
+
 async function saveRepair() {
   const marca    = document.getElementById('rep-fi-marca').value.trim();
   const modelo   = document.getElementById('rep-fi-modelo').value.trim();
@@ -770,7 +785,7 @@ async function saveRepair() {
         seguimientoFecha, seguimientoNota, seguimientoAck: seguimientoFecha ? (existing.seguimientoFecha === seguimientoFecha ? (existing.seguimientoAck || false) : false) : null
       };
       if (foto) updateData.foto = foto;
-      await db.collection('repairs').doc(editingRepairId).set(updateData);
+      await db.collection('repairs').doc(editingRepairId).set(_stripUndefined(updateData));
       toast('Reparación actualizada', 'success');
       logActivity({
         tipo: 'edicion',
@@ -822,7 +837,7 @@ async function saveRepair() {
       if (foto) newDoc.foto = foto;
       // Tag con device para que el cross-device listener no nos notifique a nosotros mismos
       if (typeof getDeviceId === 'function') newDoc._sourceDevice = getDeviceId();
-      await db.collection('repairs').doc(id).set(newDoc);
+      await db.collection('repairs').doc(id).set(_stripUndefined(newDoc));
       toast('Reparación N°' + nOrden + ' registrada', 'success');
       logActivity({
         tipo: 'ingreso',
@@ -839,8 +854,14 @@ async function saveRepair() {
     }
     closeRepairForm();
   } catch (e) {
-    console.error(e);
-    toast('Error al guardar', 'error');
+    console.error('saveRepair:', e);
+    // Mensaje útil con causa específica si es posible
+    let msg = 'Error al guardar';
+    if (e?.code === 'permission-denied') msg = 'Sin permisos para guardar (revisá tu login)';
+    else if (e?.code === 'unavailable')   msg = 'Sin conexión a Firestore';
+    else if (e?.code === 'invalid-argument') msg = 'Datos inválidos: ' + (e.message || '');
+    else if (e?.message) msg = 'Error: ' + e.message;
+    toast(msg, 'error');
   } finally {
     btn.disabled = false;
   }
