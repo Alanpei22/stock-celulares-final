@@ -28,6 +28,19 @@ const PRECIO_TIPO_ICON = {
 function initPrecios() {
   if (_preciosListener) return;
   if (typeof db === 'undefined' || !db) return;
+  // QUOTA: hidratamos del cache antes de pedir a Firestore, así la UI muestra
+  // datos al instante y reducimos el "trabajo en frío" en cada apertura.
+  try {
+    const cached = localStorage.getItem('preciosCache');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        PRECIOS = parsed;
+        // Render inicial con cache mientras llega el snapshot
+        if (document.getElementById('rep-tab-list')) _renderReparTab();
+      }
+    }
+  } catch {}
   _preciosListener = db.collection('precios_reparaciones')
     .onSnapshot(snap => {
       PRECIOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -35,6 +48,8 @@ function initPrecios() {
         const t = (a.tipo || '').localeCompare(b.tipo || '');
         return t !== 0 ? t : (a.equipo || '').localeCompare(b.equipo || '');
       });
+      // Actualizar cache (best-effort)
+      try { localStorage.setItem('preciosCache', JSON.stringify(PRECIOS)); } catch {}
       if (!document.getElementById('precios-modal')?.classList.contains('hidden')) {
         renderPreciosList();
       }

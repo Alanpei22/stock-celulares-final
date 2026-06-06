@@ -160,8 +160,15 @@ let _crossDeviceStartTs = null;
 
 function startCrossDeviceListener() {
   if (typeof db === 'undefined' || !db) return;
-  // El popup in-page funciona siempre (no requiere permiso de push).
-  // El push del SO solo se envía si Notification.permission === 'granted'.
+  // QUOTA: estos listeners consumen reads de Firestore. Solo arrancarlos
+  // si el usuario realmente activó push o tiene popups activados.
+  const popupCfg = (typeof getPopupConfig === 'function') ? getPopupConfig() : null;
+  const wantsPopups = popupCfg && popupCfg.enabled && (popupCfg.cobros || popupCfg.senas || popupCfg.reparaciones);
+  const hasPush = ('Notification' in window) && Notification.permission === 'granted';
+  if (!wantsPopups && !hasPush) {
+    // Nada que escuchar — ahorramos reads
+    return;
+  }
 
   _crossDeviceStartTs = new Date().toISOString();
   const today = new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);

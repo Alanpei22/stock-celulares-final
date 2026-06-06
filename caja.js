@@ -1180,9 +1180,11 @@ function listenCajaRepuestos() {
 
 function listenCajaRepairs() {
   if (_cajaRepairsListener) return;
-  // Limitar a 365 días para no traer toda la historia de reparaciones
+  // QUOTA: limitar a 90 días (antes 365). Para autocompletar al cobrar
+  // alcanza con reparaciones recientes. Las viejas las podés buscar
+  // en la sección Reparaciones del index.
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 365);
+  cutoff.setDate(cutoff.getDate() - 90);
   _cajaRepairsListener = db.collection('repairs')
     .where('fechaIngreso', '>=', cutoff.toISOString())
     .onSnapshot(snap => {
