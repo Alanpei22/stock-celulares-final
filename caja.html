@@ -103,6 +103,9 @@
     </div>
   </div>
 
+  <!-- Botón búsqueda global (bottom-left) -->
+  <button class="gsearch-fab" id="gsearch-fab" onclick="openGlobalSearch()" title="Búsqueda global (Ctrl+K)">🔍</button>
+
   <!-- FAB Speed Dial -->
   <div class="fab-backdrop hidden" id="fab-backdrop" onclick="closeFabMenu()"></div>
   <div class="fab-wrap" id="fab-wrap">
@@ -820,6 +823,139 @@
 <script src="notifications.js"></script>
 <script src="webpush.js"></script>
 <script>
+// ── Búsqueda global ──
+function openGlobalSearch() {
+  document.getElementById('gsearch-overlay').classList.remove('hidden');
+  document.getElementById('gsearch-modal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  const inp = document.getElementById('gsearch-input');
+  setTimeout(() => { if (inp) { inp.value = ''; inp.focus(); _renderGlobalSearch(); } }, 80);
+}
+function closeGlobalSearch() {
+  document.getElementById('gsearch-overlay').classList.add('hidden');
+  document.getElementById('gsearch-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function _renderGlobalSearch() {
+  const q = (document.getElementById('gsearch-input')?.value || '').trim().toLowerCase();
+  const cont = document.getElementById('gsearch-results');
+  if (!cont) return;
+  if (!q || q.length < 2) {
+    cont.innerHTML = '<div class="gsearch-hint">Escribí al menos 2 caracteres para buscar</div>';
+    return;
+  }
+  const has = (txt) => String(txt || '').toLowerCase().includes(q);
+  const results = { reparaciones: [], movimientos: [], productos: [], repuestos: [], precios: [] };
+
+  if (typeof CAJA_REPAIRS !== 'undefined') {
+    CAJA_REPAIRS.forEach(r => {
+      const t = [r.nOrden, r.nombre, r.marca, r.modelo, r.tlf, r.arreglo, r.imei, r.dni].join(' ');
+      if (has(t)) results.reparaciones.push(r);
+    });
+  }
+  if (typeof MOVIMIENTOS !== 'undefined') {
+    MOVIMIENTOS.forEach(m => {
+      const t = [m.descripcion, m.categoria, m.metodoPago, m.vendedor, m.itemNombre, m.monto].join(' ');
+      if (has(t)) results.movimientos.push(m);
+    });
+  }
+  if (typeof PRODUCTOS !== 'undefined') {
+    PRODUCTOS.forEach(p => {
+      const t = [p.nombre, p.codigo, p.categoria].join(' ');
+      if (has(t)) results.productos.push(p);
+    });
+  }
+  if (typeof CAJA_REPUESTOS !== 'undefined') {
+    CAJA_REPUESTOS.forEach(r => {
+      const t = [r.nombre, r.tipo, r.marca, r.modelo].join(' ');
+      if (has(t)) results.repuestos.push(r);
+    });
+  }
+  if (typeof PRECIOS !== 'undefined') {
+    PRECIOS.forEach(p => {
+      const t = [p.tipo, p.equipo, p.nota].join(' ');
+      if (has(t)) results.precios.push(p);
+    });
+  }
+
+  const total = Object.values(results).reduce((s, a) => s + a.length, 0);
+  if (!total) {
+    cont.innerHTML = `<div class="gsearch-empty">🔍<br>Sin resultados para "${_esc(q)}"</div>`;
+    return;
+  }
+
+  const sections = [
+    { items: results.reparaciones, label: '🔧 Reparaciones', render: r => `
+      <div class="gsearch-result" onclick="_gsClickReparacion('${_esc(r.id)}')">
+        <span class="gsr-title">N°${r.nOrden || '?'} · ${_esc(r.marca || '')} ${_esc(r.modelo || '')}</span>
+        <span class="gsr-sub">${_esc(r.nombre || '—')} · ${_esc(r.arreglo || '')} · <b>${_esc(r.estado || '')}</b>${r.monto ? ' · $' + Number(r.monto).toLocaleString('es-AR') : ''}</span>
+      </div>`},
+    { items: results.movimientos, label: '💰 Movimientos del día', render: m => `
+      <div class="gsearch-result" onclick="_gsClickMovimiento('${_esc(m.id)}')">
+        <span class="gsr-title ${m.tipo === 'ingreso' ? 'gsr-pos' : 'gsr-neg'}">${m.tipo === 'ingreso' ? '+' : '−'}$${Number(m.monto||0).toLocaleString('es-AR')} · ${_esc(m.descripcion || m.categoria || '')}</span>
+        <span class="gsr-sub">${_esc(m.categoria || '')}${m.metodoPago ? ' · ' + _esc(m.metodoPago) : ''}${m.vendedor ? ' · ' + _esc(m.vendedor) : ''}</span>
+      </div>`},
+    { items: results.productos, label: '🏷️ Productos / Inventario', render: p => `
+      <div class="gsearch-result" onclick="_gsClickProducto('${_esc(p.id)}')">
+        <span class="gsr-title">${_esc(p.nombre)} · $${Number(p.precioVenta || 0).toLocaleString('es-AR')}</span>
+        <span class="gsr-sub">${p.codigo ? _esc(p.codigo) + ' · ' : ''}${_esc(p.categoria || '')} · Stock: <b>${p.stock || 0}</b></span>
+      </div>`},
+    { items: results.repuestos, label: '🔩 Repuestos', render: r => `
+      <div class="gsearch-result gsearch-result--info">
+        <span class="gsr-title">${_esc(r.nombre)}${r.precioVenta ? ' · $' + Number(r.precioVenta).toLocaleString('es-AR') : ''}</span>
+        <span class="gsr-sub">${_esc(r.tipo || '')} · ${_esc(r.marca || '')} ${_esc(r.modelo || '')} · Stock: <b>${r.cantidad || 0}</b></span>
+      </div>`},
+    { items: results.precios, label: '💲 Precios de reparación', render: p => `
+      <div class="gsearch-result" onclick="_gsClickPrecio('${_esc(p.id)}')">
+        <span class="gsr-title">${_esc(p.tipo)} · ${_esc(p.equipo)}</span>
+        <span class="gsr-sub">${p.precio > 0 ? '$' + Number(p.precio).toLocaleString('es-AR') : '<i>sin precio</i>'}${p.nota ? ' · ' + _esc(p.nota) : ''}</span>
+      </div>`},
+  ];
+
+  let html = '';
+  sections.forEach(s => {
+    if (!s.items.length) return;
+    const show = s.items.slice(0, 8);
+    html += `<div class="gsearch-section">
+      <div class="gsearch-section-hdr">${s.label} <span class="gsr-count">${s.items.length}</span></div>
+      ${show.map(s.render).join('')}
+      ${s.items.length > 8 ? `<div class="gsearch-more">+ ${s.items.length - 8} más — afiná la búsqueda</div>` : ''}
+    </div>`;
+  });
+  cont.innerHTML = html;
+}
+function _gsClickReparacion(id) {
+  closeGlobalSearch();
+  const r = (typeof CAJA_REPAIRS !== 'undefined') ? CAJA_REPAIRS.find(x => x.id === id) : null;
+  if (r && typeof _openRepairLinkModal === 'function') _openRepairLinkModal(r);
+  else location.href = 'index.html';
+}
+function _gsClickMovimiento(id) {
+  closeGlobalSearch();
+  if (typeof openMovForm === 'function') setTimeout(() => openMovForm(id), 120);
+}
+function _gsClickProducto(id) {
+  closeGlobalSearch();
+  switchCajaTab('inventario');
+  setTimeout(() => { if (typeof openProductoForm === 'function') openProductoForm(id); }, 220);
+}
+function _gsClickPrecio(id) {
+  closeGlobalSearch();
+  switchCajaTab('reparaciones');
+  setTimeout(() => { if (typeof openPrecioForm === 'function') openPrecioForm(id); }, 220);
+}
+// Atajo de teclado Ctrl+K / Cmd+K
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    if (document.getElementById('gsearch-modal')?.classList.contains('hidden')) openGlobalSearch();
+    else closeGlobalSearch();
+  } else if (e.key === 'Escape' && !document.getElementById('gsearch-modal')?.classList.contains('hidden')) {
+    closeGlobalSearch();
+  }
+});
+
 function switchCajaTab(tab) {
   const tabs = { caja: 'caja-tab', inventario: 'inv-tab', reparaciones: 'rep-tab' };
   const btns = { caja: 'cnav-caja', inventario: 'cnav-inv', reparaciones: 'cnav-rep' };
@@ -856,6 +992,23 @@ function switchCajaTab(tab) {
   <div style="display:flex;gap:8px;margin-top:10px">
     <button class="btn-secondary" onclick="closeNewModeloModal()" style="flex:1">Cancelar</button>
     <button class="btn-primary" onclick="confirmNewModelo()" style="flex:2">✅ Crear modelo</button>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: BÚSQUEDA GLOBAL ═══════════ -->
+<div id="gsearch-overlay" class="gsearch-overlay hidden" onclick="closeGlobalSearch()"></div>
+<div id="gsearch-modal" class="gsearch-modal hidden">
+  <div class="gsearch-hdr">
+    <span class="gsearch-ico">🔍</span>
+    <input id="gsearch-input" type="search" class="gsearch-input"
+      placeholder="Buscá reparaciones, ventas, productos, repuestos, precios…"
+      autocomplete="off" oninput="_renderGlobalSearch()">
+    <kbd class="gsearch-kbd">Esc</kbd>
+  </div>
+  <div id="gsearch-results" class="gsearch-results"></div>
+  <div class="gsearch-footer">
+    <span><kbd>Ctrl</kbd> + <kbd>K</kbd> · abrir buscador</span>
+    <span><kbd>Esc</kbd> · cerrar</span>
   </div>
 </div>
 

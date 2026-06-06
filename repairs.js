@@ -1168,10 +1168,39 @@ async function _doChangeRepairStatus(id, newStatus, r) {
     if (newStatus === 'entregado' && r.monto && r.monto > 0) {
       setTimeout(() => openCobroModal(r), 400);
     }
+    // ── Aviso automático al cliente cuando pasa a "Listo" ──
+    if (newStatus === 'listo' && r.tlf) {
+      setTimeout(() => _ofrecerAvisoListo(id, r), 600);
+    }
   } catch (e) {
     console.error(e);
     toast('Error al actualizar estado', 'error');
   }
+}
+
+// Pregunta si avisar al cliente por WhatsApp que su equipo está listo.
+// Si el usuario marca "no preguntar más", recordamos la preferencia.
+function _ofrecerAvisoListo(id, r) {
+  const pref = localStorage.getItem('waListoPref') || 'ask';
+  if (pref === 'never') return;
+  if (pref === 'auto') {
+    // Refrescar la copia local con el estado actualizado para que sendWA use el template correcto
+    const r2 = REPAIRS.find(x => x.id === id) || r;
+    if (typeof repairWhatsApp === 'function') repairWhatsApp(id);
+    if (r2 && typeof toast === 'function') toast('📤 WhatsApp enviado a ' + (r2.nombre || r2.tlf), 'success');
+    return;
+  }
+  // pref === 'ask' → mostrar prompt nativo con opciones rápidas
+  const nombre = r.nombre || r.tlf;
+  const ok = confirm(`📲 Avisar al cliente que el equipo está listo?\n\nCliente: ${nombre}\nN°${r.nOrden} — ${r.marca} ${r.modelo}\n\nVa a abrir WhatsApp con el mensaje pre-armado.`);
+  if (ok && typeof repairWhatsApp === 'function') repairWhatsApp(id);
+}
+
+// Permite cambiar la preferencia desde otro lado (menú config)
+function setWaListoPref(pref) {
+  if (!['ask', 'auto', 'never'].includes(pref)) return;
+  localStorage.setItem('waListoPref', pref);
+  toast(`Preferencia guardada: ${pref === 'auto' ? 'enviar automático' : pref === 'never' ? 'nunca avisar' : 'preguntar'}`, 'info');
 }
 
 // ── Registrar cobro en caja ─────────────────────────────
