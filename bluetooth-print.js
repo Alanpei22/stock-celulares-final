@@ -64,13 +64,23 @@ function printRawBT(text) {
 function printSystemThermal(text, title) {
   const w = window.open('', '_blank', 'width=380,height=600');
   if (!w) { if (typeof toast === 'function') toast('Habilitá los popups para imprimir', 'error'); return; }
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title || 'Ticket'}</title>
+  // BUG-FIX: escapar title (XSS) + cerrar ventana al terminar (no dejarla huérfana)
+  const safeTitle = _escHtml(title || 'Ticket');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${safeTitle}</title>
     <style>
       @page { size: 58mm auto; margin: 2mm; }
       body { font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.35; white-space: pre-wrap; width: 54mm; margin: 0; }
-    </style></head><body>${_escHtml(text)}</body></html>`);
+    </style></head><body>${_escHtml(text)}
+    <script>
+      window.onafterprint = function() { setTimeout(function(){ try { window.close(); } catch(e){} }, 200); };
+    <\/script>
+    </body></html>`);
   w.document.close();
-  setTimeout(() => { try { w.focus(); w.print(); } catch {} }, 350);
+  setTimeout(() => {
+    try { w.focus(); w.print(); } catch {}
+    // Cierre defensivo si el usuario cancela el print y no dispara onafterprint
+    setTimeout(() => { try { if (!w.closed) w.close(); } catch {} }, 60000);
+  }, 350);
 }
 
 function _escHtml(s) {

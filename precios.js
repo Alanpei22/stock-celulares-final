@@ -465,6 +465,15 @@ function _setReparDetailCat(cat) {
 function _renderReparTab() {
   const cont = document.getElementById('rep-tab-list');
   if (!cont) return;
+  // BUG-FIX: si el usuario está editando un precio inline, postergar el render
+  // para no perder el focus ni lo que está tipeando.
+  const focused = document.activeElement;
+  if (focused && focused.classList && focused.classList.contains('rep-svc-precio-input')
+      && cont.contains(focused)) {
+    if (_renderReparTab._pendingRetry) clearTimeout(_renderReparTab._pendingRetry);
+    _renderReparTab._pendingRetry = setTimeout(_renderReparTab, 1200);
+    return;
+  }
   if (_reparView === 'detail' && _reparDetailModelo) {
     return _renderModeloDetail();
   }

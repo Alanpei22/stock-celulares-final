@@ -117,9 +117,20 @@ async function generarFinanzasPDF() {
     // ── 2) Ventas de equipos (stock) ──
     if (inc.ventas) {
       statusEl.textContent = '⏳ Leyendo ventas de equipos...';
-      const snap = await db.collection('stock').where('vendido', '==', true).get();
+      // BUG-FIX: filtrar por fecha en la query (no traer todo el histórico)
+      // Las fechas ISO permiten comparación lexicográfica directa.
+      let snap;
+      try {
+        snap = await db.collection('stock')
+          .where('fecha_venta', '>=', from)
+          .where('fecha_venta', '<=', to + 'T23:59:59.999Z')
+          .get();
+      } catch (e) {
+        console.warn('Query con range falló, usando fallback:', e);
+        snap = await db.collection('stock').where('vendido', '==', true).get();
+      }
       const vendidos = snap.docs.map(d => d.data()).filter(p => {
-        if (!p.fecha_venta) return false;
+        if (!p.vendido || !p.fecha_venta) return false;
         const f = String(p.fecha_venta).slice(0, 10);
         return f >= from && f <= to;
       });
@@ -137,7 +148,18 @@ async function generarFinanzasPDF() {
     // ── 3) Reparaciones ──
     if (inc.reparaciones) {
       statusEl.textContent = '⏳ Leyendo reparaciones...';
-      const snap = await db.collection('repairs').get();
+      // BUG-FIX: traer solo reparaciones cuyo fechaIngreso esté en el rango
+      // (single inequality, no requiere índice compuesto)
+      let snap;
+      try {
+        snap = await db.collection('repairs')
+          .where('fechaIngreso', '>=', from)
+          .where('fechaIngreso', '<=', to + 'T23:59:59.999Z')
+          .get();
+      } catch (e) {
+        console.warn('Query con range en repairs falló, fallback:', e);
+        snap = await db.collection('repairs').get();
+      }
       const all = snap.docs.map(d => d.data());
       // Ingresadas en el período
       const ingresadas = all.filter(r => {

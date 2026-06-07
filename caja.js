@@ -586,7 +586,7 @@ function renderStats() {
     const retEl = document.getElementById('desglose-retiros');
     if (retEl) retEl.textContent = fmt(totalRetiros);
   }
-  updateCajaResumen();
+  // (Quickbar #qb-efectivo / #qb-neto ya se actualizan más arriba en esta misma función)
 }
 
 // ── Feature 6: Comparativa vs ayer ──
@@ -642,49 +642,9 @@ function _renderVsYesterday(todayNeto) {
   el.textContent = `${arrow} ${Math.abs(pct)}% vs ayer`;
 }
 
-let _cajaResumenOpen = false;
-
-function updateCajaResumen() {
-  const bar = document.getElementById('caja-resumen-bar');
-  if (!bar) return;
-  if (!MOVIMIENTOS.length) { bar.classList.add('hidden'); return; }
-
-  const ingMovs  = MOVIMIENTOS.filter(m => m.tipo === 'ingreso');
-  const egMovs   = MOVIMIENTOS.filter(m => m.tipo === 'egreso');
-  const retiros  = egMovs.filter(m => m.categoria === RETIRO_CAT);
-  const gastos   = egMovs.filter(m => m.categoria !== RETIRO_CAT);
-  const totalIng = ingMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const totalEg  = egMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const totalGastos = gastos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  // HIGH-07: neto excluye retiros (igual que el stat-card) para mostrar valores consistentes
-  const neto = totalIng - totalGastos;
-  const apertura = ARQUEO?.total || 0;
-
-  const ingEfec = ingMovs.reduce((s, m) => s + _efecMonto(m), 0);
-  const digIng  = totalIng - ingEfec;
-
-  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-  set('cres-ing',  '+' + fmt(totalIng));
-  set('cres-eg',   '−' + fmt(totalEg));
-  // MED-08: mostrar signo explícito para neto negativo (fmt usa Math.abs internamente)
-  set('cres-neto', (neto < 0 ? '−' : '') + fmt(neto));
-  const netoWrap = document.getElementById('cres-neto');
-  if (netoWrap) netoWrap.style.color = neto >= 0 ? '#10b981' : '#ef4444';
-  set('cres-d-ef',   fmt(ingEfec));
-  set('cres-d-dig',  fmt(digIng));
-  set('cres-d-mov',  MOVIMIENTOS.length);
-  set('cres-d-aper', fmt(apertura));
-
-  bar.classList.remove('hidden');
-}
-
-function toggleCajaResumen() {
-  _cajaResumenOpen = !_cajaResumenOpen;
-  const detail  = document.getElementById('caja-resumen-detail');
-  const chevron = document.getElementById('cres-chevron');
-  if (detail)  detail.classList.toggle('hidden', !_cajaResumenOpen);
-  if (chevron) chevron.textContent = _cajaResumenOpen ? '▲' : '▼'; // LOW-15: ▲=expanded, ▼=collapsed
-}
+// (updateCajaResumen + toggleCajaResumen removidos — referenciaban
+// IDs #caja-resumen-bar / #cres-* que ya no existen desde el rediseño
+// de la quickbar. Los datos ya se actualizan en renderStats().)
 
 // Panel de detalle de caja (stats + desglose) — colapsable, recuerda preferencia
 function toggleCajaDetail() {

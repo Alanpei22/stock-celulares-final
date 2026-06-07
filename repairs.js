@@ -1170,7 +1170,11 @@ async function _doChangeRepairStatus(id, newStatus, r) {
     }
     // ── Aviso automático al cliente cuando pasa a "Listo" ──
     if (newStatus === 'listo' && r.tlf) {
-      setTimeout(() => _ofrecerAvisoListo(id, r), 600);
+      // BUG-FIX: mutar la copia local ANTES de llamar a repairWhatsApp para que
+      // use el template 'repair_listo' (el snapshot de Firestore puede tardar).
+      const localR = REPAIRS.find(x => x.id === id);
+      if (localR) localR.estado = 'listo';
+      setTimeout(() => _ofrecerAvisoListo(id, { ...r, estado: 'listo' }), 600);
     }
   } catch (e) {
     console.error(e);

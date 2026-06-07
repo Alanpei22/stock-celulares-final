@@ -928,8 +928,13 @@ function _renderGlobalSearch() {
 function _gsClickReparacion(id) {
   closeGlobalSearch();
   const r = (typeof CAJA_REPAIRS !== 'undefined') ? CAJA_REPAIRS.find(x => x.id === id) : null;
-  if (r && typeof _openRepairLinkModal === 'function') _openRepairLinkModal(r);
-  else location.href = 'index.html';
+  if (r && typeof _openRepairLinkModal === 'function') {
+    // BUG-FIX: el modal usa inputs #mov-fi-* que viven en el tab caja
+    switchCajaTab('caja');
+    setTimeout(() => _openRepairLinkModal(r), 150);
+  } else {
+    location.href = 'index.html';
+  }
 }
 function _gsClickMovimiento(id) {
   closeGlobalSearch();

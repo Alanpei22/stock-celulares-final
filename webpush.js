@@ -236,7 +236,8 @@ function startCrossDeviceListener() {
           const titulo = '🔧 Nueva reparación';
           const bodyParts = [];
           if (r.nOrden) bodyParts.push('N°' + r.nOrden);
-          if (r.marca || r.modelo) bodyParts.push((r.marca || '') + ' ' + (r.modelo || '')).trim();
+          const equipoStr = ((r.marca || '') + ' ' + (r.modelo || '')).trim();
+          if (equipoStr) bodyParts.push(equipoStr);
           if (r.arreglo) bodyParts.push(r.arreglo);
           const body = bodyParts.join(' · ') + (r.nombre ? '\nCliente: ' + r.nombre : '');
 
