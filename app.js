@@ -546,6 +546,7 @@ function toggleRepMenu() {
     { icon: '📋', label: 'Actividad reciente', onClick: () => (typeof openActivityFeed === 'function') && openActivityFeed() },
     { icon: '🟢', label: 'WhatsApp pendientes', onClick: () => (typeof sendPendingWA === 'function') && sendPendingWA() },
     { divider: true },
+    { icon: '👤', label: 'Generar fichas de clientes', sub: 'Desde tu historial de reparaciones', onClick: () => (typeof migrarClientesDesdeHistorial === 'function') && migrarClientesDesdeHistorial() },
     { icon: '💾', label: 'Importar historial', onClick: () => document.getElementById('rep-import-btn')?.click() },
     { divider: true },
     { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },

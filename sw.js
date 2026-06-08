@@ -1,4 +1,4 @@
-const CACHE = 'cel-v63';
+const CACHE = 'cel-v64';
 const SHELL = ['manifest.json', 'icon.svg'];
 
 self.addEventListener('install', e => {

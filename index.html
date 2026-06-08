@@ -527,6 +527,16 @@
   </div>
 </div>
 
+<!-- MODAL FICHA DE CLIENTE (CRM) -->
+<div id="cliente-ficha-overlay" class="modal-overlay hidden" onclick="closeClienteFicha()"></div>
+<div id="cliente-ficha-modal" class="modal-card cliente-ficha-card hidden">
+  <div class="modal-header">
+    <h3>👤 Ficha de cliente</h3>
+    <button class="modal-close" onclick="closeClienteFicha()">✕</button>
+  </div>
+  <div class="modal-body" id="cliente-ficha-body"></div>
+</div>
+
 <!-- MODAL RESERVAR EQUIPO -->
 <div id="reservar-modal" class="modal-overlay hidden">
   <div class="modal-card">
@@ -969,7 +979,9 @@
         </div>
         <div class="fg">
           <label class="fl">Teléfono</label>
-          <input id="rep-fi-tlf" class="fi" type="tel" placeholder="1155667788" inputmode="numeric">
+          <input id="rep-fi-tlf" class="fi" type="tel" placeholder="1155667788" inputmode="numeric"
+            onblur="_repTelAutocomplete(this.value)">
+          <div id="rep-cliente-hint" class="rep-cliente-hint hidden"></div>
         </div>
         <div class="fg">
           <label class="fl">DNI</label>
@@ -1842,6 +1854,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="repairs.js"></script>
+<script src="clientes.js"></script>
 <script src="modulos_catalog.js"></script>
 <script src="repuestos.js"></script>
 <script src="pedidos.js"></script>

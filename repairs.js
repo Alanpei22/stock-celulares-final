@@ -786,6 +786,10 @@ async function saveRepair() {
       };
       if (foto) updateData.foto = foto;
       await db.collection('repairs').doc(editingRepairId).set(_stripUndefined(updateData));
+      // CRM: mantener ficha del cliente al día
+      if (tlf && typeof upsertCliente === 'function') {
+        upsertCliente({ tlf, nombre, dni });
+      }
       toast('Reparación actualizada', 'success');
       logActivity({
         tipo: 'edicion',
@@ -847,6 +851,10 @@ async function saveRepair() {
         extra: { nOrden, marca, modelo, arreglo, monto, nombre }
       });
       triggerWaNotify('ingreso', { marca, modelo, nOrden, arreglo, nombre, monto });
+      // CRM: crear/actualizar ficha del cliente (no bloqueante)
+      if (tlf && typeof upsertCliente === 'function') {
+        upsertCliente({ tlf, nombre, dni });
+      }
       closeRepairForm();
       // Ofrecer imprimir ticket inmediatamente — MED-11: no local push, onSnapshot adds it
       _showPrintPrompt(id);
@@ -1028,7 +1036,11 @@ function openRepairDetail(id) {
   mgmtBtns.push(`<button class="rep-act rep-act--neu" onclick="closeRepairDetail();openRepairForm('${id}')"><span class="rep-act__ico">✏️</span><span class="rep-act__lbl">Editar</span></button>`);
   mgmtBtns.push(`<button class="rep-act rep-act--neu" onclick="openTicket('${id}')"><span class="rep-act__ico">🧾</span><span class="rep-act__lbl">Ticket</span></button>`);
   if (!r.esGarantia) mgmtBtns.push(`<button class="rep-act rep-act--neu" onclick="openGarantiaModal('${id}')"><span class="rep-act__ico">🔄</span><span class="rep-act__lbl">Garantía</span></button>`);
-  if (hasHistory) mgmtBtns.push(`<button class="rep-act rep-act--neu" onclick="openCustomerHistory('${id}')"><span class="rep-act__ico">👤</span><span class="rep-act__lbl">Historial</span></button>`);
+  if (r.tlf && typeof openClienteFicha === 'function') {
+    mgmtBtns.push(`<button class="rep-act rep-act--neu" onclick="closeRepairDetail();openClienteFicha('${esc(r.tlf)}')"><span class="rep-act__ico">👤</span><span class="rep-act__lbl">Ficha cliente</span></button>`);
+  } else if (hasHistory) {
+    mgmtBtns.push(`<button class="rep-act rep-act--neu" onclick="openCustomerHistory('${id}')"><span class="rep-act__ico">👤</span><span class="rep-act__lbl">Historial</span></button>`);
+  }
 
   document.getElementById('rep-det-actions').innerHTML = `
     ${commBtns.length ? `
