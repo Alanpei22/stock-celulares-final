@@ -42,6 +42,7 @@ function listenStock() {
     STOCK = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     STOCK.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
     render();
+    if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
     // Backup automático una vez por sesión, 3s después de cargar datos
     if (!_autoBackupDone) { _autoBackupDone = true; setTimeout(autoBackup, 3000); }
   }, err => {
@@ -597,10 +598,122 @@ function switchSection(section) {
 // ── Dashboard ──────────────────────────────────────────────
 
 async function renderDashboard() {
+  _renderDashSaludo();
+  _renderDashTuDia();
+  _renderDashEntregas();
   renderDashRepairs();
   renderDashFollowUps();
   renderDashLowStock();
-  loadDashCaja();
+  loadDashCaja(); // único read (caja de hoy)
+}
+
+// Refresca el dashboard SIN re-leer caja (solo datos en memoria).
+// Se llama desde los listeners de repairs/stock/repuestos cuando llegan datos.
+function _refreshDashIfVisible() {
+  const dashSec = document.getElementById('dash-section');
+  if (!dashSec || dashSec.classList.contains('section-hidden')) return;
+  _renderDashTuDia();
+  _renderDashEntregas();
+  renderDashRepairs();
+  renderDashFollowUps();
+  renderDashLowStock();
+}
+
+// Saludo según la hora + fecha en español
+function _renderDashSaludo() {
+  const hiEl = document.getElementById('dash-saludo-hi');
+  const fEl  = document.getElementById('dash-saludo-fecha');
+  const now = new Date();
+  const h = Number(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires', hour: 'numeric', hour12: false }));
+  const saludo = h < 6 ? 'Buenas noches' : h < 13 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
+  const emoji  = h < 6 ? '🌙' : h < 13 ? '☀️' : h < 20 ? '🌤️' : '🌙';
+  if (hiEl) hiEl.textContent = `${saludo} ${emoji}`;
+  if (fEl) {
+    const fecha = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'long', day: 'numeric', month: 'long' });
+    fEl.textContent = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+  }
+}
+
+// "Tu día": contadores accionables (todo desde datos en memoria, sin reads)
+function _renderDashTuDia() {
+  const card = document.getElementById('dash-tudia-card');
+  const grid = document.getElementById('dash-tudia-grid');
+  if (!card || !grid) return;
+
+  const reps = (typeof REPAIRS !== 'undefined') ? REPAIRS : [];
+  const stock = (typeof STOCK !== 'undefined') ? STOCK : [];
+  const repuestos = (typeof REPUESTOS !== 'undefined') ? REPUESTOS : [];
+  const now = Date.now();
+  const today = new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
+
+  // Demoradas: reparando hace +3 días
+  const demoradas = reps.filter(r => r.estado === 'reparando' && r.fechaIngreso &&
+    (now - new Date(r.fechaIngreso).getTime()) / 86400000 > 3).length;
+  // Listas para entregar
+  const listas = reps.filter(r => r.estado === 'listo').length;
+  // Garantías de venta por vencer (próximos 7 días)
+  const garantiasVencen = stock.filter(p => {
+    if (!p.garantiaHasta) return false;
+    const dias = (new Date(p.garantiaHasta).getTime() - now) / 86400000;
+    return dias >= 0 && dias <= 7;
+  }).length;
+  // Reservas venciendo (fecha límite <= hoy o próximos 3 días)
+  const reservasVencen = stock.filter(p => {
+    if (!p.reservado || !p.reservaFechaLimite) return false;
+    const dias = (new Date(p.reservaFechaLimite + 'T23:59:59').getTime() - now) / 86400000;
+    return dias <= 3;
+  }).length;
+  // Repuestos bajo stock
+  const bajoStock = repuestos.filter(r => r.stockMin > 0 && (r.cantidad || 0) <= r.stockMin).length;
+
+  const items = [];
+  if (demoradas > 0) items.push({ n: demoradas, lbl: 'Demoradas +3d', ico: '🔴', cls: 'td-danger', act: "switchSection('repairs')" });
+  if (listas > 0)    items.push({ n: listas, lbl: 'Listas p/ entregar', ico: '✅', cls: 'td-ok', act: "switchSection('repairs')" });
+  if (reservasVencen > 0) items.push({ n: reservasVencen, lbl: 'Reservas venciendo', ico: '⏳', cls: 'td-warn', act: "switchSection('stock')" });
+  if (garantiasVencen > 0) items.push({ n: garantiasVencen, lbl: 'Garantías por vencer', ico: '🛡️', cls: 'td-warn', act: "switchSection('stock')" });
+  if (bajoStock > 0) items.push({ n: bajoStock, lbl: 'Repuestos bajos', ico: '⚠️', cls: 'td-warn', act: "switchSection('repuestos')" });
+
+  if (!items.length) {
+    card.style.display = '';
+    grid.innerHTML = '<div class="dash-tudia-allgood">🎉 Todo al día — sin pendientes urgentes</div>';
+    return;
+  }
+  card.style.display = '';
+  grid.innerHTML = items.map(it => `
+    <button class="dash-tudia-item ${it.cls}" onclick="${it.act}">
+      <span class="td-ico">${it.ico}</span>
+      <span class="td-num">${it.n}</span>
+      <span class="td-lbl">${it.lbl}</span>
+    </button>
+  `).join('');
+}
+
+// Entregas / listas con botón avisar por WhatsApp
+function _renderDashEntregas() {
+  const card = document.getElementById('dash-entregas-card');
+  const el   = document.getElementById('dash-entregas-list');
+  if (!card || !el) return;
+  const reps = (typeof REPAIRS !== 'undefined') ? REPAIRS : [];
+  const listas = reps.filter(r => r.estado === 'listo')
+    .sort((a, b) => (a.fechaIngreso || '').localeCompare(b.fechaIngreso || ''));
+  if (!listas.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  el.innerHTML = listas.slice(0, 6).map(r => {
+    const fListo = Array.isArray(r.estadoHistorial)
+      ? (r.estadoHistorial.filter(h => h.estado === 'listo').pop()?.fecha)
+      : null;
+    const dias = fListo ? Math.floor((Date.now() - new Date(fListo).getTime()) / 86400000) : null;
+    const diasStr = dias === null ? '' : dias === 0 ? 'hoy' : dias === 1 ? '1 día' : dias + ' días';
+    const urgente = dias !== null && dias > 5;
+    return `<div class="dash-ent-row${urgente ? ' dash-ent-urgente' : ''}" onclick="openRepairDetail('${esc(r.id)}')">
+      <div class="dash-ent-info">
+        <span class="dash-ent-equipo">N°${r.nOrden || '?'} · ${esc(r.marca || '')} ${esc(r.modelo || '')}</span>
+        <span class="dash-ent-meta">${esc(r.nombre || '—')}${diasStr ? ' · listo hace ' + diasStr : ''}${r.monto ? ' · $' + Number(r.monto).toLocaleString('es-AR') : ''}</span>
+      </div>
+      ${r.tlf ? `<button class="dash-ent-wa" onclick="event.stopPropagation();repairWhatsApp('${esc(r.id)}')" title="Avisar por WhatsApp">🟢</button>` : ''}
+    </div>`;
+  }).join('');
+  if (listas.length > 6) el.innerHTML += `<p class="dash-more">+ ${listas.length - 6} más</p>`;
 }
 
 function renderDashRepairs() {

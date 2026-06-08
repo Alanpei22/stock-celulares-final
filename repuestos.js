@@ -169,7 +169,8 @@ function listenRepuestos() {
     REPUESTOS.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
     _lowStockDismissed = false; // reaparece en cada cambio de inventario
     renderRepuestos();
-    if (typeof renderDashLowStock === 'function') renderDashLowStock();
+    if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
+    else if (typeof renderDashLowStock === 'function') renderDashLowStock();
   }, err => {
     console.error('Repuestos:', err);
     toast('Error cargando repuestos', 'error');

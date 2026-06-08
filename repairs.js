@@ -44,7 +44,8 @@ function listenRepairs() {
       REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
       renderRepairs();
-      if (typeof renderDashFollowUps === 'function') renderDashFollowUps();
+      if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
+      else if (typeof renderDashFollowUps === 'function') renderDashFollowUps();
     }, err => {
       console.error('Repairs:', err);
       toast('Error cargando reparaciones', 'error');
