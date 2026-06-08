@@ -35,6 +35,15 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Seguimiento público de reparaciones (QR del ticket) ──
+    // Lectura PÚBLICA (el cliente escanea el QR sin estar logueado).
+    // Contiene SOLO datos no sensibles: estado, equipo, fechas.
+    // Escritura: solo el negocio (authenticated).
+    match /seguimiento_publico/{id} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+
     // ── Todas las demás colecciones del negocio ──
     // (stock, repairs, repuestos, productos, caja_movimientos,
     //  caja_arqueos, caja_cierres, precios_reparaciones, actividad, etc.)

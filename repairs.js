@@ -855,6 +855,10 @@ async function saveRepair() {
       if (tlf && typeof upsertCliente === 'function') {
         upsertCliente({ tlf, nombre, dni });
       }
+      // Seguimiento público (QR): crear doc no sensible
+      if (typeof upsertSeguimientoPublico === 'function') {
+        upsertSeguimientoPublico(newDoc);
+      }
       closeRepairForm();
       // Ofrecer imprimir ticket inmediatamente — MED-11: no local push, onSnapshot adds it
       _showPrintPrompt(id);
@@ -1162,6 +1166,10 @@ async function _doChangeRepairStatus(id, newStatus, r) {
 
   try {
     await db.collection('repairs').doc(id).update(update);
+    // Seguimiento público (QR): reflejar el nuevo estado
+    if (typeof upsertSeguimientoPublico === 'function') {
+      upsertSeguimientoPublico({ ...r, ...update });
+    }
     toast('Estado: ' + (REPAIR_STATES[newStatus]?.label || newStatus), 'success');
 
     const estadoLabel = REPAIR_STATES[newStatus]?.label || newStatus;

@@ -177,6 +177,9 @@ ${css}
 function printRepair(format) {
   const rep = window._printRep;
   if (!rep) return;
+  // Asegurar el doc de seguimiento público (para que el QR funcione,
+  // también en reparaciones viejas que se reimprimen)
+  if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);
   if (format === 'A4') {
     _openPrint(_buildA4(rep));
   } else {
@@ -244,12 +247,29 @@ ${rep.presupuesto ? `<div class="row"><span>Presupuesto:</span><span class="r">$
 <div class="row"><span>Estado:</span><span class="r b">${_pr(rep.estado) !== '—' ? rep.estado.toUpperCase() : '—'}</span></div>
 <div class="sep"></div>
 
+${_qrSeguimientoHtml(rep)}
+
 <div class="firma">
   <div class="sm">Firma y aclaración del cliente:</div>
   <div style="height:22px"></div>
   <div style="border-top:1px solid #000;margin-top:2px"></div>
 </div>
 <div class="c" style="margin-top:10px;font-size:10px">✦ Gracias por elegirnos ✦</div>`;
+}
+
+// Bloque QR de seguimiento para el ticket de ingreso.
+// El cliente lo escanea y ve el estado de su reparación online.
+function _qrSeguimientoHtml(rep) {
+  if (!rep || !rep.id) return '';
+  if (typeof urlSeguimiento !== 'function' || typeof qrImgSrc !== 'function') return '';
+  const url = urlSeguimiento(rep.id);
+  const src = qrImgSrc(url, 130);
+  return `
+<div class="c" style="margin:6px 0;padding:6px 0;border-top:1px dashed #555;border-bottom:1px dashed #555">
+  <div class="b sm" style="margin-bottom:4px">📲 SEGUÍ TU REPARACIÓN</div>
+  <img src="${src}" width="110" height="110" style="display:block;margin:0 auto" alt="QR">
+  <div class="sm" style="margin-top:3px">Escaneá el código para ver el estado</div>
+</div>`;
 }
 
 // CSS compartido por los tickets 80mm (ingreso y retiro)

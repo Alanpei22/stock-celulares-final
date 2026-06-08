@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f172a">
+  <title>Seguimiento de reparación</title>
+  <style>
+    *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+      min-height: 100dvh; color: #1a1a1a;
+      display: flex; align-items: flex-start; justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #fff; border-radius: 24px; width: 100%; max-width: 440px;
+      overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.3); margin-top: 20px;
+    }
+    .hdr {
+      background: linear-gradient(135deg, #0f172a, #334155); color: #fff;
+      padding: 26px 24px 22px; text-align: center;
+    }
+    .hdr-biz { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; }
+    .hdr-sub { font-size: .82rem; opacity: .7; margin-top: 4px; }
+    .body { padding: 24px; }
+    .loading, .error { text-align: center; padding: 50px 20px; color: #64748b; }
+    .error-ico { font-size: 3rem; margin-bottom: 12px; }
+
+    .equipo-box {
+      text-align: center; padding: 18px; background: #f8fafc;
+      border-radius: 16px; margin-bottom: 22px;
+    }
+    .equipo-orden { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; }
+    .equipo-nombre { font-size: 1.3rem; font-weight: 800; color: #0f172a; margin: 4px 0; }
+    .equipo-arreglo { font-size: .9rem; color: #64748b; }
+
+    .estado-actual {
+      display: flex; align-items: center; gap: 12px; justify-content: center;
+      padding: 16px; border-radius: 16px; margin-bottom: 24px;
+    }
+    .estado-actual.s-reparando { background: rgba(245,158,11,.12); }
+    .estado-actual.s-listo     { background: rgba(16,185,129,.14); }
+    .estado-actual.s-entregado { background: rgba(59,130,246,.12); }
+    .estado-actual.s-cancelado { background: rgba(239,68,68,.1); }
+    .estado-emoji { font-size: 2rem; }
+    .estado-txt { text-align: left; }
+    .estado-label { font-size: 1.1rem; font-weight: 800; color: #0f172a; }
+    .estado-desc { font-size: .82rem; color: #64748b; }
+
+    .timeline { position: relative; padding-left: 28px; }
+    .timeline::before {
+      content: ''; position: absolute; left: 9px; top: 6px; bottom: 6px;
+      width: 2px; background: #e2e8f0;
+    }
+    .tl-step { position: relative; padding-bottom: 20px; }
+    .tl-step:last-child { padding-bottom: 0; }
+    .tl-dot {
+      position: absolute; left: -28px; top: 1px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #fff; border: 3px solid #cbd5e1;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .65rem;
+    }
+    .tl-step.done .tl-dot { border-color: #10b981; background: #10b981; color: #fff; }
+    .tl-step.current .tl-dot { border-color: #f59e0b; background: #f59e0b; color: #fff; }
+    .tl-label { font-size: .92rem; font-weight: 700; color: #0f172a; }
+    .tl-fecha { font-size: .76rem; color: #94a3b8; }
+    .tl-step.pending .tl-label { color: #cbd5e1; }
+
+    .footer { text-align: center; padding: 18px 24px 26px; border-top: 1px solid #f1f5f9; }
+    .footer-txt { font-size: .8rem; color: #94a3b8; }
+    .footer-biz { font-weight: 700; color: #64748b; }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+</head>
+<body>
+  <div class="card">
+    <div class="hdr">
+      <div class="hdr-biz" id="biz">Seguimiento</div>
+      <div class="hdr-sub">Estado de tu reparación</div>
+    </div>
+    <div class="body" id="body">
+      <div class="loading">⏳ Cargando…</div>
+    </div>
+    <div class="footer">
+      <div class="footer-txt">Seguimiento en vivo · <span class="footer-biz" id="footer-biz">TechPoint</span></div>
+    </div>
+  </div>
+
+  <script>
+    'use strict';
+    const ESTADOS = {
+      reparando: { emoji: '🔧', label: 'En reparación', desc: 'Estamos trabajando en tu equipo', order: 1 },
+      listo:     { emoji: '✅', label: 'Listo para retirar', desc: '¡Ya podés venir a buscarlo!', order: 2 },
+      entregado: { emoji: '📦', label: 'Entregado', desc: 'Equipo entregado al cliente', order: 3 },
+      cancelado: { emoji: '❌', label: 'Cancelado', desc: 'La reparación fue cancelada', order: 0 },
+      no_van:    { emoji: '⏸️', label: 'Sin reparar', desc: 'El equipo no fue reparado', order: 0 },
+    };
+    const FLUJO = ['reparando', 'listo', 'entregado'];
+
+    function fmtFecha(iso) {
+      if (!iso) return '';
+      try {
+        return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+          + ' · ' + new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      } catch { return ''; }
+    }
+    function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+    async function load() {
+      const id = new URLSearchParams(location.search).get('id');
+      const body = document.getElementById('body');
+      if (!id) {
+        body.innerHTML = '<div class="error"><div class="error-ico">🔍</div>Link inválido</div>';
+        return;
+      }
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+        const _db = firebase.firestore();
+        const snap = await _db.collection('seguimiento_publico').doc(id).get();
+        if (!snap.exists) {
+          body.innerHTML = '<div class="error"><div class="error-ico">🤷</div>No encontramos esta reparación.<br>Verificá el código del ticket.</div>';
+          return;
+        }
+        render(snap.data());
+      } catch (e) {
+        console.error(e);
+        body.innerHTML = '<div class="error"><div class="error-ico">⚠️</div>No pudimos cargar el estado.<br>Probá de nuevo en un momento.</div>';
+      }
+    }
+
+    function render(d) {
+      const biz = d.negocio || 'TechPoint';
+      document.getElementById('biz').textContent = biz;
+      document.getElementById('footer-biz').textContent = biz;
+
+      const est = ESTADOS[d.estado] || ESTADOS.reparando;
+      const curOrder = est.order;
+
+      // Timeline: usa el flujo estándar, marca done/current/pending
+      const histMap = {};
+      (d.historial || []).forEach(h => { histMap[h.estado] = h.fecha; });
+
+      let timelineHtml = '';
+      if (d.estado === 'cancelado' || d.estado === 'no_van') {
+        timelineHtml = `<div class="tl-step current"><div class="tl-dot">✕</div>
+          <div class="tl-label">${esc(est.label)}</div>
+          <div class="tl-fecha">${fmtFecha(histMap[d.estado])}</div></div>`;
+      } else {
+        timelineHtml = FLUJO.map(estado => {
+          const e = ESTADOS[estado];
+          let cls = 'pending';
+          if (e.order < curOrder) cls = 'done';
+          else if (e.order === curOrder) cls = 'current';
+          const fecha = histMap[estado];
+          return `<div class="tl-step ${cls}">
+            <div class="tl-dot">${cls === 'done' ? '✓' : ''}</div>
+            <div class="tl-label">${e.emoji} ${esc(e.label)}</div>
+            ${fecha ? `<div class="tl-fecha">${fmtFecha(fecha)}</div>` : ''}
+          </div>`;
+        }).join('');
+      }
+
+      document.getElementById('body').innerHTML = `
+        <div class="equipo-box">
+          ${d.nOrden ? `<div class="equipo-orden">Orden N°${esc(d.nOrden)}</div>` : ''}
+          <div class="equipo-nombre">${esc(d.equipo || 'Tu equipo')}</div>
+          ${d.arreglo ? `<div class="equipo-arreglo">🔧 ${esc(d.arreglo)}</div>` : ''}
+        </div>
+        <div class="estado-actual s-${esc(d.estado)}">
+          <span class="estado-emoji">${est.emoji}</span>
+          <div class="estado-txt">
+            <div class="estado-label">${esc(est.label)}</div>
+            <div class="estado-desc">${esc(est.desc)}</div>
+          </div>
+        </div>
+        <div class="timeline">${timelineHtml}</div>
+      `;
+    }
+
+    load();
+  </script>
+</body>
+</html>
