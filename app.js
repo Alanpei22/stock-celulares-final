@@ -189,16 +189,15 @@ function _updateOwnerDots() {
 async function submitOwnerPin() {
   const pin = _ownerPinBuf;
   try {
-    const doc = await db.collection('config').doc('owner').get();
-    if (!doc.exists || !doc.data().pin) {
-      // Primer uso: guardar el PIN elegido
-      await db.collection('config').doc('owner').set({ pin });
+    // SEGURIDAD: verificación con hash (SHA-256) + migración de PIN legacy
+    const result = await verifyOwnerPin(db, pin);
+    if (result.created) {
       closeOwnerPinModal();
       unlockOwnerMode();
       toast('🔑 PIN de dueño configurado', 'success');
       return;
     }
-    if (pin === doc.data().pin) {
+    if (result.ok) {
       closeOwnerPinModal();
       if (_ownerPinCallback) {
         const cb = _ownerPinCallback;
@@ -213,6 +212,7 @@ async function submitOwnerPin() {
       _updateOwnerDots();
     }
   } catch(e) {
+    console.error('submitOwnerPin:', e);
     document.getElementById('owner-pin-error').textContent = 'Error de conexión';
     _ownerPinBuf = '';
     _updateOwnerDots();

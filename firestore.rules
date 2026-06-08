@@ -1,11 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Solo usuarios autenticados pueden leer y escribir.
-    // Desplegá estas reglas DESPUÉS de haber creado tu cuenta en Firebase Auth
-    // y haber verificado que podés entrar a la app con email/contraseña.
+
+    // ── Helpers ──
+    function signedIn() { return request.auth != null; }
+
+    // ── config/owner: PIN de dueño (hasheado con PBKDF2) ──
+    // Lectura: necesaria para validar el PIN client-side. El hash PBKDF2
+    // hace inviable la fuerza bruta aunque alguien lea el documento.
+    // Escritura: solo authenticated. Validamos que pinHash sea string
+    // y que NO se vuelva a escribir un campo `pin` en texto plano.
+    match /config/owner {
+      allow read: if signedIn();
+      allow delete: if signedIn();
+      allow create, update: if signedIn()
+                   && (!('pin' in request.resource.data))
+                   && (!('pinHash' in request.resource.data)
+                       || request.resource.data.pinHash is string);
+    }
+
+    // ── Resto de config (templates WA, settings, etc.) ──
+    match /config/{doc} {
+      allow read, write: if signedIn();
+    }
+
+    // ── Subcolección de dispositivos para push ──
+    match /caja_config/{doc=**} {
+      allow read, write: if signedIn();
+    }
+
+    // ── Backups: solo crear/leer, nunca borrar desde el cliente ──
+    match /backups/{doc} {
+      allow read, create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    // ── Todas las demás colecciones del negocio ──
+    // (stock, repairs, repuestos, productos, caja_movimientos,
+    //  caja_arqueos, caja_cierres, precios_reparaciones, actividad, etc.)
+    // Acceso solo a usuarios autenticados de la cuenta del negocio.
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if signedIn();
     }
   }
 }

@@ -67,24 +67,10 @@ function _updateCajaOwnerDots() {
 async function submitCajaOwnerPin() {
   const pin = _cajaOwnerBuf;
   try {
-    const snap = await db.collection('config').doc('owner').get();
-    let storedPin = snap.exists ? snap.data().pin : null;
+    // SEGURIDAD: verificación con hash (PBKDF2) + migración automática de PIN legacy
+    const result = await verifyOwnerPin(db, pin);
 
-    // Solo crear PIN si el documento no existe aún (primera vez)
-    if (!snap.exists) {
-      await db.collection('config').doc('owner').set({ pin });
-      storedPin = pin;
-    }
-
-    if (!storedPin) {
-      // Doc existe pero sin campo pin → no resetear, mostrar error
-      document.getElementById('caja-owner-error').textContent = 'PIN no configurado. Configuralo desde la app principal.';
-      _cajaOwnerBuf = '';
-      _updateCajaOwnerDots();
-      return;
-    }
-
-    if (pin === storedPin) {
+    if (result.ok) {
       // ¿Hay una acción puntual esperando PIN?
       if (_cajaOwnerCallback) {
         const cb = _cajaOwnerCallback;

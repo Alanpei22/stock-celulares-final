@@ -1,0 +1,22 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Fotos de equipos del stock
+    match /stock-photos/{stockId}/{filename} {
+      // Lectura: cualquiera con la URL (las fotos se muestran en la app
+      // y en fichas; no son datos sensibles). Si querés cerrarlo a solo
+      // autenticados, cambiá `if true` por `if request.auth != null`.
+      allow read: if true;
+      // Escritura: solo autenticados, solo imágenes, máx 5 MB.
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Cualquier otra ruta: bloqueada por defecto.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

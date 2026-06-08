@@ -55,16 +55,6 @@ function debounce(fn, ms = 300) {
   };
 }
 
-// ── Hash de PIN (Web Crypto, sin dependencias) ─────────────
-// Devuelve Promise<string> con SHA-256 hex del PIN.
-// Usar para almacenar/comparar PINs en Firestore.
-async function hashPin(pin) {
-  const data = new TextEncoder().encode(String(pin) + 'tp-v1');
-  const buf  = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(buf))
-    .map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 // ── Gestión de listeners Firestore ────────────────────────
 // Cancela un listener existente antes de crear uno nuevo.
 // Uso: myListener = safeListener(myListener, () => db.collection(...).onSnapshot(...));
@@ -180,4 +170,62 @@ function searchMatch(haystack, query) {
     const synGroup = _SYN_MAP.get(t) || [t];
     return synGroup.some(syn => hay.includes(syn));
   });
+}
+
+// ══════════════════════════════════════════════════════
+//  PIN — hashing seguro (PBKDF2) con migración legacy
+// ══════════════════════════════════════════════════════
+// Hashea un PIN con PBKDF2 (150k iteraciones) para que un PIN corto sea
+// caro de romper por fuerza bruta aunque alguien lea el hash de Firestore.
+async function hashPin(pin) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode(String(pin)), { name: 'PBKDF2' }, false, ['deriveBits']
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: enc.encode('scf_owner_pin_salt_v1'), iterations: 150000, hash: 'SHA-256' },
+    keyMaterial, 256
+  );
+  return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Verifica un PIN contra el documento config/owner.
+// Maneja migración: si el doc tiene `pin` (texto plano legacy) y coincide,
+// lo migra a `pinHash` y borra el campo plano.
+// Devuelve: { ok: bool, created: bool }  (created=true si era primer uso)
+async function verifyOwnerPin(db, pin) {
+  const ref = db.collection('config').doc('owner');
+  const snap = await ref.get();
+  const hash = await hashPin(pin);
+
+  // Primer uso: no existe doc o no tiene ni pin ni pinHash
+  if (!snap.exists || (!snap.data().pinHash && !snap.data().pin)) {
+    await ref.set({ pinHash: hash, updatedAt: new Date().toISOString() }, { merge: true });
+    return { ok: true, created: true };
+  }
+
+  const data = snap.data();
+
+  // Caso moderno: comparar hash
+  if (data.pinHash) {
+    return { ok: data.pinHash === hash, created: false };
+  }
+
+  // Caso legacy: PIN en texto plano → comparar y migrar si coincide
+  if (data.pin) {
+    if (data.pin === String(pin)) {
+      // Migrar a hash y borrar el plano
+      try {
+        await ref.set({
+          pinHash: hash,
+          pin: firebase.firestore.FieldValue.delete(),
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (e) { console.warn('PIN migration:', e); }
+      return { ok: true, created: false };
+    }
+    return { ok: false, created: false };
+  }
+
+  return { ok: false, created: false };
 }

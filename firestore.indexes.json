@@ -6,6 +6,14 @@
       "fields": [
         { "fieldPath": "fechaIngreso", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "caja_movimientos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fecha", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
