@@ -37,7 +37,8 @@ let CIERRE = null;
 // ── Autocomplete de venta ─────────────────────────────────
 let CAJA_REPUESTOS = [];        // listener específico para autocomplete
 let _cajaRepuestosListener = null;
-let _selectedSaleItem = null;   // { source, id, nombre, stock, precio, icon, extra }
+let _selectedSaleItem = null;   // (legacy — ya no se usa para guardar; ver _cart)
+let _cart = [];                 // carrito de venta: [{ source, id, nombre, qty, precio, costoUSD, costoARS, icon, stock }]
 
 // ── Autocomplete de reparaciones ──────────────────────────
 let CAJA_REPAIRS = [];
@@ -60,6 +61,7 @@ window._cajaCleanup = function() {
   MOVIMIENTOS    = [];
   CIERRES_PARCIALES = [];
   _selectedSaleItem  = null;
+  _cart = [];
   _selectedRepairItem = null;
   _pendingRepairLink  = null;
 };
@@ -947,8 +949,8 @@ function _updateMovStepUI(tipo) {
 function _updateMovResumen() {
   const tipo   = document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') ? 'ingreso' : 'egreso';
   const monto  = parseFloat(document.getElementById('mov-fi-monto')?.value) || 0;
-  const desc   = (_selectedSaleItem && _selectedSaleItem.nombre) ||
-                 (document.getElementById('mov-fi-desc')?.value || '').trim();
+  const desc   = _cart.length ? _cartSummary()
+               : (document.getElementById('mov-fi-desc')?.value || '').trim();
   const metodo = document.getElementById('mov-hidden-metodo')?.value || '';
   const totEl  = document.getElementById('mov-resumen-total');
   const txtEl  = document.getElementById('mov-resumen-txt');
@@ -1011,6 +1013,7 @@ function openMovForm(id) {
     if (deleteWrap) deleteWrap.style.display = '';
     // Limpiar split antes de cargar datos del movimiento existente
     resetSplit();
+    _clearSaleItem(false); // vaciar carrito (no toca el texto de descripción)
     setMovTipo(m.tipo || 'ingreso');
     document.getElementById('mov-fi-monto').value = m.monto || '';
     document.getElementById('mov-fi-desc').value  = m.descripcion || '';
@@ -1090,6 +1093,8 @@ function setMovTipo(tipo) {
   // Captura de cliente solo tiene sentido en ventas (ingreso)
   const cliSec = document.getElementById('mov-cliente-section');
   if (cliSec) cliSec.style.display = (tipo === 'ingreso') ? '' : 'none';
+  // Los productos son ventas: al pasar a egreso, vaciar el carrito
+  if (tipo === 'egreso' && _cart.length) _clearSaleItem(false);
   _updateMovStepUI(tipo);
   _updateMovResumen();
 }
@@ -1262,11 +1267,7 @@ function _onMovDescInput() {
   const input = document.getElementById('mov-fi-desc');
   if (!input) return;
   const q = (input.value || '').trim().toLowerCase();
-
-  // Si el usuario cambió el texto después de elegir, descartar selección previa
-  if (_selectedSaleItem && input.value.trim() !== _selectedSaleItem.nombre) {
-    _clearSaleItem(false);
-  }
+  // Nota: el buscador ahora agrega productos al carrito; tipear no descarta el carrito.
 
   // Cuando está vacío, no mostrar nada
   if (q.length < 1) { _hideMovSuggestions(); return; }
@@ -1475,66 +1476,110 @@ function _selectMovSuggestion(idx) {
     return;
   }
 
-  _selectedSaleItem = r;
-
-  // Llenar descripción
-  const input = document.getElementById('mov-fi-desc');
-  input.value = r.nombre;
-
-  // Auto-set categoría según el origen
-  selectCat('Venta producto');
-
-  // Pre-cargar monto con precio de venta * cantidad (= 1 inicialmente)
-  if (r.precio > 0) {
-    document.getElementById('mov-fi-monto').value = r.precio;
-  }
-
-  _showQtyPicker(r);
-  _updateMovResumen();
+  _addToCart(r);
 }
 
 
-function _showQtyPicker(item) {
+// ══════════════════════════════════════════
+//  CARRITO DE VENTA (varios productos)
+// ══════════════════════════════════════════
+
+function _cartTotal() {
+  return _cart.reduce((s, it) => s + (Number(it.precio) || 0) * it.qty, 0);
+}
+
+function _cartSummary() {
+  if (!_cart.length) return '';
+  if (_cart.length === 1) {
+    const it = _cart[0];
+    return it.qty > 1 ? `${it.nombre} x${it.qty}` : it.nombre;
+  }
+  return _cart.map(it => `${it.nombre} x${it.qty}`).join(', ');
+}
+
+// Si el carrito tiene productos, el monto se autocompleta con el total.
+// Queda editable para aplicar un descuento puntual.
+function _syncMontoFromCart() {
+  if (!_cart.length) return;
+  const montoEl = document.getElementById('mov-fi-monto');
+  if (montoEl) montoEl.value = _cartTotal();
+}
+
+function _addToCart(r) {
+  const stockMax = r.stock > 0 ? r.stock : 999;
+  const existing = _cart.find(it => it.id === r.id && it.source === r.source);
+  if (existing) {
+    existing.qty = Math.min(stockMax, existing.qty + 1);
+  } else {
+    _cart.push({
+      source: r.source, id: r.id, nombre: r.nombre,
+      precio: Number(r.precio) || 0,
+      costoUSD: r.costoUSD || 0, costoARS: r.costoARS || 0,
+      icon: r.icon || '📦', stock: r.stock, qty: 1,
+    });
+    selectCat('Venta producto');
+  }
+  // Limpiar el buscador para poder agregar otro producto
+  const input = document.getElementById('mov-fi-desc');
+  if (input) input.value = '';
+  _hideMovSuggestions();
+  _renderCart();
+  _syncMontoFromCart();
+  _updateMovResumen();
+}
+
+function _changeCartQty(i, delta) {
+  const it = _cart[i];
+  if (!it) return;
+  const stockMax = it.stock > 0 ? it.stock : 999;
+  it.qty = Math.max(1, Math.min(stockMax, it.qty + delta));
+  _renderCart();
+  _syncMontoFromCart();
+  _updateMovResumen();
+}
+
+function _removeCartItem(i) {
+  _cart.splice(i, 1);
+  _renderCart();
+  _syncMontoFromCart();
+  _updateMovResumen();
+}
+
+function _renderCart() {
   const wrap = document.getElementById('mov-sale-item-info');
   if (!wrap) return;
-  const stockBadgeCls = item.stock <= 0 ? 'sug-stock-zero'
-                      : item.stock <= 2 ? 'sug-stock-low'
-                      : 'sug-stock-ok';
-  // HIGH-06: si stock=0 es pedido especial — no limitar cantidad a 1
-  const stockMax = item.stock > 0 ? item.stock : 999;
+  if (!_cart.length) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
+
+  const lines = _cart.map((it, i) => {
+    const stockBadgeCls = it.stock <= 0 ? 'sug-stock-zero'
+                        : it.stock <= 2 ? 'sug-stock-low'
+                        : 'sug-stock-ok';
+    const sub = (Number(it.precio) || 0) * it.qty;
+    const sinStock = it.stock <= 0
+      ? '<div class="sale-item-warn">⚠️ Sin stock — pedido especial</div>' : '';
+    return `
+      <div class="cart-line">
+        <span class="cart-line-icon">${it.icon || '📦'}</span>
+        <div class="cart-line-text">
+          <span class="sale-item-name">${esc(it.nombre)}</span>
+          <span class="sale-item-meta">${it.source === 'producto' ? '📦 Accesorio' : '🔧 Repuesto'} · Stock: <b class="${stockBadgeCls}">${it.stock}</b> · ${fmt(sub)}</span>
+        </div>
+        <div class="sale-qty-controls">
+          <button type="button" class="qty-btn" onclick="_changeCartQty(${i},-1)">−</button>
+          <span class="cart-qty-val">${it.qty}</span>
+          <button type="button" class="qty-btn" onclick="_changeCartQty(${i},1)">+</button>
+        </div>
+        <button class="sale-item-clear" onclick="_removeCartItem(${i})" type="button" title="Quitar">✕</button>
+        ${sinStock}
+      </div>`;
+  }).join('');
 
   wrap.innerHTML = `
-    <div class="sale-item-card">
-      <div class="sale-item-row">
-        <span class="sale-item-icon">${item.icon}</span>
-        <div class="sale-item-text">
-          <span class="sale-item-name">${esc(item.nombre)}</span>
-          <span class="sale-item-meta">${item.source === 'producto' ? '📦 Accesorio' : '🔧 Repuesto'} · Stock: <b class="${stockBadgeCls}">${item.stock}</b></span>
-        </div>
-        <button class="sale-item-clear" onclick="_clearSaleItem()" type="button" title="Quitar">✕</button>
-      </div>
-      <div class="sale-item-qty">
-        <span class="sale-item-qty-lbl">Cantidad</span>
-        <div class="sale-qty-controls">
-          <button type="button" class="qty-btn" onclick="_changeSaleQty(-1)">−</button>
-          <input id="mov-sale-qty" type="number" min="1" max="${stockMax}" value="1" inputmode="numeric">
-          <button type="button" class="qty-btn" onclick="_changeSaleQty(1)">+</button>
-        </div>
-      </div>
-      ${item.stock <= 0 ? '<div class="sale-item-warn">⚠️ Sin stock — pedido especial, ingresá la cantidad manualmente</div>' : ''}
-    </div>
-  `;
+    <div class="cart-box">
+      ${lines}
+      <div class="cart-total-row"><span>${_cart.length} ítem${_cart.length > 1 ? 's' : ''}</span><b>${fmt(_cartTotal())}</b></div>
+    </div>`;
   wrap.classList.remove('hidden');
-
-  // Recalcular monto cuando cambia la cantidad
-  const qtyInput = document.getElementById('mov-sale-qty');
-  qtyInput.addEventListener('input', () => {
-    const qty = Math.max(1, parseInt(qtyInput.value) || 1);
-    if (item.precio > 0) {
-      document.getElementById('mov-fi-monto').value = qty * item.precio;
-    }
-    _updateMovResumen();
-  });
 }
 
 function _hideQtyPicker() {
@@ -1542,20 +1587,11 @@ function _hideQtyPicker() {
   if (wrap) { wrap.classList.add('hidden'); wrap.innerHTML = ''; }
 }
 
-function _changeSaleQty(delta) {
-  const inp = document.getElementById('mov-sale-qty');
-  if (!inp) return;
-  const max = parseInt(inp.max) || 999;
-  let val = (parseInt(inp.value) || 1) + delta;
-  val = Math.max(1, Math.min(max, val));
-  inp.value = val;
-  inp.dispatchEvent(new Event('input'));
-}
-
 function _clearSaleItem(clearText = true) {
+  _cart = [];
   _selectedSaleItem = null;
-  _hideQtyPicker();
-  if (clearText) document.getElementById('mov-fi-desc').value = '';
+  _renderCart();
+  if (clearText) { const d = document.getElementById('mov-fi-desc'); if (d) d.value = ''; }
   _updateMovResumen();
 }
 
@@ -1666,7 +1702,8 @@ async function saveMov() {
   const metWrap    = document.querySelector('.metodos-group')?.closest('.fg');
 
   const monto      = parseFloat(montoInput?.value);
-  const descripcion = descInput?.value.trim() || '';
+  // Con carrito, la descripción se arma del resumen de productos; sino, texto libre.
+  const descripcion = _cart.length ? _cartSummary() : (descInput?.value.trim() || '');
   const categoria  = document.getElementById('mov-hidden-cat')?.value || '';
   const metodoPago = document.getElementById('mov-hidden-metodo')?.value || '';
 
@@ -1727,33 +1764,45 @@ async function saveMov() {
   if (!vendedorActivo) vendedorActivo = localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '';
   if (vendedorActivo) data.vendedor = vendedorActivo;
 
-  // ── Item seleccionado del autocomplete (solo en INGRESO y al CREAR, no editar) ──
-  let stockUpdate  = null;
+  // ── Carrito de productos (solo en INGRESO y al CREAR, no editar) ──
+  let stockUpdates = [];   // un descuento de stock por cada ítem del carrito
   let repairUpdate = null;
 
-  if (_selectedSaleItem && tipo === 'ingreso' && !editingMovId) {
-    let qty = Math.max(1, parseInt(document.getElementById('mov-sale-qty')?.value) || 1);
-    // LOW-13: cap qty to available stock (only when stock > 0, i.e. not special order)
-    if (_selectedSaleItem.stock > 0 && qty > _selectedSaleItem.stock) {
-      toast(`Cantidad ajustada al stock disponible (${_selectedSaleItem.stock} u.)`, 'error');
-      qty = _selectedSaleItem.stock;
-      const qtyInp = document.getElementById('mov-sale-qty');
-      if (qtyInp) qtyInp.value = qty;
+  if (_cart.length && tipo === 'ingreso' && !editingMovId) {
+    let costoTotal = 0;
+    const items = [];
+    for (const it of _cart) {
+      let qty = Math.max(1, it.qty);
+      // LOW-13: cap qty al stock disponible (solo si stock > 0, no pedido especial)
+      if (it.stock > 0 && qty > it.stock) {
+        toast(`"${it.nombre}": cantidad ajustada al stock (${it.stock} u.)`, 'error');
+        qty = it.stock;
+      }
+      const costoARSUnit = Number(it.costoARS) || 0;
+      costoTotal += costoARSUnit * qty;
+      items.push({
+        id: it.id, source: it.source, nombre: it.nombre, qty,
+        precioUnit: Number(it.precio) || 0,
+        costoUSDUnit: it.costoUSD || 0,
+        costoARSUnit,
+      });
+      const collection = it.source === 'producto' ? 'productos' : 'repuestos';
+      const stockField = it.source === 'producto' ? 'stock' : 'cantidad';
+      // CRIT-03: increment atómico para evitar race conditions
+      stockUpdates.push({ collection, id: it.id, stockField, qty });
     }
-    data.itemId       = _selectedSaleItem.id;
-    data.itemSource   = _selectedSaleItem.source;
-    data.itemQty      = qty;
-    data.itemNombre   = _selectedSaleItem.nombre;
-    // Snapshot del costo al momento de la venta (para reportar margen real)
-    data.costoUSDUnit = _selectedSaleItem.costoUSD || 0;
-    data.costoARSUnit = _selectedSaleItem.costoARS || 0;
-    data.costoARSTotal = (_selectedSaleItem.costoARS || 0) * qty;
-    data.gananciaARS  = (Number(monto) || 0) - data.costoARSTotal;
-
-    const collection = _selectedSaleItem.source === 'producto' ? 'productos' : 'repuestos';
-    const stockField = _selectedSaleItem.source === 'producto' ? 'stock' : 'cantidad';
-    // CRIT-03: usar increment atómico en vez de valor stale para evitar race conditions
-    stockUpdate = { collection, id: _selectedSaleItem.id, stockField, qty };
+    data.items         = items;
+    data.itemNombre    = _cartSummary();   // backward-compat (búsqueda/notificaciones)
+    data.costoARSTotal = costoTotal;
+    data.gananciaARS   = (Number(monto) || 0) - costoTotal;
+    // Compat: si es un solo producto, mantené los campos viejos (reportes/borrado legacy)
+    if (items.length === 1) {
+      data.itemId       = items[0].id;
+      data.itemSource   = items[0].source;
+      data.itemQty      = items[0].qty;
+      data.costoUSDUnit = items[0].costoUSDUnit;
+      data.costoARSUnit = items[0].costoARSUnit;
+    }
   }
 
   if (_selectedRepairItem && tipo === 'ingreso' && !editingMovId) {
@@ -1819,16 +1868,20 @@ async function saveMov() {
       }
 
       // CRIT-03/04: stock se descuenta siempre (independiente de repairUpdate) con increment atómico
-      if (stockUpdate) {
-        try {
-          await db.collection(stockUpdate.collection).doc(stockUpdate.id).update({
-            [stockUpdate.stockField]: firebase.firestore.FieldValue.increment(-stockUpdate.qty)
-          });
-          toastMsg += ` · stock −${stockUpdate.qty} u.`;
-        } catch (stockErr) {
-          console.error('Stock decrement error:', stockErr);
-          toast('Movimiento guardado, pero falló el descuento de stock', 'error');
+      if (stockUpdates.length) {
+        let totalU = 0;
+        for (const su of stockUpdates) {
+          try {
+            await db.collection(su.collection).doc(su.id).update({
+              [su.stockField]: firebase.firestore.FieldValue.increment(-su.qty)
+            });
+            totalU += su.qty;
+          } catch (stockErr) {
+            console.error('Stock decrement error:', stockErr);
+            toast('Movimiento guardado, pero falló el descuento de stock de un ítem', 'error');
+          }
         }
+        if (totalU) toastMsg += ` · stock −${totalU} u.`;
       }
 
       toast(toastMsg + (toastMsg === 'Movimiento registrado' ? '' : ''), 'success');
@@ -1855,18 +1908,25 @@ function deleteMov() {
       await db.collection('caja_movimientos').doc(id).delete();
       closeMovForm();
 
-      // Revertir stock si era venta de inventario (Feature 1)
+      // Revertir stock si era venta de inventario — soporta carrito (items[]) y ventas viejas (itemId único)
       let stockReturned = 0;
-      let stockColl = null, stockField = null;
-      if (movData.itemId && movData.itemSource && movData.itemQty > 0 && movData.tipo === 'ingreso') {
-        stockColl  = movData.itemSource === 'producto' ? 'productos' : 'repuestos';
-        stockField = movData.itemSource === 'producto' ? 'stock' : 'cantidad';
-        try {
-          await db.collection(stockColl).doc(movData.itemId).update({
-            [stockField]: firebase.firestore.FieldValue.increment(movData.itemQty)
-          });
-          stockReturned = movData.itemQty;
-        } catch (stockErr) { console.error('Stock revert:', stockErr); }
+      const restored = []; // { coll, field, id, qty } — para rehacer el descuento en el undo
+      if (movData.tipo === 'ingreso') {
+        const itemsRevert = (Array.isArray(movData.items) && movData.items.length)
+          ? movData.items
+          : (movData.itemId ? [{ id: movData.itemId, source: movData.itemSource, qty: movData.itemQty }] : []);
+        for (const it of itemsRevert) {
+          if (!it.id || !(it.qty > 0)) continue;
+          const coll  = it.source === 'producto' ? 'productos' : 'repuestos';
+          const field = it.source === 'producto' ? 'stock' : 'cantidad';
+          try {
+            await db.collection(coll).doc(it.id).update({
+              [field]: firebase.firestore.FieldValue.increment(it.qty)
+            });
+            stockReturned += it.qty;
+            restored.push({ coll, field, id: it.id, qty: it.qty });
+          } catch (stockErr) { console.error('Stock revert:', stockErr); }
+        }
       }
 
       // Revertir seña si correspondía (simétrico al increment del save)
@@ -1889,9 +1949,9 @@ function deleteMov() {
         onUndo: async () => {
           try {
             await db.collection('caja_movimientos').doc(id).set(movData);
-            if (stockReturned > 0) {
-              await db.collection(stockColl).doc(movData.itemId).update({
-                [stockField]: firebase.firestore.FieldValue.increment(-stockReturned)
+            for (const rr of restored) {
+              await db.collection(rr.coll).doc(rr.id).update({
+                [rr.field]: firebase.firestore.FieldValue.increment(-rr.qty)
               });
             }
             if (senaReverted > 0) {
