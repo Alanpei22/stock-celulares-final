@@ -378,40 +378,53 @@
     <button class="mov-close-btn" onclick="closeMovForm()">✕</button>
   </div>
 
-  <!-- Monto grande -->
-  <div class="mov-monto-area">
-    <span class="mov-monto-prefix">$</span>
-    <input id="mov-fi-monto" class="mov-monto-big" type="number" placeholder="0" min="0" inputmode="numeric">
-  </div>
-
-  <!-- Quick amounts -->
-  <div class="quick-amounts">
-    <button class="quick-amt" onclick="addQuickAmt(5000)">+5k</button>
-    <button class="quick-amt" onclick="addQuickAmt(10000)">+10k</button>
-    <button class="quick-amt" onclick="addQuickAmt(20000)">+20k</button>
-    <button class="quick-amt" onclick="addQuickAmt(50000)">+50k</button>
-    <button class="quick-amt" onclick="addQuickAmt(100000)">+100k</button>
-  </div>
-
-  <!-- Categorías -->
-  <div class="fg" style="margin-top:.6rem">
-    <label class="fl">Categoría</label>
-    <div id="mov-categorias" class="chip-group"></div>
-    <input type="hidden" id="mov-hidden-cat">
-  </div>
-
-  <!-- Descripción + autocomplete inventario/repuestos -->
-  <div class="fg">
-    <label class="fl">Descripción</label>
-    <div class="mov-desc-wrap">
-      <input id="mov-fi-desc" class="fi" type="text" placeholder="Buscá producto / repuesto o escribí libre... *" autocomplete="off">
-      <div id="mov-desc-suggest" class="mov-desc-suggest hidden"></div>
+  <!-- ░░ PASO 1 — Qué ░░ -->
+  <div class="mov-step">
+    <div class="mov-step-hdr">
+      <span class="mov-step-num">1</span>
+      <span class="mov-step-lbl" id="mov-step1-lbl">¿Qué vendés?</span>
     </div>
-    <!-- Item seleccionado (cantidad + stock) -->
-    <div id="mov-sale-item-info" class="mov-sale-item-info hidden"></div>
+    <div class="fg">
+      <div class="mov-desc-wrap">
+        <input id="mov-fi-desc" class="fi" type="text" placeholder="Buscá producto / repuesto o escribí libre... *" autocomplete="off">
+        <div id="mov-desc-suggest" class="mov-desc-suggest hidden"></div>
+      </div>
+      <!-- Item seleccionado (cantidad + stock) -->
+      <div id="mov-sale-item-info" class="mov-sale-item-info hidden"></div>
+    </div>
+    <!-- Categorías -->
+    <div class="fg" style="margin-top:.6rem">
+      <label class="fl">Categoría</label>
+      <div id="mov-categorias" class="chip-group"></div>
+      <input type="hidden" id="mov-hidden-cat">
+    </div>
   </div>
 
-  <!-- Método de pago -->
+  <!-- ░░ PASO 2 — Cuánto ░░ -->
+  <div class="mov-step">
+    <div class="mov-step-hdr">
+      <span class="mov-step-num">2</span>
+      <span class="mov-step-lbl">¿Cuánto?</span>
+    </div>
+    <div class="mov-monto-area">
+      <span class="mov-monto-prefix">$</span>
+      <input id="mov-fi-monto" class="mov-monto-big" type="number" placeholder="0" min="0" inputmode="numeric">
+    </div>
+    <div class="quick-amounts">
+      <button class="quick-amt" onclick="addQuickAmt(5000)">+5k</button>
+      <button class="quick-amt" onclick="addQuickAmt(10000)">+10k</button>
+      <button class="quick-amt" onclick="addQuickAmt(20000)">+20k</button>
+      <button class="quick-amt" onclick="addQuickAmt(50000)">+50k</button>
+      <button class="quick-amt" onclick="addQuickAmt(100000)">+100k</button>
+    </div>
+  </div>
+
+  <!-- ░░ PASO 3 — Cómo paga ░░ -->
+  <div class="mov-step">
+    <div class="mov-step-hdr">
+      <span class="mov-step-num">3</span>
+      <span class="mov-step-lbl" id="mov-step3-lbl">¿Cómo paga?</span>
+    </div>
   <div class="fg">
     <div class="metodo-hdr-row">
       <label class="fl">Método de pago</label>
@@ -462,6 +475,7 @@
       </div>
     </div>
   </div>
+  </div>
 
   <!-- Cliente (opcional) — alimenta el CRM desde ventas -->
   <div class="fg" id="mov-cliente-section">
@@ -472,13 +486,19 @@
     </div>
   </div>
 
+  <!-- Resumen en vivo -->
+  <div class="mov-resumen-bar" id="mov-resumen-bar">
+    <span class="mov-resumen-txt" id="mov-resumen-txt">Completá la venta</span>
+    <span class="mov-resumen-total" id="mov-resumen-total">$0</span>
+  </div>
+
   <!-- Actions -->
   <div id="mov-delete-wrap" style="display:none;margin-top:4px">
     <button class="btn-danger" onclick="deleteMov()">🗑 Eliminar</button>
   </div>
   <div style="display:flex;gap:10px;margin-top:12px">
     <button class="btn-secondary" onclick="closeMovForm()" style="flex:1">Cancelar</button>
-    <button class="btn-primary" id="mov-save-btn" onclick="saveMov()" style="flex:2">💾 Guardar</button>
+    <button class="btn-primary" id="mov-save-btn" onclick="saveMov()" style="flex:2">✅ Confirmar venta</button>
   </div>
 </div>
 

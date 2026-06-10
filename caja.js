@@ -929,6 +929,37 @@ function addQuickAmt(amt) {
   const input = document.getElementById('mov-fi-monto');
   if (!input) return;
   input.value = (parseFloat(input.value) || 0) + amt;
+  _updateMovResumen();
+}
+
+// ── Cobro didáctico: textos de los pasos según venta/gasto ──
+function _updateMovStepUI(tipo) {
+  const s1  = document.getElementById('mov-step1-lbl');
+  const s3  = document.getElementById('mov-step3-lbl');
+  const btn = document.getElementById('mov-save-btn');
+  const esGasto = tipo === 'egreso';
+  if (s1)  s1.textContent  = esGasto ? '¿Qué gasto?'      : '¿Qué vendés?';
+  if (s3)  s3.textContent  = esGasto ? '¿Cómo pagaste?'   : '¿Cómo paga?';
+  if (btn) btn.textContent = esGasto ? '✅ Confirmar gasto' : '✅ Confirmar venta';
+}
+
+// ── Cobro didáctico: barra de resumen en vivo ──
+function _updateMovResumen() {
+  const tipo   = document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') ? 'ingreso' : 'egreso';
+  const monto  = parseFloat(document.getElementById('mov-fi-monto')?.value) || 0;
+  const desc   = (_selectedSaleItem && _selectedSaleItem.nombre) ||
+                 (document.getElementById('mov-fi-desc')?.value || '').trim();
+  const metodo = document.getElementById('mov-hidden-metodo')?.value || '';
+  const totEl  = document.getElementById('mov-resumen-total');
+  const txtEl  = document.getElementById('mov-resumen-txt');
+  if (totEl) totEl.textContent = monto > 0 ? fmt(monto) : '$0';
+  if (txtEl) {
+    const partes = [];
+    if (desc)   partes.push(desc);
+    if (metodo) partes.push(metodo.toLowerCase());
+    txtEl.textContent = partes.length ? partes.join(' · ')
+                        : (tipo === 'egreso' ? 'Completá el gasto' : 'Completá la venta');
+  }
 }
 
 // ── Cliente opcional en venta (alimenta el CRM) ──
@@ -1023,10 +1054,16 @@ function openMovForm(id) {
   if (vueltoVal) { vueltoVal.textContent = '$0'; vueltoVal.className = 'vuelto-val'; }
 
   // Auto-clear error on input
-  document.getElementById('mov-fi-monto').oninput = () =>
+  document.getElementById('mov-fi-monto').oninput = () => {
     document.querySelector('.mov-monto-area')?.classList.remove('field-error');
-  document.getElementById('mov-fi-desc').oninput = () =>
+    _updateMovResumen();
+  };
+  document.getElementById('mov-fi-desc').oninput = () => {
     document.getElementById('mov-fi-desc')?.closest('.fg')?.classList.remove('field-error');
+    _updateMovResumen();
+  };
+  _updateMovStepUI(_movTipo || 'ingreso');
+  _updateMovResumen();
 
   overlay.classList.remove('hidden');
   modal.classList.remove('hidden');
@@ -1053,6 +1090,8 @@ function setMovTipo(tipo) {
   // Captura de cliente solo tiene sentido en ventas (ingreso)
   const cliSec = document.getElementById('mov-cliente-section');
   if (cliSec) cliSec.style.display = (tipo === 'ingreso') ? '' : 'none';
+  _updateMovStepUI(tipo);
+  _updateMovResumen();
 }
 
 function renderCatBtns(tipo) {
@@ -1080,6 +1119,7 @@ function selectMetodo(metodo) {
   const hidden = document.getElementById('mov-hidden-metodo');
   if (hidden) hidden.value = metodo;
   updateSplitRemainder();
+  _updateMovResumen();
   // Mostrar calculadora de vuelto solo si es efectivo y no hay split
   const vueltoSec = document.getElementById('vuelto-section');
   if (vueltoSec) {
@@ -1450,6 +1490,7 @@ function _selectMovSuggestion(idx) {
   }
 
   _showQtyPicker(r);
+  _updateMovResumen();
 }
 
 
@@ -1492,6 +1533,7 @@ function _showQtyPicker(item) {
     if (item.precio > 0) {
       document.getElementById('mov-fi-monto').value = qty * item.precio;
     }
+    _updateMovResumen();
   });
 }
 
@@ -1514,6 +1556,7 @@ function _clearSaleItem(clearText = true) {
   _selectedSaleItem = null;
   _hideQtyPicker();
   if (clearText) document.getElementById('mov-fi-desc').value = '';
+  _updateMovResumen();
 }
 
 // ══════════════════════════════════════════
