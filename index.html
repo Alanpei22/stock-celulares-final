@@ -1890,41 +1890,6 @@
 <script src="bluetooth-print.js"></script>
 <script src="notif-settings.js"></script>
 
-<!-- ── AI CHAT FLOTANTE ── -->
-<button class="ai-fab" onclick="toggleAiChat()" title="Asistente IA">✨</button>
-
-<div class="ai-chat-overlay hidden" id="ai-chat-overlay" onclick="closeAiChat()"></div>
-<div class="ai-chat-modal hidden" id="ai-chat-modal">
-  <div class="ai-chat-hdr">
-    <div class="ai-chat-hdr-left">
-      <span class="ai-chat-icon">✨</span>
-      <div>
-        <div class="ai-chat-title">Asistente IA</div>
-        <div class="ai-chat-sub">TechPoint · Haiku 4.5</div>
-      </div>
-    </div>
-    <button class="ai-chat-close" onclick="closeAiChat()">✕</button>
-  </div>
-  <div class="ai-chat-messages" id="ai-chat-messages">
-    <div class="ai-chat-bubble ai-bubble">
-      👋 ¡Hola! Puedo ayudarte con:<br><br>
-      📋 <b>Consultas:</b> "Dame 4 equipos entre 100 y 120 mil"<br>
-      ➕ <b>Agregar stock:</b> "Agregá Samsung A13 128GB nuevo a $90000"<br>
-      💡 <b>Precios:</b> "¿Cuánto vale un iPhone 13 usado?"
-    </div>
-  </div>
-  <div id="ai-chat-img-preview" class="ai-chat-img-preview hidden">
-    <img id="ai-chat-img-thumb" src="" alt="">
-    <button class="ai-chat-img-clear" onclick="clearChatImage()">✕</button>
-  </div>
-  <div class="ai-chat-input-row">
-    <label class="ai-chat-img-btn" for="ai-chat-img-input" title="Adjuntar imagen">📷</label>
-    <input type="file" id="ai-chat-img-input" accept="image/*" hidden onchange="onChatImage(this)">
-    <textarea class="ai-chat-input" id="ai-chat-input" placeholder="Escribí tu consulta..." rows="1" onkeydown="aiChatKeydown(event)"></textarea>
-    <button class="ai-chat-send" id="ai-chat-send" onclick="sendAiChat()">➤</button>
-  </div>
-</div>
-
 <!-- ── MODAL NUEVA MARCA ── -->
 <div class="modal-overlay hidden" id="add-marca-modal" onclick="if(event.target.id==='add-marca-modal')closeAddMarcaModal()">
   <div class="modal-card" style="max-width:340px">
@@ -1940,7 +1905,6 @@
   </div>
 </div>
 
-<script src="aichat.js"></script>
 
 <!-- ── MODAL ACTIVIDAD ── -->
 <div class="modal-overlay hidden" id="actividad-modal" onclick="if(event.target.id==='actividad-modal')closeActividadModal()">
