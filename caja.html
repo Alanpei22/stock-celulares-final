@@ -988,6 +988,19 @@ document.addEventListener('keydown', (e) => {
     else closeGlobalSearch();
   } else if (e.key === 'Escape' && !document.getElementById('gsearch-modal')?.classList.contains('hidden')) {
     closeGlobalSearch();
+  } else if (e.key === 'Enter') {
+    // ENTER en la pestaña Caja → abrir alta de venta (ingreso), si no hay nada abierto ni se está tipeando
+    const enCaja     = document.getElementById('cnav-caja')?.classList.contains('active');
+    const movCerrado = document.getElementById('mov-modal')?.classList.contains('hidden') !== false;
+    const gsCerrado  = document.getElementById('gsearch-modal')?.classList.contains('hidden') !== false;
+    const ae         = document.activeElement;
+    const tag        = (ae?.tagName || '').toLowerCase();
+    const tipeando   = ['input', 'textarea', 'select', 'button'].includes(tag) || ae?.isContentEditable;
+    const otroModal  = document.querySelector('.nota-overlay:not(.hidden), .modal-overlay:not(.hidden), .arqueo-modal:not(.hidden)');
+    if (enCaja && movCerrado && gsCerrado && !tipeando && !otroModal && typeof openMovFormType === 'function') {
+      e.preventDefault();
+      openMovFormType('ingreso');
+    }
   }
 });
 

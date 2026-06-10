@@ -1392,16 +1392,22 @@ function _showMovSuggestions(results, q) {
   const drop = document.getElementById('mov-desc-suggest');
   if (!drop) return;
 
+  // Botón para agregar lo tipeado como producto libre (no está en el inventario)
+  const addLibreBtn = q ? `
+    <button type="button" class="mov-sug-add-libre" onpointerdown="event.preventDefault()" onclick="_addFreeFromSearch()">
+      ➕ Agregar "<b>${esc(q)}</b>" como producto libre
+    </button>` : '';
+
   // Sin resultados → mostrar empty state (no esconder)
   if (!results.length) {
     drop.innerHTML = `
       <div class="mov-sug-empty">
         <span class="sug-empty-ico">🔍</span>
         <div class="sug-empty-text">
-          <div class="sug-empty-title">Sin coincidencias para "${esc(q || '')}"</div>
-          <div class="sug-empty-sub">Seguí escribiendo libre · o cargá el producto en Accesorios</div>
+          <div class="sug-empty-title">No está en el inventario</div>
+          <div class="sug-empty-sub">Podés agregarlo igual como producto libre 👇</div>
         </div>
-      </div>`;
+      </div>${addLibreBtn}`;
     drop._results = [];
     drop.classList.remove('hidden');
     return;
@@ -1451,7 +1457,7 @@ function _showMovSuggestions(results, q) {
         <span class="sug-stock ${stockCls}">${r.stock} u.</span>
       </span>
     </button>`;
-  }).join('');
+  }).join('') + addLibreBtn;
 
   // Guardar resultados en el elemento para usarlos al hacer click
   drop._results = results;
@@ -1505,9 +1511,33 @@ function _syncMontoFromCart() {
   if (montoEl) montoEl.value = _cartTotal();
 }
 
+// Agrega un producto que NO está en el inventario (precio se carga a mano).
+function _addFreeFromSearch() {
+  const input = document.getElementById('mov-fi-desc');
+  const nombre = (input?.value || '').trim();
+  if (!nombre) return;
+  _addToCart({ source: 'libre', id: null, nombre, precio: 0, costoUSD: 0, costoARS: 0, icon: '🏷️', stock: -1 });
+  // Enfocar el precio de la línea recién agregada
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('#mov-sale-item-info .cart-price-input');
+    inputs[inputs.length - 1]?.focus();
+  }, 0);
+}
+
+// Setea el precio de un ítem libre sin re-renderizar (para no perder el foco mientras se tipea).
+function _setCartPrice(i, val) {
+  if (!_cart[i]) return;
+  _cart[i].precio = Math.max(0, parseFloat(val) || 0);
+  const totalEl = document.querySelector('#mov-sale-item-info .cart-total-row b');
+  if (totalEl) totalEl.textContent = fmt(_cartTotal());
+  _syncMontoFromCart();
+  _updateMovResumen();
+}
+
 function _addToCart(r) {
   const stockMax = r.stock > 0 ? r.stock : 999;
-  const existing = _cart.find(it => it.id === r.id && it.source === r.source);
+  // Los productos libres (sin id) nunca se agrupan: cada uno es una línea aparte.
+  const existing = r.id ? _cart.find(it => it.id === r.id && it.source === r.source) : null;
   if (existing) {
     existing.qty = Math.min(stockMax, existing.qty + 1);
   } else {
@@ -1551,18 +1581,25 @@ function _renderCart() {
   if (!_cart.length) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
 
   const lines = _cart.map((it, i) => {
-    const stockBadgeCls = it.stock <= 0 ? 'sug-stock-zero'
-                        : it.stock <= 2 ? 'sug-stock-low'
-                        : 'sug-stock-ok';
+    const isLibre = it.source === 'libre';
     const sub = (Number(it.precio) || 0) * it.qty;
-    const sinStock = it.stock <= 0
-      ? '<div class="sale-item-warn">⚠️ Sin stock — pedido especial</div>' : '';
+    let metaHtml, extraHtml = '';
+    if (isLibre) {
+      metaHtml = `<span class="sale-item-meta">🏷️ Producto libre · no descuenta stock</span>`;
+      extraHtml = `<input type="number" class="cart-price-input" min="0" inputmode="numeric" value="${it.precio || ''}" placeholder="Precio $" oninput="_setCartPrice(${i}, this.value)">`;
+    } else {
+      const stockBadgeCls = it.stock <= 0 ? 'sug-stock-zero'
+                          : it.stock <= 2 ? 'sug-stock-low'
+                          : 'sug-stock-ok';
+      metaHtml = `<span class="sale-item-meta">${it.source === 'producto' ? '📦 Accesorio' : '🔧 Repuesto'} · Stock: <b class="${stockBadgeCls}">${it.stock}</b> · ${fmt(sub)}</span>`;
+      if (it.stock <= 0) extraHtml = '<div class="sale-item-warn">⚠️ Sin stock — pedido especial</div>';
+    }
     return `
       <div class="cart-line">
         <span class="cart-line-icon">${it.icon || '📦'}</span>
         <div class="cart-line-text">
           <span class="sale-item-name">${esc(it.nombre)}</span>
-          <span class="sale-item-meta">${it.source === 'producto' ? '📦 Accesorio' : '🔧 Repuesto'} · Stock: <b class="${stockBadgeCls}">${it.stock}</b> · ${fmt(sub)}</span>
+          ${metaHtml}
         </div>
         <div class="sale-qty-controls">
           <button type="button" class="qty-btn" onclick="_changeCartQty(${i},-1)">−</button>
@@ -1570,7 +1607,7 @@ function _renderCart() {
           <button type="button" class="qty-btn" onclick="_changeCartQty(${i},1)">+</button>
         </div>
         <button class="sale-item-clear" onclick="_removeCartItem(${i})" type="button" title="Quitar">✕</button>
-        ${sinStock}
+        ${extraHtml}
       </div>`;
   }).join('');
 
@@ -1772,24 +1809,28 @@ async function saveMov() {
     let costoTotal = 0;
     const items = [];
     for (const it of _cart) {
+      const esLibre = it.source === 'libre' || !it.id;
       let qty = Math.max(1, it.qty);
-      // LOW-13: cap qty al stock disponible (solo si stock > 0, no pedido especial)
-      if (it.stock > 0 && qty > it.stock) {
+      // LOW-13: cap qty al stock disponible (solo productos del inventario con stock > 0)
+      if (!esLibre && it.stock > 0 && qty > it.stock) {
         toast(`"${it.nombre}": cantidad ajustada al stock (${it.stock} u.)`, 'error');
         qty = it.stock;
       }
       const costoARSUnit = Number(it.costoARS) || 0;
       costoTotal += costoARSUnit * qty;
       items.push({
-        id: it.id, source: it.source, nombre: it.nombre, qty,
+        id: it.id || null, source: it.source, nombre: it.nombre, qty,
         precioUnit: Number(it.precio) || 0,
         costoUSDUnit: it.costoUSD || 0,
         costoARSUnit,
       });
-      const collection = it.source === 'producto' ? 'productos' : 'repuestos';
-      const stockField = it.source === 'producto' ? 'stock' : 'cantidad';
-      // CRIT-03: increment atómico para evitar race conditions
-      stockUpdates.push({ collection, id: it.id, stockField, qty });
+      // Los productos libres no tocan stock
+      if (!esLibre) {
+        const collection = it.source === 'producto' ? 'productos' : 'repuestos';
+        const stockField = it.source === 'producto' ? 'stock' : 'cantidad';
+        // CRIT-03: increment atómico para evitar race conditions
+        stockUpdates.push({ collection, id: it.id, stockField, qty });
+      }
     }
     data.items         = items;
     data.itemNombre    = _cartSummary();   // backward-compat (búsqueda/notificaciones)

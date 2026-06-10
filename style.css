@@ -5293,6 +5293,20 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
   padding: 4px 6px 2px; font-size: 13px; color: var(--text2);
 }
 .cart-total-row b { font-size: 15px; color: var(--text); }
+.cart-price-input {
+  flex-basis: 100%; margin-top: 6px;
+  padding: 8px 10px; font-size: 14px;
+  border: 1px solid var(--accent); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text);
+}
+.mov-sug-add-libre {
+  display: block; width: 100%; text-align: left;
+  padding: 11px 14px; border: none; border-top: 1px solid var(--border);
+  background: var(--accent-soft); color: var(--text);
+  font-size: 13px; cursor: pointer;
+}
+.mov-sug-add-libre:hover { background: var(--accent-glow); }
+.mov-sug-add-libre b { color: var(--accent2); }
 
 .mov-desc-suggest {
  position: absolute;
