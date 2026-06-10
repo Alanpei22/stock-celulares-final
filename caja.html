@@ -463,6 +463,15 @@
     </div>
   </div>
 
+  <!-- Cliente (opcional) — alimenta el CRM desde ventas -->
+  <div class="fg" id="mov-cliente-section">
+    <button type="button" class="btn-secondary" id="mov-cliente-toggle" onclick="toggleClienteFields()" style="width:100%">👤 Agregar cliente (opcional)</button>
+    <div id="mov-cliente-fields" class="hidden" style="margin-top:8px;display:flex;flex-direction:column;gap:8px">
+      <input id="mov-cliente-tel" class="fi" type="tel" placeholder="📱 Teléfono" autocomplete="off" inputmode="numeric" onblur="_movClientePrefill()">
+      <input id="mov-cliente-nombre" class="fi" type="text" placeholder="👤 Nombre" autocomplete="off">
+    </div>
+  </div>
+
   <!-- Actions -->
   <div id="mov-delete-wrap" style="display:none;margin-top:4px">
     <button class="btn-danger" onclick="deleteMov()">🗑 Eliminar</button>
@@ -815,6 +824,7 @@
 <script src="auth.js"></script>
 <script src="caja.js"></script>
 <script src="caja_extra.js"></script>
+<script src="clientes.js"></script>
 <script src="inventario.js"></script>
 <script src="finanzas-report.js"></script>
 <script src="modulos_catalog.js"></script>

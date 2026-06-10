@@ -931,6 +931,42 @@ function addQuickAmt(amt) {
   input.value = (parseFloat(input.value) || 0) + amt;
 }
 
+// ── Cliente opcional en venta (alimenta el CRM) ──
+function toggleClienteFields() {
+  const fields = document.getElementById('mov-cliente-fields');
+  const toggle = document.getElementById('mov-cliente-toggle');
+  if (!fields) return;
+  const abrir = fields.classList.contains('hidden');
+  fields.classList.toggle('hidden', !abrir);
+  if (toggle) toggle.textContent = abrir ? '👤 Cliente' : '👤 Agregar cliente (opcional)';
+  if (abrir) document.getElementById('mov-cliente-tel')?.focus();
+}
+
+// Al salir del campo teléfono, si ya existe el cliente, autocompleta el nombre.
+async function _movClientePrefill() {
+  if (typeof getClientePorTel !== 'function') return;
+  const tel = document.getElementById('mov-cliente-tel')?.value.trim();
+  const nomEl = document.getElementById('mov-cliente-nombre');
+  if (!tel || !nomEl || nomEl.value.trim()) return;
+  try {
+    const cli = await getClientePorTel(tel);
+    if (cli && cli.nombre && !nomEl.value.trim()) nomEl.value = cli.nombre;
+  } catch {}
+}
+
+// Limpia y colapsa la sección de cliente del modal.
+function _resetClienteFields(mov) {
+  const tel = document.getElementById('mov-cliente-tel');
+  const nom = document.getElementById('mov-cliente-nombre');
+  const fields = document.getElementById('mov-cliente-fields');
+  const toggle = document.getElementById('mov-cliente-toggle');
+  if (tel) tel.value = (mov && mov.clienteTel) || '';
+  if (nom) nom.value = (mov && mov.clienteNombre) || '';
+  const tieneDatos = !!(mov && (mov.clienteTel || mov.clienteNombre));
+  if (fields) fields.classList.toggle('hidden', !tieneDatos);
+  if (toggle) toggle.textContent = tieneDatos ? '👤 Cliente' : '👤 Agregar cliente (opcional)';
+}
+
 function openMovForm(id) {
   closeFabMenu();
   editingMovId = id || null;
@@ -963,6 +999,7 @@ function openMovForm(id) {
       if (splitInput) splitInput.value = m.monto2;
       updateSplitRemainder();
     }
+    _resetClienteFields(m);
   } else {
     if (deleteWrap) deleteWrap.style.display = 'none';
     resetSplit();
@@ -972,6 +1009,7 @@ function openMovForm(id) {
     selectMetodo('Efectivo');
     _clearSaleItem();
     _selectedRepairItem = null;
+    _resetClienteFields(null);
   }
 
   // Clear any previous error highlights
@@ -1012,6 +1050,9 @@ function setMovTipo(tipo) {
   renderCatBtns(tipo);
   const cats = CATEGORIAS[tipo] || [];
   selectCat(cats[0] || '');
+  // Captura de cliente solo tiene sentido en ventas (ingreso)
+  const cliSec = document.getElementById('mov-cliente-section');
+  if (cliSec) cliSec.style.display = (tipo === 'ingreso') ? '' : 'none';
 }
 
 function renderCatBtns(tipo) {
@@ -1627,6 +1668,13 @@ async function saveMov() {
     data.metodoPago2 = metodo2;
     data.monto2 = splitAmt;
   }
+  // ── Cliente opcional (solo ventas): se guarda en el movimiento y alimenta el CRM ──
+  if (tipo === 'ingreso') {
+    const cliTel = document.getElementById('mov-cliente-tel')?.value.trim() || '';
+    const cliNom = document.getElementById('mov-cliente-nombre')?.value.trim() || '';
+    if (cliTel) data.clienteTel = cliTel;
+    if (cliNom) data.clienteNombre = cliNom;
+  }
   // BUG-FIX: si hubo cierres parciales, el último vendedor es quien sigue de cajero.
   // Sino: localStorage (actualizado en arqueo/turno) > ARQUEO.vendedor como fallback.
   let vendedorActivo = '';
@@ -1708,6 +1756,12 @@ async function saveMov() {
       });
 
       let toastMsg = 'Movimiento registrado';
+
+      // Alimentar el CRM con el cliente de la venta (fire-and-forget, no bloquea la caja)
+      if (data.clienteTel && typeof upsertCliente === 'function') {
+        upsertCliente({ tlf: data.clienteTel, nombre: data.clienteNombre || '' })
+          .catch(e => console.error('upsertCliente desde venta:', e));
+      }
 
       // Actualizar reparación vinculada
       if (repairUpdate) {
