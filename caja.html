@@ -130,7 +130,7 @@
   <div id="inv-tab" class="caja-pg-tab section-hidden">
     <header>
       <div class="hdr-top">
-        <div class="hdr-brand"><h1>🏷️ Inventario</h1></div>
+        <div class="hdr-brand"><h1>🏷️ Accesorios</h1></div>
         <div class="hdr-actions">
           <div class="hdr-menu-wrap">
             <button class="hdr-btn hdr-menu-btn" id="inv-menu-btn" onclick="toggleInvMenu()" title="Opciones">⋮</button>
@@ -219,7 +219,7 @@
     </button>
     <button class="nav-btn" id="cnav-inv" onclick="switchCajaTab('inventario')">
       <span class="nav-ico">🏷️</span>
-      <span class="nav-lbl">Inventario</span>
+      <span class="nav-lbl">Accesorios</span>
     </button>
     <button class="nav-btn" id="cnav-rep" onclick="switchCajaTab('reparaciones')">
       <span class="nav-ico">🔧</span>
@@ -896,7 +896,7 @@ function _renderGlobalSearch() {
         <span class="gsr-title ${m.tipo === 'ingreso' ? 'gsr-pos' : 'gsr-neg'}">${m.tipo === 'ingreso' ? '+' : '−'}$${Number(m.monto||0).toLocaleString('es-AR')} · ${_esc(m.descripcion || m.categoria || '')}</span>
         <span class="gsr-sub">${_esc(m.categoria || '')}${m.metodoPago ? ' · ' + _esc(m.metodoPago) : ''}${m.vendedor ? ' · ' + _esc(m.vendedor) : ''}</span>
       </div>`},
-    { items: results.productos, label: '🏷️ Productos / Inventario', render: p => `
+    { items: results.productos, label: '🏷️ Accesorios', render: p => `
       <div class="gsearch-result" onclick="_gsClickProducto('${_esc(p.id)}')">
         <span class="gsr-title">${_esc(p.nombre)} · $${Number(p.precioVenta || 0).toLocaleString('es-AR')}</span>
         <span class="gsr-sub">${p.codigo ? _esc(p.codigo) + ' · ' : ''}${_esc(p.categoria || '')} · Stock: <b>${p.stock || 0}</b></span>

@@ -1317,7 +1317,7 @@ function _showMovSuggestions(results, q) {
         <span class="sug-empty-ico">🔍</span>
         <div class="sug-empty-text">
           <div class="sug-empty-title">Sin coincidencias para "${esc(q || '')}"</div>
-          <div class="sug-empty-sub">Seguí escribiendo libre · o cargá el producto en Inventario</div>
+          <div class="sug-empty-sub">Seguí escribiendo libre · o cargá el producto en Accesorios</div>
         </div>
       </div>`;
     drop._results = [];
@@ -1362,7 +1362,7 @@ function _showMovSuggestions(results, q) {
       <span class="sug-ico">${r.icon}</span>
       <span class="sug-info">
         <span class="sug-name">${esc(r.nombre)}</span>
-        <span class="sug-meta">${r.source === 'producto' ? '📦 Inventario' : '🔧 Repuesto'}${r.extra ? ' · ' + esc(r.extra) : ''}</span>
+        <span class="sug-meta">${r.source === 'producto' ? '📦 Accesorio' : '🔧 Repuesto'}${r.extra ? ' · ' + esc(r.extra) : ''}</span>
       </span>
       <span class="sug-right">
         ${precioStr ? `<span class="sug-precio">${precioStr}</span>` : ''}
@@ -1427,7 +1427,7 @@ function _showQtyPicker(item) {
         <span class="sale-item-icon">${item.icon}</span>
         <div class="sale-item-text">
           <span class="sale-item-name">${esc(item.nombre)}</span>
-          <span class="sale-item-meta">${item.source === 'producto' ? '📦 Inventario' : '🔧 Repuesto'} · Stock: <b class="${stockBadgeCls}">${item.stock}</b></span>
+          <span class="sale-item-meta">${item.source === 'producto' ? '📦 Accesorio' : '🔧 Repuesto'} · Stock: <b class="${stockBadgeCls}">${item.stock}</b></span>
         </div>
         <button class="sale-item-clear" onclick="_clearSaleItem()" type="button" title="Quitar">✕</button>
       </div>
