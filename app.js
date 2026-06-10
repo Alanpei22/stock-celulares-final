@@ -561,7 +561,6 @@ function toggleRep2Menu() {
     { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
     { divider: true },
     { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: () => (typeof openStockWizard === 'function') && openStockWizard() },
-    { icon: '💵', label: 'Carga rápida de costos', onClick: () => location.href = 'carga-costos.html' },
     { icon: '📊', label: 'Exportar / Importar Excel', onClick: () => location.href = 'bulk-edit-repuestos.html' },
     { icon: '📋', label: 'Pedido de mercadería', onClick: () => (typeof openPedidosModal === 'function') && openPedidosModal() },
     { divider: true },
