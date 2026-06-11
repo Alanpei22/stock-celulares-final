@@ -1585,7 +1585,7 @@ function _renderCart() {
     const sub = (Number(it.precio) || 0) * it.qty;
     let metaHtml, extraHtml = '';
     if (isLibre) {
-      metaHtml = `<span class="sale-item-meta">🏷️ Producto libre · no descuenta stock</span>`;
+      metaHtml = `<span class="sale-item-meta">🏷️ Producto libre · se agrega al inventario</span>`;
       extraHtml = `<input type="number" class="cart-price-input" min="0" inputmode="numeric" value="${it.precio || ''}" placeholder="Precio $" oninput="_setCartPrice(${i}, this.value)">`;
     } else {
       const stockBadgeCls = it.stock <= 0 ? 'sug-stock-zero'
@@ -1802,7 +1802,8 @@ async function saveMov() {
   if (vendedorActivo) data.vendedor = vendedorActivo;
 
   // ── Carrito de productos (solo en INGRESO y al CREAR, no editar) ──
-  let stockUpdates = [];   // un descuento de stock por cada ítem del carrito
+  let stockUpdates = [];     // un descuento de stock por cada ítem del carrito
+  let nuevosProductos = [];  // productos libres a dar de alta en el inventario
   let repairUpdate = null;
 
   if (_cart.length && tipo === 'ingreso' && !editingMovId) {
@@ -1824,8 +1825,10 @@ async function saveMov() {
         costoUSDUnit: it.costoUSD || 0,
         costoARSUnit,
       });
-      // Los productos libres no tocan stock
-      if (!esLibre) {
+      if (esLibre) {
+        // Producto libre → se da de alta en el inventario (stock 0, costo 0; se ajusta después)
+        nuevosProductos.push({ nombre: it.nombre, precioVenta: Number(it.precio) || 0 });
+      } else {
         const collection = it.source === 'producto' ? 'productos' : 'repuestos';
         const stockField = it.source === 'producto' ? 'stock' : 'cantidad';
         // CRIT-03: increment atómico para evitar race conditions
@@ -1923,6 +1926,26 @@ async function saveMov() {
           }
         }
         if (totalU) toastMsg += ` · stock −${totalU} u.`;
+      }
+
+      // Alta en inventario de los productos libres vendidos (stock 0, costo 0; se ajustan luego)
+      if (nuevosProductos.length) {
+        let creados = 0;
+        for (const np of nuevosProductos) {
+          try {
+            await db.collection('productos').add({
+              codigo: '', nombre: np.nombre, categoria: '',
+              precioVenta: np.precioVenta, precioCosto: 0,
+              stock: 0, stockMin: 0, activo: true,
+              fechaAlta: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            });
+            creados++;
+          } catch (prodErr) {
+            console.error('Alta producto libre:', prodErr);
+          }
+        }
+        if (creados) toastMsg += ` · ${creados} producto${creados > 1 ? 's' : ''} al inventario`;
       }
 
       toast(toastMsg + (toastMsg === 'Movimiento registrado' ? '' : ''), 'success');
