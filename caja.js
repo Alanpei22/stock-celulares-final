@@ -1955,7 +1955,9 @@ async function saveMov() {
     closeMovForm();
   } catch (e) {
     console.error('saveMov:', e);
-    toast('Error al guardar', 'error');
+    toast(e?.code === 'resource-exhausted'
+      ? '⚠️ Cupo diario de Firebase agotado — se renueva a las 4 AM (hora AR). El movimiento NO se guardó.'
+      : 'Error al guardar', 'error');
   }
 }
 

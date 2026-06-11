@@ -17,7 +17,17 @@ const FB_CONFIG = {
 
 // Inicializa Firebase y devuelve la instancia de Firestore.
 function _fbInit() {
-  if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  if (!firebase.apps.length) {
+    firebase.initializeApp(FB_CONFIG);
+    // QUOTA: persistencia offline (IndexedDB). Los docs quedan cacheados en el
+    // dispositivo y al recargar solo se facturan las lecturas de docs que
+    // cambiaron — sin esto cada recarga re-lee TODAS las colecciones y agota
+    // el cupo diario gratis ("quota exceeded" al guardar).
+    // Debe ejecutarse antes de cualquier otra operación de Firestore.
+    try {
+      firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    } catch (e) { /* navegador sin soporte: la app sigue igual, sin caché */ }
+  }
   return firebase.firestore();
 }
 

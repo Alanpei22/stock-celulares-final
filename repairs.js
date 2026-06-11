@@ -919,6 +919,7 @@ async function saveRepair() {
     let msg = 'Error al guardar';
     if (e?.code === 'permission-denied') msg = 'Sin permisos para guardar (revisá tu login)';
     else if (e?.code === 'unavailable')   msg = 'Sin conexión a Firestore';
+    else if (e?.code === 'resource-exhausted') msg = '⚠️ Cupo diario de Firebase agotado — se renueva a las 4 AM (hora AR). La reparación NO se guardó.';
     else if (e?.code === 'invalid-argument') msg = 'Datos inválidos: ' + (e.message || '');
     else if (e?.message) msg = 'Error: ' + e.message;
     toast(msg, 'error');
