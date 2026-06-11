@@ -899,6 +899,15 @@
         <div class="fg" id="rep-orden-spacer" style="display:none"></div>
 
         <div class="fg">
+          <label class="fl">Fecha de ingreso</label>
+          <div class="date-stepper">
+            <button type="button" class="date-stepper-btn" onclick="_repIngresoShift(-1)" aria-label="Día anterior">‹</button>
+            <span class="date-stepper-val" id="rep-fecha-ingreso-lbl">Hoy</span>
+            <button type="button" class="date-stepper-btn" onclick="_repIngresoShift(1)" aria-label="Día siguiente">›</button>
+          </div>
+        </div>
+
+        <div class="fg">
           <label class="fl">Marca * <button type="button" class="btn-add-marca" onclick="openAddMarcaModal()" title="Agregar nueva marca">＋</button></label>
           <input id="rep-fi-marca" class="fi" type="text" placeholder="Samsung, iPhone..." list="rep-dl-marca" autocomplete="off">
           <datalist id="rep-dl-marca">

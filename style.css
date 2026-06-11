@@ -5308,6 +5308,21 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
 .mov-sug-add-libre:hover { background: var(--accent-glow); }
 .mov-sug-add-libre b { color: var(--accent2); }
 
+/* ── Selector de fecha con flechas (día por día) ── */
+.date-stepper { display: flex; align-items: center; gap: 10px; }
+.date-stepper-btn {
+  width: 42px; height: 42px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg1); color: var(--text);
+  font-size: 22px; line-height: 1; cursor: pointer;
+}
+.date-stepper-btn:hover { background: var(--hover); }
+.date-stepper-btn:active { transform: scale(0.96); }
+.date-stepper-val {
+  flex: 1; text-align: center;
+  font-size: 15px; font-weight: 600; color: var(--text);
+}
+
 .mov-desc-suggest {
  position: absolute;
  top: calc(100% + 4px); left: 0; right: 0;

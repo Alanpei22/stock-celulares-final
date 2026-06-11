@@ -521,6 +521,50 @@ function _readGarantiaForm() {
 }
 
 // ── Form ──────────────────────────────────
+// ── Fecha de ingreso ajustable (flechas, día por día) ──
+let _repIngresoDate = null; // día elegido (Date a medianoche local)
+
+function _repIngresoReset(date) {
+  const base = (date instanceof Date && !isNaN(date)) ? date : new Date();
+  _repIngresoDate = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+  _repIngresoRender();
+}
+
+function _repIngresoShift(delta) {
+  if (!_repIngresoDate) _repIngresoReset();
+  const d = new Date(_repIngresoDate);
+  d.setDate(d.getDate() + delta);
+  // No permitir fechas futuras
+  const hoy = new Date();
+  const hoyMid = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  if (d > hoyMid) return;
+  _repIngresoDate = d;
+  _repIngresoRender();
+}
+
+function _repIngresoRender() {
+  const lbl = document.getElementById('rep-fecha-ingreso-lbl');
+  if (!lbl || !_repIngresoDate) return;
+  const hoy = new Date();
+  const hoyMid = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const ayer = new Date(hoyMid); ayer.setDate(ayer.getDate() - 1);
+  const fechaStr = _repIngresoDate.toLocaleDateString('es-AR', { weekday: 'short', day: '2-digit', month: 'short' });
+  let prefijo = '';
+  if (_repIngresoDate.getTime() === hoyMid.getTime()) prefijo = 'Hoy · ';
+  else if (_repIngresoDate.getTime() === ayer.getTime()) prefijo = 'Ayer · ';
+  lbl.textContent = prefijo + fechaStr;
+}
+
+// Devuelve el ISO a guardar: hoy → momento exacto; día pasado → ese día a la hora actual.
+function _repIngresoISO() {
+  if (!_repIngresoDate) return new Date().toISOString();
+  const now = new Date();
+  if (_repIngresoDate.toDateString() === now.toDateString()) return now.toISOString();
+  const d = new Date(_repIngresoDate);
+  d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
+  return d.toISOString();
+}
+
 function openRepairForm(id) {
   editingRepairId = id || null;
   const COMMON_ARREGLOS = [
@@ -592,6 +636,7 @@ function openRepairForm(id) {
       document.getElementById('rep-fi-foto-img').src = '';
       document.getElementById('rep-fi-foto-preview').classList.add('hidden');
     }
+    _repIngresoReset(r.fechaIngreso ? new Date(r.fechaIngreso) : null);
   } else {
     document.getElementById('rep-form-title').textContent = '🔧 Nueva Reparación';
     document.getElementById('rep-orden-row').style.display    = '';
@@ -638,6 +683,7 @@ function openRepairForm(id) {
     document.getElementById('rep-fi-foto').value = '';
     document.getElementById('rep-fi-foto-img').src = '';
     document.getElementById('rep-fi-foto-preview').classList.add('hidden');
+    _repIngresoReset(); // hoy por defecto
   }
 
   document.getElementById('rep-form-modal').classList.remove('hidden');
@@ -782,6 +828,7 @@ async function saveRepair() {
       const updateData = {
         ...existing,
         marca, modelo, arreglo, condicion, codigo, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
+        fechaIngreso: _repIngresoISO(),
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs, diasGarantia, checklist,
         seguimientoFecha, seguimientoNota, seguimientoAck: seguimientoFecha ? (existing.seguimientoFecha === seguimientoFecha ? (existing.seguimientoAck || false) : false) : null
       };
@@ -826,7 +873,7 @@ async function saveRepair() {
       });
 
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      const ahora = new Date().toISOString();
+      const ahora = _repIngresoISO(); // fecha de ingreso elegida con las flechas (hoy por defecto)
       const newDoc = {
         id, nOrden, marca, modelo, arreglo, condicion, codigo, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs,
