@@ -21,3 +21,10 @@ npm-debug.log*
 
 # Firebase (caché local del deploy)
 .firebase/
+
+# Vercel (link local y env con secretos — NUNCA commitear)
+.vercel/
+.env*.local
+.env
+
+.vercel
