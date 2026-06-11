@@ -19,6 +19,7 @@ const NOTIF_DEFAULTS = {
   push: {
     enabled: false,
     cierrePendiente: true,
+    resumenDiario: true,
     reparacionesListas: false,
     bajoStockCritico: false,
     cobrosRemotos: false,

@@ -1,0 +1,21 @@
+name: Resumen diario
+
+on:
+  schedule:
+    # 21:00 AR = 00:00 UTC (del día siguiente en UTC, mismo día en AR)
+    - cron: '0 0 * * *'
+  workflow_dispatch: {} # permite disparar manualmente desde GitHub UI
+
+jobs:
+  resumen-diario:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/cron-resumen-diario
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsSL -X POST "$BASE_URL/api/cron-resumen-diario" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{}'
