@@ -5,8 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TechPoint">
   <meta name="theme-color" content="#0f172a">
   <title>Caja — TechPoint</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="caja.css">
 </head>
@@ -852,6 +857,10 @@
 <script src="bluetooth-print.js"></script>
 <script src="notifications.js"></script>
 <script src="webpush.js"></script>
+<script>
+// PWA: registrar service worker también desde caja (push + instalación)
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
+</script>
 <script>
 // ── Búsqueda global ──
 function openGlobalSearch() {

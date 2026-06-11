@@ -2031,6 +2031,27 @@ function initPWA() {
   if (isIOS && !isStandalone) { document.getElementById('ios-tip').classList.add('show'); }
 }
 
+// ── URL action handler (?action=nueva-reparacion desde el shortcut de la app) ──
+function _handleUrlAction() {
+  try {
+    const params = new URLSearchParams(location.search);
+    const action = params.get('action');
+    if (!action) return;
+    params.delete('action');
+    const newSearch = params.toString();
+    history.replaceState({}, '', location.pathname + (newSearch ? '?' + newSearch : ''));
+    const tryAct = (retry = 0) => {
+      if (action === 'nueva-reparacion') {
+        if (typeof openRepairForm === 'function' && document.getElementById('app') && !document.getElementById('app').classList.contains('app-hidden')) {
+          openRepairForm();
+        } else if (retry < 15) setTimeout(() => tryAct(retry + 1), 400);
+      }
+    };
+    setTimeout(() => tryAct(0), 800);
+  } catch (e) { console.error('_handleUrlAction:', e); }
+}
+_handleUrlAction();
+
 // ── Arranque ──────────────────────────────────────────────
 (function() {
   const img = localStorage.getItem(BIZ_KEY);

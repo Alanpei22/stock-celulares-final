@@ -1,5 +1,5 @@
-const CACHE = 'cel-v66';
-const SHELL = ['manifest.json', 'icon.svg'];
+const CACHE = 'cel-v67';
+const SHELL = ['manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
@@ -61,8 +61,8 @@ self.addEventListener('push', event => {
   const title = data.title || '🔔 TechPoint';
   const options = {
     body: data.body || '',
-    icon: data.icon || '/icon.svg',
-    badge: data.badge || '/icon.svg',
+    icon: data.icon || '/icon-192.png',
+    badge: data.badge || '/icon-192.png',
     tag: data.tag || undefined,
     requireInteraction: !!data.requireInteraction,
     data: { url: data.url || '/index.html', ...(data.data || {}) },
