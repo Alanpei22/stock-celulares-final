@@ -5311,10 +5311,12 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
 /* ── Selector de fecha con flechas (día por día) ── */
 .date-stepper { display: flex; align-items: center; gap: 10px; }
 .date-stepper-btn {
-  width: 42px; height: 42px; flex-shrink: 0;
+  width: 44px; height: 44px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--bg1); color: var(--text);
-  font-size: 22px; line-height: 1; cursor: pointer;
+  background: var(--bg1); color: var(--accent2);
+  font-size: 15px; cursor: pointer;
+  padding: 0;
 }
 .date-stepper-btn:hover { background: var(--hover); }
 .date-stepper-btn:active { transform: scale(0.96); }
