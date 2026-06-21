@@ -423,11 +423,21 @@ function buildCajaAnualHTML(movs) {
 
 // -- Prompt post-cierre --
 
-function openCajaDuenoPrompt(suggestedAmount) {
+function openCajaDuenoPrompt(suggestedAmount, cajaChica = 0) {
   const inp = document.getElementById('cd-prompt-monto');
   if (inp) inp.value = suggestedAmount > 0 ? suggestedAmount : '';
   const descEl = document.getElementById('cd-prompt-desc');
   if (descEl) descEl.value = '';
+  // Hint: avisar que ya se descontó la caja chica del monto sugerido
+  const hintEl = document.getElementById('cd-prompt-hint');
+  if (hintEl) {
+    if (cajaChica > 0) {
+      hintEl.textContent = `Ya se descontaron $${Number(cajaChica).toLocaleString('es-AR')} de caja chica`;
+      hintEl.classList.remove('hidden');
+    } else {
+      hintEl.classList.add('hidden');
+    }
+  }
   document.getElementById('cd-prompt-overlay').classList.remove('hidden');
   document.getElementById('cd-prompt-modal').classList.remove('hidden');
   if (inp) setTimeout(() => inp.select(), 150);
