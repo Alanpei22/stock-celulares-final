@@ -273,6 +273,99 @@ async function deletePrecio() {
   }
 }
 
+// ══════════════════════════════════════════
+//  AJUSTE MASIVO POR % (inflación / dólar)
+// ══════════════════════════════════════════
+
+// Items afectados = según el filtro de categoría activo (o todos)
+function _ajusteScopeItems() {
+  return _precioFilterTipo ? PRECIOS.filter(p => p.tipo === _precioFilterTipo) : PRECIOS.slice();
+}
+
+function _redondearPrecio(n, paso) {
+  if (!paso || paso <= 1) return Math.round(n);
+  return Math.round(n / paso) * paso;
+}
+
+function _ajusteCalc(valor, pct, paso) {
+  return Math.max(0, _redondearPrecio(valor * (1 + pct / 100), paso));
+}
+
+function openAjustePrecios() {
+  const items = _ajusteScopeItems();
+  if (!items.length) { toast('No hay precios para ajustar', 'info'); return; }
+  const lbl = document.getElementById('ajuste-scope-lbl');
+  if (lbl) lbl.textContent = _precioFilterTipo
+    ? `Se ajustarán ${items.length} precios de "${_precioFilterTipo}"`
+    : `Se ajustarán los ${items.length} precios (todas las categorías)`;
+  const pct = document.getElementById('ajuste-pct'); if (pct) pct.value = '';
+  _ajustePreview();
+  document.getElementById('ajuste-precios-overlay').classList.remove('hidden');
+  document.getElementById('ajuste-precios-modal').classList.remove('hidden');
+}
+
+function closeAjustePrecios() {
+  document.getElementById('ajuste-precios-overlay').classList.add('hidden');
+  document.getElementById('ajuste-precios-modal').classList.add('hidden');
+}
+
+function _setAjustePct(v) {
+  const inp = document.getElementById('ajuste-pct');
+  if (inp) { inp.value = v; _ajustePreview(); }
+}
+
+function _ajustePreview() {
+  const pct  = parseFloat(document.getElementById('ajuste-pct')?.value);
+  const paso = parseInt(document.getElementById('ajuste-redondeo')?.value) || 0;
+  const out  = document.getElementById('ajuste-preview');
+  if (!out) return;
+  const items = _ajusteScopeItems();
+  if (!pct || isNaN(pct) || !items.length) { out.innerHTML = ''; return; }
+  const ej = items.find(p => Number(p.precio) > 0);
+  if (!ej) { out.innerHTML = ''; return; }
+  const v = Number(ej.precio);
+  out.innerHTML = `Ejemplo: <b>$${v.toLocaleString('es-AR')}</b> → <b style="color:var(--accent2)">$${_ajusteCalc(v, pct, paso).toLocaleString('es-AR')}</b>`;
+}
+
+async function aplicarAjustePrecios() {
+  const pct  = parseFloat(document.getElementById('ajuste-pct')?.value);
+  const paso = parseInt(document.getElementById('ajuste-redondeo')?.value) || 0;
+  if (!pct || isNaN(pct)) { toast('Ingresá un porcentaje', 'error'); return; }
+  const items = _ajusteScopeItems();
+  if (!items.length) { toast('No hay precios para ajustar', 'info'); return; }
+
+  const aplicar = async () => {
+    try {
+      const ahora = new Date().toISOString();
+      let batch = db.batch(), n = 0, total = 0;
+      for (const p of items) {
+        const upd = { updatedAt: ahora };
+        if (Number(p.precio) > 0)      upd.precio = _ajusteCalc(Number(p.precio), pct, paso);
+        if (Number(p.precioLista) > 0) upd.precioLista = _ajusteCalc(Number(p.precioLista), pct, paso);
+        if (upd.precio === undefined && upd.precioLista === undefined) continue;
+        batch.update(db.collection('precios_reparaciones').doc(p.id), upd);
+        n++; total++;
+        if (n >= 450) { await batch.commit(); batch = db.batch(); n = 0; }
+      }
+      if (n > 0) await batch.commit();
+      closeAjustePrecios();
+      toast(`✅ ${total} precios ajustados ${pct > 0 ? '+' : ''}${pct}%`, 'success');
+    } catch (e) {
+      console.error('aplicarAjustePrecios:', e);
+      toast(e?.code === 'resource-exhausted'
+        ? '⚠️ Cupo de Firebase agotado, probá más tarde'
+        : 'Error al ajustar precios', 'error');
+    }
+  };
+
+  const conf = `¿${pct > 0 ? 'Subir' : 'Bajar'} ${items.length} precio(s) un ${Math.abs(pct)}%?\n\nCambia los precios de venta. El ajuste masivo no se puede deshacer de una.`;
+  if (typeof requireCajaOwnerPin === 'function') {
+    requireCajaOwnerPin(() => { if (confirm(conf)) aplicar(); }, 'PIN de dueño para ajustar precios');
+  } else if (confirm(conf)) {
+    aplicar();
+  }
+}
+
 function _escP(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }

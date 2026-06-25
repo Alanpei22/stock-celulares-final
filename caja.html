@@ -719,9 +719,46 @@
   <div class="precios-filter-chips" id="precios-filter-chips"></div>
   <div id="precios-list" class="precios-list"></div>
   <div id="precios-empty" class="precios-empty hidden"></div>
-  <div style="display:flex;gap:8px;margin-top:10px">
+  <button class="btn-secondary" onclick="openAjustePrecios()" style="width:100%;margin-top:10px">📈 Ajustar precios por %</button>
+  <div style="display:flex;gap:8px;margin-top:8px">
     <button class="btn-secondary" onclick="openPreciosBulk()" style="flex:1">📋 Carga masiva</button>
     <button class="btn-primary" onclick="openPrecioForm()" style="flex:1">➕ Agregar precio</button>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: AJUSTE MASIVO POR % ═══════════ -->
+<div id="ajuste-precios-overlay" class="nota-overlay hidden" onclick="closeAjustePrecios()"></div>
+<div id="ajuste-precios-modal" class="arqueo-modal hidden" style="max-width:380px">
+  <div class="nota-modal-hdr">
+    <span>📈 Ajustar precios</span>
+    <button onclick="closeAjustePrecios()">✕</button>
+  </div>
+  <p class="arqueo-sub" id="ajuste-scope-lbl">Se ajustarán todos los precios</p>
+  <div class="fg">
+    <label class="fl">Porcentaje (+ sube · − baja)</label>
+    <div class="ajuste-pct-row">
+      <button type="button" class="ajuste-pct-chip" onclick="_setAjustePct(-10)">−10%</button>
+      <button type="button" class="ajuste-pct-chip" onclick="_setAjustePct(-5)">−5%</button>
+      <button type="button" class="ajuste-pct-chip" onclick="_setAjustePct(5)">+5%</button>
+      <button type="button" class="ajuste-pct-chip" onclick="_setAjustePct(10)">+10%</button>
+      <button type="button" class="ajuste-pct-chip" onclick="_setAjustePct(15)">+15%</button>
+      <button type="button" class="ajuste-pct-chip" onclick="_setAjustePct(20)">+20%</button>
+    </div>
+    <input id="ajuste-pct" class="fi" type="number" placeholder="ej: 10  ·  -5" inputmode="numeric" oninput="_ajustePreview()">
+  </div>
+  <div class="fg">
+    <label class="fl">Redondear a</label>
+    <select id="ajuste-redondeo" class="fi" onchange="_ajustePreview()">
+      <option value="100">$100</option>
+      <option value="500" selected>$500</option>
+      <option value="1000">$1.000</option>
+      <option value="0">Sin redondear</option>
+    </select>
+  </div>
+  <p id="ajuste-preview" class="arqueo-sub" style="min-height:20px"></p>
+  <div style="display:flex;gap:10px;margin-top:12px">
+    <button class="btn-secondary" onclick="closeAjustePrecios()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" onclick="aplicarAjustePrecios()" style="flex:2">📈 Aplicar</button>
   </div>
 </div>
 
