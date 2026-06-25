@@ -6,9 +6,15 @@ const REPAIR_STATES = {
   reparando: { label: 'Reparando', cls: 'bg-reparando' },
   listo:     { label: 'Listo ✓',  cls: 'bg-listo'     },
   entregado: { label: 'Entregado', cls: 'bg-entregado' },
-  cancelado: { label: 'No van',    cls: 'bg-cancelado' },
-  'no van':  { label: 'No van',    cls: 'bg-cancelado' },
+  'no va':   { label: 'No va',     cls: 'bg-cancelado' },
+  // Legacy (datos viejos) — solo para mostrar la etiqueta correcta
+  cancelado: { label: 'No va',     cls: 'bg-cancelado' },
+  'no van':  { label: 'No va',     cls: 'bg-cancelado' },
 };
+// Botones de estado que se muestran (uno solo "No va")
+const REPAIR_STATE_BUTTONS = ['reparando', 'listo', 'entregado', 'no va'];
+// ¿El estado es de la familia "No va" (incluye datos viejos)?
+function _esNoVa(estado) { return estado === 'no va' || estado === 'cancelado' || estado === 'no van'; }
 
 let REPAIRS = [];
 let STAFF   = [];
@@ -188,6 +194,12 @@ function renderRepairs() {
       // Demorado = reparando hace más de 3 días
       if (r.estado !== 'reparando' || !r.fechaIngreso) return false;
       if ((now - new Date(r.fechaIngreso)) / 86400000 <= 3) return false;
+    } else if (fEstado === 'para-entregar') {
+      if (r.estado !== 'listo') return false;
+    } else if (fEstado === 'para-devolver') {
+      if (!_esNoVa(r.estado) || r.devuelto === true) return false;
+    } else if (fEstado === 'no va' || fEstado === 'cancelado') {
+      if (!_esNoVa(r.estado)) return false;
     } else if (fEstado && r.estado !== fEstado) return false;
     if (fMarca  && r.marca  !== fMarca)  return false;
     if (q) {
@@ -204,7 +216,7 @@ function renderRepairs() {
   });
 
   // Sort
-  const STATE_ORDER = { reparando: 0, listo: 1, entregado: 2, cancelado: 3 };
+  const STATE_ORDER = { reparando: 0, listo: 1, entregado: 2, 'no va': 3, cancelado: 3, 'no van': 3 };
   if (fSort === 'antiguo') {
     filtered.sort((a, b) => (a.fechaIngreso || '').localeCompare(b.fechaIngreso || ''));
   } else if (fSort === 'estado') {
@@ -227,6 +239,8 @@ function renderRepairs() {
   document.getElementById('rs-reparando').textContent = REPAIRS.filter(r => r.estado === 'reparando').length;
   document.getElementById('rs-listo').textContent     = REPAIRS.filter(r => r.estado === 'listo').length;
   document.getElementById('rs-demorados').textContent = demorados;
+  const devolverEl = document.getElementById('rs-devolver');
+  if (devolverEl) devolverEl.textContent = REPAIRS.filter(r => _esNoVa(r.estado) && r.devuelto !== true).length;
 
   updateNavBadge();
 
@@ -960,10 +974,14 @@ function openRepairDetail(id) {
     <div class="det-row">
       <span class="det-label">Estado</span>
       <div class="rep-status-btns">
-        ${Object.entries(REPAIR_STATES).map(([k, v]) =>
-          `<button class="status-btn ${v.cls}${k === r.estado ? ' status-btn--active' : ''}"
-            onclick="changeRepairStatus('${id}','${k}')">${v.label}</button>`
-        ).join('')}
+        ${REPAIR_STATE_BUTTONS.map(k => {
+          const v = REPAIR_STATES[k];
+          const activo = k === r.estado || (k === 'no va' && _esNoVa(r.estado));
+          let lbl = v.label;
+          if (k === 'no va' && _esNoVa(r.estado)) lbl = r.devuelto ? 'No va · devuelto' : 'No va · devolver';
+          return `<button class="status-btn ${v.cls}${activo ? ' status-btn--active' : ''}"
+            onclick="changeRepairStatus('${id}','${k}')">${lbl}</button>`;
+        }).join('')}
       </div>
     </div>
     <div class="det-row">
@@ -1158,7 +1176,24 @@ async function logActivity({ tipo, desc, repairId, tecnico, extra = {} }) {
 // ── Cambio de estado ──────────────────────
 async function changeRepairStatus(id, newStatus) {
   const r = REPAIRS.find(x => x.id === id);
-  if (!r || r.estado === newStatus) return;
+  if (!r) return;
+
+  // ── "No va" → preguntar si el equipo ya fue devuelto al cliente ──
+  if (newStatus === 'no va' || newStatus === 'cancelado') {
+    const devuelto = confirm('↩️ ¿Ya le devolviste el equipo al cliente (sin reparar)?\n\nAceptar = DEVUELTO\nCancelar = queda PARA DEVOLVER');
+    await _doChangeRepairStatus(id, 'no va', r,
+      devuelto ? { devuelto: true, fechaEntrega: new Date().toISOString() } : { devuelto: false });
+    return;
+  }
+
+  if (r.estado === newStatus) return;
+
+  // ── "Listo" → preguntar si el cliente ya se lo llevó ──
+  if (newStatus === 'listo') {
+    if (confirm('📦 ¿El cliente ya se llevó el equipo?\n\nAceptar = marcar ENTREGADO\nCancelar = queda LISTO para retirar')) {
+      return changeRepairStatus(id, 'entregado');
+    }
+  }
 
   // ── GUARDIA: al pasar a "entregado", forzar carga de costo si falta ──
   if (newStatus === 'entregado' && _faltaCargarCosto(r)) {
@@ -1206,9 +1241,9 @@ async function changeRepairStatus(id, newStatus) {
   await _doChangeRepairStatus(id, newStatus, r);
 }
 
-async function _doChangeRepairStatus(id, newStatus, r) {
+async function _doChangeRepairStatus(id, newStatus, r, extra = {}) {
   const ahora = new Date().toISOString();
-  const update = { estado: newStatus };
+  const update = { estado: newStatus, ...extra };
   if (newStatus === 'entregado') update.fechaEntrega = ahora;
   const prevHistory = Array.isArray(r.estadoHistorial) ? r.estadoHistorial : [];
   update.estadoHistorial = [...prevHistory, { estado: newStatus, fecha: ahora }];
@@ -2693,6 +2728,21 @@ async function quickStatusChange(e, id, newStatus) {
   const rep = REPAIRS.find(x => x.id === id);
   if (!rep) return;
 
+  // ── "No va" → preguntar si ya fue devuelto ──
+  if (newStatus === 'no va' || newStatus === 'cancelado') {
+    const devuelto = confirm('↩️ ¿Ya le devolviste el equipo al cliente (sin reparar)?\n\nAceptar = DEVUELTO\nCancelar = queda PARA DEVOLVER');
+    await _doStatusChange(id, 'no va',
+      devuelto ? { devuelto: true, fechaEntrega: new Date().toISOString() } : { devuelto: false });
+    return;
+  }
+
+  // ── "Listo" → preguntar si el cliente ya se lo llevó ──
+  if (newStatus === 'listo') {
+    if (confirm('📦 ¿El cliente ya se llevó el equipo?\n\nAceptar = marcar ENTREGADO\nCancelar = queda LISTO para retirar')) {
+      return quickStatusChange(e, id, 'entregado');
+    }
+  }
+
   // ── GUARDIA: al pasar a "entregado", forzar carga de costo si falta ──
   if (newStatus === 'entregado' && _faltaCargarCosto(rep)) {
     const ok = await openCostoRequeridoModal(rep);
@@ -2738,8 +2788,8 @@ async function quickStatusChange(e, id, newStatus) {
   await _doStatusChange(id, newStatus);
 }
 
-async function _doStatusChange(id, newStatus) {
-  const update = { estado: newStatus };
+async function _doStatusChange(id, newStatus, extra = {}) {
+  const update = { estado: newStatus, ...extra };
   if (newStatus === 'entregado') update.fechaEntrega = new Date().toISOString();
   try {
     await db.collection('repairs').doc(id).update(update);

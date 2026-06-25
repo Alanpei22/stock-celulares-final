@@ -1332,7 +1332,7 @@ function _onMovDescInput() {
   const qIsNumeric = /^\d+$/.test(q.replace(/\s/g, ''));
   CAJA_REPAIRS.forEach(r => {
     // Omitir canceladas y las ya cobradas+entregadas
-    if (r.estado === 'cancelado' || r.estado === 'no van') return;
+    if (r.estado === 'cancelado' || r.estado === 'no van' || r.estado === 'no va') return;
     if (r.cobrado && r.estado === 'entregado') return;
 
     let matches = false;

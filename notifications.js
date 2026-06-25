@@ -316,7 +316,7 @@ function _checkFechaRetiroVencida() {
   if (typeof REPAIRS === 'undefined' || !Array.isArray(REPAIRS)) return null;
   const today = _todayARNotif();
   const vencidas = REPAIRS.filter(r => {
-    if (r.estado === 'entregado' || r.estado === 'cancelado') return false;
+    if (r.estado === 'entregado' || r.estado === 'cancelado' || r.estado === 'no va' || r.estado === 'no van') return false;
     if (!r.fechaEstimada) return false;
     return r.fechaEstimada < today;
   });

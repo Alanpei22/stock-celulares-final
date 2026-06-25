@@ -172,8 +172,10 @@
           <option value="">Todos los estados</option>
           <option value="reparando">Reparando</option>
           <option value="listo">Listo</option>
+          <option value="para-entregar">📦 Para entregar (listos)</option>
           <option value="entregado">Entregado</option>
-          <option value="cancelado">Cancelado</option>
+          <option value="no va">No va</option>
+          <option value="para-devolver">↩️ Para devolver</option>
           <option value="demorado">⚠️ Demorados</option>
         </select>
         <select class="pill" id="rep-f-marca"><option value="">Todas las marcas</option></select>
@@ -197,6 +199,7 @@
       <div class="stat stat--clickable" onclick="(function(s){var el=document.getElementById('rep-f-estado');el.value=el.value===s?'':s;renderRepairs();}('reparando'))"><span class="stat-num" id="rs-reparando">0</span><span class="stat-lbl">Reparando</span></div>
       <div class="stat stat--clickable" onclick="(function(s){var el=document.getElementById('rep-f-estado');el.value=el.value===s?'':s;renderRepairs();}('listo'))"><span class="stat-num" id="rs-listo">0</span><span class="stat-lbl">Listos</span></div>
       <div class="stat stat--clickable" onclick="(function(s){var el=document.getElementById('rep-f-estado');el.value=el.value===s?'':s;renderRepairs();}('demorado'))"><span class="stat-num rep-demorado-num" id="rs-demorados">0</span><span class="stat-lbl">Demorados</span></div>
+      <div class="stat stat--clickable" onclick="(function(s){var el=document.getElementById('rep-f-estado');el.value=el.value===s?'':s;renderRepairs();}('para-devolver'))"><span class="stat-num" id="rs-devolver">0</span><span class="stat-lbl">↩️ Devolver</span></div>
     </div>
 
     <div class="list-wrap">
