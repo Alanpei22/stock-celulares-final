@@ -2189,7 +2189,7 @@ async function saveCajaChica() {
       ? `💰 Caja chica guardada: $${monto.toLocaleString('es-AR')} para mañana`
       : 'Caja chica omitida', 'info');
     // El dueño se lleva lo esperado MENOS lo que queda de caja chica
-    setTimeout(() => openCajaDuenoPrompt(Math.max(0, _getCierreEsperado() - monto), monto), 400);
+    setTimeout(() => openCajaDuenoPrompt(Math.max(0, contadoTotal - monto), monto), 400);
   } catch (e) {
     console.error('saveCajaChica:', e);
     // Si falla solo el update del cierre, igual guardamos config y continuamos
@@ -2199,7 +2199,7 @@ async function saveCajaChica() {
       });
     } catch {}
     closeCajaChicaModal();
-    setTimeout(() => openCajaDuenoPrompt(Math.max(0, _getCierreEsperado() - monto), monto), 400);
+    setTimeout(() => openCajaDuenoPrompt(Math.max(0, contadoTotal - monto), monto), 400);
   }
 }
 
