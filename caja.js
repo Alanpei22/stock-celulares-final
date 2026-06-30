@@ -37,6 +37,8 @@ let CIERRE = null;
 // ── Autocomplete de venta ─────────────────────────────────
 let CAJA_REPUESTOS = [];        // listener específico para autocomplete
 let _cajaRepuestosListener = null;
+let CAJA_STOCK = [];            // equipos (stock) para vender desde caja
+let _cajaStockListener = null;
 let _selectedSaleItem = null;   // (legacy — ya no se usa para guardar; ver _cart)
 let _cart = [];                 // carrito de venta: [{ source, id, nombre, qty, precio, costoUSD, costoARS, icon, stock }]
 
@@ -54,6 +56,7 @@ let _parcialListener  = null;
 window._cajaCleanup = function() {
   if (movListener)             { movListener();             movListener = null; }
   if (_cajaRepuestosListener)  { _cajaRepuestosListener();  _cajaRepuestosListener = null; }
+  if (_cajaStockListener)      { _cajaStockListener();      _cajaStockListener = null; }
   if (_cajaRepairsListener)    { _cajaRepairsListener();    _cajaRepairsListener = null; }
   if (_parcialListener)        { _parcialListener();        _parcialListener = null; }
   CAJA_REPUESTOS = [];
@@ -111,6 +114,7 @@ function initApp() {
   _loadYesterdayStats().then(() => renderStats()); // Feature 6: vs ayer
   listenCierresParciales();        // ← turnos/cierres parciales
   listenCajaRepuestos();           // ← repuestos para autocomplete
+  listenCajaStock();               // ← equipos (stock) para vender desde caja
   listenCajaRepairs();             // ← reparaciones para autocomplete
   _initMovDescAutocomplete();      // ← input handler de descripción
   ensureDolar(db);                 // ← cotización para calcular costo en pesos
@@ -1268,6 +1272,14 @@ function listenCajaRepuestos() {
   }, err => console.error('Repuestos (caja):', err));
 }
 
+function listenCajaStock() {
+  if (_cajaStockListener) return;
+  // Solo equipos disponibles (no vendidos) para el autocomplete de venta
+  _cajaStockListener = db.collection('stock').where('vendido', '==', false).onSnapshot(snap => {
+    CAJA_STOCK = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }, err => console.error('Stock (caja):', err));
+}
+
 function listenCajaRepairs() {
   if (_cajaRepairsListener) return;
   // QUOTA: limitar a 90 días (antes 365). Para autocompletar al cobrar
@@ -1371,6 +1383,27 @@ function _onMovDescInput() {
       });
     }
   });
+
+  // ── Equipos (stock) — solo no vendidos ──
+  if (Array.isArray(CAJA_STOCK)) {
+    CAJA_STOCK.forEach(p => {
+      if (p.vendido) return;
+      if (searchMatch([p.marca, p.modelo, p.almacenamiento, p.imei], q)) {
+        const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : '', p.estado].filter(Boolean).join(' · ');
+        results.push({
+          source: 'equipo',
+          id: p.id,
+          nombre: `${p.marca || ''} ${p.modelo || ''}`.trim() || 'Equipo',
+          extra: specs,
+          stock: 1,                       // equipo único
+          precio: Number(p.precio) || 0,
+          costoUSD: 0,
+          costoARS: Number(p.costo) || 0,
+          icon: '📱',
+        });
+      }
+    });
+  }
 
   // ── Reparaciones ──
   const qIsNumeric = /^\d+$/.test(q.replace(/\s/g, ''));
@@ -1494,7 +1527,7 @@ function _showMovSuggestions(results, q) {
       <span class="sug-ico">${r.icon}</span>
       <span class="sug-info">
         <span class="sug-name">${esc(r.nombre)}</span>
-        <span class="sug-meta">${r.source === 'producto' ? '📦 Accesorio' : '🔧 Repuesto'}${r.extra ? ' · ' + esc(r.extra) : ''}</span>
+        <span class="sug-meta">${r.source === 'producto' ? '📦 Accesorio' : r.source === 'equipo' ? '📱 Equipo' : '🔧 Repuesto'}${r.extra ? ' · ' + esc(r.extra) : ''}</span>
       </span>
       <span class="sug-right">
         ${precioStr ? `<span class="sug-precio">${precioStr}</span>` : ''}
@@ -1590,6 +1623,7 @@ function _addToCart(r) {
       precio: Number(r.precio) || 0,
       costoUSD: r.costoUSD || 0, costoARS: r.costoARS || 0,
       icon: r.icon || '📦', stock: r.stock, qty: 1,
+      extra: r.extra || '',
     });
     selectCat('Venta producto');
   }
@@ -1625,12 +1659,15 @@ function _renderCart() {
   if (!_cart.length) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
 
   const lines = _cart.map((it, i) => {
-    const isLibre = it.source === 'libre';
+    const isLibre  = it.source === 'libre';
+    const isEquipo = it.source === 'equipo';
     const sub = (Number(it.precio) || 0) * it.qty;
     let metaHtml, extraHtml = '';
     if (isLibre) {
       metaHtml = `<span class="sale-item-meta">🏷️ Producto libre · se agrega al inventario</span>`;
       extraHtml = `<input type="number" class="cart-price-input" min="0" inputmode="numeric" value="${it.precio || ''}" placeholder="Precio $" oninput="_setCartPrice(${i}, this.value)">`;
+    } else if (isEquipo) {
+      metaHtml = `<span class="sale-item-meta">📱 Equipo${it.extra ? ' · ' + esc(it.extra) : ''} · ${fmt(sub)}</span>`;
     } else {
       const stockBadgeCls = it.stock <= 0 ? 'sug-stock-zero'
                           : it.stock <= 2 ? 'sug-stock-low'
@@ -1846,18 +1883,20 @@ async function saveMov() {
   if (vendedorActivo) data.vendedor = vendedorActivo;
 
   // ── Carrito de productos (solo en INGRESO y al CREAR, no editar) ──
-  let stockUpdates = [];     // un descuento de stock por cada ítem del carrito
-  let nuevosProductos = [];  // productos libres a dar de alta en el inventario
+  let stockUpdates = [];      // un descuento de stock por cada ítem del carrito
+  let nuevosProductos = [];   // productos libres a dar de alta en el inventario
+  let equiposVendidos = [];   // equipos del stock a marcar como vendidos
   let repairUpdate = null;
 
   if (_cart.length && tipo === 'ingreso' && !editingMovId) {
     let costoTotal = 0;
     const items = [];
     for (const it of _cart) {
-      const esLibre = it.source === 'libre' || !it.id;
-      let qty = Math.max(1, it.qty);
+      const esLibre  = it.source === 'libre' || (it.source !== 'equipo' && !it.id);
+      const esEquipo = it.source === 'equipo';
+      let qty = esEquipo ? 1 : Math.max(1, it.qty);
       // LOW-13: cap qty al stock disponible (solo productos del inventario con stock > 0)
-      if (!esLibre && it.stock > 0 && qty > it.stock) {
+      if (!esLibre && !esEquipo && it.stock > 0 && qty > it.stock) {
         toast(`"${it.nombre}": cantidad ajustada al stock (${it.stock} u.)`, 'error');
         qty = it.stock;
       }
@@ -1869,7 +1908,10 @@ async function saveMov() {
         costoUSDUnit: it.costoUSD || 0,
         costoARSUnit,
       });
-      if (esLibre) {
+      if (esEquipo) {
+        // Equipo del stock → se marca como vendido (no descuenta cantidad)
+        equiposVendidos.push(it.id);
+      } else if (esLibre) {
         // Producto libre → se da de alta en el inventario (stock 0, costo 0; se ajusta después)
         nuevosProductos.push({ nombre: it.nombre, precioVenta: Number(it.precio) || 0 });
       } else {
@@ -1929,13 +1971,33 @@ async function saveMov() {
       await db.collection('caja_movimientos').doc(editingMovId).update(data);
       toast('Movimiento actualizado', 'success');
     } else {
-      await db.collection('caja_movimientos').add({
+      const movRef = await db.collection('caja_movimientos').add({
         ...data,
         createdAt: new Date().toISOString(),
         _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
       });
 
       let toastMsg = 'Movimiento registrado';
+
+      // Marcar los equipos del stock como vendidos
+      if (equiposVendidos.length) {
+        let vendidos = 0;
+        for (const eqId of equiposVendidos) {
+          try {
+            await db.collection('stock').doc(eqId).update({
+              vendido: true,
+              fechaVenta: new Date().toISOString(),
+              vendedor: data.vendedor || null,
+              ventaMovId: movRef.id,
+            });
+            vendidos++;
+          } catch (eqErr) {
+            console.error('Marcar equipo vendido:', eqErr);
+            toast('Movimiento guardado, pero falló marcar un equipo como vendido', 'error');
+          }
+        }
+        if (vendidos) toastMsg += ` · ${vendidos} equipo${vendidos > 1 ? 's' : ''} vendido${vendidos > 1 ? 's' : ''} 📱`;
+      }
 
       // Alimentar el CRM con el cliente de la venta (fire-and-forget, no bloquea la caja)
       if (data.clienteTel && typeof upsertCliente === 'function') {
@@ -2020,13 +2082,23 @@ function deleteMov() {
 
       // Revertir stock si era venta de inventario — soporta carrito (items[]) y ventas viejas (itemId único)
       let stockReturned = 0;
-      const restored = []; // { coll, field, id, qty } — para rehacer el descuento en el undo
+      const restored = [];        // { coll, field, id, qty } — para rehacer el descuento en el undo
+      const equiposRevert = [];   // equipos a re-marcar como vendidos en el undo
       if (movData.tipo === 'ingreso') {
         const itemsRevert = (Array.isArray(movData.items) && movData.items.length)
           ? movData.items
           : (movData.itemId ? [{ id: movData.itemId, source: movData.itemSource, qty: movData.itemQty }] : []);
         for (const it of itemsRevert) {
-          if (!it.id || !(it.qty > 0)) continue;
+          if (!it.id) continue;
+          if (it.source === 'equipo') {
+            // Equipo: vuelve a estar disponible (no vendido)
+            try {
+              await db.collection('stock').doc(it.id).update({ vendido: false, ventaMovId: null });
+              equiposRevert.push(it.id);
+            } catch (eqErr) { console.error('Equipo revert:', eqErr); }
+            continue;
+          }
+          if (!(it.qty > 0)) continue;
           const coll  = it.source === 'producto' ? 'productos' : 'repuestos';
           const field = it.source === 'producto' ? 'stock' : 'cantidad';
           try {
@@ -2063,6 +2135,9 @@ function deleteMov() {
               await db.collection(rr.coll).doc(rr.id).update({
                 [rr.field]: firebase.firestore.FieldValue.increment(-rr.qty)
               });
+            }
+            for (const eqId of equiposRevert) {
+              await db.collection('stock').doc(eqId).update({ vendido: true, ventaMovId: id });
             }
             if (senaReverted > 0) {
               await db.collection('repairs').doc(movData.repairId).update({
