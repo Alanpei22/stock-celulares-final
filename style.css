@@ -5347,6 +5347,8 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
   border: 1px solid currentColor;
 }
 .mov-hora { font-size: 11px; color: var(--text3); }
+.mp-logo-ico { height: 1.1em; width: auto; vertical-align: -0.2em; display: inline-block; }
+.metodo-btn .mp-logo-ico, .metodo-btn2 .mp-logo-ico { height: 1.25em; vertical-align: -0.25em; }
 .metodo-efec   { color: #16a34a; }
 .metodo-transf { color: #2563eb; }
 .metodo-mp     { color: #0ea5e9; }

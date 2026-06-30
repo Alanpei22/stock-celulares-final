@@ -728,7 +728,7 @@ function _metodoInfo(metodo) {
   const map = {
     'Efectivo':        { icon: '💵', cls: 'metodo-efec',   short: 'Efectivo' },
     'Transferencia':   { icon: '🏦', cls: 'metodo-transf', short: 'Transfer.' },
-    'MercadoPago':     { icon: '💙', cls: 'metodo-mp',     short: 'MercadoPago' },
+    'MercadoPago':     { icon: '<img src="mp-logo.png" class="mp-logo-ico" alt="">', cls: 'metodo-mp', short: 'MercadoPago' },
     'Tarjeta débito':  { icon: '💳', cls: 'metodo-tarj',   short: 'Débito' },
     'Tarjeta crédito': { icon: '💳', cls: 'metodo-tarj',   short: 'Crédito' },
   };
