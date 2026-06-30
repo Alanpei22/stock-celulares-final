@@ -5346,16 +5346,22 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
   padding: 2px 8px; border-radius: 999px;
   border: 1px solid currentColor;
 }
-.mov-hora { font-size: 13px; font-weight: 600; color: var(--text2); }
+.mov-hora { font-size: 13px; font-weight: 600; color: var(--text2); margin-left: 4px; }
+.mov-hora::before { content: '·'; margin-right: 8px; color: var(--text3); font-weight: 400; }
 .mp-logo-ico { height: 1.1em; width: auto; vertical-align: -0.2em; display: inline-block; }
-/* Variantes de precio en la tarjeta de equipo */
-.card-price-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
-.card-price-chips .ppc {
-  font-size: 11.5px; font-weight: 600; color: var(--text2);
-  background: var(--bg1); border: 1px solid var(--border);
-  padding: 2px 7px; border-radius: 8px; white-space: nowrap;
+/* Variantes de precio en la tarjeta de equipo (estilo precio, no chips) */
+.card-price-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.card-price-variants { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.card-price-variants .cpv {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; font-size: .8rem;
 }
-.card-price-chips .ppc small { font-weight: 400; color: var(--text3); }
+.card-price-variants .cpv-lbl { color: var(--text2); }
+.card-price-variants .cpv-val {
+  font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.card-price-variants .cpv-val small { font-weight: 400; color: var(--text3); }
 .metodo-btn .mp-logo-ico, .metodo-btn2 .mp-logo-ico { height: 1.25em; vertical-align: -0.25em; }
 .metodo-efec   { color: #16a34a; }
 .metodo-transf { color: #2563eb; }
