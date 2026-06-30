@@ -719,6 +719,48 @@ function _movMatchesSearch(m) {
   return txt.includes(_movSearchQuery);
 }
 
+// Ícono, color y nombre corto de cada método de pago
+function _metodoInfo(metodo) {
+  const map = {
+    'Efectivo':        { icon: '💵', cls: 'metodo-efec',   short: 'Efectivo' },
+    'Transferencia':   { icon: '🏦', cls: 'metodo-transf', short: 'Transfer.' },
+    'MercadoPago':     { icon: '💙', cls: 'metodo-mp',     short: 'MercadoPago' },
+    'Tarjeta débito':  { icon: '💳', cls: 'metodo-tarj',   short: 'Débito' },
+    'Tarjeta crédito': { icon: '💳', cls: 'metodo-tarj',   short: 'Crédito' },
+  };
+  return map[metodo] || { icon: '💰', cls: 'metodo-otro', short: metodo || 'Efectivo' };
+}
+
+// Badge(s) de método para una tarjeta (contempla pago dividido)
+function _metodoBadges(m) {
+  const inf = _metodoInfo(m.metodoPago || 'Efectivo');
+  if (m.metodoPago2 && m.monto2) {
+    const inf2  = _metodoInfo(m.metodoPago2);
+    const parte1 = Math.round((Number(m.monto) || 0) - (Number(m.monto2) || 0));
+    return `<span class="mov-metodo-badge ${inf.cls}">${inf.icon} ${inf.short} $${parte1.toLocaleString('es-AR')}</span>`
+         + `<span class="mov-metodo-badge ${inf2.cls}">${inf2.icon} ${inf2.short} $${(Number(m.monto2)||0).toLocaleString('es-AR')}</span>`;
+  }
+  return `<span class="mov-metodo-badge ${inf.cls}">${inf.icon} ${inf.short}</span>`;
+}
+
+// Resumen del día por método de pago (solo ingresos, contempla splits)
+function _renderMetodoResumen() {
+  const tot = {};
+  MOVIMIENTOS.filter(m => m.tipo === 'ingreso').forEach(m => {
+    const monto = Number(m.monto) || 0;
+    const m2    = Number(m.monto2) || 0;
+    const met1  = m.metodoPago || 'Efectivo';
+    tot[met1] = (tot[met1] || 0) + (monto - m2);
+    if (m2 > 0 && m.metodoPago2) tot[m.metodoPago2] = (tot[m.metodoPago2] || 0) + m2;
+  });
+  const entries = Object.entries(tot).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) return '';
+  return `<div class="mov-metodo-resumen">` + entries.map(([met, v]) => {
+    const inf = _metodoInfo(met);
+    return `<span class="mov-mr-item ${inf.cls}">${inf.icon} ${inf.short} <b>${fmt(v)}</b></span>`;
+  }).join('') + `</div>`;
+}
+
 function renderMovimientos() {
   const list  = document.getElementById('caja-list');
   const empty = document.getElementById('caja-empty');
@@ -777,23 +819,25 @@ function renderMovimientos() {
     const hora = typeof m.createdAt === 'string'
       ? new Date(m.createdAt).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })
       : '';
-    const metodoStr = m.metodoPago2
-      ? `${m.metodoPago} $${Math.round(m.monto - (m.monto2||0)).toLocaleString('es-AR')} + ${m.metodoPago2} $${(m.monto2||0).toLocaleString('es-AR')}` // MED-07
-      : m.metodoPago;
-    const meta = [metodoStr, hora].filter(Boolean).join(' · ');
     const signo = m.tipo === 'ingreso' ? '+' : '−';
     return `
       <div class="mov-card mov-${esc(m.tipo)}" onclick="openMovForm('${esc(m.id)}')">
         <div class="caja-card-left">
           <span class="caja-cat">${esc(m.categoria || '')}</span>
           <span class="caja-desc">${esc(m.descripcion || '—')}</span>
-          <span class="caja-meta">${esc(meta)}</span>
+          <span class="caja-meta">${_metodoBadges(m)}${hora ? `<span class="mov-hora">${hora}</span>` : ''}</span>
         </div>
         <div class="caja-card-right">
           <span class="caja-monto mov-${esc(m.tipo)}">${signo}${fmt(m.monto)}</span>
         </div>
       </div>`;
   }).join('');
+
+  // Resumen del día por método arriba de la lista (solo sin filtro activo)
+  if (!isFiltering) {
+    const resumen = _renderMetodoResumen();
+    if (resumen) list.insertAdjacentHTML('afterbegin', resumen);
+  }
 }
 
 function _renderTurnoSep(c) {

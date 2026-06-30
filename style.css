@@ -5338,6 +5338,33 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
 .ajuste-pct-chip:hover { background: var(--hover); }
 .ajuste-pct-chip:active { transform: scale(.96); }
 
+/* ── Badges de método de pago en la lista de caja ── */
+.caja-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.mov-metodo-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.mov-hora { font-size: 11px; color: var(--text3); }
+.metodo-efec   { color: #16a34a; }
+.metodo-transf { color: #2563eb; }
+.metodo-mp     { color: #0ea5e9; }
+.metodo-tarj   { color: #9333ea; }
+.metodo-otro   { color: var(--text2); }
+/* Resumen del día por método */
+.mov-metodo-resumen {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 4px 2px 12px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.mov-mr-item {
+  font-size: 12px; font-weight: 600;
+  padding: 5px 10px; border-radius: 10px;
+  border: 1px solid currentColor;
+}
+.mov-mr-item b { font-weight: 800; margin-left: 2px; }
+
 .mov-desc-suggest {
  position: absolute;
  top: calc(100% + 4px); left: 0; right: 0;
