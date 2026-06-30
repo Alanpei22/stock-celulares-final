@@ -1118,6 +1118,11 @@ function openMovForm(id) {
 
   overlay.classList.remove('hidden');
   modal.classList.remove('hidden');
+
+  // Al crear una venta, enfocar el buscador para escribir el artículo directo
+  if (!editingMovId) {
+    setTimeout(() => document.getElementById('mov-fi-desc')?.focus(), 250);
+  }
 }
 
 function closeMovForm() {
@@ -1316,6 +1321,18 @@ function _initMovDescAutocomplete() {
   input.addEventListener('blur', () => setTimeout(_hideMovSuggestions, 300));
   input.addEventListener('keydown', e => {
     if (e.key === 'Escape') _hideMovSuggestions();
+    else if (e.key === 'Enter') {
+      // Enter confirma el artículo: agrega la primera sugerencia, o lo carga como producto libre
+      const drop = document.getElementById('mov-desc-suggest');
+      const visible = drop && !drop.classList.contains('hidden');
+      if (visible && drop._results && drop._results.length) {
+        e.preventDefault();
+        _selectMovSuggestion(0);
+      } else if (input.value.trim()) {
+        e.preventDefault();
+        _addFreeFromSearch();
+      }
+    }
   });
 }
 
