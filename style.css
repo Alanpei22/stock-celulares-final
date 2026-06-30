@@ -5346,8 +5346,16 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
   padding: 2px 8px; border-radius: 999px;
   border: 1px solid currentColor;
 }
-.mov-hora { font-size: 11px; color: var(--text3); }
+.mov-hora { font-size: 13px; font-weight: 600; color: var(--text2); }
 .mp-logo-ico { height: 1.1em; width: auto; vertical-align: -0.2em; display: inline-block; }
+/* Variantes de precio en la tarjeta de equipo */
+.card-price-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.card-price-chips .ppc {
+  font-size: 11.5px; font-weight: 600; color: var(--text2);
+  background: var(--bg1); border: 1px solid var(--border);
+  padding: 2px 7px; border-radius: 8px; white-space: nowrap;
+}
+.card-price-chips .ppc small { font-weight: 400; color: var(--text3); }
 .metodo-btn .mp-logo-ico, .metodo-btn2 .mp-logo-ico { height: 1.25em; vertical-align: -0.25em; }
 .metodo-efec   { color: #16a34a; }
 .metodo-transf { color: #2563eb; }

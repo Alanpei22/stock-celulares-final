@@ -966,6 +966,7 @@ function render() {
             ? `U$D ${p.precioUSD.toLocaleString('es-AR')}${p.precio ? `<span class="card-usd">≈ $${p.precio.toLocaleString('es-AR')}</span>` : ''}`
             : p.precio ? '$ ' + p.precio.toLocaleString('es-AR') + (usdVal ? `<span class="card-usd">U$D ${usdVal.toLocaleString('es-AR')}</span>` : '') : '—'
           }</span>
+          ${!p.vendido && p.precio ? buildPriceChips(p.precio) : ''}
           <div class="card-meta">
             ${p.imei ? `<span class="card-imei">🔑 ${esc(p.imei)}</span>` : ''}
             ${dateLabel}
@@ -1230,6 +1231,20 @@ function _updateBateriaVisibility(marca) {
   const wrap = document.getElementById('fi-bateria-wrap');
   if (!wrap) return;
   wrap.style.display = (/iphone/i.test(marca) || /apple/i.test(marca)) ? '' : 'none';
+}
+
+// Versión compacta para la tarjeta del equipo (transferencia + cuotas)
+function buildPriceChips(precio) {
+  if (!precio) return '';
+  const f = n => '$' + Math.round(n).toLocaleString('es-AR');
+  const transfer = Math.round(precio * (1 + (PRICES.transfer || 0) / 100));
+  const c3 = Math.round(precio * (1 + (PRICES.c3 || 0) / 100));
+  const c6 = Math.round(precio * (1 + (PRICES.c6 || 0) / 100));
+  return `<div class="card-price-chips">
+    <span class="ppc">🏦 ${f(transfer)}</span>
+    <span class="ppc">3c ${f(c3 / 3)}<small>/c</small></span>
+    <span class="ppc">6c ${f(c6 / 6)}<small>/c</small></span>
+  </div>`;
 }
 
 function buildPriceTable(precio) {
