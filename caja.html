@@ -79,6 +79,7 @@
       <div class="desglose-item"><span class="desglose-num" id="desglose-reparac">$0</span><span class="desglose-lbl">🔧 Reparac.</span></div>
       <div class="desglose-item"><span class="desglose-num desglose-num--gasto" id="desglose-gastos">$0</span><span class="desglose-lbl">💸 Gastos</span></div>
       <div class="desglose-item" id="desglose-retiros-wrap" style="display:none"><span class="desglose-num desglose-num--retiro" id="desglose-retiros">$0</span><span class="desglose-lbl">🏧 Retiro</span></div>
+      <div class="desglose-item" id="desglose-usd-wrap" style="display:none"><span class="desglose-num desglose-num--usd" id="desglose-usd">u$ 0</span><span class="desglose-lbl">💲 Dólares</span></div>
     </div>
   </div>
 
@@ -369,6 +370,10 @@
       <span>📊 Diferencia</span>
       <span id="cierre-dif-val" class="cierre-dif-val dif-ok">$0</span>
     </div>
+    <div class="cierre-resumen-row" id="cierre-usd-row" style="display:none">
+      <span>💲 Dólares en caja <small>(aparte)</small></span>
+      <span id="cierre-usd-val" class="arqueo-total-num">u$ 0</span>
+    </div>
   </div>
   <div class="nota-modal-btns">
     <button class="btn-nota-save" onclick="saveCierre()" style="width:100%">🔐 Confirmar cierre</button>
@@ -445,6 +450,7 @@
       <button class="metodo-btn" data-m="MercadoPago" onclick="selectMetodo('MercadoPago')"><img src="mp-logo.png" class="mp-logo-ico" alt=""> MercadoPago</button>
       <button class="metodo-btn" data-m="Tarjeta débito" onclick="selectMetodo('Tarjeta débito')">💳 Débito</button>
       <button class="metodo-btn" data-m="Tarjeta crédito" onclick="selectMetodo('Tarjeta crédito')">💳 Crédito</button>
+      <button class="metodo-btn" data-m="Dólares" onclick="selectMetodo('Dólares')">💲 Dólares</button>
     </div>
     <!-- Split section -->
     <div id="split-section" class="split-section hidden">
@@ -481,6 +487,27 @@
       <div class="vuelto-row vuelto-result-row">
         <span class="vuelto-lbl">Vuelto</span>
         <span id="vuelto-val" class="vuelto-val">$0</span>
+      </div>
+    </div>
+    <!-- Dólares (solo método Dólares) -->
+    <div id="mov-dolares-section" class="dolares-section hidden">
+      <div class="dolares-row">
+        <span class="dolares-lbl">💲 Dólares recibidos</span>
+        <div class="dolares-input-wrap">
+          <span class="dolares-prefix">u$</span>
+          <input id="mov-fi-usd" class="dolares-input" type="number" placeholder="0" min="0" inputmode="numeric" oninput="_onUsdInput()">
+        </div>
+      </div>
+      <div class="dolares-row dolares-equiv-row">
+        <span class="dolares-lbl">Equivale a <small id="mov-usd-dolar"></small></span>
+        <span id="mov-usd-ars" class="dolares-equiv">$0</span>
+      </div>
+      <div class="dolares-row">
+        <span class="dolares-lbl">↩️ Vuelto en pesos <small>(sale de la caja)</small></span>
+        <div class="dolares-input-wrap">
+          <span class="dolares-prefix">$</span>
+          <input id="mov-fi-vuelto-pesos" class="dolares-input" type="number" placeholder="0" min="0" inputmode="numeric" oninput="_updateMovResumen()">
+        </div>
       </div>
     </div>
   </div>

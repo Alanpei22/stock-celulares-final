@@ -5368,6 +5368,27 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
 .metodo-mp     { color: #0ea5e9; }
 .metodo-tarj   { color: #9333ea; }
 .metodo-otro   { color: var(--text2); }
+.metodo-usd    { color: #059669; }
+.desglose-num--usd { color: #059669; }
+/* Sección Dólares en el cobro */
+.dolares-section {
+  margin-top: 12px; padding: 12px; border-radius: var(--radius-sm);
+  background: rgba(5,150,105,0.08); border: 1px solid rgba(5,150,105,0.3);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.dolares-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dolares-lbl { font-size: 13px; color: var(--text); font-weight: 600; }
+.dolares-lbl small { font-weight: 400; color: var(--text3); }
+.dolares-input-wrap {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 10px; min-width: 120px;
+}
+.dolares-prefix { color: var(--text2); font-weight: 700; }
+.dolares-input { border: none; background: transparent; color: var(--text);
+  font-size: 16px; font-weight: 700; width: 100%; text-align: right; outline: none; }
+.dolares-equiv-row { padding: 0 2px; }
+.dolares-equiv { font-size: 15px; font-weight: 700; color: #059669; }
 /* Resumen del día por método */
 .mov-metodo-resumen {
   display: flex; flex-wrap: wrap; gap: 6px;

@@ -535,10 +535,21 @@ function _efecMonto(m) {
   // Defensivo: metodoPago vacío/undefined → tratar como Efectivo (movimientos viejos sin el campo)
   const met1 = m.metodoPago || 'Efectivo';
   const met2 = m.metodoPago2 || '';
+  // Dólares: no entra a la caja de pesos; solo el vuelto en pesos SALE de la caja
+  if (met1 === 'Dólares') return -(Number(m.vueltoPesos) || 0);
   if (met1 === 'Efectivo' && met2) return total - m2amt;
   if (met1 === 'Efectivo') return total;
   if (met2 === 'Efectivo') return m2amt;
   return 0;
+}
+
+// Dólares en caja (suma los montoUSD de ingresos pagados en dólares, resta egresos)
+function _usdEnCaja() {
+  return MOVIMIENTOS.reduce((s, m) => {
+    if (m.metodoPago !== 'Dólares') return s;
+    const usd = Number(m.montoUSD) || 0;
+    return s + (m.tipo === 'ingreso' ? usd : -usd);
+  }, 0);
 }
 
 function renderStats() {
@@ -580,7 +591,17 @@ function renderStats() {
   // Desglose del día — usa _efecMonto para respetar el split
   const reparac   = ingMovs.filter(m => m.categoria === 'Reparación').reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const ventaEfec = ingMovs.filter(m => m.categoria !== 'Reparación').reduce((s, m) => s + _efecMonto(m), 0);
-  const digital   = ingMovs.reduce((s, m) => s + ((Number(m.monto) || 0) - _efecMonto(m)), 0);
+  // Digital = no efectivo, excluyendo dólares (los dólares van a su propia caja)
+  const digital   = ingMovs.filter(m => m.metodoPago !== 'Dólares')
+                           .reduce((s, m) => s + ((Number(m.monto) || 0) - _efecMonto(m)), 0);
+  // Dólares en caja (en u$)
+  const usdCaja = _usdEnCaja();
+  const usdWrap = document.getElementById('desglose-usd-wrap');
+  if (usdWrap) {
+    usdWrap.style.display = usdCaja !== 0 ? '' : 'none';
+    const usdEl = document.getElementById('desglose-usd');
+    if (usdEl) usdEl.textContent = 'u$ ' + Math.round(usdCaja).toLocaleString('es-AR');
+  }
   const totalRetiros = retiros.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   set('desglose-efectivo', ventaEfec);
   set('desglose-digital', digital);
@@ -731,6 +752,7 @@ function _metodoInfo(metodo) {
     'MercadoPago':     { icon: '<img src="mp-logo.png" class="mp-logo-ico" alt="">', cls: 'metodo-mp', short: 'MercadoPago' },
     'Tarjeta débito':  { icon: '💳', cls: 'metodo-tarj',   short: 'Débito' },
     'Tarjeta crédito': { icon: '💳', cls: 'metodo-tarj',   short: 'Crédito' },
+    'Dólares':         { icon: '💲', cls: 'metodo-usd',    short: 'Dólares' },
   };
   return map[metodo] || { icon: '💰', cls: 'metodo-otro', short: metodo || 'Efectivo' };
 }
@@ -738,6 +760,12 @@ function _metodoInfo(metodo) {
 // Badge(s) de método para una tarjeta (contempla pago dividido)
 function _metodoBadges(m) {
   const inf = _metodoInfo(m.metodoPago || 'Efectivo');
+  if (m.metodoPago === 'Dólares') {
+    const usd = Number(m.montoUSD) || 0;
+    const vuelto = Number(m.vueltoPesos) || 0;
+    return `<span class="mov-metodo-badge ${inf.cls}">${inf.icon} u$${usd.toLocaleString('es-AR')}</span>`
+         + (vuelto > 0 ? `<span class="mov-metodo-badge metodo-otro">↩️ vuelto $${vuelto.toLocaleString('es-AR')}</span>` : '');
+  }
   if (m.metodoPago2 && m.monto2) {
     const inf2  = _metodoInfo(m.metodoPago2);
     const parte1 = Math.round((Number(m.monto) || 0) - (Number(m.monto2) || 0));
@@ -1103,6 +1131,22 @@ function openMovForm(id) {
   if (recibidoEl) recibidoEl.value = '';
   const vueltoVal = document.getElementById('vuelto-val');
   if (vueltoVal) { vueltoVal.textContent = '$0'; vueltoVal.className = 'vuelto-val'; }
+  // Reset / carga de la sección Dólares
+  const dolSec = document.getElementById('mov-dolares-section');
+  if (dolSec) dolSec.classList.add('hidden');
+  const usdEl = document.getElementById('mov-fi-usd');
+  const vpEl  = document.getElementById('mov-fi-vuelto-pesos');
+  if (usdEl) usdEl.value = '';
+  if (vpEl)  vpEl.value = '';
+  if (id) {
+    const m = MOVIMIENTOS.find(x => x.id === id);
+    if (m && m.metodoPago === 'Dólares') {
+      if (usdEl) usdEl.value = m.montoUSD || '';
+      if (vpEl)  vpEl.value = m.vueltoPesos || '';
+      selectMetodo('Dólares');
+      _onUsdInput();
+    }
+  }
 
   // Auto-clear error on input
   document.getElementById('mov-fi-monto').oninput = () => {
@@ -1178,6 +1222,7 @@ function selectMetodo(metodo) {
   if (hidden) hidden.value = metodo;
   updateSplitRemainder();
   _updateMovResumen();
+  const esDolares = metodo === 'Dólares';
   // Mostrar calculadora de vuelto solo si es efectivo y no hay split
   const vueltoSec = document.getElementById('vuelto-section');
   if (vueltoSec) {
@@ -1185,6 +1230,39 @@ function selectMetodo(metodo) {
     vueltoSec.classList.toggle('hidden', metodo !== 'Efectivo' || splitActivo);
     if (metodo !== 'Efectivo') { document.getElementById('mov-recibido').value = ''; document.getElementById('vuelto-val').textContent = '$0'; }
   }
+  // Sección Dólares
+  const dolSec = document.getElementById('mov-dolares-section');
+  if (dolSec) {
+    dolSec.classList.toggle('hidden', !esDolares);
+    if (esDolares) {
+      const d = _dolarActual();
+      const dEl = document.getElementById('mov-usd-dolar');
+      if (dEl) dEl.textContent = d > 0 ? `(dólar $${d.toLocaleString('es-AR')})` : '(⚠️ cargá el dólar del día)';
+      setTimeout(() => document.getElementById('mov-fi-usd')?.focus(), 100);
+    } else {
+      document.getElementById('mov-fi-usd').value = '';
+      document.getElementById('mov-fi-vuelto-pesos').value = '';
+    }
+  }
+  // Dólares no admite pago dividido
+  if (esDolares && _splitActive) resetSplit();
+}
+
+function _dolarActual() {
+  if (typeof dolarBlue === 'number' && dolarBlue > 0) return dolarBlue;
+  return (typeof getCurrentDolar === 'function' ? (getCurrentDolar() || 0) : 0);
+}
+
+// Al tipear los dólares, calcula el equivalente en pesos y lo pone como monto
+function _onUsdInput() {
+  const usd = parseFloat(document.getElementById('mov-fi-usd')?.value) || 0;
+  const d   = _dolarActual();
+  const ars = Math.round(usd * d);
+  const montoEl = document.getElementById('mov-fi-monto');
+  if (montoEl) montoEl.value = ars > 0 ? ars : '';
+  const arsEl = document.getElementById('mov-usd-ars');
+  if (arsEl) arsEl.textContent = '$' + ars.toLocaleString('es-AR');
+  _updateMovResumen();
 }
 
 function calcVuelto() {
@@ -1883,6 +1961,14 @@ async function saveMov() {
     data.metodoPago2 = metodo2;
     data.monto2 = splitAmt;
   }
+  // ── Pago en Dólares: guardar los u$ recibidos, el vuelto en pesos y el dólar del día ──
+  if (metodoPago === 'Dólares') {
+    const usd    = parseFloat(document.getElementById('mov-fi-usd')?.value) || 0;
+    const vuelto = parseFloat(document.getElementById('mov-fi-vuelto-pesos')?.value) || 0;
+    data.montoUSD = usd;
+    data.vueltoPesos = vuelto;
+    data.dolarSnapshot = _dolarActual();
+  }
   // ── Cliente opcional (solo ventas): se guarda en el movimiento y alimenta el CRM ──
   if (tipo === 'ingreso') {
     const cliTel = document.getElementById('mov-cliente-tel')?.value.trim() || '';
@@ -2383,6 +2469,14 @@ function updateCierreTotal() {
   const dif = contado - esperado;
   document.getElementById('cierre-esperado-val').textContent = fmt(esperado);
   document.getElementById('cierre-contado-val').textContent  = fmt(contado);
+  // Dólares en caja (aparte del efectivo en pesos)
+  const usdCaja = _usdEnCaja();
+  const usdRow = document.getElementById('cierre-usd-row');
+  if (usdRow) {
+    usdRow.style.display = usdCaja !== 0 ? '' : 'none';
+    const usdValEl = document.getElementById('cierre-usd-val');
+    if (usdValEl) usdValEl.textContent = 'u$ ' + Math.round(usdCaja).toLocaleString('es-AR');
+  }
   const difEl = document.getElementById('cierre-dif-val');
   if (difEl) {
     difEl.textContent = (dif >= 0 ? '+' : '') + '$' + dif.toLocaleString('es-AR');
