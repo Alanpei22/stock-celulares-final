@@ -1,4 +1,4 @@
-const CACHE = 'cel-v81';
+const CACHE = 'cel-v82';
 const SHELL = ['manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'mp-logo.png'];
 
 self.addEventListener('install', e => {

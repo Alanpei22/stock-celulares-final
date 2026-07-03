@@ -531,6 +531,7 @@ function toggleHdrMenu() {
     { icon: '📊', label: 'Estadísticas', onClick: () => document.getElementById('stats-btn')?.click() },
     { icon: '⚙️', label: 'Configuración', onClick: () => document.getElementById('settings-btn')?.click() },
     { icon: '💾', label: 'Exportar stock', onClick: () => document.getElementById('export-btn')?.click() },
+    { icon: '🛟', label: 'Descargar backup', onClick: downloadBackup },
     { divider: true },
     { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
   ]);
@@ -1832,6 +1833,67 @@ function renderStatsEntradas() {
 // ── Export / Import ───────────────────────────────────────
 function openExport() { document.getElementById('export-modal').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
 function closeExport() { document.getElementById('export-modal').classList.add('hidden'); document.body.style.overflow = ''; }
+
+// ── Backup completo descargable (protegido con PIN de dueño) ──
+function downloadBackup() {
+  if (typeof requireOwnerPin === 'function') {
+    requireOwnerPin(_doDownloadBackup, 'PIN de dueño para descargar el backup');
+  } else {
+    _doDownloadBackup();
+  }
+}
+
+async function _doDownloadBackup() {
+  if (!db) { toast('Sin conexión a la base', 'error'); return; }
+  // caja_movimientos: solo los últimos 12 meses (el resto puede ser mucho)
+  const hace12m = new Date(); hace12m.setMonth(hace12m.getMonth() - 12);
+  const fecha12m = hace12m.toISOString().slice(0, 10);
+  const cols = [
+    { name: 'repairs' },
+    { name: 'stock' },
+    { name: 'productos' },
+    { name: 'repuestos' },
+    { name: 'clientes' },
+    { name: 'caja_movimientos', where: ['fecha', '>=', fecha12m] },
+    { name: 'precios_reparaciones' },
+    { name: 'caja_dueno_movimientos' },
+  ];
+
+  toast('🛟 Generando backup…', 'info');
+  const backup = { _meta: { app: 'TechPoint', generado: new Date().toISOString(), version: 1 } };
+  let totalDocs = 0;
+  try {
+    for (const c of cols) {
+      // .get() UNA sola vez por colección (nada de listeners) para no gastar cuota
+      let q = db.collection(c.name);
+      if (c.where) q = q.where(c.where[0], c.where[1], c.where[2]);
+      const snap = await q.get();
+      backup[c.name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      totalDocs += snap.size;
+    }
+  } catch (e) {
+    console.error('backup:', e);
+    toast(e?.code === 'resource-exhausted'
+      ? '⚠️ Cupo de Firebase agotado, probá más tarde'
+      : 'Error generando el backup', 'error');
+    return;
+  }
+
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const hoy = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backup-techpoint-${hoy}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+  const mb = (blob.size / 1048576).toFixed(1);
+  toast(`✅ Backup descargado — ${totalDocs} registros · ${mb} MB`, 'success');
+}
 
 function exportCSV() {
   const headers = ['Marca','Modelo','Estado','Precio','Almacenamiento','RAM','IMEI','Notas','Fecha Ingreso','Vendido','Fecha Venta','Vendedor','Forma de Pago'];
