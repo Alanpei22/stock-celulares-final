@@ -702,6 +702,7 @@ function _renderModeloDetail() {
         <span class="rep-detail-model-ico">📱</span>
         <span class="rep-detail-model-name">${_escP(equipo)}</span>
       </div>
+      <button class="rep-detail-del" onclick="_copiarModeloPrecios('${_escP(equipo)}')" title="Copiar estos precios a otro modelo">📋</button>
       <button class="rep-detail-del" onclick="_deleteModeloComplete('${_escP(equipo)}')" title="Eliminar modelo">🗑</button>
     </div>
 
@@ -989,6 +990,72 @@ async function _deleteModeloComplete(equipo) {
     requireCajaOwnerPin(doDelete, 'PIN de dueño para eliminar el modelo');
   } else {
     doDelete();
+  }
+}
+
+// ── Copiar los precios de un modelo a otro nuevo ──
+// Clave para no duplicar: misma categoría + calidad + tipo de variante.
+function _copiarPrecioKey(p) {
+  return [p.tipo || '', p.calidad || '', p.tipoVariante || ''].join('||');
+}
+
+async function _copiarModeloPrecios(origen) {
+  const items = PRECIOS.filter(p => p.equipo === origen);
+  if (!items.length) { toast('Este modelo no tiene precios para copiar', 'info'); return; }
+
+  const destino = (prompt(`Copiar los ${items.length} precios de "${origen}" a qué modelo?\n\nEj: si "${origen}" es un iPhone 14, poné "iPhone 15".`, '') || '').trim();
+  if (!destino) return;
+  if (destino.toLowerCase() === origen.toLowerCase()) {
+    toast('El modelo destino tiene que ser distinto al origen', 'error');
+    return;
+  }
+
+  // Evitar duplicar lo que el destino ya tenga (misma categoría/calidad/variante)
+  const yaTiene = new Set(PRECIOS.filter(p => p.equipo === destino).map(_copiarPrecioKey));
+  const aCopiar = items.filter(p => !yaTiene.has(_copiarPrecioKey(p)));
+  const salteados = items.length - aCopiar.length;
+
+  if (!aCopiar.length) {
+    toast(`"${destino}" ya tiene todos esos precios cargados`, 'info');
+    return;
+  }
+
+  const doCopy = async () => {
+    let msg = `¿Copiar ${aCopiar.length} precio${aCopiar.length !== 1 ? 's' : ''} de "${origen}" a "${destino}"?`;
+    if (salteados > 0) msg += `\n\n(${salteados} ya existían en "${destino}" y se saltean)`;
+    if (!confirm(msg)) return;
+    try {
+      const ahora = new Date().toISOString();
+      let batch = db.batch(), n = 0;
+      for (const p of aCopiar) {
+        const nuevo = {
+          tipo: p.tipo || '',
+          equipo: destino,
+          precio: Number(p.precio) || 0,
+          nota: p.nota || '',
+          calidad: p.calidad || null,
+          tipoVariante: p.tipoVariante || null,
+          precioLista: (Number(p.precioLista) > 0) ? Number(p.precioLista) : null,
+          updatedAt: ahora,
+        };
+        batch.set(db.collection('precios_reparaciones').doc(), nuevo);
+        n++;
+        if (n >= 450) { await batch.commit(); batch = db.batch(); n = 0; }
+      }
+      if (n > 0) await batch.commit();
+      toast(`✅ ${aCopiar.length} precios copiados a "${destino}"`, 'success');
+    } catch (e) {
+      console.error('copiarModeloPrecios:', e);
+      toast(e?.code === 'resource-exhausted'
+        ? '⚠️ Cupo de Firebase agotado, probá más tarde'
+        : 'Error al copiar los precios', 'error');
+    }
+  };
+
+  if (typeof requireCajaOwnerPin === 'function') {
+    requireCajaOwnerPin(doCopy, 'PIN de dueño para copiar precios');
+  } else {
+    doCopy();
   }
 }
 
