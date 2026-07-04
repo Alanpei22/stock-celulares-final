@@ -1444,6 +1444,86 @@ function repairWhatsApp(id) {
   window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
+// ══════════════════════════════════════════
+//  GARANTÍAS ACTIVAS
+// ══════════════════════════════════════════
+function _normWaPhone(tlf) {
+  let phone = String(tlf || '').replace(/\D/g, '');
+  if (!phone) return '';
+  if (phone.length === 10)                              phone = '549' + phone;
+  else if (phone.length === 11 && phone.startsWith('0')) phone = '549' + phone.slice(1);
+  else if (!phone.startsWith('54'))                     phone = '549' + phone;
+  return phone;
+}
+
+// Reparaciones entregadas cuya garantía sigue vigente
+function _garantiasActivas() {
+  const hoy = Date.now();
+  const out = [];
+  REPAIRS.forEach(r => {
+    if (r.estado !== 'entregado') return;
+    const dias = Number(r.diasGarantia) || 0;
+    if (dias <= 0) return;
+    const base = r.fechaEntrega || r.fechaIngreso;
+    if (!base) return;
+    const venc = new Date(base).getTime() + dias * 86400000;
+    if (venc < hoy) return; // ya vencida
+    out.push({ ...r, _venc: venc });
+  });
+  out.sort((a, b) => a._venc - b._venc); // las más próximas a vencer primero
+  return out;
+}
+
+function openGarantiasModal() {
+  const lista = _garantiasActivas();
+  const body = document.getElementById('garantias-body');
+  const cnt  = document.getElementById('garantias-count');
+  if (cnt) cnt.textContent = lista.length ? `${lista.length} activa${lista.length !== 1 ? 's' : ''}` : '';
+  if (body) {
+    if (!lista.length) {
+      body.innerHTML = '<div class="rep-tab-empty" style="padding:24px"><span class="rep-empty-ico">🛡️</span><p>No hay garantías activas</p><p class="empty-sub">Aparecen las reparaciones entregadas con garantía vigente.</p></div>';
+    } else {
+      body.innerHTML = lista.map(r => {
+        const diasRest = Math.ceil((r._venc - Date.now()) / 86400000);
+        const vencStr = new Date(r._venc).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+        const urgente = diasRest <= 7;
+        const equipo = [r.marca, r.modelo].filter(Boolean).join(' ');
+        return `
+          <div class="gar-row">
+            <div class="gar-info">
+              <span class="gar-equipo">📱 ${esc(equipo)}${r.nombre ? ' · ' + esc(r.nombre) : ''}</span>
+              <span class="gar-venc${urgente ? ' gar-venc--urgente' : ''}">🛡️ Vence ${vencStr} · ${diasRest} día${diasRest !== 1 ? 's' : ''}</span>
+            </div>
+            ${r.tlf ? `<button class="gar-wa" onclick="_garantiaWA('${r.id}')" title="Avisar por WhatsApp">🟢</button>` : '<span class="gar-notel">sin tel</span>'}
+          </div>`;
+      }).join('');
+    }
+  }
+  document.getElementById('garantias-overlay')?.classList.remove('hidden');
+  document.getElementById('garantias-modal')?.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeGarantiasModal() {
+  document.getElementById('garantias-overlay')?.classList.add('hidden');
+  document.getElementById('garantias-modal')?.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function _garantiaWA(id) {
+  const r = REPAIRS.find(x => x.id === id);
+  if (!r || !r.tlf) { toast('No hay teléfono registrado', 'error'); return; }
+  const phone = _normWaPhone(r.tlf);
+  const nombre = r.nombre ? r.nombre.split(' ')[0] : '';
+  const dias = Number(r.diasGarantia) || 0;
+  const base = r.fechaEntrega || r.fechaIngreso;
+  const venc = new Date(new Date(base).getTime() + dias * 86400000);
+  const vencStr = venc.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const equipo = [r.marca, r.modelo].filter(Boolean).join(' ');
+  const msg = `Hola ${nombre}! 👋\nTe recordamos que tu *${equipo}* tiene garantía hasta el *${vencStr}* 🛡️\nCualquier inconveniente escribinos!`;
+  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
 // ── WhatsApp Presupuesto ──────────────────
 function sendPresupuestoWA(id) {
   const r = REPAIRS.find(x => x.id === id);

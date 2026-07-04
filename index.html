@@ -154,6 +154,7 @@
               <button class="hdr-drop-item" id="rep-staff-btn" onclick="openStaffModal();closeRepMenu()">👥 Personal</button>
               <button class="hdr-drop-item" id="rep-stats-btn" onclick="closeRepMenu()">📊 Estadísticas</button>
               <button class="hdr-drop-item" onclick="openActividadModal();closeRepMenu()">📋 Actividad</button>
+              <button class="hdr-drop-item" onclick="openGarantiasModal();closeRepMenu()">🛡️ Garantías activas</button>
               <button class="hdr-drop-item hdr-btn--wa" onclick="sendPendingWA();closeRepMenu()">🟢 WA pendientes</button>
               <div class="hdr-drop-sep"></div>
               <button class="hdr-drop-item" id="rep-import-btn" onclick="closeRepMenu()">💾 Importar historial</button>
@@ -1919,6 +1920,17 @@
 
 
 <!-- ── MODAL ACTIVIDAD ── -->
+<div class="modal-overlay hidden" id="garantias-overlay" onclick="if(event.target.id==='garantias-overlay')closeGarantiasModal()"></div>
+<div class="modal-overlay hidden" id="garantias-modal">
+  <div class="modal-card actividad-card">
+    <div class="modal-header">
+      <h3>🛡️ Garantías activas <span id="garantias-count" class="gar-count"></span></h3>
+      <button class="modal-close" onclick="closeGarantiasModal()">✕</button>
+    </div>
+    <div id="garantias-body" class="garantias-body"></div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="actividad-modal" onclick="if(event.target.id==='actividad-modal')closeActividadModal()">
   <div class="modal-card actividad-card">
     <div class="modal-header">

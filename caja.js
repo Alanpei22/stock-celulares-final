@@ -5,6 +5,7 @@
 // Firebase — ver firebase-config.js
 
 const DENOMINACIONES = [20000, 10000, 2000, 1000, 500, 200, 100];
+const DENOMINACIONES_USD = [100, 50, 20, 10, 5, 1];
 
 const CATEGORIAS = {
   ingreso: ['Venta equipo', 'Reparación', 'Venta producto', 'Hidrogel / Accesorio', 'Seña', 'Otro ingreso'],
@@ -2327,6 +2328,22 @@ function openCierreModal() {
       if (inp) inp.value = CIERRE.billetes[d] || 0;
     });
   }
+  // Arqueo de dólares (solo si hay u$ en caja)
+  const usdArqueo = document.getElementById('cierre-usd-arqueo');
+  if (usdArqueo) {
+    const hayUsd = _usdEnCaja() > 0;
+    usdArqueo.style.display = hayUsd ? '' : 'none';
+    if (hayUsd) {
+      document.getElementById('cierre-usd-billetes').innerHTML = renderCierreUsdRows();
+      if (CIERRE && CIERRE.usdBilletes) {
+        DENOMINACIONES_USD.forEach(d => {
+          const inp = document.getElementById('cierre-usd-b-' + d);
+          if (inp) inp.value = CIERRE.usdBilletes[d] || 0;
+        });
+      }
+      updateCierreUsdTotal();
+    }
+  }
   updateCierreTotal();
   document.getElementById('cierre-overlay').classList.remove('hidden');
   document.getElementById('cierre-modal').classList.remove('hidden');
@@ -2355,6 +2372,49 @@ function changeCierreBillete(d, delta) {
   if (!inp) return;
   inp.value = Math.max(0, (parseInt(inp.value) || 0) + delta);
   updateCierreTotal();
+}
+
+// ── Arqueo de billetes en dólares (opcional, solo si hay u$ en caja) ──
+function renderCierreUsdRows() {
+  return DENOMINACIONES_USD.map(d => `
+    <div class="arqueo-row">
+      <span class="arqueo-denom">u$${d}</span>
+      <div class="arqueo-counter">
+        <button class="arqueo-btn" onclick="changeCierreUsdBillete(${d},-1)">−</button>
+        <input class="arqueo-input" id="cierre-usd-b-${d}" type="number" value="0" min="0" inputmode="numeric" oninput="updateCierreUsdTotal()">
+        <button class="arqueo-btn" onclick="changeCierreUsdBillete(${d},1)">+</button>
+      </div>
+      <span class="arqueo-subtotal" id="cierre-usd-s-${d}">u$0</span>
+    </div>`).join('');
+}
+
+function changeCierreUsdBillete(d, delta) {
+  const inp = document.getElementById('cierre-usd-b-' + d);
+  if (!inp) return;
+  inp.value = Math.max(0, (parseInt(inp.value) || 0) + delta);
+  updateCierreUsdTotal();
+}
+
+function updateCierreUsdTotal() {
+  const esperado = _usdEnCaja();
+  let contado = 0;
+  DENOMINACIONES_USD.forEach(d => {
+    const inp = document.getElementById('cierre-usd-b-' + d);
+    const cant = inp ? (parseInt(inp.value) || 0) : 0;
+    const sub = cant * d;
+    contado += sub;
+    const subEl = document.getElementById('cierre-usd-s-' + d);
+    if (subEl) subEl.textContent = 'u$' + sub.toLocaleString('es-AR');
+  });
+  const contEl = document.getElementById('cierre-usd-contado-val');
+  if (contEl) contEl.textContent = 'u$ ' + contado.toLocaleString('es-AR');
+  const dif = contado - esperado;
+  const difEl = document.getElementById('cierre-usd-dif-val');
+  if (difEl) {
+    difEl.textContent = (dif >= 0 ? '+' : '') + 'u$' + dif.toLocaleString('es-AR');
+    difEl.className = 'cierre-dif-val ' + (dif === 0 ? 'dif-ok' : 'dif-warn');
+  }
+  return contado;
 }
 
 // ══════════════════════════════════════════
@@ -2520,12 +2580,31 @@ async function saveCierre() {
     if (!ok) return;
   }
 
+  // Arqueo de dólares (solo si hay u$ en caja)
+  const usdBilletes = {};
+  let usdContado = 0;
+  const usdEsperado = _usdEnCaja();
+  if (usdEsperado > 0) {
+    DENOMINACIONES_USD.forEach(d => {
+      const inp = document.getElementById('cierre-usd-b-' + d);
+      const cant = inp ? (parseInt(inp.value) || 0) : 0;
+      usdBilletes[d] = cant;
+      usdContado += cant * d;
+    });
+  }
+
   try {
-    await db.collection('caja_cierres').doc(currentDate).set({
+    const cierreData = {
       fecha: currentDate, billetes, contado, esperado, diferencia,
       savedAt: new Date().toISOString()
-    });
-    CIERRE = { billetes, contado, esperado, diferencia };
+    };
+    if (usdEsperado > 0) {
+      cierreData.usdBilletes = usdBilletes;
+      cierreData.usdContado = usdContado;
+      cierreData.usdEsperado = usdEsperado;
+    }
+    await db.collection('caja_cierres').doc(currentDate).set(cierreData);
+    CIERRE = { billetes, contado, esperado, diferencia, usdBilletes, usdContado };
     closeCierreModal();
     renderCierreStatus();
     const difStr = diferencia === 0
