@@ -34,13 +34,39 @@ window._repairsCleanup = function() {
 };
 
 // ── Firebase ──────────────────────────────
+const _REP_CACHE_KEY = 'repairsCache';
+
+// Guarda una copia liviana (sin fotos base64) en localStorage para pintar al instante
+function _cacheRepairs() {
+  try {
+    const liviano = REPAIRS.map(({ foto, patronImg, ...r }) => r);
+    localStorage.setItem(_REP_CACHE_KEY, JSON.stringify(liviano));
+  } catch { /* quota / modo privado: seguimos sin cache */ }
+}
+
+// Pinta la lista desde el cache local ANTES de que llegue Firestore (0ms percibidos)
+function _hydrateRepairsFromCache() {
+  if (REPAIRS.length) return;
+  try {
+    const cached = localStorage.getItem(_REP_CACHE_KEY);
+    if (!cached) return;
+    const parsed = JSON.parse(cached);
+    if (Array.isArray(parsed) && parsed.length) {
+      REPAIRS = parsed;
+      REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
+      if (typeof renderRepairs === 'function') renderRepairs();
+    }
+  } catch { /* cache corrupto: se ignora, llega Firestore igual */ }
+}
+
 function listenRepairs() {
   // Evitar listeners duplicados
   if (_repairsListener) { _repairsListener(); _repairsListener = null; }
 
-  // Limitar a 365 días: cubre estadísticas anuales y no lee toda la historia
+  // 120 días cubre el día a día. Las estadísticas del año se piden on-demand
+  // (loadAllRepairsHistory) para que el primer load sea liviano y rápido.
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 365);
+  cutoff.setDate(cutoff.getDate() - 120);
   const cutoffISO = cutoff.toISOString();
 
   _repairsListener = db.collection('repairs')
@@ -49,6 +75,7 @@ function listenRepairs() {
       _repairsLoaded = true;
       REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
+      _cacheRepairs();
       renderRepairs();
       if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
       else if (typeof renderDashFollowUps === 'function') renderDashFollowUps();
@@ -58,10 +85,14 @@ function listenRepairs() {
     });
 }
 
-// Carga histórico completo (solo cuando se pide explícitamente, ej: estadísticas anuales)
+// Carga histórico completo (solo cuando se pide explícitamente, ej: estadísticas anuales).
+// Se cachea en memoria por sesión para no re-leer toda la historia cada vez.
+let _fullHistoryCache = null;
 async function loadAllRepairsHistory() {
+  if (_fullHistoryCache) return _fullHistoryCache;
   const snap = await db.collection('repairs').orderBy('fechaIngreso', 'desc').get();
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  _fullHistoryCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return _fullHistoryCache;
 }
 
 // ── Init ──────────────────────────────────
@@ -132,6 +163,7 @@ function initRepairs() {
   loadStaff();
   loadCustomMarcas();
   loadWaNotifyNumber();
+  _hydrateRepairsFromCache(); // pinta la lista al instante desde el cache local
   listenRepairs();
 
   // Cerrar modales con ESC (repairs) — LOW-12: store reference to allow removal
@@ -1922,22 +1954,41 @@ let repStatsTab = 'mes';
 
 function openRepairStats() {
   repStatsTab = 'mes';
+  _statsSource = null; // 'mes' entra en los 120 días → usa REPAIRS (instantáneo)
   _renderStatsPeriodBar('mes');
   document.getElementById('rep-stats-body').innerHTML = buildRepairStatsHTML('mes');
   document.getElementById('rep-stats-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
 
+// Tabs cuyo período (o su comparación "vs anterior") supera los 120 días
+// del listener → necesitan el histórico completo.
+const _STATS_TABS_FULL = new Set(['ult-90', 'anual']);
+
 function closeRepairStats() {
   document.getElementById('rep-stats-modal').classList.add('hidden');
   document.body.style.overflow = '';
 }
 
-function switchRepairStatsTab(tab) {
+async function switchRepairStatsTab(tab) {
   repStatsTab = tab;
   _renderStatsPeriodBar(tab);
-  document.getElementById('rep-stats-body').innerHTML = buildRepairStatsHTML(tab);
-  document.getElementById('rep-stats-body').scrollTop = 0;
+  const body = document.getElementById('rep-stats-body');
+  if (_STATS_TABS_FULL.has(tab)) {
+    // Necesita más de 120 días → traer histórico completo on-demand (cacheado por sesión)
+    body.innerHTML = '<div class="list-loading"><span class="list-loading__spinner"></span>Cargando historial…</div>';
+    try {
+      _statsSource = await loadAllRepairsHistory();
+    } catch (e) {
+      console.error('year stats:', e);
+      _statsSource = null; // fallback: usa los 120 días que ya están
+    }
+    if (repStatsTab !== tab) return; // el usuario cambió de tab mientras cargaba
+  } else {
+    _statsSource = null; // usa REPAIRS (rápido, ya en memoria)
+  }
+  body.innerHTML = buildRepairStatsHTML(tab);
+  body.scrollTop = 0;
 }
 
 function _renderStatsPeriodBar(tab) {
@@ -1990,10 +2041,15 @@ function _periodRange(tab) {
   return { from, to, label, prevFrom, prevTo, prevLabel };
 }
 
+// Fuente de datos de las stats: null = REPAIRS (120 días, rápido); si el tab
+// necesita más historia, switchRepairStatsTab la carga y la setea acá.
+let _statsSource = null;
+
 function _calcStatsForPeriod(from, to) {
   const fromTs = from.getTime();
   const toTs   = to.getTime();
-  const reps = REPAIRS.filter(r => {
+  const src = _statsSource || REPAIRS;
+  const reps = src.filter(r => {
     if (!r.fechaIngreso) return false;
     const t = new Date(r.fechaIngreso).getTime();
     return t >= fromTs && t <= toTs;

@@ -33,6 +33,29 @@ window._appCleanup = function() {
   STOCK = [];
 };
 
+const _STOCK_CACHE_KEY = 'stockCache';
+
+// Guarda el stock en localStorage para pintarlo al instante en la próxima apertura
+function _cacheStock() {
+  try { localStorage.setItem(_STOCK_CACHE_KEY, JSON.stringify(STOCK)); }
+  catch { /* quota / modo privado: seguimos sin cache */ }
+}
+
+// Pinta la lista de equipos desde el cache local ANTES de que llegue Firestore
+function _hydrateStockFromCache() {
+  if (STOCK.length) return;
+  try {
+    const cached = localStorage.getItem(_STOCK_CACHE_KEY);
+    if (!cached) return;
+    const parsed = JSON.parse(cached);
+    if (Array.isArray(parsed) && parsed.length) {
+      STOCK = parsed;
+      STOCK.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+      if (typeof render === 'function') render();
+    }
+  } catch { /* cache corrupto: se ignora */ }
+}
+
 function listenStock() {
   // Cancelar listener previo (evita duplicados en re-login)
   if (_stockListener) { _stockListener(); _stockListener = null; }
@@ -41,6 +64,7 @@ function listenStock() {
     _stockLoaded = true;
     STOCK = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     STOCK.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+    _cacheStock();
     render();
     if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
     // Backup automático una vez por sesión, 3s después de cargar datos
@@ -427,6 +451,7 @@ function initApp() {
   });
 
   initPWA();
+  _hydrateStockFromCache(); // pinta los equipos al instante desde el cache local
   listenStock();
   initRepairs();
   initRepuestos();
