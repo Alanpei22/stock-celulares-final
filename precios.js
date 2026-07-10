@@ -573,6 +573,19 @@ function _renderReparTab() {
   return _renderModeloList();
 }
 
+// Filtro por marca en la lista de modelos ('' = todas)
+let _reparMarcaFilter = '';
+
+// Marca = primera palabra del nombre del equipo ("Samsung A54" → "Samsung")
+function _marcaDeEquipo(equipo) {
+  return (equipo || '').trim().split(/\s+/)[0] || '';
+}
+
+function _setReparMarca(marca) {
+  _reparMarcaFilter = (_reparMarcaFilter === marca) ? '' : marca;
+  _renderReparTab();
+}
+
 function _renderModeloList() {
   const cont = document.getElementById('rep-tab-list');
   const empty = document.getElementById('rep-tab-empty');
@@ -584,6 +597,9 @@ function _renderModeloList() {
     lista = lista.filter(p =>
       ((p.equipo||'') + ' ' + (p.tipo||'') + ' ' + (p.nota||'')).toLowerCase().includes(q)
     );
+  }
+  if (_reparMarcaFilter) {
+    lista = lista.filter(p => _marcaDeEquipo(p.equipo).toLowerCase() === _reparMarcaFilter.toLowerCase());
   }
 
   // Agrupar por equipo
@@ -597,8 +613,9 @@ function _renderModeloList() {
 
   if (!modelos.length) {
     if (empty) empty.classList.add('hidden');
-    if (q) {
-      cont.innerHTML = `<div class="rep-tab-empty"><span class="rep-empty-ico">🔍</span><p>Sin resultados para "${_escP(q)}"</p></div>`;
+    if (q || _reparMarcaFilter) {
+      cont.innerHTML = _renderMarcaChips() +
+        `<div class="rep-tab-empty"><span class="rep-empty-ico">🔍</span><p>Sin resultados${q ? ` para "${_escP(q)}"` : ''}${_reparMarcaFilter ? ` en ${_escP(_reparMarcaFilter)}` : ''}</p></div>`;
       return;
     }
     // Estado vacío: mostrar PREVIEW de cómo se va a ver + botón crear ejemplo
@@ -653,12 +670,17 @@ function _renderModeloList() {
   }
   if (empty) empty.classList.add('hidden');
 
-  cont.innerHTML = modelos.map(equipo => {
+  cont.innerHTML = _renderMarcaChips() + modelos.map(equipo => {
     const items = grupos[equipo];
     const categorias = [...new Set(items.map(p => p.tipo).filter(Boolean))];
     const sinPrecio = items.filter(p => !p.precio || p.precio <= 0).length;
     // Preview de las primeras 4 categorías
     const previewIcons = categorias.slice(0, 4).map(t => PRECIO_TIPO_ICON[t] || '🔧').join(' ');
+    // Precio de referencia: Pantalla / Módulo (lo más consultado)
+    const pantalla = items.find(p => p.tipo === 'Pantalla / Módulo' && Number(p.precio) > 0);
+    const precioRef = pantalla
+      ? `<div class="rep-modelo-card-price"><span class="rmcp-lbl">📱 Pantalla</span><span class="rmcp-val">$${Number(pantalla.precio).toLocaleString('es-AR')}</span></div>`
+      : '';
     return `
       <div class="rep-modelo-card" onclick="_openModeloDetail('${_escP(equipo)}')">
         <div class="rep-modelo-card-main">
@@ -672,9 +694,28 @@ function _renderModeloList() {
             ${previewIcons ? `<div class="rep-modelo-card-preview">${previewIcons}</div>` : ''}
           </div>
         </div>
+        ${precioRef}
         <div class="rep-modelo-card-arrow">›</div>
       </div>`;
   }).join('');
+}
+
+// Chips de marca (derivadas de la primera palabra), ordenadas por cantidad
+function _renderMarcaChips() {
+  const counts = {};
+  PRECIOS.forEach(p => {
+    const m = _marcaDeEquipo(p.equipo);
+    if (m) counts[m] = (counts[m] || 0) + 1;
+  });
+  const marcas = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([m]) => m);
+  if (marcas.length < 2) return '';
+  return `<div class="rep-marca-chips">
+    <button class="precio-chip${!_reparMarcaFilter ? ' precio-chip--active' : ''}" onclick="_setReparMarca('')">Todas</button>
+    ${marcas.map(m => `<button class="precio-chip${_reparMarcaFilter === m ? ' precio-chip--active' : ''}" onclick="_setReparMarca('${_escP(m)}')">${_escP(m)}</button>`).join('')}
+  </div>`;
 }
 
 // ── Vista DETALLE de un modelo (tabs por categoría) ──
@@ -738,26 +779,30 @@ function _renderVarianteCard(p) {
   if (p.nota)         lineas.push(`<div class="rep-var-line rep-var-nota">${_escP(p.nota)}</div>`);
   if (!lineas.length) lineas.push(`<div class="rep-var-line rep-var-empty">Sin variante</div>`);
 
+  // El precio efectivo se edita inline (tocás el número y escribís);
+  // el resto de la card sigue abriendo el formulario completo.
+  const inputEf = `<input type="number" class="rep-svc-precio-input rep-var-inline-input" data-id="${_escP(p.id)}"
+      value="${ef || ''}" placeholder="0" min="0" inputmode="numeric"
+      onclick="event.stopPropagation()"
+      onkeydown="_onPrecioInlineKey(event)"
+      onblur="_savePrecioInline('${_escP(p.id)}', this.value)">`;
+
   return `
     <div class="rep-variante-card" onclick="openPrecioForm('${_escP(p.id)}')">
       <div class="rep-variante-info">
         ${lineas.join('')}
       </div>
-      <div class="rep-variante-prices">
+      <div class="rep-variante-prices" onclick="event.stopPropagation()">
+        <div class="rep-variante-price-row">
+          <span class="rep-variante-price-lbl">Efectivo</span>
+          ${inputEf}
+        </div>
         ${lista > 0 ? `
-          <div class="rep-variante-price-row">
-            <span class="rep-variante-price-lbl">Desc efectivo</span>
-            <span class="rep-variante-price-val rep-variante-price-val--ef">$${ef.toLocaleString('es-AR')}</span>
-          </div>
           <div class="rep-variante-price-row">
             <span class="rep-variante-price-lbl">Lista</span>
             <span class="rep-variante-price-val rep-variante-price-val--lista">$${lista.toLocaleString('es-AR')}</span>
           </div>
-        ` : `
-          <div class="rep-variante-price-row rep-variante-price-row--single">
-            <span class="rep-variante-price-val${ef > 0 ? '' : ' rep-variante-price-val--zero'}">${ef > 0 ? '$' + ef.toLocaleString('es-AR') : 'sin precio'}</span>
-          </div>
-        `}
+        ` : ''}
       </div>
     </div>
   `;
@@ -1083,7 +1128,7 @@ function closeNewModeloModal() {
   document.getElementById('newmod-modal').classList.add('hidden');
 }
 
-async function confirmNewModelo() {
+function confirmNewModelo() {
   const equipo = document.getElementById('newmod-equipo').value.trim();
   if (!equipo) { toast('Ingresá el nombre del modelo', 'error'); return; }
   const checks = document.querySelectorAll('#newmod-svcs input[type="checkbox"]:checked');
@@ -1100,22 +1145,137 @@ async function confirmNewModelo() {
     return;
   }
 
+  closeNewModeloModal();
+  _pwizStart(equipo, tipos); // → precios uno por uno en ventanas
+}
+
+// ══════════════════════════════════════════
+//  WIZARD: precios del modelo nuevo, un servicio por ventana
+// ══════════════════════════════════════════
+let _pwiz = null; // { equipo, tipos: [], idx, precios: [{precio, lista}] }
+
+function _pwizStart(equipo, tipos) {
+  _pwiz = { equipo, tipos, idx: 0, precios: tipos.map(() => ({ precio: 0, lista: 0 })) };
+  document.getElementById('pwiz-title').textContent = `💲 ${equipo}`;
+  document.getElementById('pwiz-overlay').classList.remove('hidden');
+  document.getElementById('pwiz-modal').classList.remove('hidden');
+  // Enter en los inputs = Siguiente
+  ['pwiz-precio', 'pwiz-lista'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el._pwizBound) {
+      el._pwizBound = true;
+      el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); _pwizNext(); } });
+    }
+  });
+  _pwizRender();
+}
+
+function _pwizRender() {
+  if (!_pwiz) return;
+  const { tipos, idx } = _pwiz;
+  const enResumen = idx >= tipos.length;
+  document.getElementById('pwiz-ask').classList.toggle('hidden', enResumen);
+  document.getElementById('pwiz-resumen').classList.toggle('hidden', !enResumen);
+  // Progreso
+  const paso = Math.min(idx + 1, tipos.length);
+  document.getElementById('pwiz-step-lbl').textContent = enResumen ? 'Resumen' : `${paso} de ${tipos.length}`;
+  document.getElementById('pwiz-progress-fill').style.width =
+    (enResumen ? 100 : Math.round((idx / tipos.length) * 100)) + '%';
+
+  if (enResumen) { _pwizRenderResumen(); return; }
+
+  const tipo = tipos[idx];
+  document.getElementById('pwiz-svc-ico').textContent = PRECIO_TIPO_ICON[tipo] || '🔧';
+  document.getElementById('pwiz-svc-name').textContent = tipo;
+  const p = _pwiz.precios[idx];
+  document.getElementById('pwiz-precio').value = p.precio || '';
+  document.getElementById('pwiz-lista').value  = p.lista || '';
+  document.getElementById('pwiz-back').style.visibility = idx === 0 ? 'hidden' : '';
+  setTimeout(() => document.getElementById('pwiz-precio')?.focus(), 120);
+}
+
+function _pwizSaveCurrent() {
+  if (!_pwiz || _pwiz.idx >= _pwiz.tipos.length) return;
+  _pwiz.precios[_pwiz.idx] = {
+    precio: parseInt(document.getElementById('pwiz-precio').value) || 0,
+    lista:  parseInt(document.getElementById('pwiz-lista').value) || 0,
+  };
+}
+
+function _pwizNext() {
+  if (!_pwiz) return;
+  _pwizSaveCurrent();
+  _pwiz.idx++;
+  _pwizRender();
+}
+
+function _pwizSkip() {
+  if (!_pwiz) return;
+  _pwiz.precios[_pwiz.idx] = { precio: 0, lista: 0 };
+  _pwiz.idx++;
+  _pwizRender();
+}
+
+function _pwizBack() {
+  if (!_pwiz || _pwiz.idx === 0) return;
+  if (_pwiz.idx < _pwiz.tipos.length) _pwizSaveCurrent();
+  _pwiz.idx--;
+  _pwizRender();
+}
+
+function _pwizRenderResumen() {
+  const cont = document.getElementById('pwiz-resumen-list');
+  if (!cont || !_pwiz) return;
+  const f = n => n > 0 ? '$' + n.toLocaleString('es-AR') : '<span class="pwiz-sin">sin precio</span>';
+  cont.innerHTML = `
+    <div class="pwiz-resumen-title">📱 ${_escP(_pwiz.equipo)}</div>
+    ${_pwiz.tipos.map((t, i) => `
+      <div class="pwiz-resumen-row">
+        <span class="pwiz-rr-name">${PRECIO_TIPO_ICON[t] || '🔧'} ${_escP(t)}</span>
+        <span class="pwiz-rr-val">${f(_pwiz.precios[i].precio)}${_pwiz.precios[i].lista > 0 ? ` <small>· lista $${_pwiz.precios[i].lista.toLocaleString('es-AR')}</small>` : ''}</span>
+      </div>`).join('')}
+  `;
+}
+
+function _pwizCancel() {
+  if (!_pwiz) { _pwizClose(); return; }
+  const cargados = _pwiz.precios.filter(p => p.precio > 0).length;
+  if (cargados > 0 && !confirm('¿Descartar el modelo y los precios cargados?\n\nNo se guardó nada todavía.')) return;
+  _pwizClose();
+}
+
+function _pwizClose() {
+  _pwiz = null;
+  document.getElementById('pwiz-overlay').classList.add('hidden');
+  document.getElementById('pwiz-modal').classList.add('hidden');
+}
+
+async function _pwizGuardar() {
+  if (!_pwiz) return;
+  const { equipo, tipos, precios } = _pwiz;
   try {
+    const ahora = new Date().toISOString();
     const batch = db.batch();
-    tipos.forEach(tipo => {
+    tipos.forEach((tipo, i) => {
       const ref = db.collection('precios_reparaciones').doc();
       batch.set(ref, {
-        tipo, equipo, precio: 0, nota: '',
-        updatedAt: new Date().toISOString(),
+        tipo, equipo,
+        precio: precios[i].precio || 0,
+        precioLista: precios[i].lista > 0 ? precios[i].lista : null,
+        nota: '',
+        updatedAt: ahora,
       });
     });
     await batch.commit();
-    _reparOpenModelos.add(equipo); // abrir el modelo recién creado
-    toast(`✅ ${tipos.length} servicio(s) creado(s) para ${equipo}`, 'success');
-    closeNewModeloModal();
+    _reparOpenModelos.add(equipo); // dejar el modelo recién creado abierto en la lista
+    const conPrecio = precios.filter(p => p.precio > 0).length;
+    toast(`✅ ${equipo}: ${tipos.length} servicio(s) creados (${conPrecio} con precio)`, 'success');
+    _pwizClose();
   } catch (e) {
-    console.error('confirmNewModelo:', e);
-    toast('Error al crear el modelo', 'error');
+    console.error('_pwizGuardar:', e);
+    toast(e?.code === 'resource-exhausted'
+      ? '⚠️ Cupo de Firebase agotado, probá más tarde'
+      : 'Error al guardar el modelo', 'error');
   }
 }
 

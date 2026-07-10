@@ -1122,12 +1122,56 @@ function switchCajaTab(tab) {
     <input id="newmod-equipo" class="precio-input" type="text" placeholder="iPhone 14, Samsung A54…" autocomplete="off">
   </div>
   <div class="precio-fg">
-    <label>Crear servicios con precio 0 (los completás después):</label>
+    <label>¿Qué servicios le cargás? (los precios te los pregunto uno por uno)</label>
     <div id="newmod-svcs" class="newmod-svcs"></div>
   </div>
   <div style="display:flex;gap:8px;margin-top:10px">
     <button class="btn-secondary" onclick="closeNewModeloModal()" style="flex:1">Cancelar</button>
-    <button class="btn-primary" onclick="confirmNewModelo()" style="flex:2">✅ Crear modelo</button>
+    <button class="btn-primary" onclick="confirmNewModelo()" style="flex:2">Siguiente ➡️</button>
+  </div>
+</div>
+
+<!-- ═══════════ WIZARD: PRECIOS DEL MODELO NUEVO (una ventana por servicio) ═══════════ -->
+<div id="pwiz-overlay" class="nota-overlay hidden"></div>
+<div id="pwiz-modal" class="arqueo-modal hidden" style="max-width:400px">
+  <div class="nota-modal-hdr">
+    <span id="pwiz-title">💲 Precios</span>
+    <button onclick="_pwizCancel()">✕</button>
+  </div>
+  <div class="pwiz-progress"><div id="pwiz-progress-fill" class="pwiz-progress-fill"></div></div>
+  <div class="pwiz-step-lbl" id="pwiz-step-lbl">1 de 4</div>
+
+  <!-- Vista: pregunta de precio de un servicio -->
+  <div id="pwiz-ask">
+    <div class="pwiz-svc">
+      <span class="pwiz-svc-ico" id="pwiz-svc-ico">🔧</span>
+      <div>
+        <div class="pwiz-svc-name" id="pwiz-svc-name">Servicio</div>
+        <div class="pwiz-svc-sub">¿Cuánto cobrás este arreglo?</div>
+      </div>
+    </div>
+    <div class="precio-fg">
+      <label>Precio efectivo</label>
+      <input id="pwiz-precio" class="precio-input pwiz-precio-input" type="number" placeholder="0" min="0" inputmode="numeric">
+    </div>
+    <div class="precio-fg">
+      <label>Precio lista <small>(opcional — tarjeta/transferencia)</small></label>
+      <input id="pwiz-lista" class="precio-input" type="number" placeholder="0" min="0" inputmode="numeric">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn-secondary" id="pwiz-back" onclick="_pwizBack()" style="flex:1">← Atrás</button>
+      <button class="btn-secondary" onclick="_pwizSkip()" style="flex:1">Saltar</button>
+      <button class="btn-primary" onclick="_pwizNext()" style="flex:2">Siguiente ➡️</button>
+    </div>
+  </div>
+
+  <!-- Vista: resumen final -->
+  <div id="pwiz-resumen" class="hidden">
+    <div id="pwiz-resumen-list" class="pwiz-resumen-list"></div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn-secondary" onclick="_pwizBack()" style="flex:1">← Atrás</button>
+      <button class="btn-primary" onclick="_pwizGuardar()" style="flex:2">💾 Guardar modelo</button>
+    </div>
   </div>
 </div>
 

@@ -1473,3 +1473,42 @@ body.dark .mov-tipo-btn--ing.tipo-active { background: #34D399; border-color: #3
 body.dark .mov-tipo-btn--eg.tipo-active  { background: #F87171; border-color: #F87171; color: #0a0a0b; }
 body.dark .tipo-ingreso.tipo-active { background: #34D399; border-color: #34D399; color: #0a0a0b; }
 body.dark .tipo-egreso.tipo-active  { background: #F87171; border-color: #F87171; color: #0a0a0b; }
+
+/* ══ Wizard de precios del modelo nuevo (pwiz) ══ */
+.pwiz-progress { height:5px; background:var(--bg2,#eee); border-radius:3px; margin:4px 0 4px; overflow:hidden; }
+.pwiz-progress-fill { height:100%; width:0; background:#C8965A; border-radius:3px; transition:width .25s; }
+.pwiz-step-lbl { font-size:.72rem; color:var(--t3,#999); font-weight:700; text-align:right; margin-bottom:8px; }
+.pwiz-svc { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.pwiz-svc-ico { font-size:2rem; flex-shrink:0; }
+.pwiz-svc-name { font-size:1.05rem; font-weight:800; color:var(--t1,#1a1a1a); }
+.pwiz-svc-sub { font-size:.75rem; color:var(--t3,#999); }
+.pwiz-precio-input { font-size:1.3rem; font-weight:800; text-align:right; }
+.pwiz-resumen-title { font-weight:800; font-size:1rem; margin-bottom:10px; color:var(--t1,#1a1a1a); }
+.pwiz-resumen-row { display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:7px 2px; border-bottom:1px solid var(--border,#eee); font-size:.85rem; }
+.pwiz-rr-name { color:var(--t2,#555); }
+.pwiz-rr-val { font-weight:800; color:var(--t1,#1a1a1a); white-space:nowrap; }
+.pwiz-rr-val small { font-weight:500; color:var(--t3,#999); }
+.pwiz-sin { color:var(--t3,#999); font-weight:500; font-style:italic; }
+body.dark .pwiz-progress { background:rgba(255,255,255,.08); }
+body.dark .pwiz-svc-name, body.dark .pwiz-resumen-title, body.dark .pwiz-rr-val { color:#eee; }
+body.dark .pwiz-resumen-row { border-color:rgba(255,255,255,.08); }
+
+/* ══ Chips de marca en la lista de modelos ══ */
+.rep-marca-chips { display:flex; gap:6px; flex-wrap:wrap; padding:2px 0 10px; }
+
+/* ══ Precio de referencia (pantalla) en la card del modelo ══ */
+.rep-modelo-card-price { display:flex; flex-direction:column; align-items:flex-end; gap:1px; flex-shrink:0; margin-right:4px; }
+.rmcp-lbl { font-size:.62rem; color:var(--t3,#999); font-weight:700; text-transform:uppercase; letter-spacing:.02em; }
+.rmcp-val { font-size:.95rem; font-weight:800; color:#C8965A; white-space:nowrap; }
+body.dark .rmcp-val { color:#D4A76A; }
+
+/* ══ Precio efectivo editable inline en la variante ══ */
+.rep-var-inline-input {
+  width:110px; text-align:right; font-size:1rem; font-weight:800;
+  border:1.5px dashed var(--border,#ddd); border-radius:8px; padding:5px 8px;
+  background:transparent; color:var(--t1,#1a1a1a);
+}
+.rep-var-inline-input:focus { border-style:solid; border-color:#C8965A; outline:none; }
+.rep-var-inline-input.rep-svc-saving { opacity:.5; }
+.rep-var-inline-input.rep-svc-saved { border-color:#10b981; border-style:solid; }
+body.dark .rep-var-inline-input { color:#eee; border-color:rgba(255,255,255,.2); }
