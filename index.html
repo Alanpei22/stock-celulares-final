@@ -897,8 +897,13 @@
       <button class="modal-close" id="rep-form-close">✕</button>
     </div>
     <div class="modal-body">
+      <div id="repwiz-hdr" class="repwiz-hdr" style="display:none">
+        <div class="repwiz-progress"><div id="repwiz-progress-fill" class="repwiz-progress-fill"></div></div>
+        <div class="repwiz-lbl" id="repwiz-lbl">Paso 1 de 5</div>
+      </div>
       <div class="form-grid">
 
+        <div class="repwiz-step" data-rstep="1">
         <div class="fg" id="rep-orden-row" style="display:none">
           <label class="fl" id="rep-orden-label">N° Orden</label>
           <input id="rep-fi-orden" class="fi" type="number" placeholder="Automático" min="1" inputmode="numeric">
@@ -926,7 +931,9 @@
           <label class="fl">Modelo *</label>
           <input id="rep-fi-modelo" class="fi" type="text" placeholder="A54, iPhone 13..." autocomplete="off">
         </div>
+        </div><!-- /paso 1 -->
 
+        <div class="repwiz-step" data-rstep="2">
         <div class="fg fg--full">
           <label class="fl">Tipo de arreglo *</label>
           <select id="rep-fi-arreglo" class="fs">
@@ -977,7 +984,9 @@
             <label class="acc-check"><input type="checkbox" id="acc-auriculares"><span>🎧 Auriculares</span></label>
           </div>
         </div>
+        </div><!-- /paso 2 -->
 
+        <div class="repwiz-step" data-rstep="3">
         <div class="fg">
           <label class="fl">Precio cobrado ($) <small style="color:var(--t2);font-weight:400">— lo que paga el cliente</small></label>
           <input id="rep-fi-monto" class="fi" type="number" placeholder="28000" min="0" inputmode="numeric">
@@ -1008,7 +1017,9 @@
           </select>
           <input id="rep-fi-garantia-custom" class="fi" type="number" min="1" max="730" placeholder="Días" inputmode="numeric" style="margin-top:6px;display:none">
         </div>
+        </div><!-- /paso 3 -->
 
+        <div class="repwiz-step" data-rstep="4">
         <div class="fg fg--full">
           <label class="fl">Nombre del cliente</label>
           <input id="rep-fi-nombre" class="fi" type="text" placeholder="Juan García" autocomplete="off">
@@ -1035,7 +1046,9 @@
             <option value="">— Sin asignar —</option>
           </select>
         </div>
+        </div><!-- /paso 4 -->
 
+        <div class="repwiz-step" data-rstep="5">
         <!-- Checklist de recepción -->
         <div class="fg fg--full">
           <button type="button" class="cl-toggle-btn" onclick="toggleChecklistForm()">
@@ -1094,9 +1107,14 @@
             </div>
           </div>
         </div>
+        </div><!-- /paso 5 -->
 
       </div>
-      <div class="form-actions">
+      <div class="form-actions" id="repwiz-nav" style="display:none">
+        <button class="btn-secondary" id="repwiz-back" onclick="_repwizBack()">← Atrás</button>
+        <button class="btn-primary" id="repwiz-next" onclick="_repwizNext()">Siguiente ➡️</button>
+      </div>
+      <div class="form-actions" id="rep-form-actions">
         <button class="btn-secondary" id="rep-form-cancel">Cancelar</button>
         <button class="btn-primary" id="rep-form-save">💾 Guardar</button>
       </div>

@@ -611,6 +611,86 @@ function _repIngresoISO() {
   return d.toISOString();
 }
 
+// ══════════════════════════════════════════
+//  WIZARD de ingreso de reparación (solo al CREAR; editar usa el form clásico)
+//  Mismo formulario/IDs de siempre, presentado de a un paso: saveRepair no cambia.
+// ══════════════════════════════════════════
+const _REPWIZ_TITLES = ['📱 Equipo', '🔧 Arreglo y estado', '💰 Precio', '👤 Cliente', '📎 Extras (opcional)'];
+let _repwizIdx = -1; // -1 = wizard apagado (form clásico)
+
+function _repwizStart() {
+  _repwizIdx = 0;
+  _repwizRender();
+}
+
+function _repwizOff() {
+  _repwizIdx = -1;
+  document.querySelectorAll('#rep-form-modal .repwiz-step').forEach(s => s.classList.remove('repwiz-step--hidden'));
+  const hdr = document.getElementById('repwiz-hdr');
+  const nav = document.getElementById('repwiz-nav');
+  const actions = document.getElementById('rep-form-actions');
+  if (hdr) hdr.style.display = 'none';
+  if (nav) nav.style.display = 'none';
+  if (actions) actions.style.display = '';
+}
+
+function _repwizRender() {
+  if (_repwizIdx < 0) return;
+  const total = _REPWIZ_TITLES.length;
+  const last = _repwizIdx === total - 1;
+  document.querySelectorAll('#rep-form-modal .repwiz-step').forEach(s => {
+    s.classList.toggle('repwiz-step--hidden', Number(s.dataset.rstep) !== _repwizIdx + 1);
+  });
+  const hdr = document.getElementById('repwiz-hdr');
+  const nav = document.getElementById('repwiz-nav');
+  const actions = document.getElementById('rep-form-actions');
+  if (hdr) hdr.style.display = '';
+  if (nav) nav.style.display = '';
+  if (actions) actions.style.display = 'none';
+  document.getElementById('repwiz-lbl').textContent = `Paso ${_repwizIdx + 1} de ${total} · ${_REPWIZ_TITLES[_repwizIdx]}`;
+  document.getElementById('repwiz-progress-fill').style.width = Math.round(((_repwizIdx + 1) / total) * 100) + '%';
+  document.getElementById('repwiz-back').style.visibility = _repwizIdx === 0 ? 'hidden' : '';
+  document.getElementById('repwiz-next').textContent = last ? '💾 Guardar' : 'Siguiente ➡️';
+  // Scroll arriba y foco en el primer campo del paso
+  const body = document.querySelector('#rep-form-modal .modal-body');
+  if (body) body.scrollTop = 0;
+  const focos = { 0: 'rep-fi-marca', 1: 'rep-fi-arreglo', 2: 'rep-fi-monto', 3: 'rep-fi-nombre' };
+  const fid = focos[_repwizIdx];
+  if (fid) setTimeout(() => document.getElementById(fid)?.focus(), 150);
+}
+
+function _repwizValidarPaso() {
+  if (_repwizIdx === 0) {
+    if (!document.getElementById('rep-fi-marca').value.trim())  { toast('Ingresá la marca', 'error');  return false; }
+    if (!document.getElementById('rep-fi-modelo').value.trim()) { toast('Ingresá el modelo', 'error'); return false; }
+  }
+  if (_repwizIdx === 1) {
+    const arr = document.getElementById('rep-fi-arreglo').value;
+    if (!arr) { toast('Seleccioná el tipo de arreglo', 'error'); return false; }
+    if (arr === 'Otro' && !document.getElementById('rep-fi-arreglo-custom').value.trim()) {
+      toast('Describí el arreglo', 'error'); return false;
+    }
+  }
+  return true;
+}
+
+function _repwizNext() {
+  if (_repwizIdx < 0) return;
+  if (!_repwizValidarPaso()) return;
+  if (_repwizIdx === _REPWIZ_TITLES.length - 1) {
+    document.getElementById('rep-form-save')?.click(); // último paso → guardar de verdad
+    return;
+  }
+  _repwizIdx++;
+  _repwizRender();
+}
+
+function _repwizBack() {
+  if (_repwizIdx <= 0) return;
+  _repwizIdx--;
+  _repwizRender();
+}
+
 function openRepairForm(id) {
   editingRepairId = id || null;
   const COMMON_ARREGLOS = [
@@ -732,9 +812,12 @@ function openRepairForm(id) {
     _repIngresoReset(); // hoy por defecto
   }
 
+  // Nuevo ingreso → paso a paso; edición → formulario clásico completo
+  if (id) _repwizOff();
+  else _repwizStart();
+
   document.getElementById('rep-form-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
-  setTimeout(() => document.getElementById('rep-fi-marca').focus(), 300);
 }
 
 function _showPrintPrompt(repairId) {

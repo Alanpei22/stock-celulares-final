@@ -5077,6 +5077,23 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
   font-size: 16px; font-weight: 700; width: 100%; text-align: right; outline: none; }
 .dolares-equiv-row { padding: 0 2px; }
 .dolares-equiv { font-size: 15px; font-weight: 700; color: #059669; }
+
+/* ── Wizard de ingreso de reparación (repwiz) ── */
+/* display:contents => en modo clásico los wrappers no alteran la grilla del form */
+.repwiz-step { display: contents; }
+.repwiz-step--hidden { display: none; }
+.repwiz-hdr { margin-bottom: 12px; }
+.repwiz-progress {
+  height: 5px; background: var(--bg2); border-radius: 3px; overflow: hidden;
+}
+.repwiz-progress-fill {
+  height: 100%; width: 20%; background: var(--accent);
+  border-radius: 3px; transition: width .25s;
+}
+.repwiz-lbl {
+  margin-top: 6px; font-size: .8rem; font-weight: 700; color: var(--text2);
+  text-align: right;
+}
 .cierre-usd-arqueo-title {
   margin: 14px 0 8px; padding-top: 12px;
   border-top: 1px solid var(--border);
