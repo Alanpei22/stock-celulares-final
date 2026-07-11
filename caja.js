@@ -2097,9 +2097,12 @@ async function saveMov() {
         } else if (data.metodoPago2) {
           met = `${metodoPago} ${tgMonto(monto - (data.monto2 || 0))} + ${data.metodoPago2} ${tgMonto(data.monto2)}`;
         }
+        const esRetiro = !esIng && data.categoria === RETIRO_CAT;
         const lineas = [
-          `${esIng ? '💰' : '💸'} <b>${esIng ? 'Ingreso' : 'Egreso'} ${tgMonto(monto)}</b> · ${esc(met)}`,
-          `${data.categoria ? esc(data.categoria) + ' · ' : ''}${esc(descripcion)}`,
+          esRetiro
+            ? `🏧 <b>Retiro dueño ${tgMonto(monto)}</b> · ${esc(met)} (sale de caja, no cuenta como gasto)`
+            : `${esIng ? '💰' : '💸'} <b>${esIng ? 'Ingreso' : 'Egreso'} ${tgMonto(monto)}</b> · ${esc(met)}`,
+          `${!esRetiro && data.categoria ? esc(data.categoria) + ' · ' : ''}${esc(descripcion)}`,
         ];
         if (Array.isArray(data.items) && data.items.length > 1) {
           lineas.push(data.items.map(it => `· ${esc(it.nombre)} x${it.qty}`).join('\n'));
@@ -2648,14 +2651,47 @@ async function saveCierre() {
       ? 'sin diferencia ✅'
       : (diferencia > 0 ? '+' : '') + '$' + diferencia.toLocaleString('es-AR');
     toast('🔐 Cierre guardado — ' + difStr, Math.abs(diferencia) <= 500 ? 'success' : 'info');
-    // 📨 Aviso Telegram: cierre de caja
+    // 📨 Aviso Telegram: cierre de caja con desglose completo del día
     if (typeof tgNotify === 'function') {
+      const ingMovs = MOVIMIENTOS.filter(m => m.tipo === 'ingreso');
+      const egMovs  = MOVIMIENTOS.filter(m => m.tipo === 'egreso');
+      const retirosM = egMovs.filter(m => m.categoria === RETIRO_CAT);
+      const gastosM  = egMovs.filter(m => m.categoria !== RETIRO_CAT);
+      const totIng   = ingMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+      const totGastos  = gastosM.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+      const totRetiros = retirosM.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+      // Desglose de ingresos por método (contempla splits; dólares aparte en u$)
+      const porMet = {};
+      ingMovs.forEach(m => {
+        if (m.metodoPago === 'Dólares') return;
+        const monto = Number(m.monto) || 0, m2 = Number(m.monto2) || 0;
+        const met1 = m.metodoPago || 'Efectivo';
+        porMet[met1] = (porMet[met1] || 0) + (monto - m2);
+        if (m2 > 0 && m.metodoPago2) porMet[m.metodoPago2] = (porMet[m.metodoPago2] || 0) + m2;
+      });
+      const metStr = Object.entries(porMet).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+        .map(([met, v]) => `${_metodoInfo(met).icon.startsWith('<') ? '💙' : _metodoInfo(met).icon} ${esc(_metodoInfo(met).short)} ${tgMonto(v)}`)
+        .join('\n');
+      const usdIng = _usdEnCaja();
       const difTg = diferencia === 0 ? 'sin diferencia ✅'
         : (diferencia > 0 ? `sobran ${tgMonto(diferencia)}` : `faltan ${tgMonto(-diferencia)}`) + (Math.abs(diferencia) > 500 ? ' ⚠️' : '');
-      let msg = `🔐 <b>Cierre de caja</b>\nEsperado ${tgMonto(esperado)} · Contado ${tgMonto(contado)}\n📊 ${difTg}`;
-      if (usdContado > 0) msg += `\n💲 Dólares contados: u$${Math.round(usdContado).toLocaleString('es-AR')}`;
-      msg += `\n🕐 ${tgHora()}`;
-      tgNotify(msg);
+
+      const lineas = [
+        `🔐 <b>Cierre de caja</b>`,
+        `🔓 Apertura: ${tgMonto(ARQUEO?.total || 0)}`,
+        `💰 <b>Ingresos: ${tgMonto(totIng)}</b> (${ingMovs.length} mov.)`,
+      ];
+      if (metStr) lineas.push(metStr);
+      if (usdIng !== 0) lineas.push(`💲 Dólares u$${Math.round(usdIng).toLocaleString('es-AR')}`);
+      lineas.push(`💸 Gastos: ${tgMonto(totGastos)}${gastosM.length ? ` (${gastosM.length})` : ''}`);
+      if (totRetiros > 0) lineas.push(`🏧 Retiros dueño: ${tgMonto(totRetiros)} (no cuenta como gasto)`);
+      lineas.push(`📊 <b>Neto del día: ${tgMonto(totIng - totGastos)}</b>`);
+      lineas.push(`━━━━━━━━`);
+      lineas.push(`💵 Efectivo esperado ${tgMonto(esperado)} · contado ${tgMonto(contado)}`);
+      lineas.push(`📊 ${difTg}`);
+      if (usdContado > 0) lineas.push(`💲 Dólares contados: u$${Math.round(usdContado).toLocaleString('es-AR')}`);
+      lineas.push(`🕐 ${tgHora()}`);
+      tgNotify(lineas.join('\n'));
     }
     // Primero preguntar caja chica, después caja dueño
     setTimeout(() => openCajaChicaModal(contado), 600);
@@ -2776,6 +2812,21 @@ async function saveCierreParcial() {
     });
     closeCierreParcialModal();
     toast(`🔄 Turno de ${nombre} cerrado — ${horaAR}`, 'success');
+    // 📨 Aviso Telegram: cierre de turno con sus números
+    if (typeof tgNotify === 'function') {
+      const lineas = [
+        `🔄 <b>Turno cerrado — ${esc(nombre)}</b> (${desdeHora} → ${horaAR})`,
+        `💰 Ingresos ${tgMonto(stats.totalIng)} · 💸 Egresos ${tgMonto(stats.totalEg)}`,
+        `💵 Efectivo ${tgMonto(stats.efec)} · 💳 Digital ${tgMonto(stats.digital)}`,
+        `📊 Neto del turno: ${tgMonto(stats.neto)}`,
+      ];
+      if (efectivoContado > 0) {
+        const dif = efectivoContado - esperado;
+        lineas.push(`🧮 Contado ${tgMonto(efectivoContado)} vs esperado ${tgMonto(esperado)} → ${dif === 0 ? 'sin diferencia ✅' : (dif > 0 ? 'sobran ' : 'faltan ') + tgMonto(Math.abs(dif)) + (Math.abs(dif) > 500 ? ' ⚠️' : '')}`);
+      }
+      if (notas) lineas.push(`📝 ${esc(notas)}`);
+      tgNotify(lineas.join('\n'));
+    }
   } catch (e) {
     console.error('saveCierreParcial:', e);
     toast('Error al guardar cierre de turno', 'error');

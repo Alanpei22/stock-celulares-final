@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ skipped: 'sin movimientos hoy' });
     }
 
-    let ingresos = 0, egresos = 0, ganancia = 0, ventas = 0;
+    let ingresos = 0, egresos = 0, retiros = 0, ganancia = 0, ventas = 0;
     const porMetodo = {};
     for (const m of movs) {
       const monto = Number(m.monto) || 0;
@@ -64,6 +64,9 @@ export default async function handler(req, res) {
         if (m2 > 0 && m.metodoPago2) {
           porMetodo[m.metodoPago2] = (porMetodo[m.metodoPago2] || 0) + m2;
         }
+      } else if (m.categoria === 'Retiro dueño') {
+        // Retiro del dueño: sale de la caja pero NO es un gasto del negocio
+        retiros += monto;
       } else {
         egresos += monto;
       }
@@ -94,6 +97,7 @@ export default async function handler(req, res) {
       `💰 Ingresos ${fmtK(ingresos)} (${ventas}) · Gastos ${fmtK(egresos)}`,
       `📦 Balance ${fmtK(ingresos - egresos)}${ganancia > 0 ? ` · Ganancia prod. ${fmtK(ganancia)}` : ''}`,
     ];
+    if (retiros > 0) lines.push(`🏧 Retiro dueño ${fmtK(retiros)} (aparte, no es gasto)`);
     if (metodoStr) lines.push(metodoStr);
     if (repIn || repOut) lines.push(`🔧 Reparaciones: ${repIn} entraron · ${repOut} cobradas`);
 

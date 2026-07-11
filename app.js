@@ -1144,6 +1144,23 @@ async function savePhone() {
       if (garantiaMeses > 0) newDoc.garantiaMeses = garantiaMeses;
       await db.collection('stock').doc(id).set(newDoc);
       toast('Equipo agregado al stock ✅', 'success');
+      // 📨 Aviso Telegram: equipo cargado para la venta
+      if (typeof tgNotify === 'function') {
+        const specsTg = [storage, ram ? ram + ' RAM' : '', bateria ? '🔋' + bateria + '%' : ''].filter(Boolean).join(' · ');
+        const precioTg = esUSD
+          ? `u$${(precioUSD || 0).toLocaleString('es-AR')}${precio ? ` (≈ ${tgMonto(precio)})` : ''}`
+          : tgMonto(precio);
+        const lineas = [
+          `🆕 <b>Equipo cargado para venta</b>`,
+          `${esc(marca)} ${esc(modelo)}${specsTg ? ' · ' + esc(specsTg) : ''} · ${esc(estado || '')}`,
+          `💵 Precio: ${precioTg}${costo > 0 ? ` · Costo: ${tgMonto(costo)} · 📈 Ganancia: ${tgMonto((precio || 0) - costo)}` : ''}`,
+        ];
+        if (imei) lineas.push(`🔑 IMEI: ${esc(imei)}`);
+        const extras = [ubicacion ? '📍 ' + esc(ubicacion) : '', garantiaMeses > 0 ? `🛡️ ${garantiaMeses}m garantía` : ''].filter(Boolean).join(' · ');
+        if (extras) lineas.push(extras);
+        lineas.push(`🕐 ${tgHora()}`);
+        tgNotify(lineas.join('\n'));
+      }
     }
     closeForm();
   } catch (e) {
@@ -1524,12 +1541,18 @@ async function confirmSell() {
     closeSellModal();
     closeDetail();
     toast(regCaja ? 'Venta registrada en caja ✅' : 'Venta registrada ✅', 'success');
-    // 📨 Aviso Telegram: equipo del stock vendido
+    // 📨 Aviso Telegram: equipo del stock vendido (detallado)
     if (typeof tgNotify === 'function') {
-      const specsTg = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' ');
-      tgNotify(`📱 <b>Equipo vendido</b>\n`
-        + `${esc(p.marca)} ${esc(p.modelo)}${specsTg ? ' ' + esc(specsTg) : ''} — ${tgMonto(p.precio)}\n`
-        + `💳 ${esc(formaPago || '—')}${regCaja ? '' : ' (sin registrar en caja)'} · 👤 ${esc(vendedor || '—')} · 🕐 ${tgHora()}`);
+      const specsTg = [p.almacenamiento, p.ram ? p.ram + ' RAM' : '', p.bateria ? '🔋' + p.bateria + '%' : ''].filter(Boolean).join(' · ');
+      const lineas = [
+        `📱 <b>Equipo vendido — ${tgMonto(p.precio)}</b>`,
+        `${esc(p.marca)} ${esc(p.modelo)}${specsTg ? ' · ' + esc(specsTg) : ''} · ${esc(p.estado || '')}`,
+      ];
+      if (p.costo > 0) lineas.push(`Costo ${tgMonto(p.costo)} · 📈 <b>Ganancia ${tgMonto((p.precio || 0) - p.costo)}</b>`);
+      if (p.imei) lineas.push(`🔑 IMEI: ${esc(p.imei)}`);
+      if (p.garantiaMeses > 0) lineas.push(`🛡️ Garantía ${p.garantiaMeses} meses`);
+      lineas.push(`💳 ${esc(formaPago || '—')}${regCaja ? '' : ' ⚠️ (sin registrar en caja)'} · 👤 ${esc(vendedor || '—')} · 🕐 ${tgHora()}`);
+      tgNotify(lineas.join('\n'));
     }
   } catch (e) {
     console.error('confirmSell:', e);
