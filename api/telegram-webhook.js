@@ -163,7 +163,69 @@ const AYUDA = `🤖 <b>Consultas disponibles:</b>
 · <b>stock</b> o <b>stock iphone 13</b> → equipos a la venta
 · <b>precio a54</b> → lista de precios de reparación
 · <b>caja</b> → los números de hoy
-· 📷 Mandá una <b>foto con el N° de orden como pie</b> → se adjunta a esa reparación`;
+· 📷 Mandá una <b>foto con el N° de orden como pie</b> → se adjunta a esa reparación
+
+📦 <b>Cargar mercadería:</b>
+· <b>sumar 5 funda iphone 13</b> → le suma 5 al stock de ese artículo
+· <b>nuevo Funda iPhone 15 $8000 x5</b> → crea el producto (precio y cantidad)`;
+
+// ── Sumar stock a un producto (accesorio) o repuesto existente ──
+async function qSumarStock(db, cant, texto) {
+  const terms = texto.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return 'Decime qué artículo, ej: <b>sumar 5 funda iphone 13</b>';
+
+  const [prodSnap, repSnap] = await Promise.all([
+    db.collection('productos').select('nombre', 'codigo', 'categoria', 'stock', 'activo').get(),
+    db.collection('repuestos').select('nombre', 'marca', 'modelo', 'tipo', 'cantidad').get(),
+  ]);
+  const matches = [];
+  prodSnap.docs.forEach(d => {
+    const p = d.data();
+    const hay = `${p.nombre || ''} ${p.codigo || ''} ${p.categoria || ''}`.toLowerCase();
+    if (terms.every(t => hay.includes(t))) matches.push({ ref: d.ref, nombre: p.nombre, stock: Number(p.stock) || 0, campo: 'stock', tipo: '📦 Accesorio' });
+  });
+  repSnap.docs.forEach(d => {
+    const r = d.data();
+    const hay = `${r.nombre || ''} ${r.marca || ''} ${r.modelo || ''} ${r.tipo || ''}`.toLowerCase();
+    if (terms.every(t => hay.includes(t))) matches.push({ ref: d.ref, nombre: r.nombre || `${r.tipo || ''} ${r.marca || ''} ${r.modelo || ''}`.trim(), stock: Number(r.cantidad) || 0, campo: 'cantidad', tipo: '🔧 Repuesto' });
+  });
+
+  if (!matches.length) {
+    return `No encontré "${esc(texto)}" en accesorios ni repuestos 🤷\nPara crearlo: <b>nuevo ${esc(texto)} $precio x${cant}</b>`;
+  }
+  if (matches.length > 1) {
+    const lista = matches.slice(0, 8).map(m => `· ${m.tipo} ${esc(m.nombre)} (stock ${m.stock})`).join('\n');
+    return `Encontré ${matches.length} artículos, sé más específico:\n${lista}${matches.length > 8 ? '\n…' : ''}`;
+  }
+
+  const m = matches[0];
+  await m.ref.update({ [m.campo]: admin.firestore.FieldValue.increment(cant) });
+  return `✅ <b>+${cant} u.</b> → ${m.tipo} <b>${esc(m.nombre)}</b>\nStock: ${m.stock} → <b>${m.stock + cant}</b>`;
+}
+
+// ── Crear un producto (accesorio) nuevo: "nuevo <nombre> $<precio> [x<cant>]" ──
+async function qNuevoProducto(db, texto) {
+  const m = texto.match(/^(.+?)\s+\$?\s*([\d.,]+)\s*(?:x\s*(\d+))?$/i);
+  if (!m) return 'Formato: <b>nuevo Funda iPhone 15 $8000 x5</b> (la cantidad es opcional, default 1)';
+  const nombre = m[1].trim();
+  const precio = parseInt(String(m[2]).replace(/[.,]/g, ''), 10) || 0;
+  const cant   = parseInt(m[3], 10) || 1;
+  if (!nombre || precio <= 0) return 'Necesito nombre y precio, ej: <b>nuevo Funda iPhone 15 $8000 x5</b>';
+
+  // Evitar duplicado exacto
+  const dup = await db.collection('productos').select('nombre').get();
+  const ya = dup.docs.find(d => (d.data().nombre || '').toLowerCase() === nombre.toLowerCase());
+  if (ya) return `Ya existe <b>${esc(nombre)}</b> — usá <b>sumar ${cant} ${esc(nombre)}</b> para agregarle stock.`;
+
+  await db.collection('productos').add({
+    codigo: '', nombre, categoria: '',
+    precioVenta: precio, precioCosto: 0,
+    stock: cant, stockMin: 0, activo: true,
+    fechaAlta: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return `✅ <b>Producto creado</b>\n📦 ${esc(nombre)} · ${fmt(precio)} · stock ${cant}\n(Queda en Accesorios; el costo lo cargás después si querés)`;
+}
 
 // ── Foto recibida: adjuntarla a la reparación del N° de orden del pie ──
 async function handleFoto(db, msg) {
@@ -252,6 +314,11 @@ export default async function handler(req, res) {
     } else if (lower.startsWith('precio')) {
       const q = text.replace(/^precios?\s*/i, '').trim();
       respuesta = q ? await qPrecios(db, q) : 'Decime el modelo, ej: <b>precio a54</b>';
+    } else if (/^(sumar|agregar)\s+\d+\s+/.test(lower)) {
+      const ms = text.match(/^(?:sumar|agregar)\s+(\d+)\s+(.+)$/i);
+      respuesta = await qSumarStock(db, parseInt(ms[1], 10), ms[2].trim());
+    } else if (lower.startsWith('nuevo ')) {
+      respuesta = await qNuevoProducto(db, text.slice(6).trim());
     } else {
       respuesta = await qRepairByText(db, text);
     }
