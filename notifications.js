@@ -16,6 +16,9 @@ const NOTIF_DEFAULTS = {
     diferenciaCierre: false,
     fechaRetiroVencida: true,
   },
+  telegram: {
+    enabled: true,
+  },
   push: {
     enabled: false,
     cierrePendiente: true,

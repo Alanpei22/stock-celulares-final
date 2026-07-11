@@ -446,6 +446,10 @@ async function saveArqueo() {
     closeArqueoModal();
     renderStats();
     toast('✅ Arqueo guardado: $' + total.toLocaleString('es-AR'), 'success');
+    // 📨 Aviso Telegram: apertura de caja
+    if (typeof tgNotify === 'function') {
+      tgNotify(`🔓 <b>Caja abierta</b> con ${tgMonto(total)}\n👤 ${esc(vendedor || '—')} · 🕐 ${tgHora()}`);
+    }
   } catch (e) {
     console.error('saveArqueo:', e);
     toast('Error al guardar arqueo', 'error');
@@ -2083,6 +2087,28 @@ async function saveMov() {
 
       let toastMsg = 'Movimiento registrado';
 
+      // 📨 Aviso Telegram del movimiento (fire-and-forget)
+      if (typeof tgNotify === 'function') {
+        const esIng = tipo === 'ingreso';
+        let met = metodoPago;
+        if (metodoPago === 'Dólares') {
+          met = `Dólares u$${(Number(data.montoUSD) || 0).toLocaleString('es-AR')}`
+              + (Number(data.vueltoPesos) > 0 ? ` (vuelto ${tgMonto(data.vueltoPesos)})` : '');
+        } else if (data.metodoPago2) {
+          met = `${metodoPago} ${tgMonto(monto - (data.monto2 || 0))} + ${data.metodoPago2} ${tgMonto(data.monto2)}`;
+        }
+        const lineas = [
+          `${esIng ? '💰' : '💸'} <b>${esIng ? 'Ingreso' : 'Egreso'} ${tgMonto(monto)}</b> · ${esc(met)}`,
+          `${data.categoria ? esc(data.categoria) + ' · ' : ''}${esc(descripcion)}`,
+        ];
+        if (Array.isArray(data.items) && data.items.length > 1) {
+          lineas.push(data.items.map(it => `· ${esc(it.nombre)} x${it.qty}`).join('\n'));
+        }
+        if (data.repairNOrden) lineas.push(`🔧 Reparación #${data.repairNOrden} ${data.esSena ? '(seña)' : '(cobro)'}`);
+        lineas.push(`👤 ${esc(data.vendedor || '—')} · 🕐 ${tgHora()}`);
+        tgNotify(lineas.join('\n'));
+      }
+
       // Marcar los equipos del stock como vendidos
       if (equiposVendidos.length) {
         let vendidos = 0;
@@ -2183,6 +2209,13 @@ function deleteMov() {
 
       await db.collection('caja_movimientos').doc(id).delete();
       closeMovForm();
+
+      // 📨 Aviso Telegram: control de movimientos borrados
+      if (typeof tgNotify === 'function') {
+        tgNotify(`🗑 <b>Movimiento ELIMINADO</b>\n`
+          + `${movData.tipo === 'ingreso' ? '💰 Ingreso' : '💸 Egreso'} ${tgMonto(movData.monto)} · ${esc(movData.metodoPago || 'Efectivo')}\n`
+          + `${esc(movData.descripcion || '')}\n🕐 ${tgHora()}`);
+      }
 
       // Revertir stock si era venta de inventario — soporta carrito (items[]) y ventas viejas (itemId único)
       let stockReturned = 0;
@@ -2502,6 +2535,10 @@ async function confirmAperturaRapida(monto) {
     closeArqueoModal();
     renderStats();
     toast(`✅ Apertura confirmada — $${monto.toLocaleString('es-AR')}`, 'success');
+    // 📨 Aviso Telegram: apertura rápida (desde caja chica)
+    if (typeof tgNotify === 'function') {
+      tgNotify(`🔓 <b>Caja abierta</b> con ${tgMonto(monto)} (caja chica de ayer)\n👤 ${esc(vendedor || '—')} · 🕐 ${tgHora()}`);
+    }
   } catch (e) {
     console.error('confirmAperturaRapida:', e);
     toast('Error al confirmar apertura', 'error');
@@ -2611,6 +2648,15 @@ async function saveCierre() {
       ? 'sin diferencia ✅'
       : (diferencia > 0 ? '+' : '') + '$' + diferencia.toLocaleString('es-AR');
     toast('🔐 Cierre guardado — ' + difStr, Math.abs(diferencia) <= 500 ? 'success' : 'info');
+    // 📨 Aviso Telegram: cierre de caja
+    if (typeof tgNotify === 'function') {
+      const difTg = diferencia === 0 ? 'sin diferencia ✅'
+        : (diferencia > 0 ? `sobran ${tgMonto(diferencia)}` : `faltan ${tgMonto(-diferencia)}`) + (Math.abs(diferencia) > 500 ? ' ⚠️' : '');
+      let msg = `🔐 <b>Cierre de caja</b>\nEsperado ${tgMonto(esperado)} · Contado ${tgMonto(contado)}\n📊 ${difTg}`;
+      if (usdContado > 0) msg += `\n💲 Dólares contados: u$${Math.round(usdContado).toLocaleString('es-AR')}`;
+      msg += `\n🕐 ${tgHora()}`;
+      tgNotify(msg);
+    }
     // Primero preguntar caja chica, después caja dueño
     setTimeout(() => openCajaChicaModal(contado), 600);
   } catch(e) { toast('Error al guardar cierre', 'error'); }

@@ -1524,6 +1524,13 @@ async function confirmSell() {
     closeSellModal();
     closeDetail();
     toast(regCaja ? 'Venta registrada en caja ✅' : 'Venta registrada ✅', 'success');
+    // 📨 Aviso Telegram: equipo del stock vendido
+    if (typeof tgNotify === 'function') {
+      const specsTg = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' ');
+      tgNotify(`📱 <b>Equipo vendido</b>\n`
+        + `${esc(p.marca)} ${esc(p.modelo)}${specsTg ? ' ' + esc(specsTg) : ''} — ${tgMonto(p.precio)}\n`
+        + `💳 ${esc(formaPago || '—')}${regCaja ? '' : ' (sin registrar en caja)'} · 👤 ${esc(vendedor || '—')} · 🕐 ${tgHora()}`);
+    }
   } catch (e) {
     console.error('confirmSell:', e);
     toast('Error al registrar la venta — intentá de nuevo', 'error');

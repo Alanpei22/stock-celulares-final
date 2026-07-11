@@ -460,6 +460,10 @@ async function saveCajaDuenoFromCierre() {
     });
     closeCajaDuenoPrompt();
     toast('📦 ' + fmt(monto) + ' guardado en caja dueño', 'success');
+    // 📨 Aviso Telegram: apartado a caja dueño en el cierre
+    if (typeof tgNotify === 'function') {
+      tgNotify(`📦 <b>${tgMonto(monto)} a caja dueño</b>\n${desc ? esc(desc) + '\n' : ''}🕐 ${tgHora()}`);
+    }
   } catch(e) { toast('Error al guardar en caja dueño', 'error'); }
 }
 
@@ -566,5 +570,9 @@ async function saveCajaDuenoMov() {
     closeCajaDuenoMovForm();
     _loadCajaDueno();
     toast((tipo === 'ingreso' ? '📦 Ingreso' : '💸 Egreso') + ' guardado', 'success');
+    // 📨 Aviso Telegram: movimiento manual de caja dueño
+    if (typeof tgNotify === 'function') {
+      tgNotify(`📦 <b>Caja dueño: ${tipo === 'ingreso' ? 'ingreso' : 'egreso'} ${tgMonto(monto)}</b>\n${desc ? esc(desc) + '\n' : ''}🕐 ${tgHora()}`);
+    }
   } catch(e) { toast('Error al guardar', 'error'); }
 }

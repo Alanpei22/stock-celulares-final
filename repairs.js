@@ -1028,6 +1028,13 @@ async function saveRepair() {
         extra: { nOrden, marca, modelo, arreglo, monto, nombre }
       });
       triggerWaNotify('ingreso', { marca, modelo, nOrden, arreglo, nombre, monto });
+      // 📨 Aviso Telegram: equipo ingresado
+      if (typeof tgNotify === 'function') {
+        tgNotify(`🔧 <b>Equipo ingresado #${nOrden}</b>\n`
+          + `${esc(marca)} ${esc(modelo)} — ${esc(arreglo)}\n`
+          + `💵 ${tgMonto(monto)}${sena > 0 ? ` (seña ${tgMonto(sena)})` : ''}`
+          + `${nombre ? `\n👤 ${esc(nombre)}` : ''} · 🕐 ${tgHora()}`);
+      }
       // CRM: crear/actualizar ficha del cliente (no bloqueante)
       if (tlf && typeof upsertCliente === 'function') {
         upsertCliente({ tlf, nombre, dni });
@@ -1356,6 +1363,19 @@ async function changeRepairStatus(id, newStatus) {
   await _doChangeRepairStatus(id, newStatus, r);
 }
 
+// 📨 Aviso Telegram de cambios de estado relevantes (listo / entregado / no va)
+function _tgEstadoRepair(newStatus, r, update = {}) {
+  if (typeof tgNotify !== 'function' || !r) return;
+  const eq = `#${r.nOrden || '?'} — ${esc(r.marca || '')} ${esc(r.modelo || '')}`;
+  if (newStatus === 'listo') {
+    tgNotify(`✅ <b>Listo para retirar</b> ${eq} · 🕐 ${tgHora()}`);
+  } else if (newStatus === 'entregado') {
+    tgNotify(`📦 <b>Entregado</b> ${eq}${r.monto > 0 ? ' · ' + tgMonto(r.monto) : ''} · 🕐 ${tgHora()}`);
+  } else if (newStatus === 'no va' || newStatus === 'cancelado') {
+    tgNotify(`↩️ <b>No va</b> ${eq} (${update.devuelto ? 'devuelto al cliente' : 'PARA DEVOLVER'}) · 🕐 ${tgHora()}`);
+  }
+}
+
 async function _doChangeRepairStatus(id, newStatus, r, extra = {}) {
   const ahora = new Date().toISOString();
   const update = { estado: newStatus, ...extra };
@@ -1370,6 +1390,7 @@ async function _doChangeRepairStatus(id, newStatus, r, extra = {}) {
       upsertSeguimientoPublico({ ...r, ...update });
     }
     toast('Estado: ' + (REPAIR_STATES[newStatus]?.label || newStatus), 'success');
+    _tgEstadoRepair(newStatus, r, update);
 
     const estadoLabel = REPAIR_STATES[newStatus]?.label || newStatus;
     logActivity({
@@ -3013,6 +3034,7 @@ async function _doStatusChange(id, newStatus, extra = {}) {
   try {
     await db.collection('repairs').doc(id).update(update);
     toast('→ ' + (REPAIR_STATES[newStatus]?.label || newStatus), 'success');
+    _tgEstadoRepair(newStatus, REPAIRS.find(x => x.id === id), update);
     // WA auto-notify on entregado
     if (newStatus === 'entregado') {
       const r = REPAIRS.find(x => x.id === id);

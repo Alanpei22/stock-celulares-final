@@ -229,3 +229,34 @@ async function verifyOwnerPin(db, pin) {
 
   return { ok: false, created: false };
 }
+
+// ══════════════════════════════════════════
+//  TELEGRAM — aviso de movimientos al dueño
+//  Fire-and-forget: jamás bloquea ni rompe la operación que avisa.
+// ══════════════════════════════════════════
+function tgNotify(texto) {
+  try {
+    // Toggle: apagable desde Configuración → Notificaciones (default: prendido)
+    if (typeof getNotifConfig === 'function') {
+      const cfg = getNotifConfig();
+      if (cfg?.telegram?.enabled === false) return;
+    }
+    fetch('/api/telegram-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: String(texto || '') }),
+    }).catch(() => {});
+  } catch { /* nunca romper la app por una notificación */ }
+}
+
+// Hora corta AR para los mensajes de Telegram
+function tgHora() {
+  return new Date().toLocaleTimeString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+// Formato $ para los mensajes
+function tgMonto(n) {
+  return '$' + Math.round(Number(n) || 0).toLocaleString('es-AR');
+}
