@@ -162,7 +162,40 @@ const AYUDA = `🤖 <b>Consultas disponibles:</b>
 · <b>iphone juan</b> → buscar reparación por texto
 · <b>stock</b> o <b>stock iphone 13</b> → equipos a la venta
 · <b>precio a54</b> → lista de precios de reparación
-· <b>caja</b> → los números de hoy`;
+· <b>caja</b> → los números de hoy
+· 📷 Mandá una <b>foto con el N° de orden como pie</b> → se adjunta a esa reparación`;
+
+// ── Foto recibida: adjuntarla a la reparación del N° de orden del pie ──
+async function handleFoto(db, msg) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const caption = (msg.caption || '').trim();
+  const m = caption.match(/\d{1,7}/);
+  if (!m) {
+    return 'Para adjuntar la foto a una reparación, mandala con el <b>N° de orden como pie de foto</b>.\nEj: sacás la foto y en el texto ponés <b>7123</b>.';
+  }
+  const num = parseInt(m[0], 10);
+  const snap = await db.collection('repairs').where('nOrden', '==', num)
+    .select('marca', 'modelo', 'nOrden').limit(1).get();
+  if (snap.empty) return `No encontré la reparación #${num} 🤷 — revisá el número.`;
+  const doc = snap.docs[0];
+  const r = doc.data();
+
+  // Elegir el tamaño más grande hasta ~900px (mismo criterio que la app)
+  const sizes = (msg.photo || []).slice().sort((a, b) => (a.width || 0) - (b.width || 0));
+  const candidatos = sizes.filter(p => (p.width || 0) <= 900);
+  const ph = candidatos.length ? candidatos[candidatos.length - 1] : sizes[0];
+  if (!ph) return '⚠️ No pude leer la foto, probá de nuevo.';
+
+  // Descargar el archivo desde Telegram
+  const fi = await (await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${ph.file_id}`)).json();
+  if (!fi.ok) return '⚠️ No pude descargar la foto de Telegram, probá de nuevo.';
+  const buf = Buffer.from(await (await fetch(`https://api.telegram.org/file/bot${token}/${fi.result.file_path}`)).arrayBuffer());
+  if (buf.length > 750 * 1024) return '⚠️ La foto es demasiado pesada, probá mandarla de nuevo (Telegram la comprime solo).';
+
+  const dataUrl = 'data:image/jpeg;base64,' + buf.toString('base64');
+  await doc.ref.update({ foto: dataUrl });
+  return `📷 <b>Foto guardada</b> en #${num} — ${esc(r.marca || '')} ${esc(r.modelo || '')} ✅\nYa se ve en la app, en el detalle de la reparación.`;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -175,15 +208,36 @@ export default async function handler(req, res) {
 
   const msg = (req.body || {}).message;
   // Siempre 200 para que Telegram no reintente
-  if (!msg || !msg.text) return res.status(200).json({ ok: true });
+  if (!msg) return res.status(200).json({ ok: true });
 
   // (2) Solo el chat del dueño
   if (String(msg.chat?.id) !== String(process.env.TELEGRAM_CHAT_ID)) {
     return res.status(200).json({ ok: true, skipped: 'chat desconocido' });
   }
 
-  const text = msg.text.trim();
   let respuesta;
+
+  // 📷 Foto adjunta → guardarla en la reparación del N° del pie
+  if (Array.isArray(msg.photo) && msg.photo.length) {
+    try {
+      respuesta = await handleFoto(getAdmin().firestore(), msg);
+    } catch (e) {
+      console.error('telegram-webhook foto:', e);
+      respuesta = '⚠️ Error guardando la foto. Probá de nuevo en un rato.';
+    }
+    await _tgReply(msg.chat.id, respuesta);
+    return res.status(200).json({ ok: true });
+  }
+
+  // Documento-imagen (foto "sin comprimir"): pedir que la mande como foto
+  if (msg.document && String(msg.document.mime_type || '').startsWith('image/')) {
+    await _tgReply(msg.chat.id, 'Mandala como <b>foto</b> (no como archivo), así Telegram la comprime y la puedo guardar 📷');
+    return res.status(200).json({ ok: true });
+  }
+
+  if (!msg.text) return res.status(200).json({ ok: true });
+
+  const text = msg.text.trim();
   try {
     const db = getAdmin().firestore();
     const lower = text.toLowerCase();
@@ -206,18 +260,22 @@ export default async function handler(req, res) {
     respuesta = '⚠️ Error consultando la base. Probá de nuevo en un rato.';
   }
 
+  await _tgReply(msg.chat.id, respuesta);
+  return res.status(200).json({ ok: true });
+}
+
+// Enviar respuesta al chat (best-effort)
+async function _tgReply(chatId, texto) {
   try {
     await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: msg.chat.id,
-        text: respuesta.slice(0, 4000),
+        chat_id: chatId,
+        text: String(texto || '').slice(0, 4000),
         parse_mode: 'HTML',
         disable_web_page_preview: true,
       }),
     });
   } catch (e) { console.error('telegram-webhook send:', e); }
-
-  return res.status(200).json({ ok: true });
 }
