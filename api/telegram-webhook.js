@@ -163,14 +163,92 @@ const AYUDA = `🤖 <b>Consultas disponibles:</b>
 · <b>stock</b> o <b>stock iphone 13</b> → equipos a la venta
 · <b>precio a54</b> → lista de precios de reparación
 · <b>caja</b> → los números de hoy
+· <b>ayer</b> / <b>semana</b> / <b>mes</b> → resumen del período
 · 📷 Mandá una <b>foto con el N° de orden como pie</b> → se adjunta a esa reparación
 
 📦 <b>Cargar mercadería:</b>
-· <b>sumar 5 funda iphone 13</b> → le suma 5 al stock de ese artículo
-· <b>nuevo Funda iPhone 15 $8000 x5</b> → crea el producto (precio y cantidad)`;
+· <b>sumar 5 funda iphone 13</b> → suma 5 al stock (con <b>$3000</b> al final también actualiza el costo)
+· <b>nuevo Funda iPhone 15 $8000 $3000 x5</b> → crea el producto (venta $8000, costo $3000 opcional, x5 opcional)`;
+
+// ── Resumen de un período: ayer / semana / mes (con comparación) ──
+function _rangoPeriodo(tab) {
+  const hoy = todayAR(); // YYYY-MM-DD en AR
+  const d = (s, dias) => {
+    const dt = new Date(s + 'T12:00:00');
+    dt.setDate(dt.getDate() + dias);
+    return dt.toISOString().slice(0, 10);
+  };
+  if (tab === 'ayer') {
+    const ayer = d(hoy, -1);
+    return { from: ayer, to: ayer, label: 'Ayer', prevFrom: d(hoy, -2), prevTo: d(hoy, -2), prevLabel: 'anteayer' };
+  }
+  if (tab === 'semana') {
+    return { from: d(hoy, -6), to: hoy, label: 'Últimos 7 días', prevFrom: d(hoy, -13), prevTo: d(hoy, -7), prevLabel: 'semana anterior' };
+  }
+  // mes calendario actual vs mes pasado completo
+  const mesIni = hoy.slice(0, 8) + '01';
+  const prevIni = d(mesIni, -1).slice(0, 8) + '01';
+  return { from: mesIni, to: hoy, label: 'Este mes', prevFrom: prevIni, prevTo: d(mesIni, -1), prevLabel: 'mes pasado' };
+}
+
+async function _statsPeriodo(db, from, to) {
+  const snap = await db.collection('caja_movimientos')
+    .where('fecha', '>=', from).where('fecha', '<=', to)
+    .select('tipo', 'monto', 'monto2', 'metodoPago', 'metodoPago2', 'categoria', 'gananciaARS', 'montoUSD').get();
+  let ing = 0, gastos = 0, retiros = 0, ganancia = 0, ventas = 0, usd = 0;
+  const porMet = {};
+  snap.docs.forEach(doc => {
+    const m = doc.data();
+    const monto = Number(m.monto) || 0, m2 = Number(m.monto2) || 0;
+    if (m.tipo === 'ingreso') {
+      ing += monto; ventas++;
+      ganancia += Number(m.gananciaARS) || 0;
+      if (m.metodoPago === 'Dólares') usd += Number(m.montoUSD) || 0;
+      else {
+        const met1 = m.metodoPago || 'Efectivo';
+        porMet[met1] = (porMet[met1] || 0) + (monto - m2);
+        if (m2 > 0 && m.metodoPago2) porMet[m.metodoPago2] = (porMet[m.metodoPago2] || 0) + m2;
+      }
+    } else if (m.categoria === 'Retiro dueño') retiros += monto;
+    else gastos += monto;
+  });
+  return { ing, gastos, retiros, ganancia, ventas, usd, porMet };
+}
+
+async function qPeriodo(db, tab) {
+  const r = _rangoPeriodo(tab);
+  const [cur, prev] = await Promise.all([
+    _statsPeriodo(db, r.from, r.to),
+    _statsPeriodo(db, r.prevFrom, r.prevTo),
+  ]);
+  if (!cur.ventas && !cur.gastos && !cur.retiros) return `Sin movimientos en ${r.label.toLowerCase()} 🤷`;
+  const neto = cur.ing - cur.gastos;
+  const netoPrev = prev.ing - prev.gastos;
+  const delta = netoPrev > 0 ? Math.round(((neto - netoPrev) / netoPrev) * 100) : null;
+  const metStr = Object.entries(cur.porMet).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 4)
+    .map(([met, v]) => `· ${esc(met)}: ${fmt(v)}`).join('\n');
+  const lineas = [
+    `📊 <b>${r.label}</b> (${r.from.split('-').reverse().join('/')} → ${r.to.split('-').reverse().join('/')})`,
+    `💰 Ingresos: <b>${fmt(cur.ing)}</b> (${cur.ventas} mov.)`,
+  ];
+  if (metStr) lineas.push(metStr);
+  if (cur.usd > 0) lineas.push(`💲 Dólares: u$${Math.round(cur.usd).toLocaleString('es-AR')}`);
+  lineas.push(`💸 Gastos: ${fmt(cur.gastos)}`);
+  if (cur.retiros > 0) lineas.push(`🏧 Retiros dueño: ${fmt(cur.retiros)} (aparte)`);
+  if (cur.ganancia > 0) lineas.push(`📈 Ganancia productos: ${fmt(cur.ganancia)}`);
+  lineas.push(`📊 <b>Neto: ${fmt(neto)}</b>${delta !== null ? ` (${delta >= 0 ? '▲ +' : '▼ '}${delta}% vs ${r.prevLabel})` : ''}`);
+  return lineas.join('\n');
+}
 
 // ── Sumar stock a un producto (accesorio) o repuesto existente ──
+// Acepta "$3000" al final para actualizar también el precio de costo.
 async function qSumarStock(db, cant, texto) {
+  let nuevoCosto = 0;
+  const mCosto = texto.match(/\s\$\s*([\d.,]+)\s*$/);
+  if (mCosto) {
+    nuevoCosto = parseInt(String(mCosto[1]).replace(/[.,]/g, ''), 10) || 0;
+    texto = texto.slice(0, mCosto.index).trim();
+  }
   const terms = texto.toLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return 'Decime qué artículo, ej: <b>sumar 5 funda iphone 13</b>';
 
@@ -199,17 +277,31 @@ async function qSumarStock(db, cant, texto) {
   }
 
   const m = matches[0];
-  await m.ref.update({ [m.campo]: admin.firestore.FieldValue.increment(cant) });
-  return `✅ <b>+${cant} u.</b> → ${m.tipo} <b>${esc(m.nombre)}</b>\nStock: ${m.stock} → <b>${m.stock + cant}</b>`;
+  const upd = { [m.campo]: admin.firestore.FieldValue.increment(cant) };
+  let costoNota = '';
+  if (nuevoCosto > 0) {
+    if (m.campo === 'stock') { // producto (accesorio): costo en ARS
+      upd.precioCosto = nuevoCosto;
+      costoNota = `\n💵 Costo actualizado: ${fmt(nuevoCosto)}`;
+    } else { // repuesto: el costo se maneja en USD desde la app
+      costoNota = '\n⚠️ El costo de los repuestos va en u$s — actualizalo desde la app.';
+    }
+  }
+  await m.ref.update(upd);
+  return `✅ <b>+${cant} u.</b> → ${m.tipo} <b>${esc(m.nombre)}</b>\nStock: ${m.stock} → <b>${m.stock + cant}</b>${costoNota}`;
 }
 
-// ── Crear un producto (accesorio) nuevo: "nuevo <nombre> $<precio> [x<cant>]" ──
+// ── Crear un producto (accesorio) nuevo ──
+// "nuevo <nombre> $<venta> [$<costo>] [x<cant>]" — los precios van con $ (así los
+// números del nombre, ej. "iPhone 13", no se confunden con precios).
 async function qNuevoProducto(db, texto) {
-  const m = texto.match(/^(.+?)\s+\$?\s*([\d.,]+)\s*(?:x\s*(\d+))?$/i);
-  if (!m) return 'Formato: <b>nuevo Funda iPhone 15 $8000 x5</b> (la cantidad es opcional, default 1)';
+  const m = texto.match(/^(.+?)\s+\$\s*([\d.,]+)(?:\s+\$\s*([\d.,]+))?\s*(?:x\s*(\d+))?$/i);
+  if (!m) return 'Formato: <b>nuevo Funda iPhone 15 $8000 $3000 x5</b>\n($venta obligatorio · $costo y x cantidad opcionales)';
+  const num = s => parseInt(String(s || '').replace(/[.,]/g, ''), 10) || 0;
   const nombre = m[1].trim();
-  const precio = parseInt(String(m[2]).replace(/[.,]/g, ''), 10) || 0;
-  const cant   = parseInt(m[3], 10) || 1;
+  const precio = num(m[2]);
+  const costo  = num(m[3]);
+  const cant   = parseInt(m[4], 10) || 1;
   if (!nombre || precio <= 0) return 'Necesito nombre y precio, ej: <b>nuevo Funda iPhone 15 $8000 x5</b>';
 
   // Evitar duplicado exacto
@@ -219,12 +311,12 @@ async function qNuevoProducto(db, texto) {
 
   await db.collection('productos').add({
     codigo: '', nombre, categoria: '',
-    precioVenta: precio, precioCosto: 0,
+    precioVenta: precio, precioCosto: costo,
     stock: cant, stockMin: 0, activo: true,
     fechaAlta: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
-  return `✅ <b>Producto creado</b>\n📦 ${esc(nombre)} · ${fmt(precio)} · stock ${cant}\n(Queda en Accesorios; el costo lo cargás después si querés)`;
+  return `✅ <b>Producto creado</b>\n📦 ${esc(nombre)} · venta ${fmt(precio)}${costo > 0 ? ` · costo ${fmt(costo)} · 📈 margen ${fmt(precio - costo)}` : ''} · stock ${cant}\n(Queda en Accesorios${costo > 0 ? '' : '; el costo lo cargás después si querés'})`;
 }
 
 // ── Foto recibida: adjuntarla a la reparación del N° de orden del pie ──
@@ -309,6 +401,8 @@ export default async function handler(req, res) {
       respuesta = await qRepairByOrden(db, parseInt(text.replace('/', ''), 10));
     } else if (lower === 'caja' || lower === '/caja') {
       respuesta = await qCaja(db);
+    } else if (lower === 'ayer' || lower === 'semana' || lower === 'mes') {
+      respuesta = await qPeriodo(db, lower);
     } else if (lower.startsWith('stock')) {
       respuesta = await qStock(db, text.slice(5).trim());
     } else if (lower.startsWith('precio')) {

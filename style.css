@@ -4981,6 +4981,9 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
   padding: 4px 6px 2px; font-size: 13px; color: var(--text2);
 }
 .cart-total-row b { font-size: 15px; color: var(--text); }
+.cart-libre-inputs { flex-basis: 100%; display: flex; gap: 6px; margin-top: 6px; }
+.cart-libre-inputs .cart-price-input { flex: 1; margin-top: 0; flex-basis: auto; }
+.cart-libre-inputs .cart-costo-input { border-style: dashed; }
 .cart-price-input {
   flex-basis: 100%; margin-top: 6px;
   padding: 8px 10px; font-size: 14px;

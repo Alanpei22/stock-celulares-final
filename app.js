@@ -1541,6 +1541,14 @@ async function confirmSell() {
     closeSellModal();
     closeDetail();
     toast(regCaja ? 'Venta registrada en caja ✅' : 'Venta registrada ✅', 'success');
+    // 🧾 Ofrecer comprobante de venta (con garantía) para el cliente
+    if (typeof printVentaTicket === 'function') {
+      setTimeout(() => {
+        if (confirm('🧾 ¿Imprimir comprobante de venta para el cliente?')) {
+          printVentaTicket(id, { ...p, ...stockUpdate });
+        }
+      }, 350);
+    }
     // 📨 Aviso Telegram: equipo del stock vendido (detallado)
     if (typeof tgNotify === 'function') {
       const specsTg = [p.almacenamiento, p.ram ? p.ram + ' RAM' : '', p.bateria ? '🔋' + p.bateria + '%' : ''].filter(Boolean).join(' · ');

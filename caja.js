@@ -1711,6 +1711,12 @@ function _setCartPrice(i, val) {
   _updateMovResumen();
 }
 
+// Costo del ítem libre: alimenta la ganancia del movimiento y el precioCosto del alta
+function _setCartCosto(i, val) {
+  if (!_cart[i]) return;
+  _cart[i].costoARS = Math.max(0, parseFloat(val) || 0);
+}
+
 function _addToCart(r) {
   const stockMax = r.stock > 0 ? r.stock : 999;
   // Los productos libres (sin id) nunca se agrupan: cada uno es una línea aparte.
@@ -1765,7 +1771,10 @@ function _renderCart() {
     let metaHtml, extraHtml = '';
     if (isLibre) {
       metaHtml = `<span class="sale-item-meta">🏷️ Producto libre · se agrega al inventario</span>`;
-      extraHtml = `<input type="number" class="cart-price-input" min="0" inputmode="numeric" value="${it.precio || ''}" placeholder="Precio $" oninput="_setCartPrice(${i}, this.value)">`;
+      extraHtml = `<div class="cart-libre-inputs">
+        <input type="number" class="cart-price-input" min="0" inputmode="numeric" value="${it.precio || ''}" placeholder="Precio venta $" oninput="_setCartPrice(${i}, this.value)">
+        <input type="number" class="cart-price-input cart-costo-input" min="0" inputmode="numeric" value="${it.costoARS || ''}" placeholder="Costo $ (opcional)" oninput="_setCartCosto(${i}, this.value)">
+      </div>`;
     } else if (isEquipo) {
       metaHtml = `<span class="sale-item-meta">📱 Equipo${it.extra ? ' · ' + esc(it.extra) : ''} · ${fmt(sub)}</span>`;
     } else {
@@ -2020,8 +2029,8 @@ async function saveMov() {
         // Equipo del stock → se marca como vendido (no descuenta cantidad)
         equiposVendidos.push(it.id);
       } else if (esLibre) {
-        // Producto libre → se da de alta en el inventario (stock 0, costo 0; se ajusta después)
-        nuevosProductos.push({ nombre: it.nombre, precioVenta: Number(it.precio) || 0 });
+        // Producto libre → se da de alta en el inventario (con el costo si se cargó)
+        nuevosProductos.push({ nombre: it.nombre, precioVenta: Number(it.precio) || 0, precioCosto: Number(it.costoARS) || 0 });
       } else {
         const collection = it.source === 'producto' ? 'productos' : 'repuestos';
         const stockField = it.source === 'producto' ? 'stock' : 'cantidad';
@@ -2174,7 +2183,7 @@ async function saveMov() {
           try {
             await db.collection('productos').add({
               codigo: '', nombre: np.nombre, categoria: '',
-              precioVenta: np.precioVenta, precioCosto: 0,
+              precioVenta: np.precioVenta, precioCosto: np.precioCosto || 0,
               stock: 0, stockMin: 0, activo: true,
               fechaAlta: firebase.firestore.FieldValue.serverTimestamp(),
               updatedAt: firebase.firestore.FieldValue.serverTimestamp(),

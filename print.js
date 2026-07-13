@@ -599,9 +599,12 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 // ══════════════════════════════════════════
 //  VENTA DE EQUIPO — ficha imprimible (Stock)
 // ══════════════════════════════════════════
-function printVentaTicket(stockId) {
-  const p = (typeof STOCK !== 'undefined') ? STOCK.find(x => x.id === stockId) : null;
+function printVentaTicket(stockId, extra) {
+  // extra: datos de la venta recién hecha (aún no sincronizados en STOCK)
+  let p = (typeof STOCK !== 'undefined') ? STOCK.find(x => x.id === stockId) : null;
+  if (!p && extra) p = extra;
   if (!p) { alert('Equipo no encontrado'); return; }
+  if (extra) p = { ...p, ...extra };
   const businessName = (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint';
   const fechaVenta = p.fecha_venta ? new Date(p.fecha_venta).toLocaleDateString('es-AR', { timeZone:'America/Argentina/Buenos_Aires', day:'2-digit', month:'2-digit', year:'numeric' }) : _today();
   const horaVenta = p.fecha_venta ? new Date(p.fecha_venta).toLocaleTimeString('es-AR', { timeZone:'America/Argentina/Buenos_Aires', hour:'2-digit', minute:'2-digit' }) : '';
