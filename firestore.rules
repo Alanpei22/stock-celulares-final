@@ -2,18 +2,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helpers ──
-    function signedIn() { return request.auth != null; }
+    // Allowlist de cuentas autorizadas del negocio.
+    // El registro público de Firebase está abierto (cualquiera puede crear
+    // una cuenta), así que NO alcanza con "estar logueado": solo estos UIDs
+    // pueden tocar la base. Para sumar un empleado, agregá su UID acá.
+    function isAllowed() {
+      return request.auth != null && request.auth.uid in [
+        'G9jAIYy86MZ1qTjRmMFyK9yO93e2'   // guyrepair22@gmail.com (dueño)
+      ];
+    }
 
     // ── config/owner: PIN de dueño (hasheado con PBKDF2) ──
-    // Lectura: necesaria para validar el PIN client-side. El hash PBKDF2
-    // hace inviable la fuerza bruta aunque alguien lea el documento.
-    // Escritura: solo authenticated. Validamos que pinHash sea string
-    // y que NO se vuelva a escribir un campo `pin` en texto plano.
     match /config/owner {
-      allow read: if signedIn();
-      allow delete: if signedIn();
-      allow create, update: if signedIn()
+      allow read: if isAllowed();
+      allow delete: if isAllowed();
+      allow create, update: if isAllowed()
                    && (!('pin' in request.resource.data))
                    && (!('pinHash' in request.resource.data)
                        || request.resource.data.pinHash is string);
@@ -21,35 +24,35 @@ service cloud.firestore {
 
     // ── Resto de config (templates WA, settings, etc.) ──
     match /config/{doc} {
-      allow read, write: if signedIn();
+      allow read, write: if isAllowed();
     }
 
     // ── Subcolección de dispositivos para push ──
     match /caja_config/{doc=**} {
-      allow read, write: if signedIn();
+      allow read, write: if isAllowed();
     }
 
     // ── Backups: solo crear/leer, nunca borrar desde el cliente ──
     match /backups/{doc} {
-      allow read, create: if signedIn();
+      allow read, create: if isAllowed();
       allow update, delete: if false;
     }
 
     // ── Seguimiento público de reparaciones (QR del ticket) ──
     // Lectura PÚBLICA (el cliente escanea el QR sin estar logueado).
     // Contiene SOLO datos no sensibles: estado, equipo, fechas.
-    // Escritura: solo el negocio (authenticated).
+    // Escritura: solo cuentas autorizadas.
     match /seguimiento_publico/{id} {
       allow read: if true;
-      allow write: if signedIn();
+      allow write: if isAllowed();
     }
 
     // ── Todas las demás colecciones del negocio ──
     // (stock, repairs, repuestos, productos, caja_movimientos,
     //  caja_arqueos, caja_cierres, precios_reparaciones, actividad, etc.)
-    // Acceso solo a usuarios autenticados de la cuenta del negocio.
+    // Solo las cuentas de la allowlist.
     match /{document=**} {
-      allow read, write: if signedIn();
+      allow read, write: if isAllowed();
     }
   }
 }
