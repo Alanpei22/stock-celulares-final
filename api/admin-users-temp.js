@@ -13,6 +13,12 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'unauthorized' });
   }
   try {
+    // Borrar una cuenta por uid: { deleteUid }
+    const delUid = (req.body || {}).deleteUid;
+    if (delUid) {
+      await getAdmin().auth().deleteUser(delUid);
+      return res.status(200).json({ deleted: delUid });
+    }
     const users = [];
     let pageToken;
     do {
