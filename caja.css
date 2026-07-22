@@ -1512,3 +1512,15 @@ body.dark .rmcp-val { color:#D4A76A; }
 .rep-var-inline-input.rep-svc-saving { opacity:.5; }
 .rep-var-inline-input.rep-svc-saved { border-color:#10b981; border-style:solid; }
 body.dark .rep-var-inline-input { color:#eee; border-color:rgba(255,255,255,.2); }
+
+/* ══ Comprobante de venta — picker de equipo ══ */
+.comprobante-list { max-height:46vh; overflow-y:auto; margin-top:10px; display:flex; flex-direction:column; gap:6px; }
+.comprobante-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 13px; border:1px solid var(--border,#e3e1de); border-radius:12px; background:var(--bg1,#f7f7f7); cursor:pointer; }
+.comprobante-item:active { transform:scale(.99); }
+.comprobante-item-info { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.comprobante-item-name { font-weight:700; font-size:.92rem; color:var(--t1,#1a1a1a); }
+.comprobante-item-meta { font-size:.72rem; color:var(--t3,#999); }
+.comprobante-item-precio { font-weight:800; font-size:.9rem; color:var(--accent,#C8965A); white-space:nowrap; flex-shrink:0; }
+.comprobante-empty { text-align:center; color:var(--t3,#999); font-size:.85rem; padding:16px 8px; }
+body.dark .comprobante-item { background:#1c1c1e; border-color:rgba(255,255,255,.08); }
+body.dark .comprobante-item-name { color:#eee; }

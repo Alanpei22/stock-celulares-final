@@ -1110,6 +1110,25 @@ function switchCajaTab(tab) {
 }
 </script>
 
+<!-- ═══════════ MODAL: COMPROBANTE DE VENTA (picker de equipo) ═══════════ -->
+<div id="comprobante-overlay" class="nota-overlay hidden" onclick="closeComprobanteModal()"></div>
+<div id="comprobante-modal" class="arqueo-modal hidden" style="max-width:420px">
+  <div class="nota-modal-hdr">
+    <span>🧾 Comprobante de venta</span>
+    <button onclick="closeComprobanteModal()">✕</button>
+  </div>
+  <p class="arqueo-sub">Elegí el equipo y se autocompleta modelo, capacidad, IMEI, batería y precio. El resto lo completás en el generador.</p>
+  <div class="precios-search-wrap" style="margin-top:8px">
+    <span class="precios-search-ico">🔍</span>
+    <input id="comprobante-search" type="search" placeholder="Buscar equipo del stock…" autocomplete="off" oninput="_renderComprobanteList()">
+  </div>
+  <div id="comprobante-list" class="comprobante-list"></div>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button class="btn-secondary" onclick="closeComprobanteModal()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" onclick="_abrirComprobante(null)" style="flex:2">📄 En blanco</button>
+  </div>
+</div>
+
 <!-- ═══════════ MODAL: NUEVO MODELO DE REPARACIÓN ═══════════ -->
 <div id="newmod-overlay" class="nota-overlay hidden" onclick="closeNewModeloModal()"></div>
 <div id="newmod-modal" class="arqueo-modal hidden" style="max-width:420px">

@@ -970,6 +970,7 @@ function toggleCajaMenu() {
     { icon: '🔄', label: 'Cierre de turno', sub: 'Cambio de cajero', onClick: openCierreParcialModal },
     { icon: '🔐', label: CIERRE ? 'Cierre registrado' : 'Cerrar caja del día', sub: CIERRE ? `Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}` : null, onClick: openCierreModal },
     { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', onClick: openReporteModal },
+    { icon: '🧾', label: 'Comprobante de venta', sub: 'Equipos — se autocompleta del stock', onClick: openComprobanteModal },
     { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
     { divider: true, hide: !isOwner },
     { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
@@ -980,6 +981,70 @@ function toggleCajaMenu() {
   ]);
 }
 function closeCajaMenu() { closeSheet(); }
+
+// ══════════════════════════════════════════
+//  COMPROBANTE DE VENTA — picker de equipo + prefill del generador
+// ══════════════════════════════════════════
+function openComprobanteModal() {
+  const inp = document.getElementById('comprobante-search');
+  if (inp) inp.value = '';
+  _renderComprobanteList();
+  document.getElementById('comprobante-overlay').classList.remove('hidden');
+  document.getElementById('comprobante-modal').classList.remove('hidden');
+  setTimeout(() => inp?.focus(), 150);
+}
+function closeComprobanteModal() {
+  document.getElementById('comprobante-overlay').classList.add('hidden');
+  document.getElementById('comprobante-modal').classList.add('hidden');
+}
+function _renderComprobanteList() {
+  const cont = document.getElementById('comprobante-list');
+  if (!cont) return;
+  const q = (document.getElementById('comprobante-search')?.value || '').trim().toLowerCase();
+  let items = (Array.isArray(CAJA_STOCK) ? CAJA_STOCK : []).filter(p => !p.vendido);
+  if (q) {
+    const terms = q.split(/\s+/).filter(Boolean);
+    items = items.filter(p => {
+      const hay = `${p.marca || ''} ${p.modelo || ''} ${p.almacenamiento || ''} ${p.imei || ''}`.toLowerCase();
+      return terms.every(t => hay.includes(t));
+    });
+  }
+  if (!items.length) {
+    cont.innerHTML = `<p class="comprobante-empty">${q ? 'Sin equipos para esa búsqueda' : 'No hay equipos en stock'} · podés hacerlo <b>En blanco</b></p>`;
+    return;
+  }
+  cont.innerHTML = items.slice(0, 20).map(p => {
+    const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : '', p.bateria ? '🔋' + p.bateria + '%' : ''].filter(Boolean).join(' · ');
+    const precio = p.moneda === 'usd' && p.precioUSD ? `u$${p.precioUSD.toLocaleString('es-AR')}` : (p.precio ? '$' + p.precio.toLocaleString('es-AR') : '—');
+    return `<div class="comprobante-item" onclick="_abrirComprobante('${esc(p.id)}')">
+      <div class="comprobante-item-info">
+        <span class="comprobante-item-name">📱 ${esc(p.marca)} ${esc(p.modelo)}</span>
+        <span class="comprobante-item-meta">${esc(specs)}</span>
+      </div>
+      <span class="comprobante-item-precio">${precio}</span>
+    </div>`;
+  }).join('');
+}
+function _abrirComprobante(id) {
+  try {
+    let prefill = {};
+    if (id) {
+      const p = (CAJA_STOCK || []).find(x => x.id === id);
+      if (p) {
+        prefill = {
+          modelo: `${p.marca || ''} ${p.modelo || ''}`.trim(),
+          capacidad: p.almacenamiento || '',
+          imei1: p.imei || '',
+          bateria: p.bateria != null ? String(p.bateria) : '',
+          precio: p.precio != null ? String(p.precio) : '',
+        };
+      }
+    }
+    localStorage.setItem('techpoint_prefill', JSON.stringify(prefill));
+  } catch (e) { console.error('comprobante prefill:', e); }
+  closeComprobanteModal();
+  window.open('comprobante-venta.html', '_blank');
+}
 // HIGH-01: listener registrado una sola vez en initApp (ver abajo), no en top-level
 let _cajaMenuClickHandler = null;
 
