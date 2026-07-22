@@ -2078,7 +2078,16 @@ async function saveMov() {
         metodoCobro: metodoPago,
         fechaCobro: new Date().toISOString(),
       };
-      if (repair.estado === 'listo') upd.estado = 'entregado';
+      // Preguntar si el cliente se lleva el equipo → marcar ENTREGADO
+      if (repair.estado !== 'entregado') {
+        const yaEntregado = confirm('📦 ¿El cliente ya se lleva el equipo?\n\nAceptar = marcar ENTREGADO\nCancelar = dejar el estado como está (queda solo cobrado)');
+        if (yaEntregado) {
+          upd.estado = 'entregado';
+          upd.fechaEntrega = new Date().toISOString();
+          const prevHist = Array.isArray(repair.estadoHistorial) ? repair.estadoHistorial : [];
+          upd.estadoHistorial = [...prevHist, { estado: 'entregado', fecha: upd.fechaEntrega }];
+        }
+      }
       repairUpdate = { id: repair.id, ...upd };
     }
   }
@@ -2116,7 +2125,7 @@ async function saveMov() {
         if (Array.isArray(data.items) && data.items.length > 1) {
           lineas.push(data.items.map(it => `· ${esc(it.nombre)} x${it.qty}`).join('\n'));
         }
-        if (data.repairNOrden) lineas.push(`🔧 Reparación #${data.repairNOrden} ${data.esSena ? '(seña)' : '(cobro)'}`);
+        if (data.repairNOrden) lineas.push(`🔧 Reparación #${data.repairNOrden} ${data.esSena ? '(seña)' : (repairUpdate?.estado === 'entregado' ? '(cobro · entregado 📦)' : '(cobro)')}`);
         lineas.push(`👤 ${esc(data.vendedor || '—')} · 🕐 ${tgHora()}`);
         tgNotify(lineas.join('\n'));
       }
