@@ -551,6 +551,7 @@ body.dark .cqb-chevron { background: #D4A76A; color: #1a1a1a; }
 .fab-sub:active { transform: scale(.92); }
 .fab-sub-ing { background: #D1FAE5; color: #065F46; }
 .fab-sub-eg { background: #FEE2E2; color: #991B1B; }
+.fab-sub-comp { background: #EDE9FE; color: #5B21B6; font-size: 1.15rem; }
 .fab { width: 58px; height: 58px; border: none; border-radius: 18px; background: #C8965A; color: #fff; font-size: 1.7rem; cursor: pointer; box-shadow: 0 6px 24px rgba(200,150,90,0.35); transition: transform 200ms; display: flex; align-items: center; justify-content: center; line-height: 1; }
 .fab:active { transform: scale(0.97); }
 .fab.fab-open { transform: rotate(45deg); }
@@ -794,6 +795,7 @@ body.dark .arqueo-vendedor-input:focus { border-color: #D4A76A; }
 body.dark .fab { background: #D4A76A; box-shadow: 0 6px 24px rgba(212,167,106,0.3); }
 body.dark .fab-sub-ing { background: rgba(16,185,129,0.15); color: #34D399; }
 body.dark .fab-sub-eg { background: rgba(239,68,68,0.15); color: #FCA5A5; }
+body.dark .fab-sub-comp { background: rgba(139,92,246,0.18); color: #C4B5FD; }
 
 @media (prefers-reduced-motion: reduce) {
  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
