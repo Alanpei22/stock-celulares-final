@@ -180,6 +180,29 @@ function listenRepuestos() {
 // ── Init ──────────────────────────────────
 function initRepuestos() {
   document.getElementById('rep2-add-btn').addEventListener('click', () => openRepuestoForm());
+  // ENTER en la sección Repuestos → abrir "Nuevo repuesto"
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const sec = document.getElementById('repuestos-section');
+    if (!sec || sec.classList.contains('section-hidden')) return;   // no estamos en Repuestos
+    if (document.querySelector('.modal-overlay:not(.hidden), .nota-overlay:not(.hidden)')) return; // hay un modal abierto
+    const ae = document.activeElement;
+    const tag = (ae?.tagName || '').toLowerCase();
+    // Caso típico: buscaste un repuesto que no está → Enter lo abre con el nombre precargado
+    if (ae && ae.id === 'rep2-search') {
+      e.preventDefault();
+      const q = ae.value.trim();
+      openRepuestoForm();
+      if (q) setTimeout(() => {
+        const nom = document.getElementById('rep2-fi-nombre');
+        if (nom) { nom.value = q; nom.select(); }
+      }, 320);
+      return;
+    }
+    if (['input', 'textarea', 'select', 'button'].includes(tag) || ae?.isContentEditable) return;   // se está tipeando
+    e.preventDefault();
+    openRepuestoForm();
+  });
   document.getElementById('rep2-search').addEventListener('input', () => {
     clearTimeout(rep2RenderTimer);
     rep2RenderTimer = setTimeout(renderRepuestos, 60);
