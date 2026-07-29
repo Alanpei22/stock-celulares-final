@@ -418,10 +418,25 @@ function openRepuestoForm(id) {
 
   // Hint del costo en pesos al lado del costo USD
   _updateCostoARSHint();
+  _bindRepuestoEnter();
 
   document.getElementById('rep2-form-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   setTimeout(() => document.getElementById('rep2-fi-nombre').focus(), 300);
+}
+
+// Enter en cualquier campo del form guarda el repuesto (en Notas hace salto de línea).
+function _bindRepuestoEnter() {
+  const modal = document.getElementById('rep2-form-modal');
+  if (!modal || modal._enterBound) return;
+  modal._enterBound = true;
+  modal.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const t = e.target;
+    if (!t || t.tagName === 'TEXTAREA') return;  // Notas: Enter = nueva línea
+    e.preventDefault();
+    saveRepuesto();
+  });
 }
 
 // Actualiza el hint "= $X.XXX" al costado del input de Costo USD
