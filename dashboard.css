@@ -1,0 +1,289 @@
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD — command center (dark, denso, sin sombras)
+   Scope: #dash-section + #app-sidebar. No afecta el resto de la app.
+   ══════════════════════════════════════════════════════════════ */
+#dash-section, #app-sidebar {
+  --d-bg:      #07090C;
+  --d-card:    #0F1318;
+  --d-bd:      rgba(255,255,255,.07);
+  --d-bd-2:    rgba(255,255,255,.12);
+  --d-tx:      #E8EDF2;
+  --d-mut:     #6B7683;
+  --d-cyan:    #22D3EE;
+  --d-amber:   #F5C518;
+  --d-violet:  #8B5CF6;
+  --d-green:   #22C55E;
+  --d-red:     #F43F5E;
+  --d-r:       12px;
+  --d-gap:     12px;
+}
+
+/* ── Base ── */
+#dash-section {
+  background: var(--d-bg);
+  color: var(--d-tx);
+  min-height: 100dvh;
+}
+#dash-section * { box-sizing: border-box; }
+#dash-section .dash-body {
+  padding: 16px 16px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--d-gap);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Tipografía del sistema */
+#dash-section .d-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
+  color: var(--d-mut); font-weight: 600; line-height: 1.2;
+}
+#dash-section .d-num {
+  font-size: 30px; font-weight: 700; line-height: 1.05;
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+  color: var(--d-tx);
+}
+#dash-section .d-num-sm { font-size: 22px; }
+#dash-section .d-usd {
+  font-size: 12.5px; font-weight: 600; color: var(--d-cyan);
+  font-variant-numeric: tabular-nums; margin-top: 3px;
+}
+#dash-section .d-sub { font-size: 11.5px; color: var(--d-mut); line-height: 1.4; }
+
+/* ── Card base ── */
+#dash-section .d-card {
+  background: var(--d-card);
+  border: 1px solid var(--d-bd);
+  border-radius: var(--d-r);
+  padding: 16px;
+}
+
+/* ── Topbar / breadcrumb ── */
+#dash-section .d-topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 0 2px;
+}
+#dash-section .d-crumb { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--d-mut); }
+#dash-section .d-crumb b { color: var(--d-tx); font-weight: 600; }
+#dash-section .d-topbar-actions { margin-left: auto; display: flex; gap: 8px; }
+#dash-section .d-icon-btn {
+  width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
+  background: transparent; border: 1px solid var(--d-bd); color: var(--d-mut);
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+}
+#dash-section .d-icon-btn:hover { border-color: var(--d-bd-2); color: var(--d-tx); }
+
+/* ── Saludo ── */
+#dash-section .d-hello { display: flex; align-items: center; gap: 12px; padding: 2px 0 4px; }
+#dash-section .d-avatar {
+  width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(34,211,238,.12); border: 1px solid rgba(34,211,238,.3);
+  color: var(--d-cyan); display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700;
+}
+#dash-section .d-hello-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#dash-section .d-hello-hi { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+#dash-section .d-hello-date { font-size: 12px; color: var(--d-mut); }
+
+/* ── Acciones rápidas (borde izquierdo de color) ── */
+#dash-section .d-quick {
+  display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--d-gap);
+}
+#dash-section .d-quick-btn {
+  background: var(--d-card); border: 1px solid var(--d-bd);
+  border-left: 3px solid var(--qc, var(--d-cyan));
+  border-radius: var(--d-r); padding: 13px 14px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 3px; text-align: left;
+  color: var(--d-tx); font-family: inherit; transition: border-color .12s, background .12s;
+}
+#dash-section .d-quick-btn:hover { background: #131820; }
+#dash-section .d-quick-btn:active { transform: scale(.99); }
+#dash-section .d-quick-ico { font-size: 17px; line-height: 1; }
+#dash-section .d-quick-lbl { font-size: 13px; font-weight: 600; }
+#dash-section .d-qc-cyan   { --qc: var(--d-cyan); }
+#dash-section .d-qc-amber  { --qc: var(--d-amber); }
+#dash-section .d-qc-violet { --qc: var(--d-violet); }
+#dash-section .d-qc-red    { --qc: var(--d-red); }
+
+/* ── Barra de período ── */
+#dash-section .d-period {
+  display: flex; flex-direction: column; gap: 10px;
+  padding-top: 4px;
+}
+#dash-section .d-period-title { font-size: 14px; font-weight: 700; }
+#dash-section .d-period-title span { color: var(--d-mut); font-weight: 500; font-size: 12px; }
+#dash-section .d-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+#dash-section .d-chip {
+  background: transparent; border: 1px solid var(--d-bd); color: var(--d-mut);
+  border-radius: 999px; padding: 6px 12px; font-size: 11.5px; font-weight: 600;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+#dash-section .d-chip:hover { border-color: var(--d-bd-2); color: var(--d-tx); }
+#dash-section .d-chip.sel { background: rgba(34,211,238,.12); border-color: rgba(34,211,238,.45); color: var(--d-cyan); }
+
+/* ── Grid de KPIs: 1 grande + 6 chicas ── */
+#dash-section .d-kpis { display: grid; gap: var(--d-gap); grid-template-columns: 1fr; }
+#dash-section .d-kpi-hero { display: flex; flex-direction: column; gap: 10px; }
+#dash-section .d-hero-top { display: flex; align-items: flex-start; gap: 10px; }
+#dash-section .d-hero-nums { flex: 1; min-width: 0; }
+#dash-section .d-hero-num {
+  font-size: 34px; font-weight: 700; line-height: 1.05; letter-spacing: -.025em;
+  font-variant-numeric: tabular-nums; margin-top: 6px;
+}
+#dash-section .d-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 999px; white-space: nowrap; flex-shrink: 0;
+}
+#dash-section .d-badge-pos { background: rgba(34,197,94,.13); color: var(--d-green); border: 1px solid rgba(34,197,94,.3); }
+#dash-section .d-badge-neg { background: rgba(244,63,94,.13); color: var(--d-red); border: 1px solid rgba(244,63,94,.3); }
+#dash-section .d-formula { font-size: 11px; color: var(--d-mut); font-variant-numeric: tabular-nums; }
+
+#dash-section .d-kpi-grid {
+  display: grid; gap: var(--d-gap);
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+#dash-section .d-kpi {
+  background: var(--d-card); border: 1px solid var(--d-bd); border-radius: var(--d-r);
+  padding: 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0;
+}
+#dash-section .d-kpi-head { display: flex; align-items: baseline; gap: 8px; }
+#dash-section .d-kpi-head .d-label { flex: 1; min-width: 0; }
+#dash-section .d-kpi-micro { font-size: 10.5px; color: var(--d-mut); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#dash-section .d-kpi .d-num { font-size: 21px; }
+#dash-section .d-spark { margin-top: 6px; height: 40px; width: 100%; display: block; }
+#dash-section .d-kpi-hero .d-spark { height: 140px; }
+
+/* ── Tiles de categoría ── */
+#dash-section .d-cats { display: grid; gap: var(--d-gap); grid-template-columns: repeat(2, minmax(0,1fr)); }
+#dash-section .d-cat {
+  background: var(--d-card); border: 1px solid var(--d-bd); border-radius: var(--d-r);
+  padding: 13px 14px; display: flex; align-items: center; gap: 11px; min-width: 0;
+  position: relative;
+}
+#dash-section .d-cat-ico { font-size: 19px; flex-shrink: 0; }
+#dash-section .d-cat-body { min-width: 0; flex: 1; }
+#dash-section .d-cat-num { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+#dash-section .d-cat-top {
+  position: absolute; top: 9px; right: 10px;
+  font-size: 9px; font-weight: 800; letter-spacing: .1em;
+  color: var(--d-amber); background: rgba(245,197,24,.12);
+  border: 1px solid rgba(245,197,24,.3); border-radius: 999px; padding: 2px 7px;
+}
+
+/* ── Fila final 60/40 ── */
+#dash-section .d-bottom { display: grid; gap: var(--d-gap); grid-template-columns: 1fr; }
+#dash-section .d-card-hd {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+#dash-section .d-card-ttl { font-size: 13px; font-weight: 700; flex: 1; min-width: 0; }
+#dash-section .d-seg { display: flex; border: 1px solid var(--d-bd); border-radius: 8px; overflow: hidden; }
+#dash-section .d-seg button {
+  background: transparent; border: none; color: var(--d-mut); cursor: pointer;
+  padding: 5px 10px; font-size: 10.5px; font-weight: 600; font-family: inherit;
+}
+#dash-section .d-seg button.sel { background: rgba(34,211,238,.12); color: var(--d-cyan); }
+
+/* Tabla top productos */
+#dash-section .d-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+#dash-section .d-tbl th {
+  text-align: left; font-size: 9.5px; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--d-mut); font-weight: 600; padding: 0 8px 8px 0; border-bottom: 1px solid var(--d-bd);
+}
+#dash-section .d-tbl th.r, #dash-section .d-tbl td.r { text-align: right; padding-right: 0; }
+#dash-section .d-tbl td {
+  padding: 9px 8px 9px 0; border-bottom: 1px solid rgba(255,255,255,.04);
+  font-variant-numeric: tabular-nums; color: var(--d-tx);
+}
+#dash-section .d-tbl tr:last-child td { border-bottom: none; }
+#dash-section .d-tbl .d-rank { color: var(--d-mut); width: 22px; font-size: 11px; }
+#dash-section .d-tbl .d-prod { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+#dash-section .d-tbl .d-pct { color: var(--d-cyan); font-weight: 600; }
+
+/* Lista reparaciones activas */
+#dash-section .d-rep-row {
+  display: flex; align-items: center; gap: 10px; padding: 9px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer;
+}
+#dash-section .d-rep-row:last-child { border-bottom: none; }
+#dash-section .d-rep-code {
+  font-size: 11px; font-weight: 700; color: var(--d-mut);
+  font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 42px;
+}
+#dash-section .d-rep-body { flex: 1; min-width: 0; }
+#dash-section .d-rep-eq { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#dash-section .d-rep-det { font-size: 11px; color: var(--d-mut); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#dash-section .d-st {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 999px; white-space: nowrap; flex-shrink: 0;
+}
+#dash-section .d-st-rep  { background: rgba(245,197,24,.12); color: var(--d-amber); border: 1px solid rgba(245,197,24,.28); }
+#dash-section .d-st-list { background: rgba(34,197,94,.12); color: var(--d-green); border: 1px solid rgba(34,197,94,.28); }
+#dash-section .d-st-dem  { background: rgba(244,63,94,.12); color: var(--d-red);  border: 1px solid rgba(244,63,94,.28); }
+#dash-section .d-empty { color: var(--d-mut); font-size: 12px; padding: 14px 0; text-align: center; }
+
+/* Alertas / pendientes (reusa el bloque existente) */
+#dash-section .d-alert-row {
+  display: flex; align-items: center; gap: 9px; padding: 9px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer;
+}
+#dash-section .d-alert-row:last-child { border-bottom: none; }
+#dash-section .d-alert-n { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 26px; }
+#dash-section .d-alert-lbl { font-size: 12.5px; flex: 1; }
+
+/* ══════════ SIDEBAR (solo pantalla grande) ══════════ */
+#app-sidebar { display: none; }
+
+@media (min-width: 1040px) {
+  /* Solo cuando la app está logueada (has-sidebar lo pone switchSection) */
+  body.has-sidebar #app-sidebar {
+    display: flex; flex-direction: column; gap: 2px;
+    position: fixed; left: 0; top: 0; bottom: 0; width: 220px; z-index: 80;
+    background: var(--d-bg); border-right: 1px solid var(--d-bd);
+    padding: 14px 10px; overflow-y: auto;
+  }
+  body.has-sidebar #app-sidebar .sb-brand {
+    display: flex; align-items: center; gap: 9px; padding: 4px 8px 14px;
+  }
+  body.has-sidebar #app-sidebar .sb-brand img { width: 26px; height: 26px; border-radius: 7px; }
+  body.has-sidebar #app-sidebar .sb-brand b { font-size: 13.5px; color: var(--d-tx); font-weight: 700; letter-spacing: .01em; }
+  body.has-sidebar #app-sidebar .sb-sec {
+    font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em; font-weight: 700;
+    padding: 14px 10px 6px;
+  }
+  body.has-sidebar #app-sidebar .sb-sec-main { color: var(--d-cyan); }
+  body.has-sidebar #app-sidebar .sb-sec-caja { color: var(--d-amber); }
+  body.has-sidebar #app-sidebar .sb-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: 9px; cursor: pointer;
+    background: transparent; border: none; border-left: 2px solid transparent;
+    color: #9AA5B1; font-size: 13px; font-weight: 500; font-family: inherit;
+    text-align: left; width: 100%;
+  }
+  body.has-sidebar #app-sidebar .sb-item:hover { background: rgba(255,255,255,.035); color: var(--d-tx); }
+  body.has-sidebar #app-sidebar .sb-item.active {
+    background: rgba(34,211,238,.08); border-left-color: var(--d-cyan); color: var(--d-tx); font-weight: 600;
+  }
+  body.has-sidebar #app-sidebar .sb-ico { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+
+  /* La app se corre a la derecha y se oculta la bottom nav */
+  body.has-sidebar #app { padding-left: 220px; }
+  body.has-sidebar .bottom-nav { display: none; }
+  body.has-sidebar .fab-wrap { right: 24px; }
+
+  /* Dashboard aprovecha el ancho */
+  #dash-section .d-quick { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  #dash-section .d-kpis { grid-template-columns: minmax(0,1fr) minmax(0,1.35fr); align-items: start; }
+  #dash-section .d-kpi-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  #dash-section .d-cats { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  #dash-section .d-bottom { grid-template-columns: 3fr 2fr; }
+  #dash-section .d-period { flex-direction: row; align-items: center; }
+  #dash-section .d-period .d-chips { margin-left: auto; }
+  #dash-section .dash-body { padding: 18px 22px 40px; }
+}
+
+/* Colapsada (botón del topbar) */
+@media (min-width: 1040px) {
+  body.sb-collapsed #app-sidebar { display: none; }
+  body.sb-collapsed.has-sidebar #app { padding-left: 0; }
+}

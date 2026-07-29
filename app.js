@@ -273,6 +273,12 @@ function lockOwnerMode() {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.remove('app-hidden');
+  // Habilita la sidebar de escritorio (en celu el CSS la mantiene oculta)
+  document.body.classList.add('has-sidebar');
+  const secActiva = document.querySelector('.main-section:not(.section-hidden)');
+  if (secActiva && typeof _syncSidebar === 'function') {
+    _syncSidebar(secActiva.id.replace('-section', ''));
+  }
   initApp();
 }
 
@@ -617,209 +623,376 @@ function switchSection(section) {
     if (sec) sec.classList.toggle('section-hidden', s !== section);
     if (btn) btn.classList.toggle('active', s === section);
   });
+  if (typeof _syncSidebar === 'function') _syncSidebar(section);
   if (section === 'dash') renderDashboard();
 }
 
 // ── Dashboard ──────────────────────────────────────────────
 
+// ══════════════════════════════════════════════════════════════
+//  DASHBOARD — command center
+// ══════════════════════════════════════════════════════════════
+const RETIRO_CAT_DASH = 'Retiro dueño';
+let _dashPeriodo = 'hoy';
+let _dashMovs = [];                 // movimientos del período activo
+let _dashCache = {};                // { 'from|to': movs[] } — evita re-leer
+let _dashTopMode = 'venta';
+
+const _DASH_PERIODOS = [
+  { k: 'hoy',    lbl: 'Hoy' },
+  { k: 'semana', lbl: 'Esta semana' },
+  { k: 'ult7',   lbl: 'Últimos 7' },
+  { k: 'mes',    lbl: 'Mes actual' },
+  { k: 'mesant', lbl: 'Mes anterior' },
+];
+
+function _dAR(d) { return d.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10); }
+function _dShift(iso, dias) { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + dias); return _dAR(d); }
+function _dMoney(n) { return '$' + Math.round(Number(n) || 0).toLocaleString('es-AR'); }
+function _dUsd(n) {
+  const dl = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue : 0;
+  if (!dl) return '';
+  return 'u$' + Math.round((Number(n) || 0) / dl).toLocaleString('es-AR');
+}
+
+function _dashRango(k) {
+  const hoy = _dAR(new Date());
+  if (k === 'hoy')  return { from: hoy, to: hoy };
+  if (k === 'ult7') return { from: _dShift(hoy, -6), to: hoy };
+  if (k === 'semana') {
+    const dow = new Date(hoy + 'T12:00:00').getDay();      // 0 = domingo
+    return { from: _dShift(hoy, -((dow + 6) % 7)), to: hoy };
+  }
+  if (k === 'mesant') {
+    const finAnt = _dShift(hoy.slice(0, 8) + '01', -1);
+    return { from: finAnt.slice(0, 8) + '01', to: finAnt };
+  }
+  return { from: hoy.slice(0, 8) + '01', to: hoy };
+}
+
 async function renderDashboard() {
   _renderDashSaludo();
-  _renderDashTuDia();
-  _renderDashEntregas();
-  renderDashRepairs();
-  renderDashFollowUps();
-  renderDashLowStock();
-  loadDashCaja(); // único read (caja de hoy)
+  _renderPeriodoChips();
+  _renderDashReps();
+  await _loadDashPeriodo();
 }
 
-// Refresca el dashboard SIN re-leer caja (solo datos en memoria).
-// Se llama desde los listeners de repairs/stock/repuestos cuando llegan datos.
+// Refresca lo que sale de memoria (sin re-leer Firestore)
 function _refreshDashIfVisible() {
-  const dashSec = document.getElementById('dash-section');
-  if (!dashSec || dashSec.classList.contains('section-hidden')) return;
-  _renderDashTuDia();
-  _renderDashEntregas();
-  renderDashRepairs();
-  renderDashFollowUps();
-  renderDashLowStock();
+  const s = document.getElementById('dash-section');
+  if (!s || s.classList.contains('section-hidden')) return;
+  _renderDashReps();
+  _renderKPIs();
+  _renderDashCats();
 }
+// Compat: repuestos.js / repairs.js las llaman como fallback
+function renderDashLowStock() { _refreshDashIfVisible(); }
+function renderDashFollowUps() {
+  const today = _dAR(new Date());
+  const rep = typeof REPAIRS !== 'undefined' ? REPAIRS : [];
+  const pend = rep.filter(r => r.seguimientoFecha && r.seguimientoFecha <= today && !r.seguimientoAck);
+  const badge = document.getElementById('nav-badge-dash');
+  if (badge) badge.style.display = pend.length ? '' : 'none';
+  _refreshDashIfVisible();
+}
+function loadDashCaja() { return _loadDashPeriodo(); }
 
-// Saludo según la hora + fecha en español
+// ── Saludo ──
 function _renderDashSaludo() {
   const hiEl = document.getElementById('dash-saludo-hi');
   const fEl  = document.getElementById('dash-saludo-fecha');
-  const now = new Date();
+  const now  = new Date();
   const h = Number(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires', hour: 'numeric', hour12: false }));
   const saludo = h < 6 ? 'Buenas noches' : h < 13 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
-  const emoji  = h < 6 ? '🌙' : h < 13 ? '☀️' : h < 20 ? '🌤️' : '🌙';
-  if (hiEl) hiEl.textContent = `${saludo} ${emoji}`;
+  if (hiEl) hiEl.textContent = saludo + '!';
   if (fEl) {
-    const fecha = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'long', day: 'numeric', month: 'long' });
-    fEl.textContent = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+    const f = now.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'long', day: 'numeric', month: 'long' });
+    fEl.textContent = f.charAt(0).toUpperCase() + f.slice(1);
   }
 }
 
-// "Tu día": contadores accionables (todo desde datos en memoria, sin reads)
-function _renderDashTuDia() {
-  const card = document.getElementById('dash-tudia-card');
-  const grid = document.getElementById('dash-tudia-grid');
-  if (!card || !grid) return;
+// ── Chips de período ──
+function _renderPeriodoChips() {
+  const c = document.getElementById('d-period-chips');
+  if (!c) return;
+  c.innerHTML = _DASH_PERIODOS.map(p =>
+    '<button class="d-chip' + (p.k === _dashPeriodo ? ' sel' : '') + '" onclick="_setDashPeriodo(\'' + p.k + '\')">' + p.lbl + '</button>'
+  ).join('');
+}
+async function _setDashPeriodo(k) {
+  _dashPeriodo = k;
+  _renderPeriodoChips();
+  await _loadDashPeriodo();
+}
 
-  const reps = (typeof REPAIRS !== 'undefined') ? REPAIRS : [];
-  const stock = (typeof STOCK !== 'undefined') ? STOCK : [];
-  const repuestos = (typeof REPUESTOS !== 'undefined') ? REPUESTOS : [];
+// ── Carga del período (1 read por rango, cacheado por sesión) ──
+async function _loadDashPeriodo() {
+  const r = _dashRango(_dashPeriodo);
+  const dias = Math.round((new Date(r.to + 'T12:00:00') - new Date(r.from + 'T12:00:00')) / 86400000) + 1;
+  const rangeEl = document.getElementById('d-period-range');
+  if (rangeEl) {
+    const f = s => s.slice(8, 10) + '/' + s.slice(5, 7);
+    rangeEl.textContent = '· ' + (r.from === r.to ? f(r.from) : f(r.from) + ' — ' + f(r.to)) +
+                          ' · ' + dias + (dias > 1 ? ' días' : ' día');
+  }
+  const key = r.from + '|' + r.to;
+  if (_dashCache[key]) {
+    _dashMovs = _dashCache[key];
+  } else {
+    try {
+      const snap = await db.collection('caja_movimientos')
+        .where('fecha', '>=', r.from).where('fecha', '<=', r.to).get();
+      _dashMovs = snap.docs.map(d => d.data());
+      _dashCache[key] = _dashMovs;
+    } catch (e) {
+      console.warn('Dashboard período:', e);
+      _dashMovs = [];
+    }
+  }
+  _renderKPIs();
+  _renderDashCats();
+  _renderTopProductos();
+}
+
+// ── Sparkline SVG (línea 2px suave + relleno con gradiente) ──
+function _sparkline(el, vals, color, alto) {
+  if (!el) return;
+  const W = 100, H = alto || 40, P = 4;
+  if (!vals || vals.length < 2) vals = [0, 0];
+  const max = Math.max.apply(null, vals);
+  const min = Math.min.apply(null, vals.concat([0]));
+  const rng = (max - min) || 1;
+  const pts = vals.map((v, i) => [
+    (i / (vals.length - 1)) * W,
+    H - P - ((v - min) / rng) * (H - P * 2),
+  ]);
+  let d = 'M' + pts[0][0].toFixed(1) + ',' + pts[0][1].toFixed(1);
+  for (let i = 1; i < pts.length; i++) {
+    const x0 = pts[i - 1][0], y0 = pts[i - 1][1], x1 = pts[i][0], y1 = pts[i][1];
+    const cx = (x0 + x1) / 2;
+    d += ' C' + cx.toFixed(1) + ',' + y0.toFixed(1) + ' ' + cx.toFixed(1) + ',' + y1.toFixed(1) +
+         ' ' + x1.toFixed(1) + ',' + y1.toFixed(1);
+  }
+  const gid = 'sg' + Math.random().toString(36).slice(2, 8);
+  el.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  el.innerHTML =
+    '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="' + color + '" stop-opacity=".28"/>' +
+    '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' +
+    '<path d="' + d + ' L' + W + ',' + H + ' L0,' + H + ' Z" fill="url(#' + gid + ')"/>' +
+    '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>';
+}
+
+// Serie diaria acumulando fn() por día del período
+function _serieDiaria(fn) {
+  const r = _dashRango(_dashPeriodo);
+  const dias = [];
+  let cur = r.from, guard = 0;
+  while (cur <= r.to && guard++ < 120) { dias.push(cur); cur = _dShift(cur, 1); }
+  return dias.map(d => _dashMovs.filter(m => m.fecha === d).reduce((s, m) => s + fn(m), 0));
+}
+
+// ── KPIs ──
+function _renderKPIs() {
+  const ing = _dashMovs.filter(m => m.tipo === 'ingreso');
+  const egs = _dashMovs.filter(m => m.tipo === 'egreso' && m.categoria !== RETIRO_CAT_DASH);
+  const ret = _dashMovs.filter(m => m.tipo === 'egreso' && m.categoria === RETIRO_CAT_DASH);
+  const tIng = ing.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const tEg  = egs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const tRet = ret.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const gan  = m => (Number(m.gananciaARS) || 0);
+  const bruta = ing.reduce((s, m) => s + gan(m), 0);
+  const neta = bruta - tEg;
+  const ticket = ing.length ? tIng / ing.length : 0;
+
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('d-neta', _dMoney(neta));
+  set('d-neta-usd', _dUsd(neta));
+  set('d-neta-formula', 'Ganancia bruta ' + _dMoney(bruta) + ' − Egresos ' + _dMoney(tEg));
+  const bEl = document.getElementById('d-neta-badge');
+  if (bEl) {
+    bEl.textContent = neta >= 0 ? 'Positivo' : 'Negativo';
+    bEl.className = 'd-badge ' + (neta >= 0 ? 'd-badge-pos' : 'd-badge-neg');
+  }
+  const serieNeta = _serieDiaria(m => m.tipo === 'ingreso'
+    ? gan(m)
+    : (m.categoria === RETIRO_CAT_DASH ? 0 : -(Number(m.monto) || 0)));
+  _sparkline(document.getElementById('d-neta-spark'), serieNeta, neta >= 0 ? '#22C55E' : '#F43F5E', 140);
+
+  // Pendientes (todo de memoria, sin reads)
+  const reps = typeof REPAIRS !== 'undefined' ? REPAIRS : [];
+  const rpts = typeof REPUESTOS !== 'undefined' ? REPUESTOS : [];
+  const hoyISO = _dAR(new Date());
   const now = Date.now();
-  const today = new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
-
-  // Demoradas: reparando hace +3 días
   const demoradas = reps.filter(r => r.estado === 'reparando' && r.fechaIngreso &&
     (now - new Date(r.fechaIngreso).getTime()) / 86400000 > 3).length;
-  // Listas para entregar
-  const listas = reps.filter(r => r.estado === 'listo').length;
-  // Garantías de venta por vencer (próximos 7 días)
-  const garantiasVencen = stock.filter(p => {
-    if (!p.garantiaHasta) return false;
-    const dias = (new Date(p.garantiaHasta).getTime() - now) / 86400000;
-    return dias >= 0 && dias <= 7;
-  }).length;
-  // Reservas venciendo (fecha límite <= hoy o próximos 3 días)
-  const reservasVencen = stock.filter(p => {
-    if (!p.reservado || !p.reservaFechaLimite) return false;
-    const dias = (new Date(p.reservaFechaLimite + 'T23:59:59').getTime() - now) / 86400000;
-    return dias <= 3;
-  }).length;
-  // Repuestos bajo stock
-  const bajoStock = repuestos.filter(r => r.stockMin > 0 && (r.cantidad || 0) <= r.stockMin).length;
+  const listas    = reps.filter(r => r.estado === 'listo').length;
+  const record    = reps.filter(r => r.seguimientoFecha && r.seguimientoFecha <= hoyISO && !r.seguimientoAck).length;
+  const bajoStock = rpts.filter(r => r.stockMin > 0 && (r.cantidad || 0) <= r.stockMin).length;
+  const devolver  = reps.filter(r => (r.estado === 'no va' || r.estado === 'cancelado' || r.estado === 'no van') && r.devuelto !== true).length;
+  const accion = demoradas + listas + record + bajoStock + devolver;
 
-  const items = [];
-  if (demoradas > 0) items.push({ n: demoradas, lbl: 'Demoradas +3d', ico: '🔴', cls: 'td-danger', act: "switchSection('repairs')" });
-  if (listas > 0)    items.push({ n: listas, lbl: 'Listas p/ entregar', ico: '✅', cls: 'td-ok', act: "switchSection('repairs')" });
-  if (reservasVencen > 0) items.push({ n: reservasVencen, lbl: 'Reservas venciendo', ico: '⏳', cls: 'td-warn', act: "switchSection('stock')" });
-  if (garantiasVencen > 0) items.push({ n: garantiasVencen, lbl: 'Garantías por vencer', ico: '🛡️', cls: 'td-warn', act: "switchSection('stock')" });
-  if (bajoStock > 0) items.push({ n: bajoStock, lbl: 'Repuestos bajos', ico: '⚠️', cls: 'td-warn', act: "switchSection('repuestos')" });
+  const cards = [
+    { lbl: 'Ingresos totales', val: _dMoney(tIng), usd: _dUsd(tIng), micro: ing.length + ' ops',
+      color: '#22D3EE', serie: _serieDiaria(m => m.tipo === 'ingreso' ? (Number(m.monto) || 0) : 0) },
+    { lbl: 'Ganancia bruta', val: _dMoney(bruta), usd: _dUsd(bruta),
+      micro: tIng > 0 ? Math.round((bruta / tIng) * 100) + '% margen' : '—',
+      color: '#22C55E', serie: _serieDiaria(m => m.tipo === 'ingreso' ? gan(m) : 0) },
+    { lbl: 'Egresos', val: _dMoney(tEg), usd: _dUsd(tEg),
+      micro: tIng > 0 ? Math.round((tEg / tIng) * 100) + '% ingresos' : '—',
+      color: '#F43F5E', serie: _serieDiaria(m => (m.tipo === 'egreso' && m.categoria !== RETIRO_CAT_DASH) ? (Number(m.monto) || 0) : 0) },
+    { lbl: 'Ticket promedio', val: _dMoney(ticket), usd: _dUsd(ticket), micro: ing.length + ' ventas',
+      color: '#8B5CF6', serie: _serieDiaria(m => m.tipo === 'ingreso' ? (Number(m.monto) || 0) : 0) },
+    { lbl: 'Retiro dueño', val: _dMoney(tRet), usd: _dUsd(tRet), micro: 'no es gasto',
+      color: '#F5C518', serie: _serieDiaria(m => (m.tipo === 'egreso' && m.categoria === RETIRO_CAT_DASH) ? (Number(m.monto) || 0) : 0) },
+    { lbl: 'Necesitan acción', val: String(accion), usd: '', micro: accion ? 'pendientes' : 'todo al día',
+      color: accion ? '#F43F5E' : '#22C55E', serie: null, click: "switchSection('repairs')" },
+  ];
 
-  if (!items.length) {
-    card.style.display = '';
-    grid.innerHTML = '<div class="dash-tudia-allgood">🎉 Todo al día — sin pendientes urgentes</div>';
-    return;
-  }
-  card.style.display = '';
-  grid.innerHTML = items.map(it => `
-    <button class="dash-tudia-item ${it.cls}" onclick="${it.act}">
-      <span class="td-ico">${it.ico}</span>
-      <span class="td-num">${it.n}</span>
-      <span class="td-lbl">${it.lbl}</span>
-    </button>
-  `).join('');
+  const grid = document.getElementById('d-kpi-grid');
+  if (!grid) return;
+  grid.innerHTML = cards.map((c, i) =>
+    '<div class="d-kpi"' + (c.click ? ' onclick="' + c.click + '" style="cursor:pointer"' : '') + '>' +
+      '<div class="d-kpi-head"><span class="d-label">' + c.lbl + '</span>' +
+      '<span class="d-kpi-micro">' + c.micro + '</span></div>' +
+      '<span class="d-num">' + c.val + '</span>' +
+      (c.usd ? '<span class="d-usd">' + c.usd + '</span>' : '') +
+      (c.serie ? '<svg class="d-spark" id="d-sp-' + i + '" preserveAspectRatio="none" aria-hidden="true"></svg>' : '') +
+    '</div>').join('');
+  cards.forEach((c, i) => { if (c.serie) _sparkline(document.getElementById('d-sp-' + i), c.serie, c.color, 40); });
 }
 
-// Entregas / listas con botón avisar por WhatsApp
-function _renderDashEntregas() {
-  const card = document.getElementById('dash-entregas-card');
-  const el   = document.getElementById('dash-entregas-list');
-  if (!card || !el) return;
-  const reps = (typeof REPAIRS !== 'undefined') ? REPAIRS : [];
-  const listas = reps.filter(r => r.estado === 'listo')
-    .sort((a, b) => (a.fechaIngreso || '').localeCompare(b.fechaIngreso || ''));
-  if (!listas.length) { card.style.display = 'none'; return; }
-  card.style.display = '';
-  el.innerHTML = listas.slice(0, 6).map(r => {
-    const fListo = Array.isArray(r.estadoHistorial)
-      ? (r.estadoHistorial.filter(h => h.estado === 'listo').pop()?.fecha)
-      : null;
-    const dias = fListo ? Math.floor((Date.now() - new Date(fListo).getTime()) / 86400000) : null;
-    const diasStr = dias === null ? '' : dias === 0 ? 'hoy' : dias === 1 ? '1 día' : dias + ' días';
-    const urgente = dias !== null && dias > 5;
-    return `<div class="dash-ent-row${urgente ? ' dash-ent-urgente' : ''}" onclick="openRepairDetail('${esc(r.id)}')">
-      <div class="dash-ent-info">
-        <span class="dash-ent-equipo">N°${r.nOrden || '?'} · ${esc(r.marca || '')} ${esc(r.modelo || '')}</span>
-        <span class="dash-ent-meta">${esc(r.nombre || '—')}${diasStr ? ' · listo hace ' + diasStr : ''}${r.monto ? ' · $' + Number(r.monto).toLocaleString('es-AR') : ''}</span>
-      </div>
-      ${r.tlf ? `<button class="dash-ent-wa" onclick="event.stopPropagation();repairWhatsApp('${esc(r.id)}')" title="Avisar por WhatsApp">🟢</button>` : ''}
-    </div>`;
+// ── Desglose por categoría ──
+function _renderDashCats() {
+  const cont = document.getElementById('d-cats');
+  if (!cont) return;
+  const stock = typeof STOCK !== 'undefined' ? STOCK : [];
+  const ing = _dashMovs.filter(m => m.tipo === 'ingreso');
+  const acc = { nuevos: [0, 0], usados: [0, 0], access: [0, 0], repar: [0, 0], repues: [0, 0] };
+  const add = (k, monto) => { acc[k][0] += 1; acc[k][1] += monto; };
+
+  ing.forEach(m => {
+    const monto = Number(m.monto) || 0;
+    if (m.categoria === 'Reparación') { add('repar', monto); return; }
+    const itemEq = Array.isArray(m.items) ? m.items.find(i => i.source === 'equipo') : null;
+    const eqId = m.stockId || (itemEq ? itemEq.id : null);
+    if (eqId) {
+      const p = stock.find(x => x.id === eqId);
+      add((p && p.estado === 'Nuevo') ? 'nuevos' : 'usados', monto);
+      return;
+    }
+    if (Array.isArray(m.items) && m.items.length) {
+      if (m.items.some(i => i.source === 'repuesto')) { add('repues', monto); return; }
+      add('access', monto); return;
+    }
+    if (m.categoria === 'Venta equipo') { add('usados', monto); return; }
+    add('access', monto);
+  });
+
+  const tiles = [
+    { k: 'nuevos', ico: '📱', lbl: 'Teléfonos nuevos' },
+    { k: 'usados', ico: '♻️', lbl: 'Usados' },
+    { k: 'access', ico: '🏷️', lbl: 'Accesorios' },
+    { k: 'repar',  ico: '🔧', lbl: 'Reparaciones' },
+    { k: 'repues', ico: '⬡',  lbl: 'Repuestos' },
+  ];
+  const top = tiles.slice().sort((a, b) => acc[b.k][1] - acc[a.k][1])[0];
+  const hayTop = top && acc[top.k][1] > 0;
+
+  cont.innerHTML = tiles.map(t => {
+    const n = acc[t.k][0], monto = acc[t.k][1];
+    const usd = _dUsd(monto);
+    return '<div class="d-cat">' +
+      (hayTop && t.k === top.k ? '<span class="d-cat-top">TOP</span>' : '') +
+      '<span class="d-cat-ico">' + t.ico + '</span>' +
+      '<div class="d-cat-body">' +
+        '<div class="d-cat-num">' + n + '</div>' +
+        '<div class="d-label">' + t.lbl + '</div>' +
+        '<div class="d-sub">' + _dMoney(monto) + (usd ? ' · ' + usd : '') + '</div>' +
+      '</div></div>';
   }).join('');
-  if (listas.length > 6) el.innerHTML += `<p class="dash-more">+ ${listas.length - 6} más</p>`;
 }
 
-function renderDashRepairs() {
-  const el = document.getElementById('dash-repairs-list');
+// ── Top productos ──
+function _setTopMode(m) {
+  _dashTopMode = m;
+  document.querySelectorAll('#d-top-seg button').forEach(b =>
+    b.classList.toggle('sel', b.dataset.mode === m));
+  _renderTopProductos();
+}
+function _renderTopProductos() {
+  const el = document.getElementById('d-top-body');
   if (!el) return;
-  const activos = (typeof REPAIRS !== 'undefined' ? REPAIRS : [])
+  const map = {};
+  let totalVentas = 0;
+  _dashMovs.filter(m => m.tipo === 'ingreso').forEach(m => {
+    const monto = Number(m.monto) || 0;
+    totalVentas += monto;
+    const items = (Array.isArray(m.items) && m.items.length)
+      ? m.items
+      : [{ nombre: m.itemNombre || m.descripcion || m.categoria || 'Venta', qty: 1, precioUnit: monto }];
+    const gTot = Number(m.gananciaARS) || 0;
+    items.forEach(it => {
+      const nom = String(it.nombre || 'Venta').trim();
+      const sub = ((Number(it.precioUnit) || 0) * (Number(it.qty) || 1)) || (items.length === 1 ? monto : 0);
+      if (!map[nom]) map[nom] = { nom: nom, u: 0, venta: 0, gan: 0 };
+      map[nom].u += Number(it.qty) || 1;
+      map[nom].venta += sub;
+      map[nom].gan += gTot / items.length;
+    });
+  });
+  let arr = Object.keys(map).map(k => map[k]);
+  if (!arr.length) { el.innerHTML = '<p class="d-empty">Sin ventas en el período</p>'; return; }
+  arr.sort((a, b) => _dashTopMode === 'ganancia' ? b.gan - a.gan : b.venta - a.venta);
+  arr = arr.slice(0, 6);
+  el.innerHTML = '<table class="d-tbl"><thead><tr>' +
+    '<th>#</th><th>Producto</th><th class="r">Un.</th>' +
+    '<th class="r">' + (_dashTopMode === 'ganancia' ? 'Ganancia' : 'Venta total') + '</th>' +
+    '<th class="r">% ventas</th></tr></thead><tbody>' +
+    arr.map((p, i) =>
+      '<tr><td class="d-rank">' + (i + 1) + '</td>' +
+      '<td class="d-prod">' + esc(p.nom) + '</td>' +
+      '<td class="r">' + p.u + '</td>' +
+      '<td class="r">' + _dMoney(_dashTopMode === 'ganancia' ? p.gan : p.venta) + '</td>' +
+      '<td class="r d-pct">' + (totalVentas > 0 ? Math.round((p.venta / totalVentas) * 100) : 0) + '%</td></tr>'
+    ).join('') + '</tbody></table>';
+}
+
+// ── Reparaciones activas ──
+function _renderDashReps() {
+  const el = document.getElementById('d-reps-body');
+  if (!el) return;
+  const reps = (typeof REPAIRS !== 'undefined' ? REPAIRS : [])
     .filter(r => r.estado === 'reparando' || r.estado === 'listo');
-  if (!activos.length) {
-    el.innerHTML = '<p class="dash-empty">Sin reparaciones activas</p>';
-    return;
-  }
-  el.innerHTML = activos.slice(0, 5).map(r => {
-    const cls = r.estado === 'listo' ? 'dash-rep-listo' : 'dash-rep-rep';
-    const lbl = r.estado === 'listo' ? 'Listo ✓' : 'Reparando';
-    return `<div class="dash-rep-row" onclick="switchSection('repairs')">
-      <span class="dash-rep-badge ${cls}">${lbl}</span>
-      <div class="dash-rep-info">
-        <span class="dash-rep-nombre">${esc(r.nombre || '—')}</span>
-        <span class="dash-rep-equipo">${esc((r.marca || '') + ' ' + (r.modelo || ''))}</span>
-      </div>
-    </div>`;
+  if (!reps.length) { el.innerHTML = '<p class="d-empty">Sin reparaciones activas</p>'; return; }
+  const now = Date.now();
+  reps.sort((a, b) => (a.fechaIngreso || '').localeCompare(b.fechaIngreso || ''));
+  el.innerHTML = reps.slice(0, 7).map(r => {
+    const dias = r.fechaIngreso ? Math.floor((now - new Date(r.fechaIngreso).getTime()) / 86400000) : 0;
+    const dem = r.estado === 'reparando' && dias > 3;
+    const cls = r.estado === 'listo' ? 'd-st-list' : dem ? 'd-st-dem' : 'd-st-rep';
+    const lbl = r.estado === 'listo' ? 'Listo' : dem ? (dias + 'd') : 'Reparando';
+    return '<div class="d-rep-row" onclick="openRepairDetail(\'' + esc(r.id) + '\')">' +
+      '<span class="d-rep-code">#' + (r.nOrden || '?') + '</span>' +
+      '<div class="d-rep-body">' +
+        '<div class="d-rep-eq">' + esc((r.marca || '') + ' ' + (r.modelo || '')) + '</div>' +
+        '<div class="d-rep-det">' + esc(r.arreglo || '—') + (r.nombre ? ' · ' + esc(r.nombre) : '') + '</div>' +
+      '</div>' +
+      '<span class="d-st ' + cls + '">' + lbl + '</span></div>';
   }).join('');
-  if (activos.length > 5) {
-    el.innerHTML += `<p class="dash-more">+ ${activos.length - 5} más → <button class="dash-more-btn" onclick="switchSection('repairs')">ver todas</button></p>`;
-  }
+  if (reps.length > 7) el.innerHTML += '<p class="d-empty">+ ' + (reps.length - 7) + ' más</p>';
 }
 
-function renderDashLowStock() {
-  const card = document.getElementById('dash-stock-card');
-  const el   = document.getElementById('dash-stock-list');
-  if (!card || !el) return;
-  const rep = typeof REPUESTOS !== 'undefined' ? REPUESTOS : [];
-  const low = rep.filter(r => r.stockMin != null && r.stockMin > 0 && (r.cantidad || 0) <= r.stockMin);
-  if (!low.length) { card.style.display = 'none'; return; }
-  card.style.display = '';
-  el.innerHTML = low.slice(0, 5).map(r =>
-    `<div class="dash-stock-row">
-      <span class="dash-stock-nombre">${esc(r.nombre)}</span>
-      <span class="dash-stock-qty">${r.cantidad ?? 0} / mín ${r.stockMin}</span>
-    </div>`
-  ).join('');
-  if (low.length > 5) el.innerHTML += `<p class="dash-more">+ ${low.length - 5} más</p>`;
-}
-
-function renderDashFollowUps() {
-  const card  = document.getElementById('dash-seguimiento-card');
-  const el    = document.getElementById('dash-seguimiento-list');
-  if (!card || !el) return;
-  const today = new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
-  const rep   = typeof REPAIRS !== 'undefined' ? REPAIRS : [];
-  const pending = rep.filter(r => r.seguimientoFecha && r.seguimientoFecha <= today && !r.seguimientoAck);
-  const badge = document.getElementById('nav-badge-dash');
-  if (badge) { badge.style.display = pending.length ? '' : 'none'; }
-  if (!pending.length) { card.style.display = 'none'; return; }
-  card.style.display = '';
-  el.innerHTML = pending.map(r =>
-    `<div class="dash-seg-row">
-      <div class="dash-seg-info">
-        <span class="dash-seg-nombre">${esc(r.nombre || '—')}</span>
-        <span class="dash-seg-nota">${esc(r.seguimientoNota || r.seguimientoFecha || '')}</span>
-      </div>
-      <button class="dash-seg-ack" onclick="ackFollowUp('${esc(r.id)}')">✓ Listo</button>
-    </div>`
-  ).join('');
-}
-
-async function loadDashCaja() {
-  const today = new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
-  try {
-    const snap = await db.collection('caja_movimientos').where('fecha', '==', today).get();
-    const movs = snap.docs.map(d => d.data());
-    const ing  = movs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-    const eg   = movs.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-    const neto = ing - eg;
-    const set  = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
-    set('dash-caja-ing',  ing  ? '+$' + ing.toLocaleString('es-AR')  : '$0');
-    set('dash-caja-eg',   eg   ? '−$' + eg.toLocaleString('es-AR')   : '$0');
-    set('dash-caja-neto', '$' + Math.abs(neto).toLocaleString('es-AR'));
-    const netoEl = document.getElementById('dash-caja-neto');
-    if (netoEl) netoEl.style.color = neto >= 0 ? '#10b981' : '#ef4444';
-  } catch(e) { console.warn('Dashboard caja:', e); }
+// ── Sidebar (solo escritorio) ──
+function toggleSidebar() { document.body.classList.toggle('sb-collapsed'); }
+function _syncSidebar(sec) {
+  document.body.classList.add('has-sidebar');
+  const map = { dash: 'sb-dash', stock: 'sb-stock', repairs: 'sb-repairs', repuestos: 'sb-repuestos' };
+  Object.keys(map).forEach(k => {
+    const el = document.getElementById(map[k]);
+    if (el) el.classList.toggle('active', k === sec);
+  });
 }
 
 async function ackFollowUp(id) {

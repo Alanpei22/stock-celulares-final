@@ -16,6 +16,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
 
@@ -25,6 +26,22 @@
 </div>
 
 <!-- APP -->
+<!-- ── SIDEBAR (solo pantalla grande; en celu queda la bottom nav) ── -->
+<aside id="app-sidebar">
+  <div class="sb-brand"><img src="icon-192.png" alt=""><b>TechPoint</b></div>
+
+  <div class="sb-sec sb-sec-main">Principal</div>
+  <button class="sb-item" id="sb-dash"      onclick="switchSection('dash')"><span class="sb-ico">◆</span>Dashboard</button>
+  <button class="sb-item" id="sb-stock"     onclick="switchSection('stock')"><span class="sb-ico">▣</span>Equipos</button>
+  <button class="sb-item" id="sb-repairs"   onclick="switchSection('repairs')"><span class="sb-ico">⚒</span>Reparaciones</button>
+  <button class="sb-item" id="sb-repuestos" onclick="switchSection('repuestos')"><span class="sb-ico">⬡</span>Repuestos</button>
+
+  <div class="sb-sec sb-sec-caja">Caja</div>
+  <button class="sb-item" onclick="window.location.href='caja.html'"><span class="sb-ico">▤</span>Caja del día</button>
+  <button class="sb-item" onclick="window.location.href='caja.html?tab=inventario'"><span class="sb-ico">◈</span>Accesorios</button>
+  <button class="sb-item" onclick="window.location.href='caja.html?action=reporte'"><span class="sb-ico">▦</span>Reporte del día</button>
+</aside>
+
 <div id="app" class="app-hidden">
 
   <div id="install-banner" class="install-banner">
@@ -291,112 +308,90 @@
 
   <!-- ── SECCIÓN DASHBOARD ── -->
   <section id="dash-section" class="main-section section-hidden">
-    <header>
-      <div class="hdr-top">
-        <div class="hdr-brand"><h1>🏠 Inicio</h1></div>
-        <div class="hdr-actions">
-          <div class="hdr-menu-wrap">
-            <button class="hdr-btn hdr-menu-btn" id="dash-menu-btn" onclick="toggleDashMenu()" title="Opciones">⋮</button>
-            <div id="dash-menu-dropdown" class="hdr-dropdown hidden">
-              <button class="hdr-drop-item dark-toggle-btn" onclick="toggleDarkMode();closeDashMenu()">
-                <span class="dark-icon">🌙</span> Modo oscuro/claro
-              </button>
-              <button class="hdr-drop-item owner-lock-btn" onclick="toggleOwnerLock();closeDashMenu()">
-                <span class="lock-icon">🔒</span> Modo dueño
-              </button>
-              <div class="hdr-drop-sep"></div>
-              <button class="hdr-drop-item" onclick="window.location.href='caja.html';closeDashMenu()">
-                💰 Ir a caja
-              </button>
-              <button class="hdr-drop-item" onclick="window.location.href='pos.html';closeDashMenu()">
-                🛒 Punto de venta
-              </button>
-              <div class="hdr-drop-sep"></div>
-              <button class="hdr-drop-item" onclick="(async()=>{ await signOut(); location.replace('login.html'); })()">
-                🚪 Cerrar sesión
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </header>
-
     <div class="dash-body">
 
-      <!-- Saludo + fecha -->
-      <div class="dash-saludo">
-        <div class="dash-saludo-hi" id="dash-saludo-hi">Hola 👋</div>
-        <div class="dash-saludo-fecha" id="dash-saludo-fecha"></div>
+      <!-- Topbar / breadcrumb -->
+      <div class="d-topbar">
+        <span class="d-crumb">Principal / <b>Dashboard</b></span>
+        <div class="d-topbar-actions">
+          <button class="d-icon-btn d-sb-toggle" onclick="toggleSidebar()" title="Colapsar panel">&#9776;</button>
+          <button class="d-icon-btn" id="dash-menu-btn" onclick="toggleDashMenu()" title="Opciones">&#8942;</button>
+        </div>
+      </div>
+
+      <!-- Saludo -->
+      <div class="d-hello">
+        <div class="d-avatar" id="dash-avatar">TP</div>
+        <div class="d-hello-txt">
+          <span class="d-hello-hi" id="dash-saludo-hi">Hola</span>
+          <span class="d-hello-date" id="dash-saludo-fecha"></span>
+        </div>
       </div>
 
       <!-- Notificaciones in-app (banners) -->
       <div id="notif-banners" class="notif-banners hidden"></div>
 
-      <!-- TU DÍA: contadores accionables -->
-      <div class="dash-card dash-tudia-card" id="dash-tudia-card" style="display:none">
-        <div class="dash-card-hdr">
-          <span class="dash-card-title">📋 Tu día</span>
-        </div>
-        <div class="dash-tudia-grid" id="dash-tudia-grid"></div>
+      <!-- Acciones rápidas -->
+      <div class="d-quick">
+        <button class="d-quick-btn d-qc-cyan" onclick="window.location.href='caja.html?action=venta'">
+          <span class="d-quick-ico">&#128181;</span><span class="d-quick-lbl">Nueva venta</span>
+        </button>
+        <button class="d-quick-btn d-qc-amber" onclick="switchSection('repairs');openRepairForm()">
+          <span class="d-quick-ico">&#128295;</span><span class="d-quick-lbl">Nueva reparación</span>
+        </button>
+        <button class="d-quick-btn d-qc-violet" onclick="window.location.href='caja.html?action=arqueo'">
+          <span class="d-quick-ico">&#129534;</span><span class="d-quick-lbl">Control de caja</span>
+        </button>
+        <button class="d-quick-btn d-qc-red" onclick="window.location.href='caja.html?action=egreso'">
+          <span class="d-quick-ico">&#128184;</span><span class="d-quick-lbl">Nuevo egreso</span>
+        </button>
       </div>
 
-      <!-- Alertas (legacy) -->
-      <div id="dash-alertas" class="dash-alertas hidden"></div>
-
-      <!-- Entregas / listas para retirar -->
-      <div class="dash-card" id="dash-entregas-card" style="display:none">
-        <div class="dash-card-hdr">
-          <span class="dash-card-title">✅ Listas para entregar</span>
-          <button class="dash-card-link" onclick="switchSection('repairs')">Ver →</button>
-        </div>
-        <div id="dash-entregas-list" class="dash-entregas-list"></div>
+      <!-- Barra de período -->
+      <div class="d-period">
+        <div class="d-period-title">Ventas del período <span id="d-period-range"></span></div>
+        <div class="d-chips" id="d-period-chips"></div>
       </div>
 
-      <!-- Caja hoy -->
-      <div class="dash-card" id="dash-caja-card">
-        <div class="dash-card-hdr">
-          <span class="dash-card-title">💰 Caja hoy</span>
-          <button class="dash-card-link" onclick="window.location.href='caja.html'">Ver caja →</button>
+      <!-- KPIs: 1 grande + 6 chicas -->
+      <div class="d-kpis">
+        <div class="d-card d-kpi-hero">
+          <div class="d-hero-top">
+            <div class="d-hero-nums">
+              <div class="d-label">Ganancia neta</div>
+              <div class="d-hero-num" id="d-neta">$0</div>
+              <div class="d-usd" id="d-neta-usd"></div>
+            </div>
+            <span class="d-badge d-badge-pos" id="d-neta-badge">Positivo</span>
+          </div>
+          <div class="d-formula" id="d-neta-formula"></div>
+          <svg class="d-spark" id="d-neta-spark" preserveAspectRatio="none" aria-hidden="true"></svg>
         </div>
-        <div class="dash-caja-nums" id="dash-caja-nums">
-          <div class="dash-caja-num"><span id="dash-caja-ing">$—</span><span class="dash-num-lbl">Ingresos</span></div>
-          <div class="dash-caja-num"><span id="dash-caja-eg">$—</span><span class="dash-num-lbl">Egresos</span></div>
-          <div class="dash-caja-num"><span id="dash-caja-neto" class="dash-neto">$—</span><span class="dash-num-lbl">Neto</span></div>
-        </div>
+        <div class="d-kpi-grid" id="d-kpi-grid"></div>
       </div>
 
-      <!-- Reparaciones activas -->
-      <div class="dash-card">
-        <div class="dash-card-hdr">
-          <span class="dash-card-title">🔧 Reparaciones activas</span>
-          <button class="dash-card-link" onclick="switchSection('repairs')">Ver todas →</button>
-        </div>
-        <div id="dash-repairs-list" class="dash-repairs-list"></div>
-      </div>
+      <!-- Desglose por categoría -->
+      <div class="d-cats" id="d-cats"></div>
 
-      <!-- Recordatorios -->
-      <div class="dash-card" id="dash-seguimiento-card" style="display:none">
-        <div class="dash-card-hdr">
-          <span class="dash-card-title">🔔 Recordatorios pendientes</span>
+      <!-- Fila final 60/40 -->
+      <div class="d-bottom">
+        <div class="d-card">
+          <div class="d-card-hd">
+            <span class="d-card-ttl">Top productos</span>
+            <div class="d-seg" id="d-top-seg">
+              <button class="sel" data-mode="venta" onclick="_setTopMode('venta')">Por venta</button>
+              <button data-mode="ganancia" onclick="_setTopMode('ganancia')">Por ganancia</button>
+            </div>
+          </div>
+          <div id="d-top-body"></div>
         </div>
-        <div id="dash-seguimiento-list" class="dash-seguimiento-list"></div>
-      </div>
-
-      <!-- Stock bajo mínimo -->
-      <div class="dash-card" id="dash-stock-card" style="display:none">
-        <div class="dash-card-hdr">
-          <span class="dash-card-title">⚠️ Repuestos con stock bajo</span>
-          <button class="dash-card-link" onclick="switchSection('repuestos')">Ver repuestos →</button>
+        <div class="d-card">
+          <div class="d-card-hd">
+            <span class="d-card-ttl">Reparaciones activas</span>
+            <button class="d-icon-btn" onclick="switchSection('repairs')" title="Ver todas">&rarr;</button>
+          </div>
+          <div id="d-reps-body"></div>
         </div>
-        <div id="dash-stock-list" class="dash-stock-list"></div>
-      </div>
-
-      <!-- Acceso rápido -->
-      <div class="dash-accesos">
-        <button class="dash-acc-btn" onclick="switchSection('repairs');openRepairForm()">＋ Reparación</button>
-        <button class="dash-acc-btn" onclick="switchSection('stock');openForm()">＋ Equipo</button>
-        <button class="dash-acc-btn" onclick="window.location.href='caja.html'">💰 Ir a caja</button>
-        <button class="dash-acc-btn" onclick="window.location.href='pos.html'">🛒 Punto de venta</button>
       </div>
 
     </div>

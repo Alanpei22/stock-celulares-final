@@ -167,8 +167,20 @@ function initApp() {
 function _handleUrlAction() {
   try {
     const params = new URLSearchParams(location.search);
+    // ?tab=inventario — desde la sidebar del dashboard
+    const tab = params.get('tab');
+    if (tab) {
+      params.delete('tab');
+      setTimeout(() => { if (typeof switchCajaTab === 'function') switchCajaTab(tab); }, 400);
+    }
     const action = params.get('action');
-    if (!action) return;
+    if (!action) {
+      if (tab) {
+        const s = params.toString();
+        history.replaceState({}, '', location.pathname + (s ? '?' + s : ''));
+      }
+      return;
+    }
     // Limpiar el param de la URL (sin recargar)
     params.delete('action');
     const newSearch = params.toString();
@@ -183,6 +195,10 @@ function _handleUrlAction() {
         else if (retry < 10) setTimeout(() => tryAct(retry + 1), 300);
       } else if (action === 'reporte') {
         if (typeof openReporteModal === 'function') openReporteModal();
+        else if (retry < 10) setTimeout(() => tryAct(retry + 1), 300);
+      } else if (action === 'venta' || action === 'egreso') {
+        // Accesos rápidos del dashboard
+        if (typeof openMovFormType === 'function') openMovFormType(action === 'venta' ? 'ingreso' : 'egreso');
         else if (retry < 10) setTimeout(() => tryAct(retry + 1), 300);
       }
     };
