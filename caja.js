@@ -102,6 +102,9 @@ function _updateDarkIcon() {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.remove('app-hidden');
+  // Sidebar (pantalla grande): activarlo y marcar el tab inicial
+  document.body.classList.add('has-sidebar');
+  document.getElementById('sb-caja')?.classList.add('active');
   initApp();
 }
 

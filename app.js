@@ -2350,6 +2350,22 @@ function initPWA() {
 function _handleUrlAction() {
   try {
     const params = new URLSearchParams(location.search);
+
+    // ?section=stock|repairs|repuestos|dash → abrir esa sección (links del sidebar de caja)
+    const section = params.get('section');
+    if (section && ['dash', 'stock', 'repairs', 'repuestos'].includes(section)) {
+      params.delete('section');
+      const s = params.toString();
+      history.replaceState({}, '', location.pathname + (s ? '?' + s : ''));
+      const trySec = (retry = 0) => {
+        const app = document.getElementById('app');
+        if (typeof switchSection === 'function' && app && !app.classList.contains('app-hidden')) {
+          switchSection(section);
+        } else if (retry < 15) setTimeout(() => trySec(retry + 1), 400);
+      };
+      setTimeout(() => trySec(0), 300);
+    }
+
     const action = params.get('action');
     if (!action) return;
     params.delete('action');

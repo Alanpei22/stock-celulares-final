@@ -14,6 +14,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="caja.css">
+  <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
 
@@ -22,6 +23,23 @@
   <img src="icon-192.png" alt="TechPoint" style="width:76px;height:76px;border-radius:20px">
   <span style="font-size:15px;font-weight:700;color:#5C5C5C;letter-spacing:.02em">TechPoint</span>
 </div>
+
+<!-- ── SIDEBAR (solo pantalla grande; en celu queda la bottom nav) ── -->
+<aside id="app-sidebar">
+  <div class="sb-brand"><img src="icon-192.png" alt=""><b>TechPoint</b></div>
+
+  <div class="sb-sec sb-sec-main">Principal</div>
+  <button class="sb-item" onclick="window.location.href='index.html'"><span class="sb-ico">◆</span>Dashboard</button>
+  <button class="sb-item" onclick="window.location.href='index.html?section=stock'"><span class="sb-ico">▣</span>Equipos</button>
+  <button class="sb-item" onclick="window.location.href='index.html?section=repairs'"><span class="sb-ico">⚒</span>Reparaciones</button>
+  <button class="sb-item" onclick="window.location.href='index.html?section=repuestos'"><span class="sb-ico">⬡</span>Repuestos</button>
+
+  <div class="sb-sec sb-sec-caja">Caja</div>
+  <button class="sb-item" id="sb-caja"      onclick="switchCajaTab('caja')"><span class="sb-ico">▤</span>Caja del día</button>
+  <button class="sb-item" id="sb-inv"       onclick="switchCajaTab('inventario')"><span class="sb-ico">◈</span>Accesorios</button>
+  <button class="sb-item" id="sb-repar"     onclick="switchCajaTab('reparaciones')"><span class="sb-ico">✧</span>Precios reparación</button>
+  <button class="sb-item" onclick="openReporteModal()"><span class="sb-ico">▦</span>Reporte del día</button>
+</aside>
 
 <!-- APP -->
 <div id="app" class="app-hidden">
@@ -1103,12 +1121,16 @@ document.addEventListener('keydown', (e) => {
 function switchCajaTab(tab) {
   const tabs = { caja: 'caja-tab', inventario: 'inv-tab', reparaciones: 'rep-tab' };
   const btns = { caja: 'cnav-caja', inventario: 'cnav-inv', reparaciones: 'cnav-rep' };
+  const sbs  = { caja: 'sb-caja',   inventario: 'sb-inv',   reparaciones: 'sb-repar' };
   Object.keys(tabs).forEach(t => {
     const sec = document.getElementById(tabs[t]);
     const btn = document.getElementById(btns[t]);
+    const sb  = document.getElementById(sbs[t]);
     if (sec) sec.classList.toggle('section-hidden', t !== tab);
     if (btn) btn.classList.toggle('active', t === tab);
+    if (sb)  sb.classList.toggle('active', t === tab);
   });
+  document.body.classList.add('has-sidebar'); // activa el sidebar en pantalla grande
   const fab = document.getElementById('fab-wrap');
   const backdrop = document.getElementById('fab-backdrop');
   if (fab) fab.style.display = tab === 'caja' ? '' : 'none';
