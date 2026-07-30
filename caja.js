@@ -848,8 +848,11 @@ function renderMovimientos() {
     list.innerHTML = '';
     if (empty) {
       empty.style.display = '';
-      empty.innerHTML = `<div class="empty-icon">🔍</div><p>Sin resultados</p><p class="empty-sub">Probá con otra búsqueda o filtro</p>
-        <button class="btn-primary" style="margin-top:10px;padding:8px 18px;border-radius:10px;border:none;background:#C8965A;color:#fff;font-weight:700;cursor:pointer" onclick="_clearMovSearch();_setMovFilter('all')">Limpiar</button>`;
+      empty.innerHTML = `<div class="empty-icon">🔍</div><p>Sin resultados <b>en este día</b></p><p class="empty-sub">Probá con otra búsqueda o buscá en todas las fechas</p>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+          <button class="btn-primary" style="padding:8px 18px;border-radius:10px;border:none;background:#C8965A;color:#fff;font-weight:700;cursor:pointer" onclick="_vsFromDay()">🔎 Buscar en todas las fechas</button>
+          <button class="btn-secondary" style="padding:8px 18px;border-radius:10px;font-weight:700;cursor:pointer" onclick="_clearMovSearch();_setMovFilter('all')">Limpiar</button>
+        </div>`;
     }
     return;
   }
@@ -988,6 +991,7 @@ function toggleCajaMenu() {
     { icon: '🧾', label: 'Arqueo de caja', onClick: reopenArqueo },
     { icon: '🔄', label: 'Cierre de turno', sub: 'Cambio de cajero', onClick: openCierreParcialModal },
     { icon: '🔐', label: CIERRE ? 'Cierre registrado' : 'Cerrar caja del día', sub: CIERRE ? `Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}` : null, onClick: openCierreModal },
+    { icon: '🔎', label: 'Buscar en ventas', sub: 'Producto o reparación en todas las fechas', onClick: openVentasSearch },
     { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', onClick: openReporteModal },
     { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
     { divider: true, hide: !isOwner },
@@ -999,6 +1003,138 @@ function toggleCajaMenu() {
   ]);
 }
 function closeCajaMenu() { closeSheet(); }
+
+// ══════════════════════════════════════════
+//  BUSCAR EN VENTAS — todas las fechas (no solo el día que estás viendo)
+// ══════════════════════════════════════════
+const _VS_PERIODOS = [
+  { d: 30,  label: '30 días' },
+  { d: 90,  label: '3 meses' },
+  { d: 365, label: '1 año' },
+];
+let _vsPeriodo = 90;
+let _vsCache = {};      // { dias: [movs] } — se lee una vez por período/sesión
+let _vsLoading = false;
+
+function openVentasSearch() {
+  const inp = document.getElementById('vsearch-input');
+  if (inp) inp.value = '';
+  _vsRenderChips();
+  document.getElementById('vsearch-overlay').classList.remove('hidden');
+  document.getElementById('vsearch-modal').classList.remove('hidden');
+  _vsLoad(_vsPeriodo);
+  setTimeout(() => inp?.focus(), 150);
+}
+
+function closeVentasSearch() {
+  document.getElementById('vsearch-overlay').classList.add('hidden');
+  document.getElementById('vsearch-modal').classList.add('hidden');
+}
+
+function _vsRenderChips() {
+  const cont = document.getElementById('vsearch-chips');
+  if (!cont) return;
+  cont.innerHTML = _VS_PERIODOS.map(p =>
+    `<button class="precio-chip${p.d === _vsPeriodo ? ' precio-chip--active' : ''}" onclick="_vsSetPeriodo(${p.d})">${p.label}</button>`
+  ).join('');
+}
+
+function _vsSetPeriodo(d) {
+  _vsPeriodo = d;
+  _vsRenderChips();
+  _vsLoad(d);
+}
+
+async function _vsLoad(dias) {
+  if (_vsCache[dias]) { _vsearchRender(); return; }
+  const info = document.getElementById('vsearch-info');
+  const res  = document.getElementById('vsearch-results');
+  if (info) info.textContent = 'Cargando movimientos…';
+  if (res) res.innerHTML = '';
+  _vsLoading = true;
+  try {
+    const desde = new Date();
+    desde.setDate(desde.getDate() - dias);
+    const snap = await db.collection('caja_movimientos')
+      .where('fecha', '>=', desde.toISOString().slice(0, 10))
+      .get();
+    _vsCache[dias] = snap.docs.map(d => d.data());
+  } catch (e) {
+    console.error('buscar ventas:', e);
+    if (info) info.textContent = e?.code === 'resource-exhausted'
+      ? '⚠️ Cupo de Firebase agotado, probá más tarde'
+      : 'Error cargando los movimientos';
+    _vsLoading = false;
+    return;
+  }
+  _vsLoading = false;
+  _vsearchRender();
+}
+
+// Texto donde se busca: descripción, ítems del carrito, cliente, N° de orden, etc.
+function _vsTexto(m) {
+  const items = Array.isArray(m.items) ? m.items.map(i => i.nombre).join(' ') : '';
+  return [m.descripcion, m.itemNombre, items, m.categoria, m.metodoPago, m.metodoPago2,
+          m.vendedor, m.clienteNombre, m.clienteTel,
+          m.repairNOrden ? '#' + m.repairNOrden : '']
+    .filter(Boolean).join(' ').toLowerCase();
+}
+
+function _vsearchRender() {
+  const res  = document.getElementById('vsearch-results');
+  const info = document.getElementById('vsearch-info');
+  if (!res || _vsLoading) return;
+  const q = (document.getElementById('vsearch-input')?.value || '').trim().toLowerCase();
+  const todos = _vsCache[_vsPeriodo] || [];
+
+  if (!q) {
+    if (info) info.textContent = `${todos.length} movimientos en el período · escribí para buscar`;
+    res.innerHTML = '';
+    return;
+  }
+  const terms = q.split(/\s+/).filter(Boolean);
+  const hits = todos.filter(m => { const t = _vsTexto(m); return terms.every(x => t.includes(x)); });
+  hits.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+  const total = hits.reduce((s, m) => s + (m.tipo === 'ingreso' ? (Number(m.monto) || 0) : 0), 0);
+  if (info) info.innerHTML = hits.length
+    ? `<b>${hits.length}</b> resultado${hits.length !== 1 ? 's' : ''} · ingresos ${fmt(total)}`
+    : 'Sin resultados en el período — probá ampliarlo ↑';
+
+  res.innerHTML = hits.slice(0, 60).map(m => {
+    const f = (m.fecha || '').split('-').reverse().join('/');
+    const hora = typeof m.createdAt === 'string'
+      ? new Date(m.createdAt).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })
+      : '';
+    const signo = m.tipo === 'ingreso' ? '+' : '−';
+    const inf = _metodoInfo(m.metodoPago || 'Efectivo');
+    return `<div class="vsearch-item" onclick="_vsGoTo('${esc(m.fecha || '')}')">
+      <div class="vsearch-item-main">
+        <span class="vsearch-item-desc">${esc(m.descripcion || '—')}</span>
+        <span class="vsearch-item-meta">${f}${hora ? ' · ' + hora : ''} · ${esc(m.categoria || '')}${m.repairNOrden ? ' · 🔧 #' + m.repairNOrden : ''}</span>
+        <span class="vsearch-item-meta ${inf.cls}">${inf.icon} ${esc(inf.short)}${m.vendedor ? ' · 👤 ' + esc(m.vendedor) : ''}</span>
+      </div>
+      <span class="vsearch-item-monto mov-${esc(m.tipo)}">${signo}${fmt(m.monto)}</span>
+    </div>`;
+  }).join('') + (hits.length > 60 ? `<p class="vsearch-info">…y ${hits.length - 60} más. Afiná la búsqueda.</p>` : '');
+}
+
+// Abrir el buscador global arrastrando lo que ya se tipeó en el buscador del día
+function _vsFromDay() {
+  const q = (document.getElementById('mov-search')?.value || '').trim();
+  openVentasSearch();
+  if (q) setTimeout(() => {
+    const inp = document.getElementById('vsearch-input');
+    if (inp) { inp.value = q; _vsearchRender(); }
+  }, 200);
+}
+
+// Ir al día de ese movimiento
+function _vsGoTo(fecha) {
+  if (!fecha) return;
+  closeVentasSearch();
+  if (typeof setDate === 'function') setDate(fecha);
+}
 
 // ══════════════════════════════════════════
 //  COMPROBANTE DE VENTA — picker de equipo + prefill del generador

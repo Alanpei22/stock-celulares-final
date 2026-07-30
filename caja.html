@@ -1140,6 +1140,22 @@ function switchCajaTab(tab) {
 }
 </script>
 
+<!-- ═══════════ MODAL: BUSCAR EN VENTAS (todas las fechas) ═══════════ -->
+<div id="vsearch-overlay" class="nota-overlay hidden" onclick="closeVentasSearch()"></div>
+<div id="vsearch-modal" class="arqueo-modal hidden" style="max-width:460px">
+  <div class="nota-modal-hdr">
+    <span>🔎 Buscar en ventas</span>
+    <button onclick="closeVentasSearch()">✕</button>
+  </div>
+  <div class="precios-search-wrap" style="margin-top:6px">
+    <span class="precios-search-ico">🔍</span>
+    <input id="vsearch-input" type="search" placeholder="Producto, reparación, cliente, N° orden…" autocomplete="off" oninput="_vsearchRender()">
+  </div>
+  <div class="vsearch-chips" id="vsearch-chips"></div>
+  <div class="vsearch-info" id="vsearch-info"></div>
+  <div class="vsearch-results" id="vsearch-results"></div>
+</div>
+
 <!-- ═══════════ MODAL: COMPROBANTE DE VENTA (picker de equipo) ═══════════ -->
 <div id="comprobante-overlay" class="nota-overlay hidden" onclick="closeComprobanteModal()"></div>
 <div id="comprobante-modal" class="arqueo-modal hidden" style="max-width:420px">

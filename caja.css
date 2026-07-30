@@ -1526,3 +1526,20 @@ body.dark .rep-var-inline-input { color:#eee; border-color:rgba(255,255,255,.2);
 .comprobante-empty { text-align:center; color:var(--t3,#999); font-size:.85rem; padding:16px 8px; }
 body.dark .comprobante-item { background:#1c1c1e; border-color:rgba(255,255,255,.08); }
 body.dark .comprobante-item-name { color:#eee; }
+
+/* ══ Buscar en ventas (todas las fechas) ══ */
+.vsearch-chips { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0 6px; }
+.vsearch-info { font-size:.76rem; color:var(--t3,#999); padding:2px 2px 6px; }
+.vsearch-results { max-height:52vh; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+.vsearch-item {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:9px 12px; border:1px solid var(--border,#e3e1de); border-radius:12px;
+  background:var(--bg1,#f7f7f7); cursor:pointer;
+}
+.vsearch-item:active { transform:scale(.99); }
+.vsearch-item-main { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.vsearch-item-desc { font-weight:700; font-size:.88rem; color:var(--t1,#1a1a1a); }
+.vsearch-item-meta { font-size:.7rem; color:var(--t3,#999); }
+.vsearch-item-monto { font-weight:800; font-size:.92rem; white-space:nowrap; flex-shrink:0; }
+body.dark .vsearch-item { background:#1c1c1e; border-color:rgba(255,255,255,.08); }
+body.dark .vsearch-item-desc { color:#eee; }
