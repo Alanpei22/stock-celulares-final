@@ -180,7 +180,9 @@ function printRepair(format) {
   // Asegurar el doc de seguimiento público (para que el QR funcione,
   // también en reparaciones viejas que se reimprimen)
   if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);
-  if (format === 'A4') {
+  if (format === 'A5') {
+    _openPrint(_buildA5(rep));
+  } else if (format === 'A4') {
     _openPrint(_buildA4(rep));
   } else {
     _build80mm(rep); // abre el popup con flujo secuencial (original → copia)
@@ -265,7 +267,7 @@ function _qrSeguimientoHtml(rep) {
   const url = urlSeguimiento(rep.id);
   const src = qrImgSrc(url, 130);
   return `
-<div class="c" style="margin:6px 0;padding:6px 0;border-top:1px dashed #555;border-bottom:1px dashed #555">
+<div class="c" style="margin:6px 0;padding:6px 0;border-top:1px dashed #000;border-bottom:1px dashed #000">
   <div class="b sm" style="margin-bottom:4px">📲 SEGUÍ TU REPARACIÓN</div>
   <img src="${src}" width="110" height="110" style="display:block;margin:0 auto" alt="QR">
   <div class="sm" style="margin-top:3px">Escaneá el código para ver el estado</div>
@@ -282,7 +284,7 @@ body { font-family:'Courier New',Courier,monospace; font-size:11px; color:#000; 
 .b  { font-weight:bold; }
 .lg { font-size:15px; }
 .sm { font-size:9.5px; }
-.sep  { border-top:1px dashed #555; margin:4px 0; }
+.sep  { border-top:1px dashed #000; margin:4px 0; }
 .sep2 { border-top:2px solid #000; margin:5px 0; }
 .row  { display:flex; justify-content:space-between; gap:4px; margin-bottom:1px; }
 .row .r { text-align:right; white-space:nowrap; }
@@ -369,31 +371,31 @@ ${(accs || rep.observaciones) ? `
   const css = `
 * { margin:0; padding:0; box-sizing:border-box; }
 @page { size: A4 portrait; margin: 8mm 12mm; }
-body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; color:#0f172a; background:#fff; }
+body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; color:#000; background:#fff; }
 .half { height:130mm; overflow:hidden; }
-.cut { text-align:center; font-size:9px; color:#666; border-top:1px dashed #aaa; border-bottom:1px dashed #aaa; padding:2px 0; margin:3mm 0; letter-spacing:4px; }
-.hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; padding-bottom:6px; border-bottom:2px solid #0f172a; }
+.cut { text-align:center; font-size:9px; color:#000; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:2px 0; margin:3mm 0; letter-spacing:4px; }
+.hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; padding-bottom:6px; border-bottom:2px solid #000; }
 .hdr-shop { font-size:18px; font-weight:900; letter-spacing:-1px; }
-.hdr-sub  { font-size:8.5px; color:#64748b; margin-top:1px; }
+.hdr-sub  { font-size:8.5px; color:#000; margin-top:1px; }
 .hdr-orden { text-align:right; }
-.hdr-orden .num { font-size:14px; font-weight:800; color:#4f46e5; }
-.hdr-orden .meta { font-size:8.5px; color:#475569; line-height:1.5; }
-.title-bar { background:#0f172a; color:#fff; padding:3px 10px; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; border-radius:3px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
+.hdr-orden .num { font-size:14px; font-weight:800; color:#000; }
+.hdr-orden .meta { font-size:8.5px; color:#000; line-height:1.5; }
+.title-bar { background:#000; color:#fff; padding:3px 10px; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; border-radius:3px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
 .copy-label { font-size:8.5px; opacity:.75; font-style:italic; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
-.card { border:1px solid #e2e8f0; border-radius:4px; padding:5px 8px; }
-.card-title { font-size:7px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#94a3b8; padding-bottom:3px; margin-bottom:3px; border-bottom:1px solid #e2e8f0; }
+.card { border:1px solid #000; border-radius:4px; padding:5px 8px; }
+.card-title { font-size:7px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#000; padding-bottom:3px; margin-bottom:3px; border-bottom:1px solid #000; }
 .field { display:flex; justify-content:space-between; margin-bottom:2px; }
-.field .lbl { color:#64748b; }
+.field .lbl { color:#000; }
 .field .val { font-weight:600; text-align:right; max-width:58%; word-break:break-word; }
-.card-full { border:1px solid #e2e8f0; border-radius:4px; padding:5px 8px; margin-bottom:6px; }
+.card-full { border:1px solid #000; border-radius:4px; padding:5px 8px; margin-bottom:6px; }
 .desc { line-height:1.4; white-space:pre-wrap; word-break:break-word; min-height:16px; }
 .totals { width:100%; border-collapse:collapse; margin-bottom:6px; }
-.totals td { padding:2.5px 8px; border:1px solid #e2e8f0; }
+.totals td { padding:2.5px 8px; border:1px solid #000; }
 .totals .amt { text-align:right; font-weight:600; }
-.totals .hl td { background:#0f172a; color:#fff; font-weight:700; font-size:10.5px; }
+.totals .hl td { background:#000; color:#fff; font-weight:700; font-size:10.5px; }
 .firmas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-.firma-box { border-top:1.5px solid #0f172a; padding-top:3px; font-size:8px; color:#64748b; }
+.firma-box { border-top:1.5px solid #000; padding-top:3px; font-size:8px; color:#000; }
 .firma-space { height:16px; }
 @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }`;
 
@@ -553,37 +555,37 @@ function _buildDeliveryA4(rep) {
   const css = `
 * { margin:0; padding:0; box-sizing:border-box; }
 @page { size: A4 portrait; margin: 8mm 12mm; }
-body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; color:#0f172a; background:#fff; }
+body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; color:#000; background:#fff; }
 .half { height:130mm; overflow:hidden; }
-.cut { text-align:center; font-size:9px; color:#666; border-top:1px dashed #aaa; border-bottom:1px dashed #aaa; padding:2px 0; margin:3mm 0; letter-spacing:4px; }
-.hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; padding-bottom:6px; border-bottom:2px solid #059669; }
+.cut { text-align:center; font-size:9px; color:#000; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:2px 0; margin:3mm 0; letter-spacing:4px; }
+.hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; padding-bottom:6px; border-bottom:2px solid #000; }
 .hdr-shop { font-size:18px; font-weight:900; letter-spacing:-1px; }
-.hdr-sub  { font-size:8.5px; color:#64748b; margin-top:1px; }
+.hdr-sub  { font-size:8.5px; color:#000; margin-top:1px; }
 .hdr-orden { text-align:right; }
-.hdr-orden .num { font-size:14px; font-weight:800; color:#059669; }
-.hdr-orden .meta { font-size:8.5px; color:#475569; line-height:1.5; }
-.title-bar { background:#059669; color:#fff; padding:3px 10px; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; border-radius:3px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
+.hdr-orden .num { font-size:14px; font-weight:800; color:#000; }
+.hdr-orden .meta { font-size:8.5px; color:#000; line-height:1.5; }
+.title-bar { background:#000; color:#fff; padding:3px 10px; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; border-radius:3px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
 .copy-label { font-size:8.5px; opacity:.8; font-style:italic; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
 .grid2-bottom { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
-.card { border:1px solid #e2e8f0; border-radius:4px; padding:5px 8px; }
-.card-title { font-size:7px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#94a3b8; padding-bottom:3px; margin-bottom:3px; border-bottom:1px solid #e2e8f0; }
+.card { border:1px solid #000; border-radius:4px; padding:5px 8px; }
+.card-title { font-size:7px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#000; padding-bottom:3px; margin-bottom:3px; border-bottom:1px solid #000; }
 .field { display:flex; justify-content:space-between; margin-bottom:2px; }
-.field .lbl { color:#64748b; }
+.field .lbl { color:#000; }
 .field .val { font-weight:600; text-align:right; max-width:58%; word-break:break-word; }
-.card-full { border:1px solid #e2e8f0; border-radius:4px; padding:5px 8px; margin-bottom:6px; }
+.card-full { border:1px solid #000; border-radius:4px; padding:5px 8px; margin-bottom:6px; }
 .desc { line-height:1.4; white-space:pre-wrap; word-break:break-word; min-height:16px; }
 .totals { width:100%; border-collapse:collapse; }
-.totals td { padding:2.5px 8px; border:1px solid #e2e8f0; }
+.totals td { padding:2.5px 8px; border:1px solid #000; }
 .totals .amt { text-align:right; font-weight:600; }
-.totals .hl td { background:#0f172a; color:#fff; font-weight:700; font-size:10.5px; }
-.garantia-box { border:1px solid #d1fae5; border-radius:4px; padding:5px 8px; background:#f0fdf4; }
-.garantia-item { font-size:9px; margin-bottom:2px; line-height:1.4; color:#166534; }
+.totals .hl td { background:#000; color:#fff; font-weight:700; font-size:10.5px; }
+.garantia-box { border:1px solid #fff; border-radius:4px; padding:5px 8px; background:#fff; }
+.garantia-item { font-size:9px; margin-bottom:2px; line-height:1.4; color:#000; }
 .garantia-item.hl { font-weight:700; font-size:10px; }
-.garantia-item.no { color:#991b1b; }
-.retiro-conf { font-size:8.5px; color:#475569; border:1px dashed #cbd5e1; border-radius:4px; padding:4px 8px; margin-bottom:6px; font-style:italic; text-align:center; }
+.garantia-item.no { color:#000; }
+.retiro-conf { font-size:8.5px; color:#000; border:1px dashed #000; border-radius:4px; padding:4px 8px; margin-bottom:6px; font-style:italic; text-align:center; }
 .firmas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-.firma-box { border-top:1.5px solid #0f172a; padding-top:3px; font-size:8px; color:#64748b; }
+.firma-box { border-top:1.5px solid #000; padding-top:3px; font-size:8px; color:#000; }
 .firma-space { height:16px; }
 @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }`;
 
@@ -678,33 +680,33 @@ function printVentaTicket(stockId, extra) {
     </div>`;
 
   const css = `
-    body { font-family: 'Segoe UI', Arial, sans-serif; margin:0; padding:0; color:#0f172a; background:#fff; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin:0; padding:0; color:#000; background:#fff; }
     .t80 { width: 76mm; margin: 0 auto; padding: 6mm 4mm; box-sizing: border-box; }
-    .hdr { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 8px; }
+    .hdr { text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px; }
     .biz { font-size: 16px; font-weight: 800; letter-spacing: -0.02em; }
-    .copy-lbl { display: inline-block; padding: 2px 8px; background: #0f172a; color: #fff; border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.05em; margin: 4px 0; }
-    .ticket-title { font-size: 11px; font-weight: 700; color: #475569; margin-top: 2px; }
-    .meta { display: flex; justify-content: space-between; font-size: 9px; color: #475569; margin-bottom: 6px; gap: 8px; }
-    .prod { border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px; margin-bottom: 8px; background: #f8fafc; }
-    .prod-marca { font-size: 13px; font-weight: 800; margin-bottom: 4px; color: #0f172a; }
-    .prod-line { font-size: 10px; color: #334155; margin-bottom: 2px; line-height: 1.45; }
-    .prod-line code { background: #e2e8f0; padding: 1px 4px; border-radius: 3px; font-size: 9px; }
-    .prod-line.obs { color: #1e40af; font-style: italic; }
-    .precio-box { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #0f172a; color: #fff; border-radius: 4px; margin-bottom: 6px; }
+    .copy-lbl { display: inline-block; padding: 2px 8px; background: #000; color: #fff; border-radius: 4px; font-size: 9px; font-weight: 700; letter-spacing: 0.05em; margin: 4px 0; }
+    .ticket-title { font-size: 11px; font-weight: 700; color: #000; margin-top: 2px; }
+    .meta { display: flex; justify-content: space-between; font-size: 9px; color: #000; margin-bottom: 6px; gap: 8px; }
+    .prod { border: 1px solid #000; border-radius: 4px; padding: 8px; margin-bottom: 8px; background: #fff; }
+    .prod-marca { font-size: 13px; font-weight: 800; margin-bottom: 4px; color: #000; }
+    .prod-line { font-size: 10px; color: #000; margin-bottom: 2px; line-height: 1.45; }
+    .prod-line code { background: #000; padding: 1px 4px; border-radius: 3px; font-size: 9px; }
+    .prod-line.obs { color: #000; font-style: italic; }
+    .precio-box { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #000; color: #fff; border-radius: 4px; margin-bottom: 6px; }
     .precio-lbl { font-size: 10px; opacity: 0.85; }
     .precio-val { font-size: 16px; font-weight: 800; }
-    .garantia-box { border: 1px solid #d1fae5; border-radius: 4px; padding: 6px 8px; background: #f0fdf4; margin: 6px 0; }
-    .garantia-box.no-warn { border-color: #fecaca; background: #fef2f2; }
-    .garantia-item { font-size: 9px; margin-bottom: 2px; line-height: 1.4; color: #166534; }
+    .garantia-box { border: 1px solid #fff; border-radius: 4px; padding: 6px 8px; background: #fff; margin: 6px 0; }
+    .garantia-box.no-warn { border-color: #000; background: #fff; }
+    .garantia-item { font-size: 9px; margin-bottom: 2px; line-height: 1.4; color: #000; }
     .garantia-item.hl { font-weight: 700; font-size: 10.5px; }
-    .garantia-item.no { color: #991b1b; font-weight: 700; font-size: 10px; text-align: center; }
-    .qr-section { text-align: center; margin: 8px 0; padding: 6px; border: 1px dashed #cbd5e1; border-radius: 4px; }
+    .garantia-item.no { color: #000; font-weight: 700; font-size: 10px; text-align: center; }
+    .qr-section { text-align: center; margin: 8px 0; padding: 6px; border: 1px dashed #000; border-radius: 4px; }
     .qr-section img { display: block; margin: 0 auto 4px; }
-    .qr-text { font-size: 8px; color: #475569; }
+    .qr-text { font-size: 8px; color: #000; }
     .firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0 6px; }
-    .firma-box { border-top: 1.5px solid #0f172a; padding-top: 3px; font-size: 8px; color: #64748b; text-align: center; }
+    .firma-box { border-top: 1.5px solid #000; padding-top: 3px; font-size: 8px; color: #000; text-align: center; }
     .firma-space { height: 22px; }
-    .footer { text-align: center; font-size: 9px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 6px; margin-top: 8px; }
+    .footer { text-align: center; font-size: 9px; color: #000; border-top: 1px dashed #000; padding-top: 6px; margin-top: 8px; }
     @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   `;
 
@@ -787,4 +789,155 @@ function printDeliveryTermica() {
   lines.push(C('Gracias por su confianza'));
 
   imprimirTermica(lines.join('\n'), { title: 'Entrega N' + (rep.nOrden||'') });
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  HOJA A5 — INGRESO · 100% BLANCO Y NEGRO                     ║
+// ║  1 ticket por página (pág.1 ORIGINAL cliente / pág.2 COPIA)  ║
+// ╚══════════════════════════════════════════════════════════════╝
+const _CL_LABELS = {
+  pantalla:'Pantalla', tactil:'Táctil', pixels:'Píxeles', cam_trasera:'Cám. trasera',
+  cam_delantera:'Cám. frontal', botones:'Botones', altavoz:'Altavoz', microfono:'Micrófono',
+  wifi:'WiFi', bluetooth:'Bluetooth', carga:'Puerto carga', bateria:'Batería',
+};
+
+// Checklist de recepción en grilla compacta (✓ ok · ✗ falla · – sin probar)
+function _clA5(rep) {
+  const cl = rep.checklist;
+  if (!cl || typeof cl !== 'object') return '';
+  const items = Object.keys(_CL_LABELS).filter(k => cl[k]);
+  if (!items.length) return '';
+  const cells = items.map(k => {
+    const v = cl[k];
+    const mark = v === 'ok' ? '✓' : v === 'falla' ? '✗' : '–';
+    return `<span class="cl"><b class="${v === 'falla' ? 'x' : ''}">${mark}</b>${_CL_LABELS[k]}</span>`;
+  }).join('');
+  return `<div class="box"><div class="box-t">Estado al recibir el equipo</div><div class="clgrid">${cells}</div></div>`;
+}
+
+function _a5Body(rep, label) {
+  const shop  = (window._DAKI_NAME || 'TechPoint').toUpperCase();
+  const saldo = _prSaldo(rep);
+  const accs  = _prAccs(rep.accesorios);
+  const garFin = rep.diasGarantia > 0 ? _garantiaFin(rep.diasGarantia) : null;
+  const patron = rep.patronImg ? `<div class="patron">${rep.patronImg}</div>` : '';
+
+  return `
+<div class="tk">
+  <div class="hd">
+    <div>
+      <div class="shop">${shop}</div>
+      <div class="sub">Servicio técnico de celulares</div>
+    </div>
+    <div class="hd-r">
+      <div class="orden">ORDEN N° ${_pr(rep.nOrden)}</div>
+      <div class="copia">${label}</div>
+    </div>
+  </div>
+
+  <div class="meta">
+    <span><b>Ingreso:</b> ${_prDate(rep.fechaIngreso)}</span>
+    ${rep.fechaEstimada ? `<span><b>Entrega est.:</b> ${_prDate(rep.fechaEstimada)}</span>` : ''}
+    <span><b>Recibió:</b> ${_pr(rep.tecnico)}</span>
+  </div>
+
+  <div class="g2">
+    <div class="box">
+      <div class="box-t">Cliente</div>
+      <div class="f"><span>Nombre</span><b>${_pr(rep.nombre)}</b></div>
+      <div class="f"><span>Teléfono</span><b>${_pr(rep.tlf)}</b></div>
+      ${rep.dni ? `<div class="f"><span>DNI</span><b>${rep.dni}</b></div>` : ''}
+    </div>
+    <div class="box">
+      <div class="box-t">Equipo</div>
+      <div class="f"><span>Marca</span><b>${_pr(rep.marca)}</b></div>
+      <div class="f"><span>Modelo</span><b>${_pr(rep.modelo)}</b></div>
+      ${rep.imei ? `<div class="f"><span>IMEI</span><b class="mono">${rep.imei}</b></div>` : ''}
+      ${rep.codigo ? `<div class="f"><span>Clave</span><b class="mono">${rep.codigo}</b></div>` : ''}
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="box-t">Trabajo a realizar</div>
+    <div class="desc">${_pr(rep.arreglo)}</div>
+    ${rep.condicion ? `<div class="f2"><span>Condición estética al ingreso:</span> ${rep.condicion}</div>` : ''}
+  </div>
+
+  ${_clA5(rep)}
+  ${patron ? `<div class="box"><div class="box-t">Patrón de desbloqueo</div>${patron}</div>` : ''}
+
+  ${(accs || rep.observaciones) ? `<div class="box">
+    ${accs ? `<div class="f2"><span>Accesorios entregados:</span> ${accs}</div>` : ''}
+    ${rep.observaciones ? `<div class="f2"><span>Observaciones:</span> ${rep.observaciones}</div>` : ''}
+  </div>` : ''}
+
+  <table class="tot">
+    ${rep.presupuesto ? `<tr><td>Presupuesto</td><td class="a">${_prMoney(rep.presupuesto)}</td></tr>` : ''}
+    <tr><td>Seña / Anticipo</td><td class="a">${_prMoney(rep.sena)}</td></tr>
+    <tr class="hl"><td>TOTAL</td><td class="a">${_prMoney(rep.monto)}</td></tr>
+    <tr class="hl"><td>SALDO A PAGAR AL RETIRAR</td><td class="a">${_prMoney(saldo)}</td></tr>
+  </table>
+
+  ${garFin ? `<div class="gar"><b>GARANTÍA ${rep.diasGarantia} DÍAS</b> — válida hasta ${garFin}. Cubre exclusivamente el trabajo realizado.</div>` : ''}
+
+  <div class="cond">
+    <b>Condiciones:</b> La garantía no cubre golpes, humedad, ni equipos abiertos por terceros.
+    Los equipos no retirados en 60 días generan gastos de depósito.
+    El cliente declara que los datos del equipo y su estado son los descritos.
+    Retiro únicamente presentando este comprobante.
+  </div>
+
+  <div class="fir">
+    <div><div class="line"></div>Firma y aclaración del cliente</div>
+    <div><div class="line"></div>Firma del técnico</div>
+  </div>
+</div>`;
+}
+
+const _CSS_A5 = `
+*{margin:0;padding:0;box-sizing:border-box}
+@page{size:A5 portrait;margin:7mm}
+body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-height:1.32;color:#000;background:#fff}
+.tk{page-break-after:always}
+.tk:last-child{page-break-after:auto}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.6px solid #000;padding-bottom:3px;margin-bottom:4px}
+.shop{font-size:16px;font-weight:800;letter-spacing:-.4px}
+.sub{font-size:7.4px;text-transform:uppercase;letter-spacing:.09em}
+.hd-r{text-align:right}
+.orden{font-size:12.5px;font-weight:800;border:1.4px solid #000;padding:1px 6px;display:inline-block}
+.copia{font-size:7.4px;text-transform:uppercase;letter-spacing:.14em;margin-top:2px;font-weight:700}
+.meta{display:flex;gap:10px;flex-wrap:wrap;font-size:7.8px;border-bottom:.6px solid #000;padding-bottom:3px;margin-bottom:4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:4px}
+.box{border:.7px solid #000;padding:3px 6px;margin-bottom:4px}
+.box-t{font-size:6.8px;font-weight:800;text-transform:uppercase;letter-spacing:.11em;border-bottom:.5px solid #000;padding-bottom:1.5px;margin-bottom:2.5px}
+.f{display:flex;justify-content:space-between;gap:6px}
+.f span{white-space:nowrap}
+.f b{font-weight:700;text-align:right;word-break:break-word}
+.f2{margin-top:1.5px}
+.f2 span{font-weight:700}
+.mono{font-family:'Courier New',monospace;font-size:8px;letter-spacing:-.2px}
+.desc{white-space:pre-wrap;word-break:break-word;font-weight:700;min-height:11px}
+.clgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px 6px}
+.cl{font-size:7.4px;white-space:nowrap}
+.cl b{display:inline-block;width:8px;font-weight:800}
+.cl b.x{text-decoration:none}
+.patron{text-align:center;padding:2px 0}
+.patron svg{width:26mm;height:26mm;filter:grayscale(1) contrast(3)}
+.tot{width:100%;border-collapse:collapse;margin-bottom:4px}
+.tot td{border:.7px solid #000;padding:1.8px 6px}
+.tot .a{text-align:right;font-weight:700;width:34%}
+.tot .hl td{font-weight:800;font-size:9.6px;border-width:1.4px}
+.gar{border:1.2px solid #000;padding:2.5px 6px;margin-bottom:4px;font-size:7.8px}
+.cond{font-size:6.6px;line-height:1.35;text-align:justify;margin-bottom:5px}
+.fir{display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:7px;margin-top:10px}
+.fir .line{border-top:.8px solid #000;margin-top:13px;margin-bottom:1.5px}
+@media print{body{-webkit-print-color-adjust:economy;print-color-adjust:economy}}`;
+
+function _buildA5(rep) {
+  return `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
+<style>${_CSS_A5}</style></head><body>
+${_a5Body(rep, 'Original — Cliente')}
+${_a5Body(rep, 'Duplicado — Taller')}
+</body></html>`;
 }
