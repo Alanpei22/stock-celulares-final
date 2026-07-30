@@ -199,8 +199,12 @@ function initRepuestos() {
       }, 320);
       return;
     }
-    if (['input', 'textarea', 'select', 'button'].includes(tag) || ae?.isContentEditable) return;   // se está tipeando
+    // Solo se ignora si se está escribiendo. Si el foco quedó en un botón
+    // (ej. el del menú con el que entraste a Repuestos), igual abrimos:
+    // el preventDefault evita que Enter re-active ese botón.
+    if (['input', 'textarea', 'select'].includes(tag) || ae?.isContentEditable) return;
     e.preventDefault();
+    if (ae && typeof ae.blur === 'function') ae.blur();
     openRepuestoForm();
   });
   document.getElementById('rep2-search').addEventListener('input', () => {

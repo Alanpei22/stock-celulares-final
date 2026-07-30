@@ -1087,10 +1087,14 @@ document.addEventListener('keydown', (e) => {
     const gsCerrado  = document.getElementById('gsearch-modal')?.classList.contains('hidden') !== false;
     const ae         = document.activeElement;
     const tag        = (ae?.tagName || '').toLowerCase();
-    const tipeando   = ['input', 'textarea', 'select', 'button'].includes(tag) || ae?.isContentEditable;
+    // Solo se ignora si se está escribiendo; si el foco quedó en un botón
+    // (ej. el del nav con el que entraste) igual abre — el preventDefault
+    // evita que Enter re-active ese botón.
+    const tipeando   = ['input', 'textarea', 'select'].includes(tag) || ae?.isContentEditable;
     const otroModal  = document.querySelector('.nota-overlay:not(.hidden), .modal-overlay:not(.hidden), .arqueo-modal:not(.hidden)');
     if (enCaja && movCerrado && gsCerrado && !tipeando && !otroModal && typeof openMovFormType === 'function') {
       e.preventDefault();
+      if (ae && typeof ae.blur === 'function') ae.blur();
       openMovFormType('ingreso');
     }
   }
