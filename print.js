@@ -365,15 +365,16 @@ ${(accs || rep.observaciones) ? `
 </table>
 ${_condicionesHtml(rep)}
 <div class="firmas">
-  <div class="firma-box"><div>Firma y aclaración del cliente</div><div class="firma-space"></div></div>
+  <div class="firma-box"><div>Firma del cliente al ingresar</div><div class="firma-space"></div></div>
   <div class="firma-box"><div>Firma del técnico — ${_pr(rep.tecnico)}</div><div class="firma-space"></div></div>
-</div>`;
+</div>
+${_entregaHtml()}`;
 
   const css = `
 * { margin:0; padding:0; box-sizing:border-box; }
-@page { size: A4 portrait; margin: 8mm 12mm; }
+@page { size: A4 portrait; margin: 6mm 10mm; }
 body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; color:#000; background:#fff; }
-.half { height:135mm; overflow:hidden; }
+.half { height:137mm; overflow:hidden; }
 .cut { text-align:center; font-size:9px; color:#000; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:2px 0; margin:3mm 0; letter-spacing:4px; }
 .hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; padding-bottom:6px; border-bottom:2px solid #000; }
 .hdr-shop { font-size:18px; font-weight:900; letter-spacing:-1px; }
@@ -397,12 +398,21 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 .totals .hl td { background:#000; color:#fff; font-weight:700; font-size:10.5px; }
 .firmas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .firma-box { border-top:1.5px solid #000; padding-top:3px; font-size:8px; color:#000; }
-.firma-space { height:16px; }
+.firma-space { height:9px; }
 /* Condiciones legales — 3 columnas para que entren en la mitad de la A4 */
 .cond { border:1px solid #000; padding:3px 6px; margin-bottom:4px; }
 .cond-t { font-size:6.6px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:2.5px; }
 .cond-c { column-count:3; column-gap:7px; font-size:5.3px; line-height:1.26; text-align:justify; }
 .cond-c p { margin-bottom:1.5px; break-inside:avoid; }
+/* Constancia de entrega — se completa a mano al retirar */
+.entr { border:1.2px solid #000; padding:3px 7px; margin-top:4px; }
+.entr-t { font-size:6.6px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:3px; }
+.entr-r { display:flex; flex-wrap:wrap; gap:4px 16px; margin-bottom:2.5px; }
+.entr-f { font-size:8px; font-weight:700; }
+.entr-f u { text-decoration:none; border-bottom:1px solid #000; display:inline-block; min-width:16mm; }
+.entr-txt { font-size:6.6px; margin-bottom:8px; }
+.entr-fir { display:grid; grid-template-columns:1.3fr 1.3fr .8fr; gap:12px; font-size:6.6px; text-align:center; }
+.entr-fir .ln { border-top:1px solid #000; margin-bottom:1.5px; }
 @media print { body { -webkit-print-color-adjust:economy; print-color-adjust:economy; } }`;
 
   return `<!DOCTYPE html>
@@ -889,9 +899,11 @@ function _a5Body(rep, label) {
   ${_condicionesHtml(rep)}
 
   <div class="fir">
-    <div><div class="line"></div>Firma y aclaración del cliente</div>
+    <div><div class="line"></div>Firma del cliente al ingresar</div>
     <div><div class="line"></div>Firma del técnico</div>
   </div>
+
+  ${_entregaHtml()}
 </div>`;
 }
 
@@ -936,7 +948,7 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-
 function _buildA5(rep) {
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
-<style>${_CSS_A5}${_CSS_COND}</style></head><body>
+<style>${_CSS_A5}${_CSS_COND}${_CSS_ENTREGA}</style></head><body>
 ${_a5Body(rep, 'Original — Cliente')}
 ${_a5Body(rep, 'Duplicado — Taller')}
 </body></html>`;
@@ -980,3 +992,35 @@ const _CSS_COND = `
 .cond-t{font-size:6.8px;font-weight:800;text-transform:uppercase;letter-spacing:.11em;border-bottom:.5px solid #000;padding-bottom:1.5px;margin-bottom:2.5px}
 .cond-c{column-count:2;column-gap:7px;font-size:5.75px;line-height:1.28;text-align:justify}
 .cond-c p{margin-bottom:1.6px;break-inside:avoid}`;
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  CONSTANCIA DE ENTREGA — se completa a mano al retirar       ║
+// ║  Va en el MISMO comprobante de ingreso (A5 y A4)             ║
+// ╚══════════════════════════════════════════════════════════════╝
+function _entregaHtml() {
+  return `
+<div class="entr">
+  <div class="entr-t">Constancia de entrega · completar al retirar el equipo</div>
+  <div class="entr-r">
+    <span class="entr-f">Fecha de entrega: <u>&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u></span>
+    <span class="entr-f">Hora: <u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u></span>
+    <span class="entr-f">Saldo abonado: $<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u></span>
+  </div>
+  <div class="entr-txt">Recibí el equipo reparado, probado y en funcionamiento, conforme al trabajo detallado en este comprobante.</div>
+  <div class="entr-fir">
+    <div><div class="ln"></div>Firma del cliente</div>
+    <div><div class="ln"></div>Aclaración</div>
+    <div><div class="ln"></div>DNI</div>
+  </div>
+</div>`;
+}
+
+const _CSS_ENTREGA = `
+.entr{border:1.2px solid #000;padding:3px 6px;margin-bottom:4px}
+.entr-t{font-size:6.8px;font-weight:800;text-transform:uppercase;letter-spacing:.11em;border-bottom:.5px solid #000;padding-bottom:1.5px;margin-bottom:3px}
+.entr-r{display:flex;flex-wrap:wrap;gap:4px 12px;margin-bottom:2.5px}
+.entr-f{font-size:7.6px;font-weight:700}
+.entr-f u{text-decoration:none;border-bottom:.7px solid #000;display:inline-block;min-width:14mm}
+.entr-txt{font-size:6.2px;margin-bottom:7px}
+.entr-fir{display:grid;grid-template-columns:1.3fr 1.3fr .8fr;gap:10px;font-size:6.4px;text-align:center}
+.entr-fir .ln{border-top:.8px solid #000;margin-bottom:1.5px}`;
