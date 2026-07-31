@@ -294,6 +294,21 @@ let currentTab = 'ventas';
 let PRICES = {};
 let dolarBlue = null;
 
+// ── Datos del negocio (salen impresos en los comprobantes) ──
+const BIZDATA_KEY = 'cel_bizdata';
+let BIZ_DATA = { dir: 'J.J. de Urquiza 4741 — Local 22', tel: '11 7239-2511', extra: '' };
+
+function loadBizData() {
+  try {
+    const d = JSON.parse(localStorage.getItem(BIZDATA_KEY) || 'null');
+    if (d && typeof d === 'object') BIZ_DATA = { dir: d.dir || '', tel: d.tel || '', extra: d.extra || '' };
+  } catch {}
+}
+function saveBizData() {
+  localStorage.setItem(BIZDATA_KEY, JSON.stringify(BIZ_DATA));
+  if (db) db.collection('config').doc('appSettings').set({ bizData: BIZ_DATA }, { merge: true }).catch(() => {});
+}
+
 function loadStock() {
   try { STOCK = JSON.parse(localStorage.getItem(STOCK_KEY) || '[]'); } catch { STOCK = []; }
 }
@@ -305,6 +320,7 @@ function loadConfig() {
   try { SELLERS = JSON.parse(localStorage.getItem(SELLERS_KEY)); if (!Array.isArray(SELLERS) || !SELLERS.length) SELLERS = DEFAULT_SELLERS.slice(); } catch { SELLERS = DEFAULT_SELLERS.slice(); }
   try { PAYMENTS = JSON.parse(localStorage.getItem(PAYMENTS_KEY)); if (!Array.isArray(PAYMENTS) || !PAYMENTS.length) PAYMENTS = DEFAULT_PAYMENTS.slice(); } catch { PAYMENTS = DEFAULT_PAYMENTS.slice(); }
   BIZ_IMAGE = localStorage.getItem(BIZ_KEY) || null;
+  loadBizData();
   loadPrices();
   // Luego sincroniza desde Firestore (fuente de verdad)
   syncConfigFromFirestore();
@@ -320,6 +336,11 @@ async function syncConfigFromFirestore() {
     if (Array.isArray(d.payments) && d.payments.length) { PAYMENTS = d.payments; localStorage.setItem(PAYMENTS_KEY, JSON.stringify(PAYMENTS)); changed = true; }
     if (d.prices && typeof d.prices === 'object')        { PRICES = d.prices;     localStorage.setItem(PRICES_KEY,   JSON.stringify(PRICES));   changed = true; }
     if (d.bizImage)  { BIZ_IMAGE = d.bizImage; localStorage.setItem(BIZ_KEY, d.bizImage); applyBizImage(); changed = true; }
+    if (d.bizData && typeof d.bizData === 'object') {
+      BIZ_DATA = { dir: d.bizData.dir || '', tel: d.bizData.tel || '', extra: d.bizData.extra || '' };
+      localStorage.setItem(BIZDATA_KEY, JSON.stringify(BIZ_DATA));
+      if (typeof _fillBizDataForm === 'function') _fillBizDataForm();
+    }
     if (d.dolarManual > 0) { localStorage.setItem('dolarManual', d.dolarManual); dolarBlue = d.dolarManual; changed = true; }
     if (changed) render();
   } catch {}
@@ -2181,11 +2202,30 @@ function importJSON(e) {
 }
 
 // ── Configuración ─────────────────────────────────────────
+// Datos del negocio: rellenar el form y guardar mientras se tipea
+function _fillBizDataForm() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el && el !== document.activeElement) el.value = v || ''; };
+  set('biz-dir', BIZ_DATA.dir);
+  set('biz-tel', BIZ_DATA.tel);
+  set('biz-extra', BIZ_DATA.extra);
+}
+let _bizDataTimer = null;
+function _saveBizDataForm() {
+  BIZ_DATA = {
+    dir:   document.getElementById('biz-dir')?.value.trim()   || '',
+    tel:   document.getElementById('biz-tel')?.value.trim()   || '',
+    extra: document.getElementById('biz-extra')?.value.trim() || '',
+  };
+  clearTimeout(_bizDataTimer);
+  _bizDataTimer = setTimeout(saveBizData, 600); // no escribir en Firestore en cada tecla
+}
+
 function openSettings() {
   renderSettingsSellers();
   renderSettingsPayments();
   renderSettingsPrices();
   updateBizPreview();
+  _fillBizDataForm();
   if (typeof updateWaNotifyStatus === 'function') updateWaNotifyStatus();
   document.getElementById('settings-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';

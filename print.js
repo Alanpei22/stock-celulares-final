@@ -317,6 +317,7 @@ function _buildA4(rep) {
   <div>
     <div class="hdr-shop">${shop.toUpperCase()}</div>
     <div class="hdr-sub">Servicio técnico de celulares</div>
+    ${_bizLinea() ? `<div class="hdr-biz">${_bizLinea()}</div>` : ''}
   </div>
   <div class="hdr-orden">
     <div class="num">ORDEN N° ${_pr(rep.nOrden)}</div>
@@ -364,18 +365,23 @@ ${(accs || rep.observaciones) ? `
   </tbody>
 </table>
 ${_condicionesHtml(rep)}
-<div class="firmas">
-  <div class="firma-box"><div>Firma del cliente al ingresar</div><div class="firma-space"></div></div>
-  <div class="firma-box"><div>Firma del técnico — ${_pr(rep.tecnico)}</div><div class="firma-space"></div></div>
+<div class="fir-box">
+  <div class="fir-t">Conformidad del cliente al dejar el equipo</div>
+  <div class="fir-txt">Declaro que los datos y el estado del equipo son los descritos, y acepto las condiciones del servicio detalladas arriba.</div>
+  <div class="fir-g">
+    <div class="fir-c"><div class="fir-sp"></div><div class="ln"></div>Firma del cliente</div>
+    <div class="fir-c"><div class="fir-sp"></div><div class="ln"></div>Aclaración</div>
+    <div class="fir-c"><div class="fir-sp"></div><div class="ln"></div>Firma del técnico — ${_pr(rep.tecnico)}</div>
+  </div>
 </div>
 ${_entregaHtml()}`;
 
   const css = `
 * { margin:0; padding:0; box-sizing:border-box; }
-@page { size: A4 portrait; margin: 5mm 10mm; }
-body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; color:#000; background:#fff; }
-.half { height:138mm; overflow:hidden; }
-.cut { text-align:center; font-size:9px; color:#000; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:1px 0; margin:2mm 0; letter-spacing:4px; }
+@page { size: A4 portrait; margin: 10mm 12mm; }
+body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10.5px; color:#000; background:#fff; }
+.pg { page-break-after: always; }
+.pg:last-child { page-break-after: auto; }
 .hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; padding-bottom:6px; border-bottom:2px solid #000; }
 .hdr-shop { font-size:18px; font-weight:900; letter-spacing:-1px; }
 .hdr-sub  { font-size:8.5px; color:#000; margin-top:1px; }
@@ -396,13 +402,17 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 .totals td { padding:2px 8px; border:1px solid #000; }
 .totals .amt { text-align:right; font-weight:600; }
 .totals .hl td { background:#000; color:#fff; font-weight:700; font-size:10.5px; }
-.firmas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-.firma-box { border-top:1.5px solid #000; padding-top:3px; font-size:8px; color:#000; }
-.firma-space { height:9px; }
+.hdr-biz { font-size:7.6px; margin-top:1px; }
+.fir-box { border:1.2px solid #000; padding:3px 7px; margin-bottom:4px; }
+.fir-t { font-size:7px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:2px; }
+.fir-txt { font-size:6.8px; margin-bottom:2px; }
+.fir-g { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:14px; font-size:7px; text-align:center; }
+.fir-sp { height:13mm; }
+.fir-g .ln { border-top:1px solid #000; margin-bottom:1.5px; }
 /* Condiciones legales — 3 columnas para que entren en la mitad de la A4 */
 .cond { border:1px solid #000; padding:3px 6px; margin-bottom:4px; }
-.cond-t { font-size:6.6px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:2.5px; }
-.cond-c { column-count:2; column-gap:9px; font-size:6.2px; line-height:1.3; text-align:justify; }
+.cond-t { font-size:7.4px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:2.5px; }
+.cond-c { column-count:2; column-gap:10px; font-size:7.4px; line-height:1.34; text-align:justify; }
 .cond-c p { margin-bottom:1.6px; break-inside:avoid; }
 /* Constancia de entrega — se completa a mano al retirar */
 .entr { border:1.2px solid #000; padding:3px 7px; margin-top:4px; }
@@ -418,9 +428,8 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
 <style>${css}</style></head><body>
-<div class="half">${block('ORIGINAL')}</div>
-<div class="cut">✂ &nbsp;&nbsp; CORTAR &nbsp;&nbsp; ✂</div>
-<div class="half">${block('COPIA')}</div>
+<div class="pg">${block('ORIGINAL — CLIENTE')}</div>
+<div class="pg">${block('COPIA — TALLER')}</div>
 </body></html>`;
 }
 
@@ -509,6 +518,7 @@ function _buildDeliveryA4(rep) {
   <div>
     <div class="hdr-shop">${shop.toUpperCase()}</div>
     <div class="hdr-sub">Servicio técnico de celulares</div>
+    ${_bizLinea() ? `<div class="hdr-biz">${_bizLinea()}</div>` : ''}
   </div>
   <div class="hdr-orden">
     <div class="num">RETIRO N° ${_pr(rep.nOrden)}</div>
@@ -600,6 +610,7 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 .garantia-item.hl { font-weight:700; font-size:10px; }
 .garantia-item.no { color:#000; }
 .retiro-conf { font-size:8.5px; color:#000; border:1px dashed #000; border-radius:4px; padding:4px 8px; margin-bottom:6px; font-style:italic; text-align:center; }
+.hdr-biz { font-size:7.6px; margin-top:1px; }
 .firmas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .firma-box { border-top:1.5px solid #000; padding-top:3px; font-size:8px; color:#000; }
 .firma-space { height:16px; }
@@ -844,6 +855,7 @@ function _a5Body(rep, label) {
     <div>
       <div class="shop">${shop}</div>
       <div class="sub">Servicio técnico de celulares</div>
+      ${_bizLinea() ? `<div class="biz">${_bizLinea()}</div>` : ''}
     </div>
     <div class="hd-r">
       <div class="orden">ORDEN N° ${_pr(rep.nOrden)}</div>
@@ -898,9 +910,14 @@ function _a5Body(rep, label) {
 
   ${_condicionesHtml(rep)}
 
-  <div class="fir">
-    <div><div class="line"></div>Firma del cliente al ingresar</div>
-    <div><div class="line"></div>Firma del técnico</div>
+  <div class="fir-box">
+    <div class="fir-t">Conformidad del cliente al dejar el equipo</div>
+    <div class="fir-txt">Declaro que los datos y el estado del equipo son los descritos, y acepto las condiciones del servicio detalladas arriba.</div>
+    <div class="fir-g">
+      <div class="fir-c"><div class="fir-sp"></div><div class="ln"></div>Firma del cliente</div>
+      <div class="fir-c"><div class="fir-sp"></div><div class="ln"></div>Aclaración</div>
+      <div class="fir-c"><div class="fir-sp"></div><div class="ln"></div>Firma del técnico</div>
+    </div>
   </div>
 
   ${_entregaHtml()}
@@ -941,8 +958,13 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-
 .tot .a{text-align:right;font-weight:700;width:34%}
 .tot .hl td{font-weight:800;font-size:9.6px;border-width:1.4px}
 .gar{border:1.2px solid #000;padding:2.5px 6px;margin-bottom:4px;font-size:7.8px}
-.fir{display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:7px;margin-top:10px}
-.fir .line{border-top:.8px solid #000;margin-top:13px;margin-bottom:1.5px}
+.biz{font-size:7px;margin-top:1px}
+.fir-box{border:1.2px solid #000;padding:3px 6px;margin-bottom:4px}
+.fir-t{font-size:6.8px;font-weight:800;text-transform:uppercase;letter-spacing:.11em;border-bottom:.5px solid #000;padding-bottom:1.5px;margin-bottom:2px}
+.fir-txt{font-size:6.4px;margin-bottom:2px}
+.fir-g{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px;font-size:6.6px;text-align:center}
+.fir-sp{height:15mm}
+.fir-g .ln{border-top:.8px solid #000;margin-bottom:1.5px}
 @media print{body{-webkit-print-color-adjust:economy;print-color-adjust:economy}}`;
 
 function _buildA5(rep) {
@@ -996,6 +1018,12 @@ const _CSS_COND = `
 // ║  CONSTANCIA DE ENTREGA — se completa a mano al retirar       ║
 // ║  Va en el MISMO comprobante de ingreso (A5 y A4)             ║
 // ╚══════════════════════════════════════════════════════════════╝
+// Datos del negocio para el encabezado (dirección · WhatsApp · extra)
+function _bizLinea() {
+  const b = (typeof BIZ_DATA !== 'undefined' && BIZ_DATA) ? BIZ_DATA : {};
+  return [b.dir, b.tel ? 'WhatsApp ' + b.tel : '', b.extra].filter(Boolean).join(' · ');
+}
+
 function _entregaHtml() {
   return `
 <div class="entr">
