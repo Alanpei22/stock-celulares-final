@@ -363,7 +363,7 @@ ${(accs || rep.observaciones) ? `
     <tr class="hl"><td>SALDO PENDIENTE AL RETIRAR</td><td class="amt">${_prMoney(saldo)}</td></tr>
   </tbody>
 </table>
-<div class="cond-ref">El cliente declara conocer y aceptar las condiciones del servicio (garantía y sus exclusiones, riesgo por daño previo, respaldo de datos, plazo de retiro de ${_RETIRO_DIAS} días y abandono a los ${_ABANDONO_DIAS} días) exhibidas en el local y entregadas junto a este comprobante.</div>
+${_condicionesHtml(rep)}
 <div class="firmas">
   <div class="firma-box"><div>Firma y aclaración del cliente</div><div class="firma-space"></div></div>
   <div class="firma-box"><div>Firma del técnico — ${_pr(rep.tecnico)}</div><div class="firma-space"></div></div>
@@ -373,7 +373,7 @@ ${(accs || rep.observaciones) ? `
 * { margin:0; padding:0; box-sizing:border-box; }
 @page { size: A4 portrait; margin: 8mm 12mm; }
 body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; color:#000; background:#fff; }
-.half { height:130mm; overflow:hidden; }
+.half { height:135mm; overflow:hidden; }
 .cut { text-align:center; font-size:9px; color:#000; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:2px 0; margin:3mm 0; letter-spacing:4px; }
 .hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; padding-bottom:6px; border-bottom:2px solid #000; }
 .hdr-shop { font-size:18px; font-weight:900; letter-spacing:-1px; }
@@ -398,7 +398,11 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 .firmas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .firma-box { border-top:1.5px solid #000; padding-top:3px; font-size:8px; color:#000; }
 .firma-space { height:16px; }
-.cond-ref { font-size:6.4px; line-height:1.3; text-align:justify; margin-bottom:4px; }
+/* Condiciones legales — 3 columnas para que entren en la mitad de la A4 */
+.cond { border:1px solid #000; padding:3px 6px; margin-bottom:4px; }
+.cond-t { font-size:6.6px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:2.5px; }
+.cond-c { column-count:3; column-gap:7px; font-size:5.3px; line-height:1.26; text-align:justify; }
+.cond-c p { margin-bottom:1.5px; break-inside:avoid; }
 @media print { body { -webkit-print-color-adjust:economy; print-color-adjust:economy; } }`;
 
   return `<!DOCTYPE html>
