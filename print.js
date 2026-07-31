@@ -372,10 +372,10 @@ ${_entregaHtml()}`;
 
   const css = `
 * { margin:0; padding:0; box-sizing:border-box; }
-@page { size: A4 portrait; margin: 6mm 10mm; }
+@page { size: A4 portrait; margin: 5mm 10mm; }
 body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; color:#000; background:#fff; }
-.half { height:137mm; overflow:hidden; }
-.cut { text-align:center; font-size:9px; color:#000; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:2px 0; margin:3mm 0; letter-spacing:4px; }
+.half { height:138mm; overflow:hidden; }
+.cut { text-align:center; font-size:9px; color:#000; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:1px 0; margin:2mm 0; letter-spacing:4px; }
 .hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; padding-bottom:6px; border-bottom:2px solid #000; }
 .hdr-shop { font-size:18px; font-weight:900; letter-spacing:-1px; }
 .hdr-sub  { font-size:8.5px; color:#000; margin-top:1px; }
@@ -385,15 +385,15 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 .title-bar { background:#000; color:#fff; padding:3px 10px; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; border-radius:3px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; }
 .copy-label { font-size:8.5px; opacity:.75; font-style:italic; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
-.card { border:1px solid #000; border-radius:4px; padding:5px 8px; }
+.card { border:1px solid #000; border-radius:4px; padding:4px 8px; }
 .card-title { font-size:7px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#000; padding-bottom:3px; margin-bottom:3px; border-bottom:1px solid #000; }
 .field { display:flex; justify-content:space-between; margin-bottom:2px; }
 .field .lbl { color:#000; }
 .field .val { font-weight:600; text-align:right; max-width:58%; word-break:break-word; }
-.card-full { border:1px solid #000; border-radius:4px; padding:5px 8px; margin-bottom:6px; }
+.card-full { border:1px solid #000; border-radius:4px; padding:4px 8px; margin-bottom:5px; }
 .desc { line-height:1.4; white-space:pre-wrap; word-break:break-word; min-height:16px; }
 .totals { width:100%; border-collapse:collapse; margin-bottom:6px; }
-.totals td { padding:2.5px 8px; border:1px solid #000; }
+.totals td { padding:2px 8px; border:1px solid #000; }
 .totals .amt { text-align:right; font-weight:600; }
 .totals .hl td { background:#000; color:#fff; font-weight:700; font-size:10.5px; }
 .firmas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
@@ -402,15 +402,15 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 /* Condiciones legales — 3 columnas para que entren en la mitad de la A4 */
 .cond { border:1px solid #000; padding:3px 6px; margin-bottom:4px; }
 .cond-t { font-size:6.6px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:2.5px; }
-.cond-c { column-count:3; column-gap:7px; font-size:5.3px; line-height:1.26; text-align:justify; }
-.cond-c p { margin-bottom:1.5px; break-inside:avoid; }
+.cond-c { column-count:2; column-gap:9px; font-size:6.2px; line-height:1.3; text-align:justify; }
+.cond-c p { margin-bottom:1.6px; break-inside:avoid; }
 /* Constancia de entrega — se completa a mano al retirar */
 .entr { border:1.2px solid #000; padding:3px 7px; margin-top:4px; }
 .entr-t { font-size:6.6px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:3px; }
 .entr-r { display:flex; flex-wrap:wrap; gap:4px 16px; margin-bottom:2.5px; }
 .entr-f { font-size:8px; font-weight:700; }
 .entr-f u { text-decoration:none; border-bottom:1px solid #000; display:inline-block; min-width:16mm; }
-.entr-txt { font-size:6.6px; margin-bottom:8px; }
+.entr-txt { font-size:6.6px; margin-bottom:6px; }
 .entr-fir { display:grid; grid-template-columns:1.3fr 1.3fr .8fr; gap:12px; font-size:6.6px; text-align:center; }
 .entr-fir .ln { border-top:1px solid #000; margin-bottom:1.5px; }
 @media print { body { -webkit-print-color-adjust:economy; print-color-adjust:economy; } }`;
