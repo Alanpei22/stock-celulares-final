@@ -363,6 +363,7 @@ ${(accs || rep.observaciones) ? `
     <tr class="hl"><td>SALDO PENDIENTE AL RETIRAR</td><td class="amt">${_prMoney(saldo)}</td></tr>
   </tbody>
 </table>
+<div class="cond-ref">El cliente declara conocer y aceptar las condiciones del servicio (garantía y sus exclusiones, riesgo por daño previo, respaldo de datos, plazo de retiro de ${_RETIRO_DIAS} días y abandono a los ${_ABANDONO_DIAS} días) exhibidas en el local y entregadas junto a este comprobante.</div>
 <div class="firmas">
   <div class="firma-box"><div>Firma y aclaración del cliente</div><div class="firma-space"></div></div>
   <div class="firma-box"><div>Firma del técnico — ${_pr(rep.tecnico)}</div><div class="firma-space"></div></div>
@@ -397,7 +398,8 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 .firmas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .firma-box { border-top:1.5px solid #000; padding-top:3px; font-size:8px; color:#000; }
 .firma-space { height:16px; }
-@media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }`;
+.cond-ref { font-size:6.4px; line-height:1.3; text-align:justify; margin-bottom:4px; }
+@media print { body { -webkit-print-color-adjust:economy; print-color-adjust:economy; } }`;
 
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
@@ -880,12 +882,7 @@ function _a5Body(rep, label) {
 
   ${garFin ? `<div class="gar"><b>GARANTÍA ${rep.diasGarantia} DÍAS</b> — válida hasta ${garFin}. Cubre exclusivamente el trabajo realizado.</div>` : ''}
 
-  <div class="cond">
-    <b>Condiciones:</b> La garantía no cubre golpes, humedad, ni equipos abiertos por terceros.
-    Los equipos no retirados en 60 días generan gastos de depósito.
-    El cliente declara que los datos del equipo y su estado son los descritos.
-    Retiro únicamente presentando este comprobante.
-  </div>
+  ${_condicionesHtml(rep)}
 
   <div class="fir">
     <div><div class="line"></div>Firma y aclaración del cliente</div>
@@ -928,7 +925,6 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-
 .tot .a{text-align:right;font-weight:700;width:34%}
 .tot .hl td{font-weight:800;font-size:9.6px;border-width:1.4px}
 .gar{border:1.2px solid #000;padding:2.5px 6px;margin-bottom:4px;font-size:7.8px}
-.cond{font-size:6.6px;line-height:1.35;text-align:justify;margin-bottom:5px}
 .fir{display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:7px;margin-top:10px}
 .fir .line{border-top:.8px solid #000;margin-top:13px;margin-bottom:1.5px}
 @media print{body{-webkit-print-color-adjust:economy;print-color-adjust:economy}}`;
@@ -936,8 +932,47 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-
 function _buildA5(rep) {
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
-<style>${_CSS_A5}</style></head><body>
+<style>${_CSS_A5}${_CSS_COND}</style></head><body>
 ${_a5Body(rep, 'Original — Cliente')}
 ${_a5Body(rep, 'Duplicado — Taller')}
 </body></html>`;
 }
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  CONDICIONES DEL SERVICIO — letra chica legal (ingreso)      ║
+// ║  Redacción estándar de taller. Conviene validarla con un     ║
+// ║  abogado / Defensa del Consumidor antes de usarla en firme.  ║
+// ╚══════════════════════════════════════════════════════════════╝
+const _RETIRO_DIAS   = 30;   // plazo para retirar sin cargo
+const _ABANDONO_DIAS = 90;   // plazo tras el cual se considera abandonado
+
+function _condicionesHtml(rep) {
+  const d = Number(rep && rep.diasGarantia) || 0;
+  // Ley 24.240: los servicios de reparación llevan garantía mínima implícita.
+  // Si no se cargó garantía, se imprime el mínimo legal en vez de "sin garantía".
+  const garTxt = d > 0
+    ? `<b>${d} días</b> desde la fecha de entrega`
+    : `<b>30 días</b> desde la fecha de entrega (garantía legal mínima)`;
+
+  return `
+<div class="cond">
+  <div class="cond-t">Condiciones del servicio</div>
+  <div class="cond-c">
+    <p><b>1. Garantía.</b> El trabajo realizado y los repuestos colocados tienen garantía de ${garTxt}, conforme la Ley 24.240 de Defensa del Consumidor. Comprende exclusivamente la falla reparada y el repuesto instalado.</p>
+    <p><b>2. Exclusiones.</b> No cubre golpes, caídas, presión o torsión; contacto con líquidos o humedad; fallas de software, actualizaciones o configuración; uso indebido o sobretensión de cargador; ni daños ajenos al trabajo efectuado. Se pierde si el equipo fue abierto o intervenido por terceros o se retiraron los sellos de seguridad.</p>
+    <p><b>3. Estado previo y riesgo.</b> El cliente declara conocer que los equipos con daño por líquidos, golpes o placa comprometida pueden presentar fallas nuevas o dejar de funcionar durante la reparación, por causas preexistentes ajenas al taller. El equipo se recibe en el estado descrito en este comprobante.</p>
+    <p><b>4. Presupuesto.</b> Todo trabajo o costo adicional al aquí detallado será informado y requerirá aprobación previa del cliente. Si el equipo no tuviera reparación o el presupuesto no fuera aceptado, se devolverá en el estado en que se encuentre, pudiendo haber sido desarmado para su diagnóstico.</p>
+    <p><b>5. Datos y respaldo.</b> El taller no se responsabiliza por pérdida de datos, fotos, contactos o aplicaciones: el respaldo previo es responsabilidad del cliente. La clave o patrón se utiliza únicamente para diagnóstico y pruebas de funcionamiento.</p>
+    <p><b>6. Retiro y abandono.</b> El equipo debe retirarse dentro de los ${_RETIRO_DIAS} días corridos desde el aviso de finalización. Vencido ese plazo se devengarán gastos de depósito diarios. Transcurridos ${_ABANDONO_DIAS} días sin ser retirado, y previa intimación fehaciente al teléfono y/o domicilio denunciados por el cliente, el equipo se considerará abandonado, quedando el taller facultado a disponer de él para cubrir gastos y trabajos impagos, conforme las normas sobre depósito del Código Civil y Comercial de la Nación.</p>
+    <p><b>7. Entrega.</b> Se realiza únicamente contra presentación de este comprobante y documento de identidad del titular, y previa cancelación total del saldo.</p>
+    <p><b>8. Repuestos reemplazados.</b> Las piezas sustituidas quedan en poder del taller, salvo solicitud expresa del cliente al momento de la entrega.</p>
+    <p><b>9. Conformidad.</b> La firma del presente implica la aceptación de estas condiciones y del estado del equipo descrito.</p>
+  </div>
+</div>`;
+}
+
+const _CSS_COND = `
+.cond{border:.7px solid #000;padding:3px 6px;margin-bottom:4px}
+.cond-t{font-size:6.8px;font-weight:800;text-transform:uppercase;letter-spacing:.11em;border-bottom:.5px solid #000;padding-bottom:1.5px;margin-bottom:2.5px}
+.cond-c{column-count:2;column-gap:7px;font-size:5.75px;line-height:1.28;text-align:justify}
+.cond-c p{margin-bottom:1.6px;break-inside:avoid}`;
