@@ -949,8 +949,7 @@ function _buildA5(rep) {
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
 <style>${_CSS_A5}${_CSS_COND}${_CSS_ENTREGA}</style></head><body>
-${_a5Body(rep, 'Original — Cliente')}
-${_a5Body(rep, 'Duplicado — Taller')}
+${_a5Body(rep, 'Comprobante del cliente')}
 </body></html>`;
 }
 
