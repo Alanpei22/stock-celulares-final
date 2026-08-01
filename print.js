@@ -374,7 +374,7 @@ ${_condicionesHtml(rep)}
     <div class="fir-c"><div class="fir-sp"></div><div class="ln"></div>Firma del técnico — ${_pr(rep.tecnico)}</div>
   </div>
 </div>
-${_entregaHtml()}`;
+${_entregaHtml(rep)}`;
 
   const css = `
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -402,7 +402,7 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10.5px; 
 .totals td { padding:2px 8px; border:1px solid #000; }
 .totals .amt { text-align:right; font-weight:600; }
 .totals .hl td { background:#000; color:#fff; font-weight:700; font-size:10.5px; }
-.hdr-biz { font-size:7.6px; margin-top:1px; }
+.hdr-biz { font-size:9.5px; font-weight:600; margin-top:2px; }
 .fir-box { border:1.2px solid #000; padding:3px 7px; margin-bottom:4px; }
 .fir-t { font-size:7px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:2px; }
 .fir-txt { font-size:6.8px; margin-bottom:2px; }
@@ -428,8 +428,7 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10.5px; 
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
 <style>${css}</style></head><body>
-<div class="pg">${block('ORIGINAL — CLIENTE')}</div>
-<div class="pg">${block('COPIA — TALLER')}</div>
+<div class="pg">${block('COMPROBANTE DEL CLIENTE')}</div>
 </body></html>`;
 }
 
@@ -610,7 +609,7 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 .garantia-item.hl { font-weight:700; font-size:10px; }
 .garantia-item.no { color:#000; }
 .retiro-conf { font-size:8.5px; color:#000; border:1px dashed #000; border-radius:4px; padding:4px 8px; margin-bottom:6px; font-style:italic; text-align:center; }
-.hdr-biz { font-size:7.6px; margin-top:1px; }
+.hdr-biz { font-size:9.5px; font-weight:600; margin-top:2px; }
 .firmas { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 .firma-box { border-top:1.5px solid #000; padding-top:3px; font-size:8px; color:#000; }
 .firma-space { height:16px; }
@@ -920,7 +919,7 @@ function _a5Body(rep, label) {
     </div>
   </div>
 
-  ${_entregaHtml()}
+  ${_entregaHtml(rep)}
 </div>`;
 }
 
@@ -958,7 +957,7 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-
 .tot .a{text-align:right;font-weight:700;width:34%}
 .tot .hl td{font-weight:800;font-size:9.6px;border-width:1.4px}
 .gar{border:1.2px solid #000;padding:2.5px 6px;margin-bottom:4px;font-size:7.8px}
-.biz{font-size:7px;margin-top:1px}
+.biz{font-size:8.4px;font-weight:600;margin-top:1.5px}
 .fir-box{border:1.2px solid #000;padding:3px 6px;margin-bottom:4px}
 .fir-t{font-size:6.8px;font-weight:800;text-transform:uppercase;letter-spacing:.11em;border-bottom:.5px solid #000;padding-bottom:1.5px;margin-bottom:2px}
 .fir-txt{font-size:6.4px;margin-bottom:2px}
@@ -1024,20 +1023,27 @@ function _bizLinea() {
   return [b.dir, b.tel ? 'WhatsApp ' + b.tel : '', b.extra].filter(Boolean).join(' · ');
 }
 
-function _entregaHtml() {
+function _entregaHtml(rep) {
+  const dias = Number(rep && rep.diasGarantia) || 0;
+  const garDias = dias > 0 ? dias : 30; // mínimo legal si no se cargó garantía
+  const bl = n => '<u>' + '&nbsp;'.repeat(n) + '</u>';
   return `
 <div class="entr">
-  <div class="entr-t">Constancia de entrega · completar al retirar el equipo</div>
+  <div class="entr-t">Entrega y garantía · a completar al retirar el equipo</div>
   <div class="entr-r">
-    <span class="entr-f">Fecha de entrega: <u>&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u></span>
-    <span class="entr-f">Hora: <u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u></span>
-    <span class="entr-f">Saldo abonado: $<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u></span>
+    <span class="entr-f">Fecha de entrega: ${bl(4)}/${bl(4)}/${bl(6)}</span>
+    <span class="entr-f">Hora: ${bl(7)}</span>
+    <span class="entr-f">Saldo abonado: $${bl(12)}</span>
   </div>
   <div class="entr-txt">Recibí el equipo reparado, probado y en funcionamiento, conforme al trabajo detallado en este comprobante.</div>
   <div class="entr-fir">
     <div><div class="ln"></div>Firma del cliente</div>
     <div><div class="ln"></div>Aclaración</div>
     <div><div class="ln"></div>DNI</div>
+  </div>
+  <div class="entr-gar">
+    <b>GARANTÍA ${garDias} DÍAS</b> desde la fecha de entrega · vence el ${bl(4)}/${bl(4)}/${bl(6)}
+    <div class="entr-gar-s">Cubre el trabajo realizado y el repuesto colocado (ver exclusiones en las condiciones). <b>Presentá este comprobante para hacerla válida.</b></div>
   </div>
 </div>`;
 }
@@ -1050,4 +1056,7 @@ const _CSS_ENTREGA = `
 .entr-f u{text-decoration:none;border-bottom:.7px solid #000;display:inline-block;min-width:14mm}
 .entr-txt{font-size:6.2px;margin-bottom:7px}
 .entr-fir{display:grid;grid-template-columns:1.3fr 1.3fr .8fr;gap:10px;font-size:6.4px;text-align:center}
-.entr-fir .ln{border-top:.8px solid #000;margin-bottom:1.5px}`;
+.entr-fir .ln{border-top:.8px solid #000;margin-bottom:1.5px}
+.entr-gar{border-top:.7px solid #000;margin-top:5px;padding-top:2.5px;font-size:7.4px}
+.entr-gar u{text-decoration:none;border-bottom:.7px solid #000;display:inline-block;min-width:9mm}
+.entr-gar-s{font-size:6.4px;margin-top:1px}`;
