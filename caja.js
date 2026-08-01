@@ -129,6 +129,8 @@ function initApp() {
 
   // ── URL action handler (?action=cierre desde notifs/banners) ──
   _handleUrlAction();
+  _checkVentaPendiente();                                   // venta hecha en el generador
+  window.addEventListener('focus', _checkVentaPendiente);   // al volver de esa pestaña
 
   // ── Notifications boot (Fase 1) ──
   if (typeof loadNotifConfig === 'function') {
@@ -1168,17 +1170,88 @@ function _renderComprobanteList() {
     return;
   }
   cont.innerHTML = items.slice(0, 20).map(p => {
-    const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : '', p.bateria ? '🔋' + p.bateria + '%' : ''].filter(Boolean).join(' · ');
+    const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : '', p.bateria ? '🔋' + p.bateria + '%' : '', p.estado].filter(Boolean).join(' · ');
     const precio = p.moneda === 'usd' && p.precioUSD ? `u$${p.precioUSD.toLocaleString('es-AR')}` : (p.precio ? '$' + p.precio.toLocaleString('es-AR') : '—');
+    // IMEI destacado: es lo único que diferencia dos equipos del mismo modelo
+    const imei = p.imei
+      ? `<span class="comprobante-item-imei">🔑 ${esc(p.imei)}</span>`
+      : `<span class="comprobante-item-imei comprobante-item-imei--none">sin IMEI cargado</span>`;
     return `<div class="comprobante-item" onclick="_abrirComprobante('${esc(p.id)}')">
       <div class="comprobante-item-info">
         <span class="comprobante-item-name">📱 ${esc(p.marca)} ${esc(p.modelo)}</span>
-        <span class="comprobante-item-meta">${esc(specs)}</span>
+        ${specs ? `<span class="comprobante-item-meta">${esc(specs)}</span>` : ''}
+        ${imei}
       </div>
       <span class="comprobante-item-precio">${precio}</span>
     </div>`;
   }).join('');
 }
+// ── Venta hecha desde el generador de comprobantes: registrarla en caja ──
+const _VENTA_PEND_KEY = 'techpoint_venta_pendiente';
+
+function _metodoDesdeTexto(t) {
+  const s = (t || '').toLowerCase();
+  if (s.includes('transfer')) return 'Transferencia';
+  if (s.includes('mercado')) return 'MercadoPago';
+  if (s.includes('crédit') || s.includes('credit')) return 'Tarjeta crédito';
+  if (s.includes('débit') || s.includes('debit') || s.includes('tarjeta')) return 'Tarjeta débito';
+  if (s.includes('dólar') || s.includes('dolar') || s.includes('usd')) return 'Dólares';
+  return 'Efectivo';
+}
+
+async function _checkVentaPendiente() {
+  let v = null;
+  try { v = JSON.parse(localStorage.getItem(_VENTA_PEND_KEY) || 'null'); } catch {}
+  if (!v) return;
+  localStorage.removeItem(_VENTA_PEND_KEY);
+  const monto = parseInt(String(v.precio || '').replace(/[^\d]/g, '')) || 0;
+  if (monto <= 0) { toast('El comprobante no tenía precio: registrá la venta a mano', 'error'); return; }
+
+  const metodo = _metodoDesdeTexto(v.pago);
+  const desc = `Venta: ${v.modelo || 'Equipo'}${v.imei ? ' · IMEI ' + v.imei : ''}`;
+  if (!confirm(`💰 ¿Registrar esta venta en la caja?\n\n${desc}\n${fmt(monto)} · ${metodo}${v.nombre ? '\nCliente: ' + v.nombre : ''}`)) return;
+
+  try {
+    const equipo = (CAJA_STOCK || []).find(x => x.id === v.stockId);
+    const data = {
+      tipo: 'ingreso', categoria: 'Venta equipo', descripcion: desc,
+      monto, metodoPago: metodo, fecha: currentDate,
+      createdAt: new Date().toISOString(),
+      comprobanteNro: v.nro || null,
+      _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
+    };
+    if (v.stockId) { data.itemId = v.stockId; data.itemSource = 'equipo'; data.itemQty = 1; data.itemNombre = v.modelo || ''; }
+    if (equipo && Number(equipo.costo) > 0) {
+      data.costoARSTotal = Number(equipo.costo);
+      data.gananciaARS = monto - Number(equipo.costo);
+    }
+    if (v.nombre) data.clienteNombre = v.nombre;
+    if (v.tel) data.clienteTel = v.tel;
+    const vendedor = localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '';
+    if (vendedor) data.vendedor = vendedor;
+
+    const movRef = await db.collection('caja_movimientos').add(data);
+
+    // Marcar el equipo como vendido
+    if (v.stockId) {
+      try {
+        await db.collection('stock').doc(v.stockId).update({
+          vendido: true, fecha_venta: new Date().toISOString(),
+          forma_pago: metodo, vendedor: vendedor || null, ventaMovId: movRef.id,
+        });
+      } catch (e) { console.error('marcar vendido:', e); toast('Venta registrada, pero no pude marcar el equipo como vendido', 'error'); }
+    }
+    if (v.tel && typeof upsertCliente === 'function') upsertCliente({ tlf: v.tel, nombre: v.nombre || '', dni: v.dni || '' }).catch(() => {});
+    toast(`✅ Venta registrada — ${fmt(monto)}`, 'success');
+    if (typeof tgNotify === 'function') {
+      tgNotify(`📱 <b>Equipo vendido — ${tgMonto(monto)}</b>\n${esc(v.modelo || '')}${v.imei ? '\n🔑 ' + esc(v.imei) : ''}\n💳 ${esc(metodo)}${v.nombre ? ' · 👤 ' + esc(v.nombre) : ''} · 🕐 ${tgHora()}`);
+    }
+  } catch (e) {
+    console.error('registrar venta pendiente:', e);
+    toast('Error al registrar la venta', 'error');
+  }
+}
+
 function _abrirComprobante(id) {
   try {
     let prefill = {};
@@ -1186,6 +1259,7 @@ function _abrirComprobante(id) {
       const p = (CAJA_STOCK || []).find(x => x.id === id);
       if (p) {
         prefill = {
+          stockId: p.id,
           modelo: `${p.marca || ''} ${p.modelo || ''}`.trim(),
           capacidad: p.almacenamiento || '',
           imei1: p.imei || '',

@@ -115,9 +115,8 @@
 
   /* ============ RECEIPT (verificado, entra en 1 A4) ============ */
   .sheet-frame{flex:none}
-  .sheet-scale{transform-origin:top left;width:210mm;height:297mm}
-  .pliego{width:210mm;height:297mm;background:var(--papel);display:flex;flex-direction:column;box-shadow:0 4mm 22mm rgba(0,0,0,.55);position:relative;color:var(--tinta)}
-  .pliego::after{content:"";position:absolute;top:148.5mm;left:0;right:0;border-top:0.25mm dashed #C4C9C6}
+  .sheet-scale{transform-origin:top left;width:210mm;height:148.5mm}
+  .pliego{width:210mm;height:148.5mm;background:var(--papel);display:flex;flex-direction:column;box-shadow:0 4mm 22mm rgba(0,0,0,.55);position:relative;color:var(--tinta)}
   .mitad{width:210mm;height:148.5mm;padding:3.5mm;display:flex;flex-direction:column;gap:1.2mm;flex:none;overflow:hidden}
 
   .cabecera{display:flex;border:0.4mm solid var(--marca);flex:none}
@@ -187,7 +186,7 @@
 
   /* ============ PRINT ============ */
   @media print{
-    @page{size:A4 portrait;margin:0}
+    @page{size:A5 landscape;margin:0}
     body{background:#fff}
     .app-ui,.mobile-preview-btn,.close-preview{display:none!important}
     .layout{display:block!important}
@@ -412,6 +411,7 @@ function pad(n){return String(n).padStart(2,'0');}
       ['modelo','capacidad','color','serie','imei1','imei2','bateria','precio'].forEach(function(k){
         if(pf[k]!=null && pf[k]!=='') state[k]=String(pf[k]);
       });
+      if(pf.stockId) state.stockId = pf.stockId;
       localStorage.removeItem('techpoint_prefill');
     }
   }catch(e){}
@@ -419,7 +419,7 @@ function pad(n){return String(n).padStart(2,'0');}
 
 /* ============ CLONAR RECIBO x2 ============ */
 const pliego=document.getElementById('pliego');
-['Original — Cliente','Duplicado — TechPoint'].forEach(rol=>{
+['Comprobante — Cliente'].forEach(rol=>{
   const n=document.getElementById('tpl').content.cloneNode(true);
   n.querySelector('.rol-copia').textContent=rol;
   pliego.appendChild(n);
@@ -630,12 +630,25 @@ function showDone(){
       '</div>'+
       '<div class="acts">'+
         '<button class="btn solid" id="btnPrint">🖨 Imprimir / Guardar PDF</button>'+
+        '<button class="btn solid" id="btnCaja" style="background:#22c55e;color:#06280f">💰 Registrar venta en caja</button>'+
         '<div class="row">'+
           '<button class="btn ghost" id="btnEdit">✏ Editar datos</button>'+
           '<button class="btn ghost" id="btnNew">＋ Nuevo comprobante</button>'+
         '</div>'+
       '</div>'+
     '</div>';
+  var _bc = document.getElementById('btnCaja');
+  if (_bc) _bc.onclick = function(){
+    try{
+      localStorage.setItem('techpoint_venta_pendiente', JSON.stringify({
+        stockId: state.stockId || null, modelo: state.modelo || '', imei: state.imei1 || '',
+        precio: state.precio || '', pago: state.pago || '', nombre: state.nombre || '',
+        dni: state.dni || '', tel: state.tel || '', nro: state.nro || '', ts: Date.now()
+      }));
+      _bc.textContent = '✓ Lista — volvé a la app y confirmá';
+      _bc.disabled = true;
+    }catch(e){ alert('No pude guardar la venta, registrala a mano en la caja.'); }
+  };
   document.getElementById('btnPrint').onclick=()=>window.print();
   document.getElementById('btnEdit').onclick=()=>{ done=false; firstStep(); render(); };
   document.getElementById('btnNew').onclick=()=>{

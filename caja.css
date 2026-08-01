@@ -1543,3 +1543,8 @@ body.dark .comprobante-item-name { color:#eee; }
 .vsearch-item-monto { font-weight:800; font-size:.92rem; white-space:nowrap; flex-shrink:0; }
 body.dark .vsearch-item { background:#1c1c1e; border-color:rgba(255,255,255,.08); }
 body.dark .vsearch-item-desc { color:#eee; }
+
+/* IMEI en el picker de equipos (diferencia equipos del mismo modelo) */
+.comprobante-item-imei { font-size:.72rem; font-weight:700; font-family:'Courier New',monospace; color:var(--t1,#1a1a1a); letter-spacing:-.2px; }
+.comprobante-item-imei--none { font-weight:500; font-style:italic; color:#d97706; font-family:inherit; }
+body.dark .comprobante-item-imei { color:#eee; }
