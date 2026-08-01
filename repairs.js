@@ -836,6 +836,17 @@ function printPromptAction() {
   openTicket(bar.dataset.repairId);
 }
 
+// Imprimir el comprobante de recepción directo en el tamaño elegido
+function printPromptFmt(format) {
+  const bar = document.getElementById('print-prompt-bar');
+  if (!bar) return;
+  const rep = REPAIRS.find(x => x.id === bar.dataset.repairId);
+  if (!rep) { toast('No encontré la reparación', 'error'); return; }
+  bar.classList.add('hidden');
+  window._printRep = rep;
+  printRepair(format);
+}
+
 function printPromptDismiss() {
   const bar = document.getElementById('print-prompt-bar');
   if (bar) bar.classList.add('hidden');
@@ -1027,7 +1038,7 @@ async function saveRepair() {
         tecnico,
         extra: { nOrden, marca, modelo, arreglo, monto, nombre }
       });
-      triggerWaNotify('ingreso', { marca, modelo, nOrden, arreglo, nombre, monto });
+      // (No se abre WhatsApp al ingresar: el aviso ya llega por Telegram)
       // 📨 Aviso Telegram: equipo ingresado
       if (typeof tgNotify === 'function') {
         tgNotify(`🔧 <b>Equipo ingresado #${nOrden}</b>\n`

@@ -355,6 +355,8 @@ ${(accs || rep.observaciones) ? `
   ${accs ? `<div class="field"><span class="lbl">Accesorios entregados:</span><span class="val">${accs}</span></div>` : ''}
   ${rep.observaciones ? `<div class="field"><span class="lbl">Observaciones:</span><span class="val">${rep.observaciones}</span></div>` : ''}
 </div>` : ''}
+${_verifHtml()}
+${_importanteHtml()}
 <table class="totals">
   <colgroup><col style="width:68%"><col style="width:32%"></colgroup>
   <tbody>
@@ -403,6 +405,16 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10.5px; 
 .totals .amt { text-align:right; font-weight:600; }
 .totals .hl td { background:#000; color:#fff; font-weight:700; font-size:10.5px; }
 .hdr-biz { font-size:9.5px; font-weight:600; margin-top:2px; }
+.verif { border:1px solid #000; padding:4px 7px; margin-bottom:5px; }
+.verif-t { font-size:7px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:3px; }
+.verif-g { display:grid; grid-template-columns:1fr 1fr; gap:2px 16px; }
+.vf { display:flex; align-items:center; justify-content:space-between; gap:6px; font-size:8.4px; }
+.vf-b { white-space:nowrap; font-size:7.6px; font-weight:700; }
+.bx { display:inline-block; width:3mm; height:3mm; border:1px solid #000; margin:0 2px 0 6px; vertical-align:-.5mm; }
+.imp { border:1.8px solid #000; padding:4px 8px; margin-bottom:5px; }
+.imp-t { font-size:8.6px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
+.imp-l { margin:0; padding-left:11px; }
+.imp-l li { font-size:7.6px; line-height:1.32; margin-bottom:2px; }
 .fir-box { border:1.2px solid #000; padding:3px 7px; margin-bottom:4px; }
 .fir-t { font-size:7px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:2px; }
 .fir-txt { font-size:6.8px; margin-bottom:2px; }
@@ -891,6 +903,8 @@ function _a5Body(rep, label) {
   </div>
 
   ${_clA5(rep)}
+  ${_verifHtml()}
+  ${_importanteHtml()}
   ${patron ? `<div class="box"><div class="box-t">Patrón de desbloqueo</div>${patron}</div>` : ''}
 
   ${(accs || rep.observaciones) ? `<div class="box">
@@ -969,7 +983,7 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-
 function _buildA5(rep) {
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
-<style>${_CSS_A5}${_CSS_COND}${_CSS_ENTREGA}</style></head><body>
+<style>${_CSS_A5}${_CSS_COND}${_CSS_ENTREGA}${_CSS_VERIF}</style></head><body>
 ${_a5Body(rep, 'Comprobante del cliente')}
 </body></html>`;
 }
@@ -1060,3 +1074,50 @@ const _CSS_ENTREGA = `
 .entr-gar{border-top:.7px solid #000;margin-top:5px;padding-top:2.5px;font-size:7.4px}
 .entr-gar u{text-decoration:none;border-bottom:.7px solid #000;display:inline-block;min-width:9mm}
 .entr-gar-s{font-size:6.4px;margin-top:1px}`;
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  VERIFICACIÓN AL RECIBIR — casilleros SÍ/NO para tildar      ║
+// ╚══════════════════════════════════════════════════════════════╝
+const _VERIF_ITEMS = [
+  'Se vio encendido',
+  'Incluye bandeja porta SIM',
+  'Se probaron funciones',
+  'Carga',
+];
+
+function _verifHtml() {
+  const filas = _VERIF_ITEMS.map(t =>
+    `<div class="vf"><span class="vf-l">${t}</span><span class="vf-b"><i class="bx"></i>SÍ<i class="bx"></i>NO</span></div>`
+  ).join('');
+  return `<div class="verif">
+  <div class="verif-t">Verificación al recibir el equipo</div>
+  <div class="verif-g">${filas}</div>
+</div>`;
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  AVISO DESTACADO — evita malentendidos con el cliente        ║
+// ╚══════════════════════════════════════════════════════════════╝
+function _importanteHtml() {
+  return `<div class="imp">
+  <div class="imp-t">⚠ Importante · leer antes de dejar el equipo</div>
+  <ul class="imp-l">
+    <li>Si el equipo <b>no enciende</b>, no se puede verificar el estado de la pantalla, cámaras, batería ni otras funciones hasta repararlo. Al encenderlo pueden aparecer fallas que ya existían y no son responsabilidad del taller.</li>
+    <li>Los equipos con <b>daño por líquido, golpes o placa comprometida</b> pueden dejar de funcionar durante la reparación por su estado previo.</li>
+    <li>El <b>presupuesto puede cambiar</b> si al abrirlo aparece otra falla. En ese caso te avisamos <b>antes</b> de continuar: no se hace ningún trabajo extra sin tu autorización.</li>
+    <li>Revisá que el equipo esté completo al retirarlo. <b>Sin este comprobante no se entrega.</b></li>
+  </ul>
+</div>`;
+}
+
+const _CSS_VERIF = `
+.verif{border:.7px solid #000;padding:3px 6px;margin-bottom:4px}
+.verif-t{font-size:6.8px;font-weight:800;text-transform:uppercase;letter-spacing:.11em;border-bottom:.5px solid #000;padding-bottom:1.5px;margin-bottom:2.5px}
+.verif-g{display:grid;grid-template-columns:1fr 1fr;gap:1px 14px}
+.vf{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:7.4px}
+.vf-b{white-space:nowrap;font-size:6.8px;font-weight:700}
+.bx{display:inline-block;width:2.6mm;height:2.6mm;border:.8px solid #000;margin:0 1.5px 0 5px;vertical-align:-.4mm}
+.imp{border:1.6px solid #000;padding:3px 7px;margin-bottom:4px}
+.imp-t{font-size:7.6px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px}
+.imp-l{margin:0;padding-left:9px}
+.imp-l li{font-size:6.8px;line-height:1.3;margin-bottom:1.5px}`;

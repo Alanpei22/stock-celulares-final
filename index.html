@@ -897,8 +897,10 @@
 <!-- MODAL FORMULARIO REPARACIÓN -->
 <!-- Banner imprimir ticket después del ingreso -->
 <div id="print-prompt-bar" class="print-prompt-bar hidden">
-  <span class="print-prompt-txt">✅ Reparación registrada</span>
-  <button class="print-prompt-btn" onclick="printPromptAction()">🧾 Imprimir ticket</button>
+  <span class="print-prompt-txt">✅ Registrada · imprimir recepción:</span>
+  <button class="print-prompt-btn" onclick="printPromptFmt('A5')">📄 A5</button>
+  <button class="print-prompt-btn" onclick="printPromptFmt('A4')">📄 A4</button>
+  <button class="print-prompt-btn" onclick="printPromptFmt('80mm')">🖨 80mm</button>
   <button class="print-prompt-close" onclick="printPromptDismiss()">✕</button>
 </div>
 
