@@ -428,13 +428,17 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10.5px; 
 .cond-c p { margin-bottom:1.6px; break-inside:avoid; }
 /* Constancia de entrega — se completa a mano al retirar */
 .entr { border:1.2px solid #000; padding:3px 7px; margin-top:4px; }
-.entr-t { font-size:6.6px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:3px; }
+.entr-t { font-size:7.4px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; border-bottom:1px solid #000; padding-bottom:1.5px; margin-bottom:3px; }
 .entr-r { display:flex; flex-wrap:wrap; gap:4px 16px; margin-bottom:2.5px; }
 .entr-f { font-size:8px; font-weight:700; }
 .entr-f u { text-decoration:none; border-bottom:1px solid #000; display:inline-block; min-width:16mm; }
-.entr-txt { font-size:6.6px; margin-bottom:6px; }
-.entr-fir { display:grid; grid-template-columns:1.3fr 1.3fr .8fr; gap:12px; font-size:6.6px; text-align:center; }
+.entr-txt { font-size:7.4px; margin-bottom:4px; }
+.entr-fir { display:grid; grid-template-columns:1.3fr 1.3fr .8fr; gap:14px; font-size:7.6px; text-align:center; }
+.entr-sp { height:13mm; }
 .entr-fir .ln { border-top:1px solid #000; margin-bottom:1.5px; }
+.entr-gar { border-top:1px solid #000; margin-top:6px; padding-top:3px; font-size:8.4px; }
+.entr-gar u { text-decoration:none; border-bottom:1px solid #000; display:inline-block; min-width:11mm; }
+.entr-gar-s { font-size:7.2px; margin-top:1.5px; }
 @media print { body { -webkit-print-color-adjust:economy; print-color-adjust:economy; } }`;
 
   return `<!DOCTYPE html>
@@ -1051,9 +1055,9 @@ function _entregaHtml(rep) {
   </div>
   <div class="entr-txt">Recibí el equipo reparado, probado y en funcionamiento, conforme al trabajo detallado en este comprobante.</div>
   <div class="entr-fir">
-    <div><div class="ln"></div>Firma del cliente</div>
-    <div><div class="ln"></div>Aclaración</div>
-    <div><div class="ln"></div>DNI</div>
+    <div><div class="entr-sp"></div><div class="ln"></div>Firma del cliente</div>
+    <div><div class="entr-sp"></div><div class="ln"></div>Aclaración</div>
+    <div><div class="entr-sp"></div><div class="ln"></div>DNI</div>
   </div>
   <div class="entr-gar">
     <b>GARANTÍA ${garDias} DÍAS</b> desde la fecha de entrega · vence el ${bl(4)}/${bl(4)}/${bl(6)}
@@ -1070,6 +1074,7 @@ const _CSS_ENTREGA = `
 .entr-f u{text-decoration:none;border-bottom:.7px solid #000;display:inline-block;min-width:14mm}
 .entr-txt{font-size:6.2px;margin-bottom:7px}
 .entr-fir{display:grid;grid-template-columns:1.3fr 1.3fr .8fr;gap:10px;font-size:6.4px;text-align:center}
+.entr-sp{height:12mm}
 .entr-fir .ln{border-top:.8px solid #000;margin-bottom:1.5px}
 .entr-gar{border-top:.7px solid #000;margin-top:5px;padding-top:2.5px;font-size:7.4px}
 .entr-gar u{text-decoration:none;border-bottom:.7px solid #000;display:inline-block;min-width:9mm}
