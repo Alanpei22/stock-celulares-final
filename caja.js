@@ -48,6 +48,11 @@ let CAJA_REPAIRS = [];
 let _cajaRepairsListener = null;
 let _selectedRepairItem = null; // { repair, mode }  mode: 'sena' | 'cobro'
 let _pendingRepairLink  = null; // repair esperando confirmación en el popup
+// Parte del cobro que corresponde a la reparación cuando la MISMA venta lleva
+// también productos. Sin carrito vale 0 y el monto entero es de la reparación
+// (comportamiento de siempre).
+let _repairAmt = 0;
+let _repairDescAuto = '';       // texto que la app autocompletó al vincular la reparación
 
 // ── Cierres parciales (turnos) ─────────────────────────────
 let CIERRES_PARCIALES = [];
@@ -68,6 +73,7 @@ window._cajaCleanup = function() {
   _cart = [];
   _selectedRepairItem = null;
   _pendingRepairLink  = null;
+  _repairAmt = 0;
 };
 
 // ══════════════════════════════════════════
@@ -1320,11 +1326,22 @@ function _updateMovStepUI(tipo) {
 }
 
 // ── Cobro didáctico: barra de resumen en vivo ──
+// Descripción final del movimiento: con carrito manda el resumen de productos,
+// y si además hay reparación vinculada se conservan las dos partes.
+function _descripcionVenta() {
+  // Al agregar un producto el buscador se limpia, así que si hay reparación
+  // vinculada se recupera su texto autocompletado.
+  const txt = (document.getElementById('mov-fi-desc')?.value || '').trim()
+            || (_selectedRepairItem ? _repairDescAuto : '');
+  if (!_cart.length) return txt;
+  const resumen = _cartSummary();
+  return (_selectedRepairItem && txt) ? `${txt} + ${resumen}` : resumen;
+}
+
 function _updateMovResumen() {
   const tipo   = document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') ? 'ingreso' : 'egreso';
   const monto  = parseFloat(document.getElementById('mov-fi-monto')?.value) || 0;
-  const desc   = _cart.length ? _cartSummary()
-               : (document.getElementById('mov-fi-desc')?.value || '').trim();
+  const desc   = _descripcionVenta();
   const metodo = document.getElementById('mov-hidden-metodo')?.value || '';
   const totEl  = document.getElementById('mov-resumen-total');
   const txtEl  = document.getElementById('mov-resumen-txt');
@@ -1415,8 +1432,9 @@ function openMovForm(id) {
     document.getElementById('mov-fi-monto').value = '';
     document.getElementById('mov-fi-desc').value  = '';
     selectMetodo('Efectivo');
-    _clearSaleItem();
     _selectedRepairItem = null;
+    _repairAmt = 0;
+    _clearSaleItem();
     _resetClienteFields(null);
   }
 
@@ -1488,8 +1506,11 @@ function setMovTipo(tipo) {
   // Captura de cliente solo tiene sentido en ventas (ingreso)
   const cliSec = document.getElementById('mov-cliente-section');
   if (cliSec) cliSec.style.display = (tipo === 'ingreso') ? '' : 'none';
-  // Los productos son ventas: al pasar a egreso, vaciar el carrito
-  if (tipo === 'egreso' && _cart.length) _clearSaleItem(false);
+  // Productos y reparaciones son ventas: al pasar a egreso se desvinculan
+  if (tipo === 'egreso') {
+    if (_cart.length) _clearSaleItem(false);
+    if (_selectedRepairItem) _clearRepairItem(false);
+  }
   _updateMovStepUI(tipo);
   _updateMovResumen();
 }
@@ -1978,12 +1999,29 @@ function _cartSummary() {
   return _cart.map(it => `${it.nombre} x${it.qty}`).join(', ');
 }
 
-// Si el carrito tiene productos, el monto se autocompleta con el total.
-// Queda editable para aplicar un descuento puntual.
+// Parte del cobro que va a la reparación. Sin carrito el monto entero es de la
+// reparación (flujo de siempre); con carrito se separa en _repairAmt.
+function _repairAmtActual() {
+  if (!_selectedRepairItem) return 0;
+  if (!_cart.length) return parseFloat(document.getElementById('mov-fi-monto')?.value) || 0;
+  return Number(_repairAmt) || 0;
+}
+
+// Si el carrito tiene productos, el monto se autocompleta con el total
+// (reparación + productos). Queda editable para aplicar un descuento puntual.
 function _syncMontoFromCart() {
   if (!_cart.length) return;
   const montoEl = document.getElementById('mov-fi-monto');
-  if (montoEl) montoEl.value = _cartTotal();
+  if (montoEl) montoEl.value = (Number(_repairAmt) || 0) + _cartTotal();
+}
+
+// Monto de la reparación editable en la línea del panel (solo con carrito).
+function _setRepairAmt(val) {
+  _repairAmt = Math.max(0, parseFloat(val) || 0);
+  const totalEl = document.querySelector('#mov-sale-item-info .cart-total-row b');
+  if (totalEl) totalEl.textContent = fmt((Number(_repairAmt) || 0) + _cartTotal());
+  _syncMontoFromCart();
+  _updateMovResumen();
 }
 
 // Agrega un producto que NO está en el inventario (precio se carga a mano).
@@ -1992,6 +2030,9 @@ function _addFreeFromSearch() {
   const input = document.getElementById('mov-fi-desc');
   const nombre = (input?.value || '').trim();
   if (!nombre) return;
+  // No convertir en "producto libre" el texto que puso la propia app al vincular
+  // la reparación (pasaba al tocar Enter en el buscador).
+  if (nombre === _repairDescAuto) return;
   _addToCart({ source: 'libre', id: null, nombre, precio: 0, costoUSD: 0, costoARS: 0, icon: '🏷️', stock: -1 });
   // Enfocar el precio de la línea recién agregada
   setTimeout(() => {
@@ -2017,6 +2058,11 @@ function _setCartCosto(i, val) {
 }
 
 function _addToCart(r) {
+  // Primer producto sobre una reparación ya vinculada: el monto que había en
+  // pantalla (saldo o seña tipeada) pasa a ser la parte de la reparación.
+  if (_selectedRepairItem && !_cart.length && !_repairAmt) {
+    _repairAmt = parseFloat(document.getElementById('mov-fi-monto')?.value) || 0;
+  }
   const stockMax = r.stock > 0 ? r.stock : 999;
   // Los productos libres (sin id) nunca se agrupan: cada uno es una línea aparte.
   const existing = r.id ? _cart.find(it => it.id === r.id && it.source === r.source) : null;
@@ -2058,10 +2104,22 @@ function _removeCartItem(i) {
   _updateMovResumen();
 }
 
+// Panel único del modal: la reparación vinculada (si hay) + el carrito de productos.
+// Con productos, la reparación se muestra como una línea más con su propio monto,
+// así el cajero ve separado qué es arreglo y qué es venta dentro de la misma venta.
 function _renderCart() {
   const wrap = document.getElementById('mov-sale-item-info');
   if (!wrap) return;
-  if (!_cart.length) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
+  if (!_cart.length && !_selectedRepairItem) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
+
+  // Reparación sola → tarjeta de siempre (flujo diario intacto)
+  if (!_cart.length) {
+    wrap.innerHTML = _repairCardHtml();
+    wrap.classList.remove('hidden');
+    return;
+  }
+
+  const repairLine = _selectedRepairItem ? _repairCartLineHtml() : '';
 
   const lines = _cart.map((it, i) => {
     const isLibre  = it.source === 'libre';
@@ -2100,12 +2158,40 @@ function _renderCart() {
       </div>`;
   }).join('');
 
+  const nItems = _cart.length + (_selectedRepairItem ? 1 : 0);
   wrap.innerHTML = `
     <div class="cart-box">
+      ${repairLine}
       ${lines}
-      <div class="cart-total-row"><span>${_cart.length} ítem${_cart.length > 1 ? 's' : ''}</span><b>${fmt(_cartTotal())}</b></div>
+      <div class="cart-total-row"><span>${nItems} ítem${nItems > 1 ? 's' : ''}</span><b>${fmt((Number(_repairAmt) || 0) + _cartTotal())}</b></div>
     </div>`;
   wrap.classList.remove('hidden');
+}
+
+// Línea de la reparación dentro del carrito, con su monto editable aparte.
+function _repairCartLineHtml() {
+  const { repair, mode } = _selectedRepairItem;
+  const equip   = [repair.marca, repair.modelo].filter(Boolean).join(' ');
+  const saldo   = Math.max(0, (repair.monto || 0) - (repair.sena || 0));
+  const modeLbl = mode === 'sena' ? '📝 Seña' : '✅ Cobro total';
+  const modeClr = mode === 'sena' ? 'var(--acc,#C8965A)' : 'var(--grn2,#10b981)';
+  return `
+    <div class="cart-line cart-line--repair">
+      <span class="cart-line-icon">🔧</span>
+      <div class="cart-line-text">
+        <span class="sale-item-name">N°${esc(String(repair.nOrden || '—'))} — ${esc(repair.nombre || 'Sin cliente')}</span>
+        <span class="sale-item-meta">
+          <span class="repair-mode-badge" style="background:${modeClr};color:#fff;padding:1px 8px;border-radius:20px;font-size:.72rem;font-weight:700">${modeLbl}</span>
+          ${equip ? ' · ' + esc(equip) : ''}${saldo > 0 ? ` · Saldo $${saldo.toLocaleString('es-AR')}` : ''}
+        </span>
+      </div>
+      <button class="sale-item-clear" onclick="_clearRepairItem()" type="button" title="Desvincular">✕</button>
+      <div class="cart-libre-inputs">
+        <input type="number" class="cart-price-input" min="0" inputmode="numeric"
+               value="${Number(_repairAmt) || ''}" placeholder="Monto de la reparación $"
+               oninput="_setRepairAmt(this.value)">
+      </div>
+    </div>`;
 }
 
 function _hideQtyPicker() {
@@ -2116,6 +2202,13 @@ function _hideQtyPicker() {
 function _clearSaleItem(clearText = true) {
   _cart = [];
   _selectedSaleItem = null;
+  // Si queda una reparación vinculada, su parte vuelve a ser el monto del movimiento
+  // (sin carrito el campo monto es la única fuente).
+  if (_selectedRepairItem && _repairAmt > 0) {
+    const montoEl = document.getElementById('mov-fi-monto');
+    if (montoEl) montoEl.value = _repairAmt;
+  }
+  _repairAmt = 0;
   _renderCart();
   if (clearText) { const d = document.getElementById('mov-fi-desc'); if (d) d.value = ''; }
   _updateMovResumen();
@@ -2159,8 +2252,8 @@ function _selectRepairMode(mode) {
   document.getElementById('repair-link-overlay')?.classList.add('hidden');
   document.getElementById('repair-link-modal')?.classList.add('hidden');
 
-  // Limpiar selección previa de producto/repuesto
-  _clearSaleItem(false);
+  // El carrito NO se descarta: reparación y productos conviven en la misma venta,
+  // cada uno con su monto (ver _renderCart / _repairAmt).
   _selectedRepairItem = { repair, mode };
 
   const equip   = [repair.marca, repair.modelo].filter(Boolean).join(' ');
@@ -2170,33 +2263,42 @@ function _selectRepairMode(mode) {
   if (cliente) partes.push(cliente);
   if (equip)   partes.push(equip);
 
+  const descEl  = document.getElementById('mov-fi-desc');
+  const montoEl = document.getElementById('mov-fi-monto');
+
   if (mode === 'sena') {
     selectCat('Seña');
-    document.getElementById('mov-fi-desc').value = `Seña ${partes.join(' — ')}`;
-    // Dejar que el usuario ingrese el monto de la seña
+    _repairDescAuto = `Seña ${partes.join(' — ')}`;
+    _repairAmt = 0;   // la seña la tipea el cajero
   } else {
     selectCat('Reparación');
-    document.getElementById('mov-fi-desc').value = `Reparación ${partes.join(' — ')}`;
+    _repairDescAuto = `Reparación ${partes.join(' — ')}`;
     // Pre-llenar con el saldo pendiente (o total si no hay seña)
-    if (saldo > 0) {
-      document.getElementById('mov-fi-monto').value = saldo;
-    } else if (repair.monto > 0) {
-      document.getElementById('mov-fi-monto').value = repair.monto;
-    }
+    _repairAmt = saldo > 0 ? saldo : (Number(repair.monto) || 0);
+  }
+  if (descEl) descEl.value = _repairDescAuto;
+  // Sin carrito, el monto del movimiento es todo de la reparación (flujo de siempre).
+  // Con carrito, el total lo arma _syncMontoFromCart (reparación + productos).
+  if (!_cart.length) {
+    if (montoEl && _repairAmt > 0) montoEl.value = _repairAmt;
+    if (mode !== 'sena') _repairAmt = 0;   // se recupera del campo monto en _addToCart
+  } else {
+    _syncMontoFromCart();
   }
 
-  _showRepairCard(repair, mode);
+  _renderCart();
+  _updateMovResumen();
 }
 
-function _showRepairCard(repair, mode) {
-  const wrap = document.getElementById('mov-sale-item-info');
-  if (!wrap) return;
+// Tarjeta de la reparación cuando es lo único del movimiento (sin productos).
+function _repairCardHtml() {
+  const { repair, mode } = _selectedRepairItem;
   const saldo   = Math.max(0, (repair.monto || 0) - (repair.sena || 0));
   const equip   = [repair.marca, repair.modelo].filter(Boolean).join(' ');
   const modeLbl = mode === 'sena' ? '📝 Seña' : '✅ Cobro total';
   const modeClr = mode === 'sena' ? 'var(--acc,#C8965A)' : 'var(--grn2,#10b981)';
 
-  wrap.innerHTML = `
+  return `
     <div class="sale-item-card">
       <div class="sale-item-row">
         <span class="sale-item-icon">🔧</span>
@@ -2212,13 +2314,20 @@ function _showRepairCard(repair, mode) {
       </div>
     </div>
   `;
-  wrap.classList.remove('hidden');
 }
 
 function _clearRepairItem(clearText = true) {
   _selectedRepairItem = null;
-  _hideQtyPicker();
-  if (clearText) document.getElementById('mov-fi-desc').value = '';
+  _repairAmt = 0;
+  const descEl = document.getElementById('mov-fi-desc');
+  // Si en el campo quedó el texto autocompletado de la reparación, se va con ella.
+  if (clearText || (descEl && descEl.value === _repairDescAuto)) {
+    if (descEl) descEl.value = '';
+  }
+  _repairDescAuto = '';
+  _renderCart();            // el carrito sobrevive: se re-dibuja sin la línea de reparación
+  _syncMontoFromCart();
+  _updateMovResumen();
 }
 
 async function saveMov() {
@@ -2228,8 +2337,9 @@ async function saveMov() {
   const metWrap    = document.querySelector('.metodos-group')?.closest('.fg');
 
   const monto      = parseFloat(montoInput?.value);
-  // Con carrito, la descripción se arma del resumen de productos; sino, texto libre.
-  const descripcion = _cart.length ? _cartSummary() : (descInput?.value.trim() || '');
+  // Con carrito, la descripción se arma del resumen de productos (+ la reparación
+  // si la venta lleva las dos cosas); sino, texto libre.
+  const descripcion = _descripcionVenta();
   const categoria  = document.getElementById('mov-hidden-cat')?.value || '';
   const metodoPago = document.getElementById('mov-hidden-metodo')?.value || '';
 
@@ -2265,6 +2375,19 @@ async function saveMov() {
   if (_splitActive && metodo2 && metodo2 === metodoPago) {
     toast('El 2do método no puede ser igual al primero', 'error');
     return;
+  }
+  // Venta mixta (reparación + productos): la parte de la reparación tiene que ser
+  // un monto válido dentro del total, sino la seña/cobro quedaría en cero.
+  if (_selectedRepairItem && _cart.length && !editingMovId) {
+    const rAmt = _repairAmtActual();
+    if (!(rAmt > 0)) {
+      toast('Ingresá el monto de la reparación', 'error');
+      return;
+    }
+    if (rAmt > monto) {
+      toast('La reparación no puede superar el total cobrado', 'error');
+      return;
+    }
   }
 
   const tipo = document.getElementById('mov-btn-ingreso').classList.contains('tipo-active') ? 'ingreso' : 'egreso';
@@ -2303,6 +2426,8 @@ async function saveMov() {
   let nuevosProductos = [];   // productos libres a dar de alta en el inventario
   let equiposVendidos = [];   // equipos del stock a marcar como vendidos
   let repairUpdate = null;
+  // Parte del cobro que va a la reparación. Sin carrito es el monto entero.
+  let repAmt = 0;
 
   if (_cart.length && tipo === 'ingreso' && !editingMovId) {
     let costoTotal = 0;
@@ -2340,7 +2465,15 @@ async function saveMov() {
     data.items         = items;
     data.itemNombre    = _cartSummary();   // backward-compat (búsqueda/notificaciones)
     data.costoARSTotal = costoTotal;
-    data.gananciaARS   = (Number(monto) || 0) - costoTotal;
+    // Venta mixta (reparación + productos en el mismo cobro): se separan los montos.
+    // La ganancia se calcula SOLO sobre los productos, igual que en un cobro de
+    // reparación suelto (que no registra ganancia).
+    repAmt = _selectedRepairItem ? Math.min(_repairAmtActual(), Number(monto) || 0) : 0;
+    if (repAmt > 0) {
+      data.montoReparacion = repAmt;
+      data.montoProductos  = (Number(monto) || 0) - repAmt;
+    }
+    data.gananciaARS   = (Number(monto) || 0) - repAmt - costoTotal;
     // Compat: si es un solo producto, mantené los campos viejos (reportes/borrado legacy)
     if (items.length === 1) {
       data.itemId       = items[0].id;
@@ -2356,19 +2489,21 @@ async function saveMov() {
     data.repairId    = repair.id;
     data.repairNOrden = repair.nOrden || null;
     data.repairMode  = mode;
+    // Sin carrito el movimiento es solo la reparación → le corresponde todo el monto.
+    if (!_cart.length) repAmt = Number(monto) || 0;
 
     if (mode === 'sena') {
       data.esSena = true;
       repairUpdate = {
         id: repair.id,
         // CRIT-07: increment atómico para evitar pérdida de seña en escrituras simultáneas
-        sena: firebase.firestore.FieldValue.increment(monto),
+        sena: firebase.firestore.FieldValue.increment(repAmt),
       };
     } else {
-      // Validar que el monto cubra el saldo pendiente
+      // Validar que la parte de la reparación cubra el saldo pendiente
       const saldoPendiente = Math.max(0, (Number(repair.monto) || 0) - (Number(repair.sena) || 0));
-      if (saldoPendiente > 0 && monto < saldoPendiente) {
-        const ok = confirm(`⚠️ El cobro ($${monto.toLocaleString('es-AR')}) es menor que el saldo pendiente ($${saldoPendiente.toLocaleString('es-AR')}).\n\n¿Marcar como cobro total de todas formas? (Si decís NO, registrá como seña)`);
+      if (saldoPendiente > 0 && repAmt < saldoPendiente) {
+        const ok = confirm(`⚠️ El cobro de la reparación ($${repAmt.toLocaleString('es-AR')}) es menor que el saldo pendiente ($${saldoPendiente.toLocaleString('es-AR')}).\n\n¿Marcar como cobro total de todas formas? (Si decís NO, registrá como seña)`);
         if (!ok) return;
       }
       data.esCobro = true;
@@ -2432,7 +2567,12 @@ async function saveMov() {
         if (Array.isArray(data.items) && data.items.length > 1) {
           lineas.push(data.items.map(it => `· ${esc(it.nombre)} x${it.qty}`).join('\n'));
         }
-        if (data.repairNOrden) lineas.push(`🔧 Reparación #${data.repairNOrden} ${data.esSena ? '(seña)' : (repairUpdate?.estado === 'entregado' ? '(cobro · entregado 📦)' : '(cobro)')}`);
+        if (data.repairNOrden) {
+          const detRep = data.montoReparacion
+            ? ` — ${tgMonto(data.montoReparacion)} (+ productos ${tgMonto(data.montoProductos)})`
+            : '';
+          lineas.push(`🔧 Reparación #${data.repairNOrden} ${data.esSena ? '(seña)' : (repairUpdate?.estado === 'entregado' ? '(cobro · entregado 📦)' : '(cobro)')}${detRep}`);
+        }
         lineas.push(`👤 ${esc(data.vendedor || '—')} · 🕐 ${tgHora()}`);
         tgNotify(lineas.join('\n'));
       }
@@ -2578,12 +2718,14 @@ function deleteMov() {
 
       // Revertir seña si correspondía (simétrico al increment del save)
       let senaReverted = 0;
-      if (movData.esSena && movData.repairId && movData.monto > 0) {
+      // En ventas mixtas la seña fue solo la parte de la reparación, no el total del mov.
+      const senaAmt = Number(movData.montoReparacion != null ? movData.montoReparacion : movData.monto) || 0;
+      if (movData.esSena && movData.repairId && senaAmt > 0) {
         try {
           await db.collection('repairs').doc(movData.repairId).update({
-            sena: firebase.firestore.FieldValue.increment(-Number(movData.monto))
+            sena: firebase.firestore.FieldValue.increment(-senaAmt)
           });
-          senaReverted = Number(movData.monto);
+          senaReverted = senaAmt;
         } catch {}
       }
 

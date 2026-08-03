@@ -4740,6 +4740,9 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
 .cart-line-text .sale-item-name { font-weight: 600; font-size: 14px; color: var(--text); }
 .cart-line-text .sale-item-meta { font-size: 12px; color: var(--text2); }
 .cart-qty-val { min-width: 24px; text-align: center; font-weight: 700; font-size: 15px; }
+/* Línea de la reparación dentro del carrito (venta mixta: arreglo + productos) */
+.cart-line--repair { border-color: var(--accent); background: var(--accent-soft); }
+.cart-line--repair .cart-price-input { border-style: dashed; }
 .cart-total-row {
   display: flex; align-items: center; justify-content: space-between;
   padding: 4px 6px 2px; font-size: 13px; color: var(--text2);
