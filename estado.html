@@ -1,81 +1,112 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-AR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0f172a">
-  <title>Seguimiento de reparación</title>
+  <meta name="theme-color" content="#ffffff">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Seguimiento de tu reparación</title>
+  <!--
+    Página que ve el CLIENTE al escanear el QR del comprobante.
+
+    Sin librerías ni CDN: lee el documento público de Firestore por su API REST
+    con un fetch común. Carga en menos de 20 KB, que es lo que corresponde para
+    alguien mirando esto con datos móviles en la calle.
+
+    Solo muestra datos no sensibles (modelo, paso, fechas, últimos 4 del IMEI).
+    Sin el token del QR no se llega a ninguna orden: las reglas de Firestore
+    permiten leer un documento por su id, pero no listar la colección.
+  -->
   <style>
     *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --tinta: #14181f;
+      --suave: #5d6673;
+      --tenue: #98a1ae;
+      --linea: #e7eaef;
+      --fondo: #f4f6f9;
+      --ok: #0f7b52;
+      --activo: #b45309;
+      --corte: #c0392b;
+    }
     body {
-      font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
-      background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-      min-height: 100dvh; color: #1a1a1a;
-      display: flex; align-items: flex-start; justify-content: center;
-      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--fondo); color: var(--tinta);
+      min-height: 100dvh; padding: 16px;
+      display: flex; justify-content: center; align-items: flex-start;
+      -webkit-font-smoothing: antialiased;
     }
     .card {
-      background: #fff; border-radius: 24px; width: 100%; max-width: 440px;
-      overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.3); margin-top: 20px;
+      background: #fff; border-radius: 20px; width: 100%; max-width: 430px;
+      overflow: hidden; box-shadow: 0 1px 3px rgba(20,24,31,.06), 0 12px 32px rgba(20,24,31,.08);
     }
-    .hdr {
-      background: linear-gradient(135deg, #0f172a, #334155); color: #fff;
-      padding: 26px 24px 22px; text-align: center;
-    }
-    .hdr-biz { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; }
-    .hdr-sub { font-size: .82rem; opacity: .7; margin-top: 4px; }
-    .body { padding: 24px; }
-    .loading, .error { text-align: center; padding: 50px 20px; color: #64748b; }
-    .error-ico { font-size: 3rem; margin-bottom: 12px; }
 
-    .equipo-box {
-      text-align: center; padding: 18px; background: #f8fafc;
-      border-radius: 16px; margin-bottom: 22px;
-    }
-    .equipo-orden { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; }
-    .equipo-nombre { font-size: 1.3rem; font-weight: 800; color: #0f172a; margin: 4px 0; }
-    .equipo-arreglo { font-size: .9rem; color: #64748b; }
+    .hdr { padding: 22px 22px 18px; border-bottom: 1px solid var(--linea); text-align: center; }
+    .hdr-biz { font-size: 1.25rem; font-weight: 800; letter-spacing: -.02em; }
+    .hdr-sub { font-size: .78rem; color: var(--tenue); margin-top: 3px; }
 
-    .estado-actual {
-      display: flex; align-items: center; gap: 12px; justify-content: center;
-      padding: 16px; border-radius: 16px; margin-bottom: 24px;
-    }
-    .estado-actual.s-reparando { background: rgba(245,158,11,.12); }
-    .estado-actual.s-listo     { background: rgba(16,185,129,.14); }
-    .estado-actual.s-entregado { background: rgba(59,130,246,.12); }
-    .estado-actual.s-cancelado { background: rgba(239,68,68,.1); }
-    .estado-emoji { font-size: 2rem; }
-    .estado-txt { text-align: left; }
-    .estado-label { font-size: 1.1rem; font-weight: 800; color: #0f172a; }
-    .estado-desc { font-size: .82rem; color: #64748b; }
+    .body { padding: 20px 22px 6px; }
+    .cargando, .error { text-align: center; padding: 46px 18px; color: var(--suave); font-size: .92rem; line-height: 1.6; }
+    .error-ico { font-size: 2.6rem; margin-bottom: 10px; }
 
-    .timeline { position: relative; padding-left: 28px; }
-    .timeline::before {
-      content: ''; position: absolute; left: 9px; top: 6px; bottom: 6px;
-      width: 2px; background: #e2e8f0;
+    .equipo { text-align: center; margin-bottom: 20px; }
+    .equipo-orden {
+      display: inline-block; font-size: .68rem; font-weight: 800; letter-spacing: .09em;
+      text-transform: uppercase; color: var(--suave);
+      background: var(--fondo); padding: 4px 11px; border-radius: 20px;
     }
-    .tl-step { position: relative; padding-bottom: 20px; }
-    .tl-step:last-child { padding-bottom: 0; }
-    .tl-dot {
-      position: absolute; left: -28px; top: 1px;
-      width: 20px; height: 20px; border-radius: 50%;
-      background: #fff; border: 3px solid #cbd5e1;
-      display: flex; align-items: center; justify-content: center;
-      font-size: .65rem;
-    }
-    .tl-step.done .tl-dot { border-color: #10b981; background: #10b981; color: #fff; }
-    .tl-step.current .tl-dot { border-color: #f59e0b; background: #f59e0b; color: #fff; }
-    .tl-label { font-size: .92rem; font-weight: 700; color: #0f172a; }
-    .tl-fecha { font-size: .76rem; color: #94a3b8; }
-    .tl-step.pending .tl-label { color: #cbd5e1; }
+    .equipo-nombre { font-size: 1.45rem; font-weight: 800; margin: 9px 0 2px; letter-spacing: -.02em; }
+    .equipo-imei { font-size: .76rem; color: var(--tenue); }
 
-    .footer { text-align: center; padding: 18px 24px 26px; border-top: 1px solid #f1f5f9; }
-    .footer-txt { font-size: .8rem; color: #94a3b8; }
-    .footer-biz { font-weight: 700; color: #64748b; }
+    .titulo-box {
+      background: var(--fondo); border-radius: 15px; padding: 16px 18px; margin-bottom: 22px;
+      border-left: 4px solid var(--activo);
+    }
+    .titulo-box.listo { border-left-color: var(--ok); }
+    .titulo-box.corte { border-left-color: var(--corte); }
+    .titulo { font-size: 1.06rem; font-weight: 800; letter-spacing: -.01em; }
+    .detalle { font-size: .86rem; color: var(--suave); margin-top: 4px; line-height: 1.5; }
+
+    .pasos { display: flex; gap: 5px; margin-bottom: 8px; }
+    .paso-b { flex: 1; height: 6px; border-radius: 3px; background: var(--linea); }
+    .paso-b.hecho { background: var(--ok); }
+    .paso-b.ahora { background: var(--activo); height: 10px; margin-top: -2px; box-shadow: 0 0 0 3px rgba(180,83,9,.15); }
+    .pasos-lbl { display: flex; justify-content: space-between; font-size: .64rem; color: var(--tenue); margin-bottom: 22px; }
+    .pasos-lbl span { flex: 1; text-align: center; }
+    .pasos-lbl span:first-child { text-align: left; }
+    .pasos-lbl span:last-child { text-align: right; }
+    .pasos-lbl span.on { color: var(--activo); font-weight: 800; }
+    .pasos-lbl span.ya { color: var(--ok); font-weight: 700; }
+
+    .fechas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    .fecha { background: var(--fondo); border-radius: 13px; padding: 12px 14px; }
+    .fecha-l { font-size: .66rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--tenue); }
+    .fecha-v { font-size: .92rem; font-weight: 700; margin-top: 3px; }
+
+    .linea-t { border-top: 1px solid var(--linea); padding-top: 16px; margin-bottom: 4px; }
+    .linea-t-h { font-size: .68rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--tenue); margin-bottom: 11px; }
+    .tl { position: relative; padding-left: 24px; }
+    .tl::before { content: ''; position: absolute; left: 6px; top: 5px; bottom: 5px; width: 2px; background: var(--linea); }
+    .tl-i { position: relative; padding-bottom: 14px; }
+    .tl-i:last-child { padding-bottom: 0; }
+    .tl-p { position: absolute; left: -24px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--ok); }
+    .tl-l { font-size: .85rem; font-weight: 700; }
+    .tl-f { font-size: .72rem; color: var(--tenue); }
+
+    .wa {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; margin: 20px 0 4px; padding: 15px;
+      background: #25d366; color: #fff; border: none; border-radius: 14px;
+      font-size: .95rem; font-weight: 800; text-decoration: none; cursor: pointer;
+    }
+    .wa:active { background: #1eb356; }
+
+    .pie { padding: 18px 22px 24px; border-top: 1px solid var(--linea); text-align: center; }
+    .pie-l { font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tenue); margin-bottom: 5px; }
+    .pie-v { font-size: .87rem; line-height: 1.6; color: var(--suave); }
+    .pie-v b { color: var(--tinta); }
+    .pie-act { font-size: .68rem; color: var(--tenue); margin-top: 14px; }
   </style>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="firebase-config.js"></script>
 </head>
 <body>
   <div class="card">
@@ -84,105 +115,181 @@
       <div class="hdr-sub">Estado de tu reparación</div>
     </div>
     <div class="body" id="body">
-      <div class="loading">⏳ Cargando…</div>
+      <div class="cargando">Cargando…</div>
     </div>
-    <div class="footer">
-      <div class="footer-txt">Seguimiento en vivo · <span class="footer-biz" id="footer-biz">TechPoint</span></div>
-    </div>
+    <div class="pie" id="pie"></div>
   </div>
 
   <script>
-    'use strict';
-    const ESTADOS = {
-      reparando: { emoji: '🔧', label: 'En reparación', desc: 'Estamos trabajando en tu equipo', order: 1 },
-      listo:     { emoji: '✅', label: 'Listo para retirar', desc: '¡Ya podés venir a buscarlo!', order: 2 },
-      entregado: { emoji: '📦', label: 'Entregado', desc: 'Equipo entregado al cliente', order: 3 },
-      cancelado: { emoji: '❌', label: 'Cancelado', desc: 'La reparación fue cancelada', order: 0 },
-      no_van:    { emoji: '⏸️', label: 'Sin reparar', desc: 'El equipo no fue reparado', order: 0 },
-    };
-    const FLUJO = ['reparando', 'listo', 'entregado'];
+  'use strict';
 
-    function fmtFecha(iso) {
-      if (!iso) return '';
-      try {
-        return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
-          + ' · ' + new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-      } catch { return ''; }
-    }
-    function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  // Mismo proyecto que la app. La clave web es pública por diseño: lo que
+  // protege los datos son las reglas de Firestore, no esconder esto.
+  var PROYECTO = 'stockcelustech';
+  var API_KEY  = 'AIzaSyAMRkrADBxRF6rST8rNwO5IqdWneXocBsE';
 
-    async function load() {
-      const id = new URLSearchParams(location.search).get('id');
-      const body = document.getElementById('body');
-      if (!id) {
-        body.innerHTML = '<div class="error"><div class="error-ico">🔍</div>Link inválido</div>';
-        return;
-      }
-      try {
-        if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-        const _db = firebase.firestore();
-        const snap = await _db.collection('seguimiento_publico').doc(id).get();
-        if (!snap.exists) {
-          body.innerHTML = '<div class="error"><div class="error-ico">🤷</div>No encontramos esta reparación.<br>Verificá el código del ticket.</div>';
-          return;
-        }
-        render(snap.data());
-      } catch (e) {
+  var PASOS = ['Recibido', 'En revisión', 'En reparación', 'Listo', 'Entregado'];
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function fechaLarga(iso) {
+    if (!iso) return '—';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d)) return '—';
+      return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch (e) { return '—'; }
+  }
+  function fechaHora(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d)) return '';
+      return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) + ' · ' +
+             d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return ''; }
+  }
+
+  // Firestore REST devuelve los valores con el tipo adentro; esto lo aplana.
+  function valor(v) {
+    if (!v || typeof v !== 'object') return null;
+    if ('stringValue'  in v) return v.stringValue;
+    if ('integerValue' in v) return Number(v.integerValue);
+    if ('doubleValue'  in v) return Number(v.doubleValue);
+    if ('booleanValue' in v) return v.booleanValue;
+    if ('nullValue'    in v) return null;
+    if ('timestampValue' in v) return v.timestampValue;
+    if ('arrayValue'   in v) return ((v.arrayValue && v.arrayValue.values) || []).map(valor);
+    if ('mapValue'     in v) return campos((v.mapValue && v.mapValue.fields) || {});
+    return null;
+  }
+  function campos(f) {
+    var out = {};
+    for (var k in f) if (Object.prototype.hasOwnProperty.call(f, k)) out[k] = valor(f[k]);
+    return out;
+  }
+
+  function noEncontrada() {
+    // A propósito no distingue "no existe" de "el código no coincide":
+    // así nadie puede averiguar si un número de orden existe probando.
+    document.getElementById('body').innerHTML =
+      '<div class="error"><div class="error-ico">🔍</div>' +
+      'No encontramos esa orden.<br>Revisá el código del comprobante.</div>';
+    document.getElementById('pie').innerHTML = '';
+  }
+
+  function sinConexion() {
+    document.getElementById('body').innerHTML =
+      '<div class="error"><div class="error-ico">📡</div>' +
+      'No pudimos cargar el estado.<br>Probá de nuevo en un momento.</div>';
+  }
+
+  var _params = new URLSearchParams(location.search);
+  var _orden  = _params.get('o');
+  var _token  = _params.get('k') || _params.get('id');   // id = comprobantes viejos
+  var _esViejo = !_params.get('k') && !!_params.get('id');
+
+  function url() {
+    return 'https://firestore.googleapis.com/v1/projects/' + PROYECTO +
+           '/databases/(default)/documents/seguimiento_publico/' +
+           encodeURIComponent(_token) + '?key=' + API_KEY;
+  }
+
+  function cargar(primera) {
+    if (!_token) { noEncontrada(); return; }
+    fetch(url(), { cache: 'no-store' })
+      .then(function (r) {
+        if (r.status === 404 || r.status === 403) { noEncontrada(); return null; }
+        if (!r.ok) throw new Error('http ' + r.status);
+        return r.json();
+      })
+      .then(function (j) {
+        if (!j) return;
+        var d = campos(j.fields || {});
+        // El número de orden del link tiene que coincidir con el del documento.
+        if (!_esViejo && _orden && String(d.nOrden) !== String(_orden)) { noEncontrada(); return; }
+        pintar(d);
+      })
+      .catch(function (e) {
         console.error(e);
-        body.innerHTML = '<div class="error"><div class="error-ico">⚠️</div>No pudimos cargar el estado.<br>Probá de nuevo en un momento.</div>';
-      }
+        if (primera) sinConexion();
+      });
+  }
+
+  function pintar(d) {
+    var biz = d.negocio || 'TechPoint';
+    document.getElementById('biz').textContent = biz;
+    document.title = 'Tu reparación · ' + biz;
+
+    var paso = Number(d.paso || 0);
+    var corte = d.cerradaSinArreglo === true;
+    var claseBox = corte ? 'corte' : (paso >= 3 ? 'listo' : '');
+
+    var barras = '';
+    var etiquetas = '';
+    for (var i = 0; i < PASOS.length; i++) {
+      var cls = corte ? '' : (i < paso ? 'hecho' : (i === paso ? 'ahora' : ''));
+      barras += '<div class="paso-b ' + cls + '"></div>';
+      var lc = corte ? '' : (i < paso ? 'ya' : (i === paso ? 'on' : ''));
+      etiquetas += '<span class="' + lc + '">' + PASOS[i] + '</span>';
     }
 
-    function render(d) {
-      const biz = d.negocio || 'TechPoint';
-      document.getElementById('biz').textContent = biz;
-      document.getElementById('footer-biz').textContent = biz;
-
-      const est = ESTADOS[d.estado] || ESTADOS.reparando;
-      const curOrder = est.order;
-
-      // Timeline: usa el flujo estándar, marca done/current/pending
-      const histMap = {};
-      (d.historial || []).forEach(h => { histMap[h.estado] = h.fecha; });
-
-      let timelineHtml = '';
-      if (d.estado === 'cancelado' || d.estado === 'no_van') {
-        timelineHtml = `<div class="tl-step current"><div class="tl-dot">✕</div>
-          <div class="tl-label">${esc(est.label)}</div>
-          <div class="tl-fecha">${fmtFecha(histMap[d.estado])}</div></div>`;
-      } else {
-        timelineHtml = FLUJO.map(estado => {
-          const e = ESTADOS[estado];
-          let cls = 'pending';
-          if (e.order < curOrder) cls = 'done';
-          else if (e.order === curOrder) cls = 'current';
-          const fecha = histMap[estado];
-          return `<div class="tl-step ${cls}">
-            <div class="tl-dot">${cls === 'done' ? '✓' : ''}</div>
-            <div class="tl-label">${e.emoji} ${esc(e.label)}</div>
-            ${fecha ? `<div class="tl-fecha">${fmtFecha(fecha)}</div>` : ''}
-          </div>`;
-        }).join('');
-      }
-
-      document.getElementById('body').innerHTML = `
-        <div class="equipo-box">
-          ${d.nOrden ? `<div class="equipo-orden">Orden N°${esc(d.nOrden)}</div>` : ''}
-          <div class="equipo-nombre">${esc(d.equipo || 'Tu equipo')}</div>
-          ${d.arreglo ? `<div class="equipo-arreglo">🔧 ${esc(d.arreglo)}</div>` : ''}
-        </div>
-        <div class="estado-actual s-${esc(d.estado)}">
-          <span class="estado-emoji">${est.emoji}</span>
-          <div class="estado-txt">
-            <div class="estado-label">${esc(est.label)}</div>
-            <div class="estado-desc">${esc(est.desc)}</div>
-          </div>
-        </div>
-        <div class="timeline">${timelineHtml}</div>
-      `;
+    var hist = Array.isArray(d.historial) ? d.historial : [];
+    var tl = '';
+    for (var h = 0; h < hist.length; h++) {
+      var p = Number(hist[h].paso || 0);
+      tl += '<div class="tl-i"><div class="tl-p"></div>' +
+            '<div class="tl-l">' + esc(PASOS[p] || '') + '</div>' +
+            '<div class="tl-f">' + esc(fechaHora(hist[h].fecha)) + '</div></div>';
     }
 
-    load();
+    document.getElementById('body').innerHTML =
+      '<div class="equipo">' +
+        (d.nOrden ? '<div class="equipo-orden">Orden N°' + esc(d.nOrden) + '</div>' : '') +
+        '<div class="equipo-nombre">' + esc(d.equipo || 'Tu equipo') + '</div>' +
+        (d.imei4 ? '<div class="equipo-imei">IMEI •••• ' + esc(d.imei4) + '</div>' : '') +
+      '</div>' +
+      '<div class="titulo-box ' + claseBox + '">' +
+        '<div class="titulo">' + esc(d.titulo || 'En proceso') + '</div>' +
+        '<div class="detalle">' + esc(d.detalle || '') + '</div>' +
+      '</div>' +
+      (corte ? '' : '<div class="pasos">' + barras + '</div><div class="pasos-lbl">' + etiquetas + '</div>') +
+      '<div class="fechas">' +
+        '<div class="fecha"><div class="fecha-l">Ingresó</div><div class="fecha-v">' + esc(fechaLarga(d.fechaIngreso)) + '</div></div>' +
+        '<div class="fecha"><div class="fecha-l">' + (d.fechaEntrega ? 'Entregado' : 'Entrega estimada') + '</div>' +
+        '<div class="fecha-v">' + esc(fechaLarga(d.fechaEntrega || d.fechaEstimada)) + '</div></div>' +
+      '</div>' +
+      (tl ? '<div class="linea-t"><div class="linea-t-h">Seguimiento</div><div class="tl">' + tl + '</div></div>' : '') +
+      (d.bizTel ? '<a class="wa" id="wa" href="#">Escribinos por WhatsApp</a>' : '');
+
+    if (d.bizTel) {
+      var tel = String(d.bizTel).replace(/\D/g, '');
+      if (tel.length === 10) tel = '549' + tel;
+      else if (tel.length === 11 && tel.charAt(0) === '0') tel = '549' + tel.slice(1);
+      else if (tel.indexOf('54') !== 0) tel = '549' + tel;
+      var msg = 'Hola! Consulto por mi reparación, orden N°' + (d.nOrden || '');
+      document.getElementById('wa').href = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(msg);
+    }
+
+    document.getElementById('pie').innerHTML =
+      (d.bizDir ? '<div class="pie-l">Dónde estamos</div><div class="pie-v"><b>' + esc(d.bizDir) + '</b></div>' : '') +
+      (d.bizExtra ? '<div class="pie-v">' + esc(d.bizExtra) + '</div>' : '') +
+      '<div class="pie-act">Se actualiza solo · ' + esc(biz) + '</div>';
+  }
+
+  cargar(true);
+  // Autorefresco: si el equipo cambia de estado mientras la persona mira la
+  // página, lo ve sin recargar. Se frena cuando la pestaña está oculta.
+  setInterval(function () {
+    if (!document.hidden) cargar(false);
+  }, 60000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) cargar(false);
+  });
   </script>
 </body>
 </html>

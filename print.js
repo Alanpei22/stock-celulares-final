@@ -261,15 +261,35 @@ ${_qrSeguimientoHtml(rep)}
 
 // Bloque QR de seguimiento para el ticket de ingreso.
 // El cliente lo escanea y ve el estado de su reparación online.
-function _qrSeguimientoHtml(rep) {
+// Versión compacta para A5 / A4: el QR al costado de un texto corto.
+function _qrSeguimientoBox(rep, mm = 25) {
+  if (!rep || !rep.id || typeof qrSeguimientoSvg !== 'function') return '';
+  const svg = qrSeguimientoSvg(rep, mm);
+  if (!svg) return '';
+  return `
+<div style="display:flex;align-items:center;gap:8px;border:1px solid #000;padding:4px 7px;margin-bottom:4px">
+  ${svg}
+  <div style="font-size:8.5px;line-height:1.35">
+    <b style="font-size:9.5px">SEGUÍ TU REPARACIÓN</b><br>
+    Escaneá este código con la cámara del celular y vas a ver en qué paso
+    está tu equipo, sin necesidad de llamar.<br>
+    Orden N°${rep.nOrden || '—'}
+  </div>
+</div>`;
+}
+
+// QR generado en la propia app (qr.js): imprime aunque el local esté sin
+// internet, en blanco y negro puro y con margen blanco, que es lo que necesita
+// la impresora térmica para que el lector lo agarre.
+function _qrSeguimientoHtml(rep, mm = 25) {
   if (!rep || !rep.id) return '';
-  if (typeof urlSeguimiento !== 'function' || typeof qrImgSrc !== 'function') return '';
-  const url = urlSeguimiento(rep.id);
-  const src = qrImgSrc(url, 130);
+  if (typeof qrSeguimientoSvg !== 'function') return '';
+  const svg = qrSeguimientoSvg(rep, mm);
+  if (!svg) return '';
   return `
 <div class="c" style="margin:6px 0;padding:6px 0;border-top:1px dashed #000;border-bottom:1px dashed #000">
   <div class="b sm" style="margin-bottom:4px">📲 SEGUÍ TU REPARACIÓN</div>
-  <img src="${src}" width="110" height="110" style="display:block;margin:0 auto" alt="QR">
+  <div style="display:flex;justify-content:center">${svg}</div>
   <div class="sm" style="margin-top:3px">Escaneá el código para ver el estado</div>
 </div>`;
 }
@@ -366,6 +386,7 @@ ${_importanteHtml()}
     <tr class="hl"><td>SALDO PENDIENTE AL RETIRAR</td><td class="amt">${_prMoney(saldo)}</td></tr>
   </tbody>
 </table>
+${_qrSeguimientoBox(rep, 25)}
 ${_condicionesHtml(rep)}
 <div class="fir-box">
   <div class="fir-t">Conformidad del cliente al dejar el equipo</div>
@@ -669,7 +690,8 @@ function printVentaTicket(stockId, extra) {
     const msg = encodeURIComponent(`Hola! Te escribo por mi compra de ${p.marca} ${p.modelo}. Garantía:`);
     waLink = `https://wa.me/${phone}?text=${msg}`;
   }
-  const qrSrc = waLink ? `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(waLink)}` : '';
+  // QR generado en la app (qr.js), no bajado de un servicio externo
+  const qrSvgWa = (waLink && typeof qrSvg === 'function') ? qrSvg(waLink, 25) : '';
 
   const block = (label) => `
     <div class="t80">
@@ -708,9 +730,9 @@ function printVentaTicket(stockId, extra) {
           <div class="garantia-item no">⚠️ VENTA SIN GARANTÍA</div>
         </div>
       `}
-      ${qrSrc ? `
+      ${qrSvgWa ? `
         <div class="qr-section">
-          <img src="${qrSrc}" alt="QR WhatsApp" width="100" height="100">
+          <div style="display:flex;justify-content:center">${qrSvgWa}</div>
           <div class="qr-text">Escaneá para contactarnos por WhatsApp</div>
         </div>
       ` : ''}
@@ -922,6 +944,8 @@ function _a5Body(rep, label) {
     <tr class="hl"><td>TOTAL</td><td class="a">${_prMoney(rep.monto)}</td></tr>
     <tr class="hl"><td>SALDO A PAGAR AL RETIRAR</td><td class="a">${_prMoney(saldo)}</td></tr>
   </table>
+
+  ${_qrSeguimientoBox(rep, 25)}
 
   ${garFin ? `<div class="gar"><b>GARANTÍA ${rep.diasGarantia} DÍAS</b> — válida hasta ${garFin}. Cubre exclusivamente el trabajo realizado.</div>` : ''}
 

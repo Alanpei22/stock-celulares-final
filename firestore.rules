@@ -42,8 +42,12 @@ service cloud.firestore {
     // Lectura PÚBLICA (el cliente escanea el QR sin estar logueado).
     // Contiene SOLO datos no sensibles: estado, equipo, fechas.
     // Escritura: solo cuentas autorizadas.
-    match /seguimiento_publico/{id} {
-      allow read: if true;
+    match /seguimiento_publico/{token} {
+      // GET: cualquiera puede leer UN documento si conoce su id, que es el
+      // token aleatorio del QR. LIST queda prohibido: sin el token no se puede
+      // recorrer la coleccion ni averiguar que ordenes existen.
+      allow get: if true;
+      allow list: if false;
       allow write: if isAllowed();
     }
 

@@ -1039,6 +1039,8 @@ async function saveRepair() {
         // Fase inicial del tablero (mapea a estado 'reparando')
         fase: 'ingresado',
         faseHist: [{ f: 'ingresado', t: ahora }],
+        // Token del QR de seguimiento (no se puede deducir del N° de orden)
+        tokenSeguimiento: (typeof _segNuevoToken === 'function') ? _segNuevoToken() : null,
         fechaIngreso: ahora,
         estadoHistorial: [{ estado: 'reparando', fecha: ahora }],
         esGarantia: false,
