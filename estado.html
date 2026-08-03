@@ -229,12 +229,14 @@
     var corte = d.cerradaSinArreglo === true;
     var claseBox = corte ? 'corte' : (paso >= 3 ? 'listo' : '');
 
+    // Entregado (último paso) = terminado: todo verde, sin paso "en curso".
+    var terminado = !corte && paso >= PASOS.length - 1;
     var barras = '';
     var etiquetas = '';
     for (var i = 0; i < PASOS.length; i++) {
-      var cls = corte ? '' : (i < paso ? 'hecho' : (i === paso ? 'ahora' : ''));
+      var cls = corte ? '' : (terminado ? 'hecho' : (i < paso ? 'hecho' : (i === paso ? 'ahora' : '')));
       barras += '<div class="paso-b ' + cls + '"></div>';
-      var lc = corte ? '' : (i < paso ? 'ya' : (i === paso ? 'on' : ''));
+      var lc = corte ? '' : (terminado ? 'ya' : (i < paso ? 'ya' : (i === paso ? 'on' : '')));
       etiquetas += '<span class="' + lc + '">' + PASOS[i] + '</span>';
     }
 

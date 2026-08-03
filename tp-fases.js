@@ -126,7 +126,9 @@ const TP_FASES = {
     wa: 'Sin drama! Te dejamos el {MODELO} listo para retirar tal como vino.',
   },
   abandonado: {
-    n: '—', nombre: 'Abandonado', corto: 'Abandonado', tono: 'bad', pipe: -1, estado: 'listo',
+    // El equipo está reparado y en el local: la barra llega hasta "Listo"
+    // (no es una orden cortada). El chip queda rojo como aviso.
+    n: '—', nombre: 'Abandonado', corto: 'Abandonado', tono: 'bad', pipe: 6, estado: 'listo',
     sig: [{ a: 'entregado', txt: '📦 Al final retiró' }],
     wa: 'Te recordamos que tu {MODELO} sigue en el local. Pasá a retirarlo cuando puedas.',
   },
@@ -259,8 +261,11 @@ function tpStepsHtml(r) {
   if (p < 0) {
     return `<div class="tp-steps tp-steps--corte"><i class="tp-step tp-step--corte"></i></div>`;
   }
+  // Entregado = trabajo terminado: la barra va TODA en verde, sin paso "actual".
+  // Antes el último tramo quedaba en ámbar y parecía que todavía faltaba algo.
+  const terminado = f === 'entregado';
   return '<div class="tp-steps">' + TP_PIPE.map((k, i) => {
-    const cls = i < p ? 'on' : (i === p ? 'now' : '');
+    const cls = terminado ? 'on' : (i < p ? 'on' : (i === p ? 'now' : ''));
     return `<i class="tp-step ${cls}" title="${TP_FASES[k].corto}"></i>`;
   }).join('') + '</div>';
 }
