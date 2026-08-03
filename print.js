@@ -464,8 +464,10 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10.5px; 
 
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
-<style>${css}</style></head><body>
+<style>${css}
+@media screen{body{width:186mm;margin:0 auto}}</style></head><body>
 <div class="pg">${block('COMPROBANTE DEL CLIENTE')}</div>
+${_autofitJs(277)}
 </body></html>`;
 }
 
@@ -885,6 +887,9 @@ function _a5Body(rep, label) {
   const accs  = _prAccs(rep.accesorios);
   const garFin = rep.diasGarantia > 0 ? _garantiaFin(rep.diasGarantia) : null;
   const patron = rep.patronImg ? `<div class="patron">${rep.patronImg}</div>` : '';
+  // El QR va DENTRO del recuadro de firmas: aprovecha el alto que ese bloque ya
+  // ocupa, así no le suma milímetros a la hoja (el A5 entra justo).
+  const qrSvgSeg = (typeof qrSeguimientoSvg === 'function') ? qrSeguimientoSvg(rep, 25) : '';
 
   return `
 <div class="tk">
@@ -945,8 +950,6 @@ function _a5Body(rep, label) {
     <tr class="hl"><td>SALDO A PAGAR AL RETIRAR</td><td class="a">${_prMoney(saldo)}</td></tr>
   </table>
 
-  ${_qrSeguimientoBox(rep, 25)}
-
   ${garFin ? `<div class="gar"><b>GARANTÍA ${rep.diasGarantia} DÍAS</b> — válida hasta ${garFin}. Cubre exclusivamente el trabajo realizado.</div>` : ''}
 
   ${_condicionesHtml(rep)}
@@ -954,10 +957,11 @@ function _a5Body(rep, label) {
   <div class="fir-box">
     <div class="fir-t">Conformidad del cliente al dejar el equipo</div>
     <div class="fir-txt">Declaro que los datos y el estado del equipo son los descritos, y acepto las condiciones del servicio detalladas arriba.</div>
-    <div class="fir-g">
+    <div class="fir-g${qrSvgSeg ? ' fir-g--qr' : ''}">
       <div class="fir-c"><div class="fir-sp"></div><div class="ln"></div>Firma del cliente</div>
       <div class="fir-c"><div class="fir-sp"></div><div class="ln"></div>Aclaración</div>
       <div class="fir-c"><div class="fir-sp"></div><div class="ln"></div>Firma del técnico</div>
+      ${qrSvgSeg ? `<div class="fir-qr">${qrSvgSeg}<span>Seguí tu reparación</span></div>` : ''}
     </div>
   </div>
 
@@ -1004,15 +1008,59 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-
 .fir-t{font-size:6.8px;font-weight:800;text-transform:uppercase;letter-spacing:.11em;border-bottom:.5px solid #000;padding-bottom:1.5px;margin-bottom:2px}
 .fir-txt{font-size:6.4px;margin-bottom:2px}
 .fir-g{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px;font-size:6.6px;text-align:center}
+.fir-g--qr{grid-template-columns:1fr 1fr 1fr auto;gap:7px;align-items:end}
 .fir-sp{height:15mm}
+.fir-g--qr .fir-sp{height:11mm}
 .fir-g .ln{border-top:.8px solid #000;margin-bottom:1.5px}
+.fir-qr{text-align:center;line-height:1.1}
+.fir-qr svg{width:19mm;height:19mm;display:block;margin:0 auto}
+.fir-qr span{font-size:5.6px;font-weight:700;display:block;margin-top:.5px}
+/* En pantalla, la hoja se mide igual que en la impresora (A5 menos 7mm de
+   margen), para que el auto-ajuste calcule bien antes de imprimir. */
+@media screen{body{width:134mm;margin:0 auto}}
 @media print{body{-webkit-print-color-adjust:economy;print-color-adjust:economy}}`;
+
+// Auto-ajuste a UNA hoja.
+// El comprobante tiene bloques de largo variable (condición del equipo,
+// observaciones, checklist, patrón), así que con datos cargados se pasaba de
+// página y el segundo pliego salía casi vacío. Esto mide el alto real y encoge
+// el comprobante lo justo para que entre, sin sacar contenido ni cortar nada.
+// `altoMm` = alto útil de la hoja (tamaño menos los márgenes de @page).
+function _autofitJs(altoMm) {
+  return `<script>(function(){
+  var MM = 96/25.4, MAX = ${altoMm}*MM;
+  var tk = document.querySelectorAll('.tk, .pg');
+  for (var i = 0; i < tk.length; i++) {
+    var el = tk[i], s = 1;
+    // Baja de a 2% hasta que entre. Piso 0.6: por debajo no se leería.
+    for (var n = 0; n < 25 && el.getBoundingClientRect().height > MAX && s > 0.6; n++) {
+      s -= 0.02;
+      el.style.transformOrigin = 'top left';
+      el.style.transform = 'scale(' + s + ')';
+      el.style.width = (100/s) + '%';
+    }
+    // El QR se achicaría junto con todo y dejaría de leerse. Se lo agranda para
+    // compensar; si con eso ya no entra en la hoja, se deja como estaba.
+    if (s < 1) {
+      var qr = el.querySelector('.fir-qr svg');
+      if (qr) {
+        var previo = qr.style.width;
+        qr.style.width = qr.style.height = (19/s) + 'mm';
+        if (el.getBoundingClientRect().height > MAX) {
+          qr.style.width = qr.style.height = previo || '19mm';
+        }
+      }
+    }
+  }
+})();<\/script>`;
+}
 
 function _buildA5(rep) {
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
 <style>${_CSS_A5}${_CSS_COND}${_CSS_ENTREGA}${_CSS_VERIF}</style></head><body>
 ${_a5Body(rep, 'Comprobante del cliente')}
+${_autofitJs(196)}
 </body></html>`;
 }
 
