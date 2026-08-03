@@ -153,7 +153,15 @@ async function sendTestPush() {
 //  Esto manda un push de verdad: llega aunque la app esté cerrada.
 //  Se excluye al dispositivo que hizo el cambio (ya lo sabe).
 // ══════════════════════════════════════════
-async function pushEquipos({ pushKey, title, body, url, tag, requireInteraction }) {
+// Vibración larga y con pausas: se siente distinto a un WhatsApp cualquiera.
+const PUSH_VIBRA = [300, 120, 300, 120, 450];
+// Botones abajo del aviso (Android). Además de servir, lo hacen más alto.
+const PUSH_BOTONES = [
+  { action: 'ver',       title: '👀 Ver equipo' },
+  { action: 'descartar', title: '✕ Descartar' },
+];
+
+async function pushEquipos({ pushKey, title, body, url, tag, requireInteraction, vibrate, actions, image }) {
   try {
     if (!title) return;
     const cfg = (typeof getNotifConfig === 'function') ? getNotifConfig() : null;
@@ -171,7 +179,13 @@ async function pushEquipos({ pushKey, title, body, url, tag, requireInteraction 
     await fetch('/api/send-push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targets, pushKey, title, body: body || '', url: url || '/index.html', tag, requireInteraction: !!requireInteraction }),
+      body: JSON.stringify({
+        targets, pushKey, title, body: body || '', url: url || '/index.html', tag,
+        requireInteraction: !!requireInteraction,
+        vibrate: vibrate || PUSH_VIBRA,
+        actions: actions || PUSH_BOTONES,
+        image: image || undefined,
+      }),
     });
   } catch (e) {
     // Nunca frenar la carga de un equipo por un aviso que no salió
@@ -188,8 +202,10 @@ function pushCambioEquipo(r, faseNueva, estadoNuevo) {
     : ((typeof REPAIR_STATES !== 'undefined' && REPAIR_STATES[estadoNuevo]) ? REPAIR_STATES[estadoNuevo].label : estadoNuevo);
   pushEquipos({
     pushKey: 'repairEstado',
-    title: `🔄 N°${r.nOrden || '?'} → ${nombreFase}`,
-    body: [equipo, r.arreglo, r.nombre ? '👤 ' + r.nombre : ''].filter(Boolean).join(' · '),
+    title: `🔄 N°${r.nOrden || '?'} · ${nombreFase.toUpperCase()}`,
+    // Varias líneas: al desplegar el aviso se ve todo el detalle
+    body: [equipo, r.arreglo ? '🔧 ' + r.arreglo : '', r.nombre ? '👤 ' + r.nombre : '']
+      .filter(Boolean).join('\n'),
     url: '/index.html',
     tag: 'rep-estado-' + (r.id || ''),
   });

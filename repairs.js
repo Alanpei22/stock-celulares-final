@@ -1078,10 +1078,15 @@ async function saveRepair() {
       if (typeof pushEquipos === 'function') {
         pushEquipos({
           pushKey: 'repairNueva',
-          title: `🔧 Equipo ingresado N°${nOrden}`,
-          body: [`${marca} ${modelo}`.trim(), arreglo, nombre ? '👤 ' + nombre : ''].filter(Boolean).join(' · '),
+          title: `🔧 EQUIPO NUEVO · N°${nOrden}`,
+          body: [`${marca} ${modelo}`.trim(), arreglo ? '🔧 ' + arreglo : '',
+                 nombre ? '👤 ' + nombre : '', monto > 0 ? '💵 $' + monto.toLocaleString('es-AR') : '']
+            .filter(Boolean).join('\n'),
           url: '/index.html',
           tag: 'rep-nueva-' + id,
+          // Queda fijo en pantalla hasta que alguien lo toca: un equipo que
+          // entra necesita que alguien lo atienda.
+          requireInteraction: true,
         });
       }
       // CRM: crear/actualizar ficha del cliente (no bloqueante)

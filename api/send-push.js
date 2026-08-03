@@ -45,7 +45,8 @@ export default async function handler(req, res) {
     const adminInstance = getAdmin();
     const db = adminInstance.firestore();
 
-    const { targets, title, body, url, requireInteraction, tag, pushKey } = req.body || {};
+    const { targets, title, body, url, requireInteraction, tag, pushKey,
+            vibrate, actions, image, renotify } = req.body || {};
     if (!title) return res.status(400).json({ error: 'title required' });
 
     // 1) Cargar dispositivos suscriptos
@@ -92,6 +93,11 @@ export default async function handler(req, res) {
       url: url || '/index.html',
       requireInteraction: !!requireInteraction,
       tag: tag || undefined,
+      // Extras para que el aviso se note: vibración, botones e imagen grande
+      vibrate: Array.isArray(vibrate) ? vibrate : undefined,
+      actions: Array.isArray(actions) ? actions.slice(0, 2) : undefined,
+      image: image || undefined,
+      renotify: renotify === false ? false : undefined,
     });
 
     const results = await Promise.allSettled(devices.map(d =>

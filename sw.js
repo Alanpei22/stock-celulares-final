@@ -1,4 +1,4 @@
-const CACHE = 'cel-v118';
+const CACHE = 'cel-v119';
 const SHELL = ['manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'mp-logo.png'];
 
 self.addEventListener('install', e => {
@@ -66,7 +66,14 @@ self.addEventListener('push', event => {
     tag: data.tag || undefined,
     requireInteraction: !!data.requireInteraction,
     data: { url: data.url || '/index.html', ...(data.data || {}) },
+    // Vibración: el patrón por defecto es corto pero se siente en el bolsillo
+    vibrate: data.vibrate || [200, 100, 200],
+    timestamp: Date.now(),
   };
+  // renotify vuelve a sonar/vibrar cuando una notificación reemplaza a otra con
+  // el mismo tag (sin esto, la segunda entra en silencio). Chrome exige tag.
+  if (data.tag && data.renotify !== false) options.renotify = true;
+  if (data.image) options.image = data.image;
   if (data.actions) options.actions = data.actions;
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -74,6 +81,8 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  // Botón "Listo" / descartar: cierra y no abre nada
+  if (event.action === 'descartar') return;
   const url = (event.notification.data && event.notification.data.url) || '/index.html';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(wins => {
