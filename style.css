@@ -4727,6 +4727,22 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
 .mov-resumen-txt { font-size: 13px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mov-resumen-total { font-size: 17px; font-weight: 700; color: var(--text); flex-shrink: 0; }
 
+/* ── Indicador de sincronización (sync-status.js) ── */
+.sync-pill {
+ position: fixed; left: 50%; transform: translateX(-50%);
+ bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
+ z-index: 900; pointer-events: none;
+ padding: 7px 14px; border-radius: 20px;
+ font-size: .74rem; font-weight: 700; white-space: nowrap;
+ box-shadow: var(--shadow-md);
+ border: 1px solid var(--border); background: var(--card); color: var(--text);
+ transition: opacity .25s, transform .25s;
+}
+.sync-pill--hidden { opacity: 0; transform: translateX(-50%) translateY(8px); }
+.sync-pill--pending { border-color: var(--warn); }
+.sync-pill--offline { border-color: var(--red); }
+.sync-pill--ok      { border-color: var(--grn2); }
+
 /* ══════════════════════════════════════════════════════════════
    TABLERO DE FASES (tp-*) — ver tp-fases.js
    Colores propios con prefijo --tp- para no pisar los de la app.

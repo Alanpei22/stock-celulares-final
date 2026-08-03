@@ -138,6 +138,13 @@ const TP_PIPE = ['ingresado', 'diagnostico', 'presupuestado', 'aprobado', 'repue
 // Fases que ya no están en el taller (para el filtro "En taller").
 const TP_CERRADAS = ['entregado', 'irreparable', 'rechazado'];
 
+// Fases que cierran sin arreglar: se pide el motivo, que después entra en el
+// aviso al cliente ({MOTIVO}) y queda registrado en la ficha.
+const TP_PIDE_MOTIVO = {
+  irreparable: '¿Por qué no tiene reparación?\n\nEsto se lo mandás al cliente en el aviso.',
+  rechazado:   '¿Por qué rechazó el presupuesto?\n\n(queda registrado, no se le manda al cliente)',
+};
+
 // ── Estado viejo → fase por defecto (para datos anteriores a las fases) ──
 const TP_ESTADO_FASE = {
   reparando:  'reparacion',
@@ -414,12 +421,22 @@ async function tpCambiarFase(id, nuevaFase) {
   const actual = tpFaseDe(r);
   if (actual === nuevaFase) return;
 
+  // Fases que cierran sin arreglar: pedir el motivo ANTES de mover nada.
+  // Si cancela el cartel no se mueve (sirve de red por si tocó el botón sin querer).
+  let motivoNuevo = null;
+  if (TP_PIDE_MOTIVO[nuevaFase]) {
+    const resp = prompt(TP_PIDE_MOTIVO[nuevaFase], r.motivo || '');
+    if (resp === null) return;
+    motivoNuevo = resp.trim();
+  }
+
   await _tpBackupPrevio();
 
   const ahora = new Date().toISOString();
   const hist = tpHistorial(r).map(x => ({ f: x.f, t: x.t }));   // saca la marca _derivado
   hist.push({ f: nuevaFase, t: ahora });
   const faseExtra = { fase: nuevaFase, faseHist: hist };
+  if (motivoNuevo !== null) faseExtra.motivo = motivoNuevo;
 
   const estadoNuevo = TP_FASES[nuevaFase].estado;
 

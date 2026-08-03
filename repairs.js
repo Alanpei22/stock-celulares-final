@@ -71,7 +71,11 @@ function listenRepairs() {
 
   _repairsListener = db.collection('repairs')
     .where('fechaIngreso', '>=', cutoffISO)
-    .onSnapshot(snap => {
+    // includeMetadataChanges: para saber si quedan cambios sin subir (indicador
+    // de sincronización). Los avisos que son SOLO de metadata no re-dibujan.
+    .onSnapshot({ includeMetadataChanges: true }, snap => {
+      if (typeof syncReport === 'function') syncReport('reparaciones', snap.metadata.hasPendingWrites);
+      if (_repairsLoaded && snap.docChanges().length === 0) return;
       _repairsLoaded = true;
       REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
@@ -1148,6 +1152,11 @@ function openRepairDetail(id) {
       <textarea class="fi fi-area tp-campo-inline" rows="2" placeholder="Qué encontraste al revisarlo (no se muestra al cliente en el QR)"
         onchange="tpGuardarCampo('${id}','diagnostico',this.value)">${esc(r.diagnostico || '')}</textarea>
     </div>
+    ${faseInfo.tono === 'bad' ? `<div class="det-row det-row--full tp-bloque">
+      <span class="det-label">Motivo del cierre</span>
+      <textarea class="fi fi-area tp-campo-inline" rows="2" placeholder="Por qué no se reparó / por qué lo rechazó"
+        onchange="tpGuardarCampo('${id}','motivo',this.value)">${esc(r.motivo || '')}</textarea>
+    </div>` : ''}
   ` : `
     <div class="det-row">
       <span class="det-label">Estado</span>

@@ -534,7 +534,11 @@ function listenMovimientos() {
   const query = db.collection('caja_movimientos').where('fecha', '==', currentDate);
 
   try {
-    movListener = query.onSnapshot(snap => {
+    // includeMetadataChanges: alimenta el indicador de sincronización.
+    movListener = query.onSnapshot({ includeMetadataChanges: true }, snap => {
+      if (typeof syncReport === 'function') syncReport('caja', snap.metadata.hasPendingWrites);
+      // Aviso solo de metadata (subió lo que estaba pendiente): no re-dibujar
+      if (snap.docChanges().length === 0 && MOVIMIENTOS.length) return;
       MOVIMIENTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       MOVIMIENTOS.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
       renderMovimientos();
