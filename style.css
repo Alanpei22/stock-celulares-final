@@ -1133,14 +1133,6 @@ body.dark .chpin-error { color: #EF9A9A; }
  transition: all .2s; box-shadow: var(--shadow);
 }
 .btn-garantia:active, .btn-history:active { transform: scale(.97); background: var(--bg1); }
-.btn-presupuesto {
- background: var(--accent); color: #fff;
- border: none; border-radius: var(--radius); padding: 12px 10px;
- font-size: .82rem; font-weight: 700; cursor: pointer; flex: 1;
- transition: all .2s;
- box-shadow: 0 2px 8px rgba(200,150,90,0.25);
-}
-.btn-presupuesto:active { transform: scale(.97); background: var(--accent2); }
 
 /* ── REPAIR DETAIL · ACTION GROUPS (redesigned) ── */
 #rep-det-actions.det-actions {

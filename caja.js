@@ -1724,6 +1724,11 @@ function _onMovDescInput() {
   // Solo autocompletar para INGRESO (ventas) — HIGH-02: use module variable
   if (_movTipo !== 'ingreso') { _hideMovSuggestions(); return; }
 
+  // Editando un movimiento ya guardado: el carrito NO se aplica (el stock ya se descontó),
+  // así que agregar productos desde el buscador pisaría monto/descripción sin tocar
+  // stock ni ganancia. Al editar, la descripción es texto libre.
+  if (editingMovId) { _hideMovSuggestions(); return; }
+
   // searchMatch (utils.js) tokeniza, normaliza acentos y expande sinónimos.
   // Ejemplos: "modulo iphone" encuentra "Pantalla iPhone 14",
   //           "Módulo" matchea "modulo", "vidrio" matchea "templado", etc.
@@ -1983,6 +1988,7 @@ function _syncMontoFromCart() {
 
 // Agrega un producto que NO está en el inventario (precio se carga a mano).
 function _addFreeFromSearch() {
+  if (editingMovId) return;   // al editar no se arma carrito (ver _onMovDescInput)
   const input = document.getElementById('mov-fi-desc');
   const nombre = (input?.value || '').trim();
   if (!nombre) return;
@@ -2387,6 +2393,14 @@ async function saveMov() {
 
   try {
     if (editingMovId) {
+      // Al editar no se rearma el carrito (el stock ya se descontó al crear), pero si
+      // cambió el monto hay que recalcular la ganancia sobre el costo ya guardado;
+      // sino el dashboard / resumen diario siguen mostrando la ganancia vieja.
+      const prevMov = (typeof MOVIMIENTOS !== 'undefined' ? MOVIMIENTOS : []).find(x => x.id === editingMovId);
+      if (prevMov && prevMov.costoARSTotal != null) {
+        data.costoARSTotal = Number(prevMov.costoARSTotal) || 0;
+        data.gananciaARS   = (Number(monto) || 0) - data.costoARSTotal;
+      }
       await db.collection('caja_movimientos').doc(editingMovId).update(data);
       toast('Movimiento actualizado', 'success');
     } else {
