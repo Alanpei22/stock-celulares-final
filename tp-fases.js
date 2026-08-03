@@ -452,6 +452,11 @@ async function tpCambiarFase(id, nuevaFase) {
   try {
     await db.collection('repairs').doc(id).update(faseExtra);
     Object.assign(r, faseExtra);
+    // El cliente tiene que ver el cambio al escanear el QR. Esto va SIEMPRE,
+    // no solo cuando cambia el estado: casi todo el recorrido del tablero
+    // (ingresado → diagnóstico → presupuesto → aprobado → repuesto) pasa por
+    // acá sin tocar el estado.
+    if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(r);
     toast('→ ' + TP_FASES[nuevaFase].nombre, 'success');
     if (typeof logActivity === 'function') {
       logActivity({
@@ -503,6 +508,7 @@ async function tpMarcarDevuelto(id) {
     const upd = { devuelto: true, fechaEntrega: new Date().toISOString() };
     await db.collection('repairs').doc(id).update(upd);
     Object.assign(r, upd);
+    if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(r);
     toast('↩️ Marcado como devuelto', 'success');
     if (typeof renderRepairs === 'function') renderRepairs();
     if (typeof openRepairDetail === 'function') openRepairDetail(id);
@@ -522,6 +528,8 @@ async function tpGuardarCampo(id, campo, valor) {
   try {
     await db.collection('repairs').doc(id).update({ [campo]: v });
     r[campo] = v;
+    // El IMEI se muestra enmascarado en la página del cliente
+    if (campo === 'imei' && typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(r);
     toast('Guardado', 'success');
   } catch (e) {
     console.error('tpGuardarCampo:', e);

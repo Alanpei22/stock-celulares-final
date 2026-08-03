@@ -992,6 +992,11 @@ async function saveRepair() {
       };
       if (foto) updateData.foto = foto;
       await db.collection('repairs').doc(editingRepairId).set(_stripUndefined(updateData));
+      // Seguimiento público (QR): si cambió el modelo, el IMEI o la fecha
+      // estimada, el cliente tiene que verlo al escanear.
+      if (typeof upsertSeguimientoPublico === 'function') {
+        upsertSeguimientoPublico({ ...updateData, id: editingRepairId });
+      }
       // CRM: mantener ficha del cliente al día
       if (tlf && typeof upsertCliente === 'function') {
         upsertCliente({ tlf, nombre, dni });
@@ -1996,20 +2001,29 @@ async function saveGarantia() {
     const nOrden = original.nOrden;
 
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    await db.collection('repairs').doc(id).set({
+    const ahoraGar = new Date().toISOString();
+    const docGarantia = {
       id, nOrden,
       marca: original.marca, modelo: original.modelo,
       arreglo, codigo, observaciones: obs,
       nombre: original.nombre, tlf: original.tlf, dni: original.dni,
+      imei: original.imei || '',
       accesorios: original.accesorios || [],
       condicion: '',
       monto: 0, sena: 0,
       estado: 'reparando',
-      fechaIngreso: new Date().toISOString(),
+      // El reingreso por garantía entra al tablero como cualquier equipo
+      fase: 'ingresado',
+      faseHist: [{ f: 'ingresado', t: ahoraGar }],
+      estadoHistorial: [{ estado: 'reparando', fecha: ahoraGar }],
+      tokenSeguimiento: (typeof _segNuevoToken === 'function') ? _segNuevoToken() : null,
+      fechaIngreso: ahoraGar,
       esGarantia: true,
       ordenOriginal: original.nOrden,
       ordenOriginalId: originalId
-    });
+    };
+    await db.collection('repairs').doc(id).set(_stripUndefined(docGarantia));
+    if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(docGarantia);
 
     await db.collection('repairs').doc(originalId).update({ tieneGarantia: true });
 

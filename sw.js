@@ -1,4 +1,4 @@
-const CACHE = 'cel-v115';
+﻿const CACHE = 'cel-v116';
 const SHELL = ['manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'mp-logo.png'];
 
 self.addEventListener('install', e => {
@@ -17,7 +17,7 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   const ext = url.pathname.split('.').pop();
 
-  // HTML: network-first — siempre busca la versión más nueva
+  // HTML: network-first â€” siempre busca la versiÃ³n mÃ¡s nueva
   if (ext === 'html' || url.pathname.endsWith('/')) {
     e.respondWith(
       fetch(e.request).then(res => {
@@ -28,7 +28,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // JS y CSS: stale-while-revalidate — sirve del caché al instante, actualiza en fondo
+  // JS y CSS: stale-while-revalidate â€” sirve del cachÃ© al instante, actualiza en fondo
   if (['js', 'css'].includes(ext)) {
     e.respondWith(
       caches.open(CACHE).then(cache =>
@@ -44,21 +44,21 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Todo lo demás (imágenes, fuentes, etc.): cache-first
+  // Todo lo demÃ¡s (imÃ¡genes, fuentes, etc.): cache-first
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request))
   );
 });
 
-// ══════════════════════════════════════════
-//  WEB PUSH — recepción + click
-// ══════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//  WEB PUSH â€” recepciÃ³n + click
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; }
-  catch { data = { title: 'Notificación', body: event.data ? event.data.text() : '' }; }
+  catch { data = { title: 'NotificaciÃ³n', body: event.data ? event.data.text() : '' }; }
 
-  const title = data.title || '🔔 TechPoint';
+  const title = data.title || 'ðŸ”” TechPoint';
   const options = {
     body: data.body || '',
     icon: data.icon || '/icon-192.png',

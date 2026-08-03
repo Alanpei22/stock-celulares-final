@@ -2612,6 +2612,11 @@ async function saveMov() {
         try {
           const { id: repId, ...repFields } = repairUpdate;
           await db.collection('repairs').doc(repId).update(repFields);
+          // Seguimiento público (QR): cobrar desde la caja puede marcar el
+          // equipo como ENTREGADO, y el cliente tiene que verlo al escanear.
+          if (typeof upsertSeguimientoPublico === 'function' && _selectedRepairItem && _selectedRepairItem.repair) {
+            upsertSeguimientoPublico({ ..._selectedRepairItem.repair, ...repFields, id: repId });
+          }
           toastMsg = `Movimiento registrado · Reparación ${repairUpdate.cobrado ? 'cobrada ✅' : 'seña actualizada ✅'}`;
         } catch (repErr) {
           console.error('Repair update error:', repErr);
