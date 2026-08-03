@@ -1084,6 +1084,8 @@ async function saveRepair() {
             .filter(Boolean).join('\n'),
           url: '/index.html',
           tag: 'rep-nueva-' + id,
+          // Banner grande debajo del texto (Chrome lo muestra en PC y Android)
+          image: '/push-nuevo.png',
           // Queda fijo en pantalla hasta que alguien lo toca: un equipo que
           // entra necesita que alguien lo atienda.
           requireInteraction: true,

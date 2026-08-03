@@ -208,6 +208,7 @@ function pushCambioEquipo(r, faseNueva, estadoNuevo) {
       .filter(Boolean).join('\n'),
     url: '/index.html',
     tag: 'rep-estado-' + (r.id || ''),
+    image: '/push-estado.png',
   });
 }
 

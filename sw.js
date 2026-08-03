@@ -1,5 +1,8 @@
-const CACHE = 'cel-v119';
-const SHELL = ['manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'mp-logo.png'];
+const CACHE = 'cel-v120';
+const SHELL = ['manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'mp-logo.png',
+  // Banners de las notificaciones: cacheados para que el aviso salga completo
+  // aunque el celu esté con mala señal cuando llega el push.
+  'push-nuevo.png', 'push-estado.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
