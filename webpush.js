@@ -148,6 +148,54 @@ async function sendTestPush() {
 }
 
 // ══════════════════════════════════════════
+//  AVISO A TODOS LOS DISPOSITIVOS
+//  Los popups de abajo solo aparecen si el otro celular tiene la app ABIERTA.
+//  Esto manda un push de verdad: llega aunque la app esté cerrada.
+//  Se excluye al dispositivo que hizo el cambio (ya lo sabe).
+// ══════════════════════════════════════════
+async function pushEquipos({ pushKey, title, body, url, tag, requireInteraction }) {
+  try {
+    if (!title) return;
+    const cfg = (typeof getNotifConfig === 'function') ? getNotifConfig() : null;
+    // Respeta los interruptores de Configuración → Notificaciones
+    if (cfg && cfg.push && (cfg.push.enabled === false || cfg.push[pushKey] === false)) return;
+
+    const yo = (typeof getDeviceId === 'function') ? getDeviceId() : null;
+    const elegidos = (cfg && cfg.pushTargets && cfg.pushTargets[pushKey]) || [];
+    // Si el usuario eligió dispositivos puntuales se respeta; si no, van todos.
+    const targets = elegidos.length
+      ? elegidos.filter(d => d !== yo)
+      : (yo ? [yo + '_NEGATED'] : ['all']);
+    if (!targets.length) return;   // el único elegido era este mismo aparato
+
+    await fetch('/api/send-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targets, pushKey, title, body: body || '', url: url || '/index.html', tag, requireInteraction: !!requireInteraction }),
+    });
+  } catch (e) {
+    // Nunca frenar la carga de un equipo por un aviso que no salió
+    console.error('[push] equipos:', e);
+  }
+}
+
+// Texto del aviso cuando un equipo cambia de estado o de fase.
+function pushCambioEquipo(r, faseNueva, estadoNuevo) {
+  if (!r) return;
+  const equipo = `${r.marca || ''} ${r.modelo || ''}`.trim();
+  const nombreFase = (typeof TP_FASES !== 'undefined' && TP_FASES[faseNueva])
+    ? TP_FASES[faseNueva].nombre
+    : ((typeof REPAIR_STATES !== 'undefined' && REPAIR_STATES[estadoNuevo]) ? REPAIR_STATES[estadoNuevo].label : estadoNuevo);
+  pushEquipos({
+    pushKey: 'repairEstado',
+    title: `🔄 N°${r.nOrden || '?'} → ${nombreFase}`,
+    body: [equipo, r.arreglo, r.nombre ? '👤 ' + r.nombre : ''].filter(Boolean).join(' · '),
+    url: '/index.html',
+    tag: 'rep-estado-' + (r.id || ''),
+  });
+}
+
+// ══════════════════════════════════════════
 //  CROSS-DEVICE LOCAL NOTIFICATIONS
 //  Cuando otro dispositivo crea un mov,
 //  este lo escucha por onSnapshot y muestra

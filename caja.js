@@ -2617,6 +2617,10 @@ async function saveMov() {
           if (typeof upsertSeguimientoPublico === 'function' && _selectedRepairItem && _selectedRepairItem.repair) {
             upsertSeguimientoPublico({ ..._selectedRepairItem.repair, ...repFields, id: repId });
           }
+          // Aviso a los demás dispositivos si el cobro cambió el estado
+          if (repFields.estado && typeof pushCambioEquipo === 'function' && _selectedRepairItem && _selectedRepairItem.repair) {
+            pushCambioEquipo({ ..._selectedRepairItem.repair, id: repId }, repFields.fase, repFields.estado);
+          }
           toastMsg = `Movimiento registrado · Reparación ${repairUpdate.cobrado ? 'cobrada ✅' : 'seña actualizada ✅'}`;
         } catch (repErr) {
           console.error('Repair update error:', repErr);

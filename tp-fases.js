@@ -462,6 +462,8 @@ async function tpCambiarFase(id, nuevaFase) {
     // (ingresado → diagnóstico → presupuesto → aprobado → repuesto) pasa por
     // acá sin tocar el estado.
     if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(r);
+    // Aviso a los demás dispositivos (el cambio de estado avisa por su camino)
+    if (typeof pushCambioEquipo === 'function') pushCambioEquipo(r, nuevaFase, r.estado);
     toast('→ ' + TP_FASES[nuevaFase].nombre, 'success');
     if (typeof logActivity === 'function') {
       logActivity({

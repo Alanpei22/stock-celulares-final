@@ -1074,6 +1074,16 @@ async function saveRepair() {
           + `💵 ${tgMonto(monto)}${sena > 0 ? ` (seña ${tgMonto(sena)})` : ''}`
           + `${nombre ? `\n👤 ${esc(nombre)}` : ''} · 🕐 ${tgHora()}`);
       }
+      // Aviso a todos los dispositivos del local (llega con la app cerrada)
+      if (typeof pushEquipos === 'function') {
+        pushEquipos({
+          pushKey: 'repairNueva',
+          title: `🔧 Equipo ingresado N°${nOrden}`,
+          body: [`${marca} ${modelo}`.trim(), arreglo, nombre ? '👤 ' + nombre : ''].filter(Boolean).join(' · '),
+          url: '/index.html',
+          tag: 'rep-nueva-' + id,
+        });
+      }
       // CRM: crear/actualizar ficha del cliente (no bloqueante)
       if (tlf && typeof upsertCliente === 'function') {
         upsertCliente({ tlf, nombre, dni });
@@ -1485,6 +1495,8 @@ async function _doChangeRepairStatus(id, newStatus, r, extra = {}) {
       upsertSeguimientoPublico({ ...r, ...update });
     }
     toast('Estado: ' + (REPAIR_STATES[newStatus]?.label || newStatus), 'success');
+    // Aviso a los demás dispositivos
+    if (typeof pushCambioEquipo === 'function') pushCambioEquipo(r, update.fase, newStatus);
     _tgEstadoRepair(newStatus, r, update);
 
     const estadoLabel = REPAIR_STATES[newStatus]?.label || newStatus;
@@ -3150,6 +3162,7 @@ async function _doStatusChange(id, newStatus, extra = {}) {
     if (rPrev && typeof upsertSeguimientoPublico === 'function') {
       upsertSeguimientoPublico({ ...rPrev, ...update });
     }
+    if (rPrev && typeof pushCambioEquipo === 'function') pushCambioEquipo(rPrev, update.fase, newStatus);
     _tgEstadoRepair(newStatus, REPAIRS.find(x => x.id === id), update);
     // WA auto-notify on entregado
     if (newStatus === 'entregado') {

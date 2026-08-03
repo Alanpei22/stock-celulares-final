@@ -27,6 +27,9 @@ const NOTIF_DEFAULTS = {
     bajoStockCritico: false,
     cobrosRemotos: false,
     senasNuevas: false,
+    // Avisos del taller a todos los dispositivos (llegan con la app cerrada)
+    repairNueva: true,
+    repairEstado: true,
   },
   // Por cada tipo de push, qué dispositivos lo reciben (lista de deviceIds)
   // Si vacío → TODOS los dispositivos suscritos lo reciben
@@ -36,6 +39,8 @@ const NOTIF_DEFAULTS = {
     bajoStockCritico: [],
     cobrosRemotos: [],
     senasNuevas: [],
+    repairNueva: [],
+    repairEstado: [],
   },
   thresholds: {
     diasReparacionDemorada: 3,

@@ -252,6 +252,8 @@ async function _renderTargetingList() {
       { key: 'bajoStockCritico',  label: '📦' },
       { key: 'cobrosRemotos',     label: '💰' },
       { key: 'senasNuevas',       label: '🪙' },
+      { key: 'repairNueva',       label: '🆕' },
+      { key: 'repairEstado',      label: '🔄' },
     ];
 
     cont.innerHTML = `
