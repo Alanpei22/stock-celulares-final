@@ -196,6 +196,20 @@
           <option value="no va">No va</option>
           <option value="para-devolver">↩️ Para devolver</option>
           <option value="demorado">⚠️ Demorados</option>
+          <option value="en-taller">🏠 En taller (sin cerrar)</option>
+          <optgroup label="── Fase ──">
+            <option value="fase:ingresado">01 · Ingresado</option>
+            <option value="fase:diagnostico">02 · En diagnóstico</option>
+            <option value="fase:presupuestado">03 · Presupuestado</option>
+            <option value="fase:aprobado">04 · Aprobado</option>
+            <option value="fase:repuesto">05 · Esperando repuesto</option>
+            <option value="fase:reparacion">06 · En reparación</option>
+            <option value="fase:listo">07 · Listo · avisado</option>
+            <option value="fase:entregado">08 · Entregado</option>
+            <option value="fase:irreparable">— Sin reparación</option>
+            <option value="fase:rechazado">— Presupuesto rechazado</option>
+            <option value="fase:abandonado">— Abandonado</option>
+          </optgroup>
         </select>
         <select class="pill" id="rep-f-marca"><option value="">Todas las marcas</option></select>
         <select class="pill" id="rep-f-fecha">
@@ -944,6 +958,10 @@
         <div class="fg">
           <label class="fl">Modelo *</label>
           <input id="rep-fi-modelo" class="fi" type="text" placeholder="A54, iPhone 13..." autocomplete="off">
+        </div>
+        <div class="fg fg--full">
+          <label class="fl">IMEI <small style="color:var(--t2);font-weight:400">— opcional, el cliente ve solo los últimos 4</small></label>
+          <input id="rep-fi-imei" class="fi" type="text" placeholder="356789102345678" inputmode="numeric" autocomplete="off" maxlength="20">
         </div>
         </div><!-- /paso 1 -->
 
@@ -1922,6 +1940,7 @@
 </div>
 
 <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script defer src="tp-fases.js"></script>
 <script defer src="repairs.js"></script>
 <script defer src="clientes.js"></script>
 <script defer src="seguimiento.js"></script>

@@ -4727,6 +4727,116 @@ body.dark .inv-stock-cero { background: #7f1d1d; color: #fca5a5; }
 .mov-resumen-txt { font-size: 13px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mov-resumen-total { font-size: 17px; font-weight: 700; color: var(--text); flex-shrink: 0; }
 
+/* ══════════════════════════════════════════════════════════════
+   TABLERO DE FASES (tp-*) — ver tp-fases.js
+   Colores propios con prefijo --tp- para no pisar los de la app.
+   Los 4 tonos semánticos se distinguen entre sí y en modo oscuro.
+   ══════════════════════════════════════════════════════════════ */
+:root {
+ --tp-wait: #2563EB;   /* espera (cliente / repuesto) — azul  */
+ --tp-work: #B45309;   /* en taller — ámbar oscuro, legible al sol */
+ --tp-ok:   #047857;   /* cerrado ok — verde */
+ --tp-bad:  #DC2626;   /* cerrado sin reparar — rojo */
+ --tp-step-off: var(--bg3);
+}
+body.dark {
+ --tp-wait: #60A5FA;
+ --tp-work: #FBBF24;
+ --tp-ok:   #34D399;
+ --tp-bad:  #F87171;
+ --tp-step-off: #3A3A3D;
+}
+.tp-tono-wait { color: var(--tp-wait); }
+.tp-tono-work { color: var(--tp-work); }
+.tp-tono-ok   { color: var(--tp-ok); }
+.tp-tono-bad  { color: var(--tp-bad); }
+
+/* Chip de fase */
+.tp-chip {
+ display: inline-flex; align-items: center; gap: 6px;
+ font-size: .68rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+ padding: 4px 10px 4px 8px; border-radius: 20px;
+ border: 1.5px solid currentColor; background: var(--card);
+ white-space: nowrap;
+}
+.tp-led {
+ width: 7px; height: 7px; border-radius: 50%;
+ background: currentColor; box-shadow: 0 0 6px currentColor; flex: none;
+}
+
+/* Barra de avance.
+   Completado y actual se distinguen por FORMA además de color:
+   el actual es más alto, más ancho y con anillo. Al sol se ve igual. */
+.tp-steps { display: flex; gap: 3px; align-items: flex-end; margin: 10px 0 2px; height: 12px; }
+.tp-step {
+ flex: 1; height: 5px; border-radius: 3px;
+ background: var(--tp-step-off); transition: .2s;
+}
+.tp-step.on {
+ background: var(--tp-ok); height: 6px;
+}
+.tp-step.now {
+ background: var(--tp-work); height: 12px; flex: 1.8;
+ border-radius: 4px; box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--tp-work);
+}
+.tp-steps--corte .tp-step--corte {
+ background: repeating-linear-gradient(45deg, var(--tp-bad) 0 5px, transparent 5px 10px);
+ height: 6px; flex: 1;
+}
+
+/* Tiempo en la fase */
+.tp-dias { font-size: .72rem; font-weight: 700; color: var(--text3); white-space: nowrap; }
+.tp-dias.rojo { color: var(--tp-bad); }
+
+/* Bloques dentro de la ficha */
+.tp-bloque { display: block; }
+.tp-fase-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
+.tp-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+/* Botones de avance — objetivo táctil cómodo (mostrador, una mano) */
+.tp-btn {
+ min-height: 46px; padding: 10px 16px;
+ background: var(--card); color: var(--text);
+ border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+ font-size: .84rem; font-weight: 700; cursor: pointer;
+ flex: 1 1 auto; min-width: 46%;
+ transition: transform .12s, background .15s;
+}
+.tp-btn:active { transform: scale(.97); }
+.tp-btn.pri  { border-color: var(--tp-ok);  color: var(--tp-ok); }
+.tp-btn.pri:active  { background: var(--tp-ok);  color: #fff; }
+.tp-btn.warn { border-color: var(--tp-bad); color: var(--tp-bad); }
+.tp-btn.warn:active { background: var(--tp-bad); color: #fff; }
+@media (min-width: 600px) { .tp-btn { flex: 0 1 auto; min-width: 0; } }
+
+.tp-nota { font-size: .78rem; color: var(--text3); line-height: 1.5; margin: 4px 0 0; }
+
+/* Vista previa del aviso al cliente */
+.tp-wa-prev {
+ background: var(--bg1); border: 1px solid var(--border);
+ border-left: 3px solid var(--wa); border-radius: var(--radius-sm);
+ padding: 10px 12px; font-size: .82rem; line-height: 1.55;
+ white-space: pre-wrap; margin-top: 6px;
+}
+
+/* Historial con duración por etapa */
+.tp-hist { display: grid; gap: 0; margin-top: 6px; }
+.tp-h {
+ display: flex; gap: 10px; align-items: baseline;
+ padding: 7px 0; font-size: .8rem; border-bottom: 1px dashed var(--border);
+}
+.tp-h:last-child { border-bottom: none; }
+.tp-h-fecha { font-size: .72rem; color: var(--text3); flex: none; width: 92px; }
+.tp-h-fase { display: flex; align-items: center; gap: 6px; font-weight: 600; flex: 1; }
+.tp-h-dur { font-size: .72rem; font-weight: 700; color: var(--accent2); margin-left: auto; flex: none; }
+
+/* Campo editable dentro de la ficha */
+.tp-campo-inline { width: 100%; margin-top: 6px; }
+
+/* La tarjeta de la lista con la barra de fases */
+.rep-card .tp-steps { margin: 8px 0 0; }
+.rep-card .tp-chip { font-size: .62rem; }
+
 /* ── Carrito de venta (varios productos) ── */
 .cart-box { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .cart-line {

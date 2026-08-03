@@ -221,11 +221,20 @@ function renderRepairs() {
   const weekAgo  = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
   const monthStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
 
+  const _tpOn = typeof tpVencido === 'function';
   let filtered = REPAIRS.filter(r => {
     if (fEstado === 'demorado') {
-      // Demorado = reparando hace más de 3 días
-      if (r.estado !== 'reparando' || !r.fechaIngreso) return false;
-      if ((now - new Date(r.fechaIngreso)) / 86400000 <= 3) return false;
+      // Demorado = se pasó del SLA de su fase (TP_SLA en tp-fases.js)
+      if (_tpOn) { if (!tpVencido(r)) return false; }
+      else {
+        if (r.estado !== 'reparando' || !r.fechaIngreso) return false;
+        if ((now - new Date(r.fechaIngreso)) / 86400000 <= 3) return false;
+      }
+    } else if (fEstado === 'en-taller') {
+      if (!_tpOn) { if (r.estado !== 'reparando') return false; }
+      else if (TP_CERRADAS.includes(tpFaseDe(r))) return false;
+    } else if (fEstado.startsWith('fase:')) {
+      if (!_tpOn || tpFaseDe(r) !== fEstado.slice(5)) return false;
     } else if (fEstado === 'para-entregar') {
       if (r.estado !== 'listo') return false;
     } else if (fEstado === 'para-devolver') {
@@ -262,11 +271,10 @@ function renderRepairs() {
     filtered.sort((a, b) => (b.nOrden || 0) - (a.nOrden || 0));
   }
 
-  // Stats bar: demorados = reparando > 3 días (excluye cancelado y 'no van')
-  const demorados = REPAIRS.filter(r => {
-    if (r.estado !== 'reparando' || !r.fechaIngreso) return false;
-    return (now - new Date(r.fechaIngreso)) / 86400000 > 3;
-  }).length;
+  // Stats bar: demorados = pasados del SLA de su fase
+  const demorados = REPAIRS.filter(r => _tpOn ? tpVencido(r) : (
+    r.estado === 'reparando' && r.fechaIngreso && (now - new Date(r.fechaIngreso)) / 86400000 > 3
+  )).length;
 
   document.getElementById('rs-reparando').textContent = REPAIRS.filter(r => r.estado === 'reparando').length;
   document.getElementById('rs-listo').textContent     = REPAIRS.filter(r => r.estado === 'listo').length;
@@ -304,9 +312,9 @@ function renderRepairs() {
       ? `<span class="owner-only ganancia-chip ${ganancia >= 0 ? 'ganancia-pos' : 'ganancia-neg'}">📈 $${ganancia.toLocaleString('es-AR')}</span>`
       : '';
 
-    // Demorado? Solo aplica a reparando (no van/cancelado nunca son demorados)
-    const isDemorado = r.estado === 'reparando' && r.fechaIngreso &&
-      (now - new Date(r.fechaIngreso)) / 86400000 > 3;
+    // Demorado = se pasó del SLA de SU fase (ver TP_SLA en tp-fases.js)
+    const isDemorado = typeof tpVencido === 'function' ? tpVencido(r)
+      : (r.estado === 'reparando' && r.fechaIngreso && (now - new Date(r.fechaIngreso)) / 86400000 > 3);
 
     // Card class — sanitizar estado para evitar espacios en el nombre de clase CSS
     const estadoSlug = (r.estado || '').replace(/\s+/g, '-').toLowerCase();
@@ -388,12 +396,15 @@ function renderRepairs() {
             <span class="card-specs">🔧 ${esc(r.arreglo || '')}</span>
           </div>
           <div class="card-right">
-            <span class="badge ${st.cls}">${st.label}</span>
+            ${typeof tpChipHtml === 'function' ? tpChipHtml(r) : `<span class="badge ${st.cls}">${st.label}</span>`}
             ${r.esGarantia ? '<span class="badge bg-warn" style="margin-top:3px">Garantía</span>' : ''}
-            ${isDemorado ? '<span class="badge" style="margin-top:3px;background:#fee2e2;color:#dc2626;font-size:.6rem">⚠️ Demorado</span>' : ''}
+            ${typeof tpDesde === 'function'
+              ? `<span class="tp-dias ${isDemorado ? 'rojo' : ''}">${tpTxtTiempo(tpDesde(r))} acá${isDemorado ? ' ⚠️' : ''}</span>`
+              : (isDemorado ? '<span class="badge" style="margin-top:3px;background:#fee2e2;color:#dc2626;font-size:.6rem">⚠️ Demorado</span>' : '')}
             ${r.tlf ? `<button class="card-wa-btn" title="WhatsApp" onclick="event.stopPropagation();repairWhatsApp('${r.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#25D366" width="28" height="28"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg></button>` : ''}
           </div>
         </div>
+        ${typeof tpStepsHtml === 'function' ? tpStepsHtml(r) : ''}
         <div class="card-bottom">
           <span class="card-price">${monto}</span>${gananciaHTML}
           <div class="card-meta">
@@ -718,6 +729,8 @@ function openRepairForm(id) {
     document.getElementById('rep-fi-arreglo-custom').style.display = isCustom ? '' : 'none';
     document.getElementById('rep-fi-arreglo-custom').value = isCustom ? r.arreglo : '';
 
+    const imeiEl = document.getElementById('rep-fi-imei');
+    if (imeiEl) imeiEl.value = r.imei || '';
     document.getElementById('rep-fi-condicion').value  = r.condicion    || '';
     document.getElementById('rep-fi-codigo').value     = r.codigo       || '';
     document.getElementById('rep-fi-monto').value      = r.monto        || '';
@@ -779,7 +792,7 @@ function openRepairForm(id) {
       if (!ordenInput.value) ordenInput.value = suggested;
     }).catch(() => {});
 
-    ['rep-fi-marca','rep-fi-modelo','rep-fi-condicion','rep-fi-codigo',
+    ['rep-fi-marca','rep-fi-modelo','rep-fi-imei','rep-fi-condicion','rep-fi-codigo',
      'rep-fi-monto','rep-fi-sena','rep-fi-costo','rep-fi-fecha-est',
      'rep-fi-nombre','rep-fi-tlf','rep-fi-dni','rep-fi-obs'].forEach(fid => {
       const el = document.getElementById(fid);
@@ -927,6 +940,7 @@ async function saveRepair() {
   const arregloSel    = document.getElementById('rep-fi-arreglo').value;
   const arregloCustom = document.getElementById('rep-fi-arreglo-custom').value.trim();
   const arreglo  = arregloSel === 'Otro' ? arregloCustom : arregloSel;
+  const imei     = (document.getElementById('rep-fi-imei') || {}).value?.trim() || '';
   const condicion= document.getElementById('rep-fi-condicion').value.trim();
   const codigo   = document.getElementById('rep-fi-codigo').value.trim();
   const monto       = parseFloat(document.getElementById('rep-fi-monto').value)       || 0;
@@ -967,7 +981,7 @@ async function saveRepair() {
       if (!existing) { closeRepairForm(); return; }
       const updateData = {
         ...existing,
-        marca, modelo, arreglo, condicion, codigo, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
+        marca, modelo, arreglo, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaIngreso: _repIngresoISO(),
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs, diasGarantia, checklist,
         seguimientoFecha, seguimientoNota, seguimientoAck: seguimientoFecha ? (existing.seguimientoFecha === seguimientoFecha ? (existing.seguimientoAck || false) : false) : null
@@ -1015,9 +1029,12 @@ async function saveRepair() {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const ahora = _repIngresoISO(); // fecha de ingreso elegida con las flechas (hoy por defecto)
       const newDoc = {
-        id, nOrden, marca, modelo, arreglo, condicion, codigo, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
+        id, nOrden, marca, modelo, arreglo, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs,
         estado: 'reparando',
+        // Fase inicial del tablero (mapea a estado 'reparando')
+        fase: 'ingresado',
+        faseHist: [{ f: 'ingresado', t: ahora }],
         fechaIngreso: ahora,
         estadoHistorial: [{ estado: 'reparando', fecha: ahora }],
         esGarantia: false,
@@ -1103,7 +1120,35 @@ function openRepairDetail(id) {
   const saldo = (r.monto && r.sena) ? r.monto - r.sena : null;
   const fechaIng = r.fechaIngreso ? fmtDateTime(r.fechaIngreso) : '—';
 
-  document.getElementById('rep-det-body').innerHTML = `
+  // ── Tablero de fases (tp-fases.js). Si no cargó, caen los botones de siempre ──
+  const _tpOk = typeof tpFaseDe === 'function';
+  const faseInfo = _tpOk ? tpFaseInfo(r) : null;
+  const waTxt = _tpOk ? tpWaTexto(r) : null;
+  const faseBloque = _tpOk ? `
+    <div class="det-row det-row--full tp-bloque">
+      <span class="det-label">Fase</span>
+      <div class="tp-fase-head">
+        ${tpChipHtml(r)}
+        <span class="tp-dias ${tpVencido(r) ? 'rojo' : ''}">${tpTxtTiempo(tpDesde(r))} en esta fase${tpVencido(r) ? ' ⚠️ demorado' : ''}</span>
+        ${_esNoVa(r.estado) ? `<span class="tp-dias">${r.devuelto ? '· devuelto' : '· para devolver'}</span>` : ''}
+      </div>
+      ${tpStepsHtml(r)}
+      <div class="tp-acciones">${tpAccionesHtml(r)}</div>
+    </div>
+    ${waTxt ? `<div class="det-row det-row--full tp-bloque">
+      <span class="det-label">Aviso al cliente</span>
+      <div class="tp-wa-prev">${esc(waTxt)}</div>
+      <div class="tp-acciones">
+        ${r.tlf ? `<button class="tp-btn pri" onclick="tpWaEnviar('${id}')">🟢 Abrir WhatsApp</button>` : '<span class="tp-nota">Sin teléfono cargado.</span>'}
+        <button class="tp-btn" onclick="tpWaCopiar('${id}', this)">Copiar</button>
+      </div>
+    </div>` : ''}
+    <div class="det-row det-row--full tp-bloque">
+      <span class="det-label">Diagnóstico técnico</span>
+      <textarea class="fi fi-area tp-campo-inline" rows="2" placeholder="Qué encontraste al revisarlo (no se muestra al cliente en el QR)"
+        onchange="tpGuardarCampo('${id}','diagnostico',this.value)">${esc(r.diagnostico || '')}</textarea>
+    </div>
+  ` : `
     <div class="det-row">
       <span class="det-label">Estado</span>
       <div class="rep-status-btns">
@@ -1116,7 +1161,10 @@ function openRepairDetail(id) {
             onclick="changeRepairStatus('${id}','${k}')">${lbl}</button>`;
         }).join('')}
       </div>
-    </div>
+    </div>`;
+
+  document.getElementById('rep-det-body').innerHTML = `
+    ${faseBloque}
     <div class="det-row">
       <span class="det-label">Arreglo</span>
       <span class="det-val">${esc(r.arreglo || '—')}</span>
@@ -1205,7 +1253,15 @@ function openRepairDetail(id) {
       <span class="det-label">Reingreso</span>
       <span class="det-val" style="color:var(--warn)">⚠️ Tiene garantía</span>
     </div>` : ''}
-    ${Array.isArray(r.estadoHistorial) && r.estadoHistorial.length > 0 ? `
+    ${r.imei ? `<div class="det-row">
+      <span class="det-label">IMEI</span>
+      <span class="det-val">${esc(r.imei)}</span>
+    </div>` : ''}
+    ${_tpOk ? `<div class="det-row det-row--full tp-bloque">
+      <span class="det-label">Historial</span>
+      ${tpHistorialHtml(r)}
+    </div>` : ''}
+    ${!_tpOk && Array.isArray(r.estadoHistorial) && r.estadoHistorial.length > 0 ? `
     <div class="det-row det-row--full">
       <span class="det-label">Historial de estados</span>
       <ul class="state-timeline">
@@ -1307,24 +1363,33 @@ async function logActivity({ tipo, desc, repairId, tecnico, extra = {} }) {
 }
 
 // ── Cambio de estado ──────────────────────
-async function changeRepairStatus(id, newStatus) {
+// faseExtra: {fase, faseHist} cuando el cambio viene del tablero de fases
+// (tp-fases.js). Se escribe junto con el estado para que no queden desfasados
+// si el usuario cancela alguno de los diálogos del camino.
+async function changeRepairStatus(id, newStatus, faseExtra = {}) {
   const r = REPAIRS.find(x => x.id === id);
   if (!r) return;
 
   // ── "No va" → preguntar si el equipo ya fue devuelto al cliente ──
   if (newStatus === 'no va' || newStatus === 'cancelado') {
     const devuelto = confirm('↩️ ¿Ya le devolviste el equipo al cliente (sin reparar)?\n\nAceptar = DEVUELTO\nCancelar = queda PARA DEVOLVER');
-    await _doChangeRepairStatus(id, 'no va', r,
-      devuelto ? { devuelto: true, fechaEntrega: new Date().toISOString() } : { devuelto: false });
+    await _doChangeRepairStatus(id, 'no va', r, {
+      ...faseExtra,
+      ...(devuelto ? { devuelto: true, fechaEntrega: new Date().toISOString() } : { devuelto: false }),
+    });
     return;
   }
 
-  if (r.estado === newStatus) return;
+  if (r.estado === newStatus && !faseExtra.fase) return;
 
   // ── "Listo" → preguntar si el cliente ya se lo llevó ──
   if (newStatus === 'listo') {
     if (confirm('📦 ¿El cliente ya se llevó el equipo?\n\nAceptar = marcar ENTREGADO\nCancelar = queda LISTO para retirar')) {
-      return changeRepairStatus(id, 'entregado');
+      // Si venía del tablero, la fase también pasa a "entregado"
+      const fx = faseExtra.fase
+        ? { fase: 'entregado', faseHist: [...(faseExtra.faseHist || []).slice(0, -1), { f: 'entregado', t: new Date().toISOString() }] }
+        : {};
+      return changeRepairStatus(id, 'entregado', fx);
     }
   }
 
@@ -1340,7 +1405,7 @@ async function changeRepairStatus(id, newStatus) {
   // Al marcar como "listo", preguntar qué repuesto se usó
   if (newStatus === 'listo') {
     openRepUsoModal(async (repuestoId) => {
-      await _doChangeRepairStatus(id, newStatus, r);
+      await _doChangeRepairStatus(id, newStatus, r, faseExtra);
       if (repuestoId && typeof REPUESTOS !== 'undefined') {
         const rep = REPUESTOS.find(x => x.id === repuestoId);
         if (rep) {
@@ -1371,7 +1436,7 @@ async function changeRepairStatus(id, newStatus) {
     return;
   }
 
-  await _doChangeRepairStatus(id, newStatus, r);
+  await _doChangeRepairStatus(id, newStatus, r, faseExtra);
 }
 
 // 📨 Aviso Telegram de cambios de estado relevantes (listo / entregado / no va)
@@ -1393,6 +1458,9 @@ async function _doChangeRepairStatus(id, newStatus, r, extra = {}) {
   if (newStatus === 'entregado') update.fechaEntrega = ahora;
   const prevHistory = Array.isArray(r.estadoHistorial) ? r.estadoHistorial : [];
   update.estadoHistorial = [...prevHistory, { estado: newStatus, fecha: ahora }];
+  // Si el cambio NO vino del tablero de fases, la fase se acomoda sola al
+  // nuevo estado para que no quede mostrando una fase que ya no corresponde.
+  if (!update.fase && typeof _tpSyncFase === 'function') Object.assign(update, _tpSyncFase(r, newStatus, ahora));
 
   try {
     await db.collection('repairs').doc(id).update(update);
@@ -3040,11 +3108,23 @@ async function quickStatusChange(e, id, newStatus) {
 }
 
 async function _doStatusChange(id, newStatus, extra = {}) {
+  const ahora = new Date().toISOString();
   const update = { estado: newStatus, ...extra };
-  if (newStatus === 'entregado') update.fechaEntrega = new Date().toISOString();
+  if (newStatus === 'entregado') update.fechaEntrega = ahora;
+  const rPrev = REPAIRS.find(x => x.id === id);
+  // BUG-FIX: los chips rápidos cambiaban el estado sin dejar historial ni
+  // actualizar el seguimiento público del QR (el detalle sí lo hacía).
+  if (rPrev) {
+    const prevHistory = Array.isArray(rPrev.estadoHistorial) ? rPrev.estadoHistorial : [];
+    update.estadoHistorial = [...prevHistory, { estado: newStatus, fecha: ahora }];
+    if (typeof _tpSyncFase === 'function') Object.assign(update, _tpSyncFase(rPrev, newStatus, ahora));
+  }
   try {
     await db.collection('repairs').doc(id).update(update);
     toast('→ ' + (REPAIR_STATES[newStatus]?.label || newStatus), 'success');
+    if (rPrev && typeof upsertSeguimientoPublico === 'function') {
+      upsertSeguimientoPublico({ ...rPrev, ...update });
+    }
     _tgEstadoRepair(newStatus, REPAIRS.find(x => x.id === id), update);
     // WA auto-notify on entregado
     if (newStatus === 'entregado') {
