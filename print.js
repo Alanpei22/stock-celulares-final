@@ -403,8 +403,9 @@ ${_entregaHtml(rep)}`;
 * { margin:0; padding:0; box-sizing:border-box; }
 @page { size: A4 portrait; margin: 10mm 12mm; }
 body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10.5px; color:#000; background:#fff; }
-.pg { page-break-after: always; }
-.pg:last-child { page-break-after: auto; }
+/* Igual que en el A5: el corte va entre páginas, no después de la última. */
+.pg { page-break-after: auto; }
+.pg + .pg { page-break-before: always; }
 .hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; padding-bottom:6px; border-bottom:2px solid #000; }
 .hdr-shop { font-size:18px; font-weight:900; letter-spacing:-1px; }
 .hdr-sub  { font-size:8.5px; color:#000; margin-top:1px; }
@@ -467,7 +468,8 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10.5px; 
 <style>${css}
 @media screen{body{width:186mm;margin:0 auto}}</style></head><body>
 <div class="pg">${block('COMPROBANTE DEL CLIENTE')}</div>
-${_autofitJs(277)}
+${/* 277mm útiles (A4 menos 10mm arriba y abajo), con 5mm de colchón */''}
+${_autofitJs(272)}
 </body></html>`;
 }
 
@@ -973,8 +975,12 @@ const _CSS_A5 = `
 *{margin:0;padding:0;box-sizing:border-box}
 @page{size:A5 portrait;margin:7mm}
 body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-height:1.32;color:#000;background:#fff}
-.tk{page-break-after:always}
-.tk:last-child{page-break-after:auto}
+/* El corte va ENTRE comprobantes, nunca después del último. Antes esto era
+   page-break-after:always + :last-child, pero al agregar el script de
+   auto-ajuste al final del body el último .tk dejó de ser :last-child y salía
+   una segunda hoja en blanco. */
+.tk{page-break-after:auto}
+.tk + .tk{page-break-before:always}
 .hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.6px solid #000;padding-bottom:3px;margin-bottom:4px}
 .shop{font-size:16px;font-weight:800;letter-spacing:-.4px}
 .sub{font-size:7.4px;text-transform:uppercase;letter-spacing:.09em}
@@ -1032,12 +1038,13 @@ function _autofitJs(altoMm) {
   var tk = document.querySelectorAll('.tk, .pg');
   for (var i = 0; i < tk.length; i++) {
     var el = tk[i], s = 1;
-    // Baja de a 2% hasta que entre. Piso 0.6: por debajo no se leería.
-    for (var n = 0; n < 25 && el.getBoundingClientRect().height > MAX && s > 0.6; n++) {
+    // OJO: acá va zoom y NO transform:scale(). scale() achica lo que se VE pero
+    // el hueco que ocupa sigue siendo el original, así que el navegador igual
+    // corta la hoja en dos. zoom sí achica el espacio ocupado.
+    // offsetHeight (alto de maquetado) es lo que manda para el corte de página.
+    for (var n = 0; n < 25 && el.offsetHeight * s > MAX && s > 0.6; n++) {
       s -= 0.02;
-      el.style.transformOrigin = 'top left';
-      el.style.transform = 'scale(' + s + ')';
-      el.style.width = (100/s) + '%';
+      el.style.zoom = s;
     }
     // El QR se achicaría junto con todo y dejaría de leerse. Se lo agranda para
     // compensar; si con eso ya no entra en la hoja, se deja como estaba.
@@ -1046,7 +1053,7 @@ function _autofitJs(altoMm) {
       if (qr) {
         var previo = qr.style.width;
         qr.style.width = qr.style.height = (19/s) + 'mm';
-        if (el.getBoundingClientRect().height > MAX) {
+        if (el.offsetHeight * s > MAX) {
           qr.style.width = qr.style.height = previo || '19mm';
         }
       }
@@ -1060,7 +1067,10 @@ function _buildA5(rep) {
 <html lang="es"><head><meta charset="UTF-8"><title>Orden N°${rep.nOrden || ''}</title>
 <style>${_CSS_A5}${_CSS_COND}${_CSS_ENTREGA}${_CSS_VERIF}</style></head><body>
 ${_a5Body(rep, 'Comprobante del cliente')}
-${_autofitJs(196)}
+${/* 196mm es el alto útil real (A5 menos 7mm de margen arriba y abajo).
+      Se apunta a 192 para dejar 4mm de colchón: los márgenes de la impresora
+      nunca son exactos y si se pasa por medio milímetro salta a dos hojas. */''}
+${_autofitJs(192)}
 </body></html>`;
 }
 
