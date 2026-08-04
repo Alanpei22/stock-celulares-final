@@ -1258,6 +1258,10 @@ body.dark .rep-act--danger:hover { background: rgba(239,68,68,0.12); }
 }
 .rep-print-block { margin-bottom: 10px; }
 .rep-print-block:last-child { margin-bottom: 0; }
+/* Aclaración de que la misma hoja sirve para recibir y para entregar */
+.rep-print-note {
+ margin-top: 7px; font-size: .72rem; line-height: 1.45; color: var(--text3);
+}
 .rep-print-block__head {
  display: flex; align-items: center; gap: 8px;
  margin-bottom: 6px;
