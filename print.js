@@ -174,19 +174,16 @@ ${css}
 }
 
 // ── Punto de entrada — Ticket de ingreso ─────────────────────
+// El comprobante de RECEPCIÓN se imprime siempre en A5: es el único formato
+// que quedó (se sacaron A4, 80mm y BT del menú). El parámetro se mantiene por
+// compatibilidad con las llamadas que ya existían.
 function printRepair(format) {
   const rep = window._printRep;
   if (!rep) return;
   // Asegurar el doc de seguimiento público (para que el QR funcione,
   // también en reparaciones viejas que se reimprimen)
   if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);
-  if (format === 'A5') {
-    _openPrint(_buildA5(rep));
-  } else if (format === 'A4') {
-    _openPrint(_buildA4(rep));
-  } else {
-    _build80mm(rep); // abre el popup con flujo secuencial (original → copia)
-  }
+  _openPrint(_buildA5(rep));
 }
 
 // ── Punto de entrada — Ticket de retiro/entrega ──────────────
@@ -668,7 +665,140 @@ body { font-family:-apple-system,'Segoe UI',Arial,sans-serif; font-size:10px; co
 // ══════════════════════════════════════════
 //  VENTA DE EQUIPO — ficha imprimible (Stock)
 // ══════════════════════════════════════════
-function printVentaTicket(stockId, extra) {
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  HOJA A5 — VENTA DE EQUIPO  (original para el cliente +      ║
+// ║  copia para el negocio, una hoja cada uno)                   ║
+// ╚══════════════════════════════════════════════════════════════╝
+const _CSS_VENTA_A5 = `
+*{margin:0;padding:0;box-sizing:border-box}
+@page{size:A5 portrait;margin:7mm}
+body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:9px;line-height:1.35;color:#000;background:#fff}
+/* El corte va ENTRE hojas, nunca después de la última (si no sale una en blanco) */
+.tk{page-break-after:auto}
+.tk + .tk{page-break-before:always}
+.vhd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.6px solid #000;padding-bottom:4px;margin-bottom:5px}
+.vshop{font-size:17px;font-weight:800;letter-spacing:-.4px}
+.vsub{font-size:7.6px;text-transform:uppercase;letter-spacing:.09em}
+.vbiz{font-size:8.4px;font-weight:600;margin-top:2px}
+.vhd-r{text-align:right}
+.vtit{font-size:11px;font-weight:800;border:1.4px solid #000;padding:2px 7px;display:inline-block}
+.vcopia{font-size:8px;text-transform:uppercase;letter-spacing:.14em;margin-top:3px;font-weight:800}
+.vmeta{display:flex;gap:12px;flex-wrap:wrap;font-size:8.4px;border-bottom:.6px solid #000;padding-bottom:4px;margin-bottom:5px}
+.vbox{border:.8px solid #000;padding:4px 7px;margin-bottom:5px}
+.vbox-t{font-size:7.2px;font-weight:800;text-transform:uppercase;letter-spacing:.11em;border-bottom:.5px solid #000;padding-bottom:2px;margin-bottom:3px}
+.veq{font-size:13px;font-weight:800;margin-bottom:2px}
+.vgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px}
+.vf{display:flex;justify-content:space-between;gap:6px;font-size:8.6px}
+.vf b{font-weight:700;text-align:right}
+.vimei{font-family:'Courier New',monospace;font-size:9px;letter-spacing:-.2px}
+.vtot{width:100%;border-collapse:collapse;margin-bottom:5px}
+.vtot td{border:.8px solid #000;padding:2.5px 7px}
+.vtot .a{text-align:right;font-weight:700;width:36%}
+.vtot .hl td{font-weight:800;font-size:11px;border-width:1.5px}
+.vgar{border:1.3px solid #000;padding:3px 7px;margin-bottom:5px}
+.vgar-t{font-size:9.6px;font-weight:800}
+.vgar-s{font-size:7.6px;margin-top:1px}
+.vcond{border:.7px solid #000;padding:3px 7px;margin-bottom:5px}
+.vcond-c{column-count:2;column-gap:8px;font-size:6.2px;line-height:1.3;text-align:justify}
+.vcond-c p{margin-bottom:1.6px;break-inside:avoid}
+.vfir{border:1.2px solid #000;padding:4px 7px;display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}
+.vfir-c{text-align:center;font-size:7px}
+.vfir-sp{height:13mm}
+.vfir-c .ln{border-top:.8px solid #000;margin-bottom:2px}
+.vqr{text-align:center;line-height:1.1}
+.vqr svg{width:19mm;height:19mm;display:block;margin:0 auto}
+.vqr span{font-size:5.8px;font-weight:700;display:block;margin-top:1px}
+.vpie{text-align:center;font-size:7.6px;margin-top:4px}
+@media screen{body{width:134mm;margin:0 auto}}
+@media print{body{-webkit-print-color-adjust:economy;print-color-adjust:economy}}`;
+
+function _ventaA5Body(d, label) {
+  const p = d.p;
+  const filas = [
+    p.estado ? ['Condición', p.estado] : null,
+    p.almacenamiento ? ['Almacenamiento', p.almacenamiento] : null,
+    p.ram ? ['RAM', p.ram] : null,
+    p.bateria ? ['Batería', p.bateria + '%'] : null,
+    p.color ? ['Color', p.color] : null,
+  ].filter(Boolean);
+
+  return `
+<div class="tk">
+  <div class="vhd">
+    <div>
+      <div class="vshop">${d.businessName.toUpperCase()}</div>
+      <div class="vsub">Venta de equipos · servicio técnico</div>
+      ${_bizLinea() ? `<div class="vbiz">${_bizLinea()}</div>` : ''}
+    </div>
+    <div class="vhd-r">
+      <div class="vtit">COMPROBANTE DE VENTA</div>
+      <div class="vcopia">${label}</div>
+    </div>
+  </div>
+
+  <div class="vmeta">
+    <span><b>Fecha:</b> ${d.fechaVenta}${d.horaVenta ? ' · ' + d.horaVenta : ''}</span>
+    ${p.vendedor ? `<span><b>Vendedor:</b> ${_pr(p.vendedor)}</span>` : ''}
+  </div>
+
+  <div class="vbox">
+    <div class="vbox-t">Equipo</div>
+    <div class="veq">${_pr(p.marca)} ${_pr(p.modelo)}</div>
+    ${p.imei ? `<div class="vf"><span>IMEI</span><b class="vimei">${_pr(p.imei)}</b></div>` : ''}
+    <div class="vgrid">
+      ${filas.map(([k, v]) => `<div class="vf"><span>${k}</span><b>${_pr(v)}</b></div>`).join('')}
+    </div>
+    ${p.notas ? `<div class="vf" style="margin-top:2px"><span>Observaciones</span><b>${_pr(p.notas)}</b></div>` : ''}
+  </div>
+
+  <table class="vtot">
+    ${p.forma_pago ? `<tr><td class="a">Forma de pago</td><td>${_pr(p.forma_pago)}</td></tr>` : ''}
+    <tr class="hl"><td class="a">TOTAL</td><td>${_prMoney(p.precio)}</td></tr>
+  </table>
+
+  ${p.garantiaMeses > 0 ? `
+  <div class="vgar">
+    <div class="vgar-t">GARANTÍA ${p.garantiaMeses} ${p.garantiaMeses === 1 ? 'MES' : 'MESES'}${d.fGarantia ? ` · vence el ${d.fGarantia}` : ''}</div>
+    <div class="vgar-s">Presentá este comprobante para hacerla válida. No cubre golpes, humedad ni mal uso.</div>
+  </div>` : `
+  <div class="vgar">
+    <div class="vgar-t">VENTA SIN GARANTÍA</div>
+    <div class="vgar-s">El comprador declara conocer y aceptar el estado del equipo.</div>
+  </div>`}
+
+  <div class="vcond">
+    <div class="vbox-t">Condiciones de la venta</div>
+    <div class="vcond-c">
+      <p><b>1. Estado del equipo.</b> El comprador revisó y probó el equipo al momento de la compra y lo recibe en el estado descrito en este comprobante, incluidos los detalles estéticos y el porcentaje de batería informado.</p>
+      <p><b>2. Garantía.</b> Cuando corresponda, cubre fallas de funcionamiento no provocadas por el uso, conforme la Ley 24.240 de Defensa del Consumidor. Se hace válida únicamente presentando este comprobante.</p>
+      <p><b>3. Exclusiones.</b> No cubre golpes, caídas, contacto con líquidos o humedad, sobretensión del cargador, fallas de software o configuración, ni equipos abiertos o intervenidos por terceros.</p>
+      <p><b>4. Datos y cuentas.</b> El equipo se entrega sin cuentas vinculadas y con los datos borrados. El respaldo de la información posterior a la compra queda a cargo del comprador.</p>
+      <p><b>5. Conformidad.</b> La firma del presente implica la aceptación del estado del equipo y de estas condiciones.</p>
+    </div>
+  </div>
+
+  <div class="vfir">
+    <div class="vfir-c"><div class="vfir-sp"></div><div class="ln"></div>Firma del vendedor</div>
+    <div class="vfir-c"><div class="vfir-sp"></div><div class="ln"></div>Firma y aclaración del comprador</div>
+    ${d.qrSvgWa ? `<div class="vqr">${d.qrSvgWa}<span>Escribinos</span></div>` : ''}
+  </div>
+
+  <div class="vpie">¡Gracias por tu compra! · ${d.businessName}</div>
+</div>`;
+}
+
+function _buildVentaA5(d) {
+  return `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>Venta — ${_pr(d.p.marca)} ${_pr(d.p.modelo)}</title>
+<style>${_CSS_VENTA_A5}</style></head><body>
+${_ventaA5Body(d, 'Original · cliente')}
+${_ventaA5Body(d, 'Copia · negocio')}
+${_autofitJs(192)}
+</body></html>`;
+}
+
+// formato: 'A5' (hoja, original + copia) o '80mm' (ticket térmico)
+function printVentaTicket(stockId, extra, formato = 'A5') {
   // extra: datos de la venta recién hecha (aún no sincronizados en STOCK)
   let p = (typeof STOCK !== 'undefined') ? STOCK.find(x => x.id === stockId) : null;
   if (!p && extra) p = extra;
@@ -696,6 +826,13 @@ function printVentaTicket(stockId, extra) {
   }
   // QR generado en la app (qr.js), no bajado de un servicio externo
   const qrSvgWa = (waLink && typeof qrSvg === 'function') ? qrSvg(waLink, 25) : '';
+
+  // Hoja A5: una para el cliente y otra para el negocio
+  if (formato === 'A5') {
+    _openPrint(_buildVentaA5({ p, businessName, fechaVenta, horaVenta, fGarantia, qrSvgWa }),
+               `Venta ${p.marca} ${p.modelo}`);
+    return;
+  }
 
   const block = (label) => `
     <div class="t80">

@@ -1418,7 +1418,8 @@ function openDetail(id) {
   document.getElementById('det-actions').innerHTML = `
     ${!p.vendido ? `<button class="btn-whatsapp" onclick="shareWhatsApp('${p.id}')">🟢 WhatsApp</button>` : ''}
     <button class="btn-copy" onclick="copyInfo('${p.id}')">📋 Copiar</button>
-    ${p.vendido ? `<button class="btn-edit" onclick="printVentaTicket('${p.id}')">🖨 Imprimir ficha</button>` : ''}
+    ${p.vendido ? `<button class="btn-edit" onclick="printVentaTicket('${p.id}','','A5')">📄 Comprobante A5</button>
+                <button class="btn-edit" onclick="printVentaTicket('${p.id}','','80mm')">🖨 Ticket 80mm</button>` : ''}
     ${!p.vendido && !p.reservado ? `<button class="btn-edit" onclick="closeDetail();openForm('${p.id}')">✏️ Editar</button>` : ''}
     ${!p.vendido && !p.reservado ? `<button class="btn-edit" onclick="openReservarModal('${p.id}')" style="background:#f59e0b;color:#fff">⏳ Reservar</button>` : ''}
     ${p.reservado ? `<button class="btn-edit" onclick="cancelarReserva('${p.id}')" style="background:#fef3c7;color:#92400e">✕ Cancelar reserva</button>` : ''}
@@ -1738,8 +1739,9 @@ async function confirmSell() {
     // 🧾 Ofrecer comprobante de venta (con garantía) para el cliente
     if (typeof printVentaTicket === 'function') {
       setTimeout(() => {
-        if (confirm('🧾 ¿Imprimir comprobante de venta para el cliente?')) {
-          printVentaTicket(id, { ...p, ...stockUpdate });
+        // A5: sale el original para el cliente y la copia para el negocio
+        if (confirm('🧾 ¿Imprimir comprobante de venta?\n\nSalen dos hojas A5: original para el cliente y copia para el negocio.')) {
+          printVentaTicket(id, { ...p, ...stockUpdate }, 'A5');
         }
       }, 350);
     }
