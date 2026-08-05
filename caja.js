@@ -1782,6 +1782,20 @@ function _onMovDescInput() {
   }
 
   // ── Repuestos ──
+  // Un repuesto guarda nombre, marca y modelo por separado ("Placa de carga" +
+  // "Samsung" + "A54"). Si se muestra solo el nombre no se sabe de qué equipo
+  // es, y así quedaba guardado en el movimiento y en el ticket. Se arma el
+  // nombre completo, sin repetir lo que ya esté escrito adentro del nombre.
+  const _normTxt = s => String(s || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');   // saca tildes para comparar
+  const _nombreRepuesto = r => {
+    const base = String(r.nombre || r.tipo || 'Repuesto').trim();
+    const yaEsta = _normTxt(base);
+    const faltan = [r.marca, r.modelo]
+      .filter(v => v && !yaEsta.includes(_normTxt(v)));
+    return [base, ...faltan].join(' ').trim();
+  };
+
   CAJA_REPUESTOS.forEach(r => {
     if (searchMatch([r.nombre, r.marca, r.modelo, r.tipo], q)) {
       const precioVenta = Number(r.precioVenta) || 0;
@@ -1790,11 +1804,16 @@ function _onMovDescInput() {
       const costoARS = costoUSD > 0 && dolar > 0
         ? Math.round(costoUSD * dolar)
         : (Number(r.precioCompra) || 0);
+      const nombreFull = _nombreRepuesto(r);
+      const nombreNorm = _normTxt(nombreFull);
       results.push({
         source: 'repuesto',
         id: r.id,
-        nombre: r.nombre || `${r.tipo || ''} ${r.marca || ''} ${r.modelo || ''}`.trim() || '(repuesto)',
-        extra: [r.tipo, r.marca].filter(Boolean).join(' · '),
+        nombre: nombreFull,
+        // Solo lo que no quedó ya adentro del nombre, para no repetirlo
+        extra: [r.tipo, r.marca, r.modelo]
+          .filter(v => v && !nombreNorm.includes(_normTxt(v)))
+          .join(' · '),
         stock: Number(r.cantidad) || 0,
         // HIGH-05: si no hay precioVenta configurado, mostrar 0 (no el costo) para evitar
         // que el cajero cobre al costo sin darse cuenta

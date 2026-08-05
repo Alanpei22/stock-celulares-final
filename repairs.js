@@ -3237,7 +3237,8 @@ function selectRepUsoItem(id) {
   const r = typeof REPUESTOS !== 'undefined' && REPUESTOS.find(x => x.id === id);
   if (r) {
     const selEl = document.getElementById('rep-uso-selected');
-    selEl.textContent = `✔ ${r.nombre} (${r.marca || ''}) — Stock actual: ${r.cantidad ?? 0}`;
+    const equipoRep = [r.marca, r.modelo].filter(Boolean).join(' ');
+    selEl.textContent = `✔ ${r.nombre}${equipoRep ? ` (${equipoRep})` : ''} — Stock actual: ${r.cantidad ?? 0}`;
     selEl.classList.remove('hidden');
   }
   const confirmBtn = document.getElementById('rep-uso-confirm-btn');
