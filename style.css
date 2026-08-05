@@ -4867,7 +4867,9 @@ body.dark {
 }
 .cart-line-icon { font-size: 20px; flex-shrink: 0; }
 .cart-line-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.cart-line-text .sale-item-name { font-weight: 600; font-size: 14px; color: var(--text); }
+/* En el carrito el nombre compite con los botones de cantidad, así que queda
+   más angosto: se le dan 3 renglones para que entre un modelo largo. */
+.cart-line-text .sale-item-name { font-weight: 600; font-size: 14px; color: var(--text); -webkit-line-clamp: 3; }
 .cart-line-text .sale-item-meta { font-size: 12px; color: var(--text2); }
 .cart-qty-val { min-width: 24px; text-align: center; font-weight: 700; font-size: 15px; }
 /* Línea de la reparación dentro del carrito (venta mixta: arreglo + productos) */
@@ -5065,7 +5067,14 @@ body.dark .mov-desc-suggest { border-color: var(--accent); box-shadow: 0 8px 24p
 
 .sug-ico { font-size: 1.1rem; flex-shrink: 0; }
 .sug-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.sug-name { font-size: .85rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Los repuestos traen nombre + marca + modelo ("Placa de carga Samsung A54"),
+   así que en un renglón se cortaba justo donde está el modelo. Se permiten dos
+   renglones: entra el nombre completo sin que el listado se desarme. */
+.sug-name {
+ font-size: .85rem; font-weight: 700; color: var(--text);
+ white-space: normal; overflow: hidden; line-height: 1.25;
+ display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
 .sug-meta { font-size: .68rem; color: var(--text3); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sug-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .sug-precio { font-size: .82rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
@@ -5106,7 +5115,13 @@ body.dark .mov-sug-empty { color: #A1A1A6; }
 }
 .sale-item-icon { font-size: 1.2rem; flex-shrink: 0; }
 .sale-item-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.sale-item-name { font-size: .9rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Igual que .sug-name: el nombre del ítem elegido y el del carrito tampoco se
+   cortan al primer renglón. */
+.sale-item-name {
+ font-size: .9rem; font-weight: 700; color: var(--text);
+ white-space: normal; overflow: hidden; line-height: 1.25;
+ display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
 .sale-item-meta { font-size: .7rem; color: var(--text3); font-weight: 500; }
 .sale-item-meta b { font-weight: 800; color: var(--text2); padding: 0 2px; }
 .sale-item-clear {
