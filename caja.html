@@ -1138,6 +1138,8 @@ function switchCajaTab(tab) {
   const backdrop = document.getElementById('fab-backdrop');
   if (fab) fab.style.display = tab === 'caja' ? '' : 'none';
   if (backdrop) backdrop.style.display = 'none';
+  // CUPO: la colección de productos se lee recién al entrar a Accesorios
+  if (tab === 'inventario' && typeof _listenProductos === 'function') _listenProductos();
   if (tab === 'inventario') focusInvScan();
   if (tab === 'reparaciones' && typeof openReparTab === 'function') openReparTab();
 }

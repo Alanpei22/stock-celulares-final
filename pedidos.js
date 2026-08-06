@@ -33,8 +33,9 @@ window._pedidosCleanup = function() {
 
 // ── Init ──────────────────────────────────────
 function initPedidos() {
-  // Listener Firestore (auto-arranca al abrir el modal por primera vez)
-  if (!_pedidosListener) listenPedidos();
+  // CUPO: el listener NO arranca acá. Leía la colección entera de pedidos en
+  // cada apertura de la app, aunque nadie abriera la sección. Arranca solo
+  // cuando se abre el modal (ver openPedidosModal).
 
   // Cerrar modal con click fuera
   const overlay = document.getElementById('pedidos-modal');

@@ -123,12 +123,15 @@ function initApp() {
   loadCierre();
   _loadYesterdayStats().then(() => renderStats()); // Feature 6: vs ayer
   listenCierresParciales();        // ← turnos/cierres parciales
-  listenCajaRepuestos();           // ← repuestos para autocomplete
-  listenCajaStock();               // ← equipos (stock) para vender desde caja
-  listenCajaRepairs();             // ← reparaciones para autocomplete
+  // CUPO: repuestos, stock y reparaciones son para el AUTOCOMPLETE de la venta.
+  // Antes se leían enteros al abrir la caja, aunque solo vinieras a mirar los
+  // números del día. Ahora arrancan la primera vez que se toca el buscador
+  // (ver _asegurarDatosVenta), o al abrir el modal de cobro.
   _initMovDescAutocomplete();      // ← input handler de descripción
   ensureDolar(db);                 // ← cotización para calcular costo en pesos
-  if (typeof initInventario === 'function') initInventario();
+  // El inventario (colección productos completa) arranca al entrar a la
+  // pestaña Accesorios — ver switchCajaTab en caja.html.
+  if (typeof initInventario === 'function') initInventario({ soloUI: true });
 
   // Estado colapsado/expandido del panel de detalle de caja
   _initCajaDetailState();
@@ -1397,6 +1400,9 @@ function _resetClienteFields(mov) {
 
 function openMovForm(id) {
   closeFabMenu();
+  // Si se abre el modal de cobro es porque se va a vender: acá ya hacen falta
+  // los productos y equipos para el buscador.
+  _asegurarDatosVenta();
   editingMovId = id || null;
   const overlay = document.getElementById('mov-overlay');
   const modal   = document.getElementById('mov-modal');
@@ -1671,6 +1677,15 @@ function _markError(el, on) {
 //  → Descuenta stock al guardar (solo en INGRESO)
 // ══════════════════════════════════════════
 
+// Arranca los listeners que alimentan el autocomplete de la venta.
+// Se llama al tocar el buscador o al abrir el modal de cobro: si el día se pasa
+// mirando los números sin vender, esas colecciones no se leen nunca.
+function _asegurarDatosVenta() {
+  listenCajaRepuestos();
+  listenCajaStock();
+  listenCajaRepairs();
+}
+
 function listenCajaRepuestos() {
   if (_cajaRepuestosListener) return;
   _cajaRepuestosListener = db.collection('repuestos').onSnapshot(snap => {
@@ -1716,6 +1731,8 @@ function _initMovDescAutocomplete() {
   const input = document.getElementById('mov-fi-desc');
   if (!input) return;
   input.setAttribute('autocomplete', 'off');
+  // Primer contacto con el buscador → recién ahí se traen productos y equipos
+  input.addEventListener('focus', _asegurarDatosVenta, { once: true });
   input.addEventListener('input', _onMovDescInput);
   input.addEventListener('focus', _onMovDescInput);
   // MED-10: 300ms en vez de 180ms para que el tap mobile registre antes de que se oculte

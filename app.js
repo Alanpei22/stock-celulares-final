@@ -646,6 +646,9 @@ function switchSection(section) {
   });
   if (typeof _syncSidebar === 'function') _syncSidebar(section);
   if (section === 'dash') renderDashboard();
+  // CUPO: los repuestos son una colección entera; se leen recién cuando se
+  // entra a la sección, no en cada apertura de la app.
+  if (section === 'repuestos' && typeof listenRepuestos === 'function') listenRepuestos();
 }
 
 // ── Dashboard ──────────────────────────────────────────────

@@ -18,8 +18,11 @@ const INV_CATEGORIAS = [
 ];
 
 // ── Inicializar ─────────────────────────────────────────────
-function initInventario() {
-  _listenProductos();
+// opts.soloUI = true → engancha la interfaz pero NO lee la colección de
+// productos. El listener arranca al entrar a la pestaña Accesorios
+// (ver switchCajaTab en caja.html), para no gastar cupo si nadie la abre.
+function initInventario(opts = {}) {
+  if (!opts.soloUI) _listenProductos();
   _initInvScanInput();
 
   document.getElementById('inv-add-btn').addEventListener('click', () => openProductoForm());

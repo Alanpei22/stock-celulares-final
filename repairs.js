@@ -34,6 +34,11 @@ window._repairsCleanup = function() {
 };
 
 // ── Firebase ──────────────────────────────
+// Días de reparaciones que la app mantiene cargadas. Es el número que más pesa
+// en el cupo de lecturas de Firebase: cada apertura de la app lee un documento
+// por cada reparación de esta ventana. Subilo solo si te falta ver equipos
+// viejos en la lista del día a día.
+const REPAIRS_DIAS_VENTANA = 60;
 const _REP_CACHE_KEY = 'repairsCache';
 
 // Guarda una copia liviana (sin fotos base64) en localStorage para pintar al instante
@@ -63,10 +68,13 @@ function listenRepairs() {
   // Evitar listeners duplicados
   if (_repairsListener) { _repairsListener(); _repairsListener = null; }
 
-  // 120 días cubre el día a día. Las estadísticas del año se piden on-demand
-  // (loadAllRepairsHistory) para que el primer load sea liviano y rápido.
+  // CUPO: cada apertura de la app vuelve a leer TODAS las reparaciones de la
+  // ventana, y eso se cobra por documento. 60 días cubre el día a día del
+  // taller (un equipo que entró hace más de 2 meses ya se entregó o está
+  // abandonado). Las más viejas se buscan con el histórico on-demand
+  // (loadAllRepairsHistory), que ya se usa para las estadísticas.
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 120);
+  cutoff.setDate(cutoff.getDate() - REPAIRS_DIAS_VENTANA);
   const cutoffISO = cutoff.toISOString();
 
   _repairsListener = db.collection('repairs')

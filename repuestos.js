@@ -161,8 +161,11 @@ function _esc(s) { return String(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt
 
 // ── Firebase ──────────────────────────────
 function listenRepuestos() {
-  // Evitar listeners duplicados
-  if (_repuestosListener) { _repuestosListener(); _repuestosListener = null; }
+  // CUPO: si ya está escuchando NO se recrea. Antes se cancelaba y se volvía a
+  // crear, y cada recreación vuelve a leer la colección entera (se llama cada
+  // vez que se entra a la sección).
+  if (_repuestosListener) return;
+  if (typeof db === 'undefined' || !db) return;
 
   _repuestosListener = db.collection('repuestos').onSnapshot(snap => {
     REPUESTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -223,7 +226,8 @@ function initRepuestos() {
   // Hint dinámico del costo en pesos al lado del campo USD
   document.getElementById('rep2-fi-costoUSD')?.addEventListener('input', _updateCostoARSHint);
   initCatalogAutocomplete();
-  listenRepuestos();
+  // CUPO: el listener de repuestos (colección completa) arranca recién al
+  // entrar a la sección Repuestos — ver switchSection() en app.js.
 }
 
 // ── Autocompletado desde catálogo de módulos ───────────────
