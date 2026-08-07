@@ -32,7 +32,7 @@ let _filtro   = { q: '', estado: '', modelo: '', sintoma: '' };
 // Cleanup para auth.js (logout)
 window._placasCleanup = function () {
   if (_placasListener) { _placasListener(); _placasListener = null; }
-  PLACAS = []; _cur = null; _curId = null; _fotos = [];
+  PLACAS = []; _cur = null; _curId = null; _fotos = []; REFS = {};
 };
 
 // ══════════════════════════════════════════════════════════
@@ -313,11 +313,14 @@ function initPlacas() {
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (!document.getElementById('pl-lightbox').classList.contains('hidden')) return cerrarFoto();
+    if (!document.getElementById('pl-ref').classList.contains('hidden')) return closeRefs();
     if (!document.getElementById('pl-kb').classList.contains('hidden')) return closeKB();
     if (!document.getElementById('pl-detail').classList.contains('hidden')) return closeDetalle();
   });
 
   listenPlacas();
+  // Las referencias son pocos documentos y se leen una sola vez por sesión.
+  loadReferencias();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -459,6 +462,209 @@ function renderList() {
       </div>
     </div>`;
   }).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+//  PLACAS DE REFERENCIA
+//
+//  Los valores buenos NO vienen de ningún lado más que de tu banco: cuando
+//  tenés una placa sana arriba (entró por pantalla, por batería, lo que sea)
+//  medís las líneas principales una vez y quedan guardadas como referencia
+//  de ese modelo. Desde ahí, cada medición que cargues se compara sola y se
+//  marca OK / bajo / alto / corto sin que tengas que decidirlo vos.
+//
+//  Firestore: placas_ref/{slug del modelo}
+// ══════════════════════════════════════════════════════════
+
+let REFS = {};   // { slug: { modelo, puntos: [...], fuente, updatedAt } }
+
+function _refSlug(modelo) {
+  return normalizeText(modelo).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function _getRef(modelo) {
+  if (!modelo) return null;
+  return REFS[_refSlug(modelo)] || null;
+}
+
+// Busca un punto dentro de la referencia del modelo (comparando sin acentos
+// ni mayúsculas, y exigiendo el mismo modo de medición).
+function _refPunto(modelo, punto, modo) {
+  const ref = _getRef(modelo);
+  if (!ref || !punto) return null;
+  return (ref.puntos || []).find(p =>
+    normalizeText(p.punto) === normalizeText(punto) && (!modo || p.modo === modo)) || null;
+}
+
+async function loadReferencias() {
+  try {
+    const snap = await db.collection('placas_ref').get();
+    REFS = {};
+    snap.docs.forEach(d => { REFS[d.id] = { id: d.id, ...d.data() }; });
+  } catch (e) {
+    console.warn('[placas] referencias:', e);
+  }
+}
+
+async function _guardarRef(ref) {
+  const slug = _refSlug(ref.modelo);
+  const data = { ...ref, updatedAt: new Date().toISOString() };
+  delete data.id;
+  await db.collection('placas_ref').doc(slug).set(data, { merge: true });
+  REFS[slug] = { id: slug, ...data };
+}
+
+// ── Parseo de medidas ─────────────────────────────────────
+// Devuelve { min, max, sufijo } o null. Acepta "3,9 V", "1.8v", "0,38",
+// "3,6 – 4,2 V", "11 kΩ". El sufijo se guarda tal cual (normalizado) porque
+// NO intento adivinar escalas: "mV" y "MΩ" se escriben parecido y confundir
+// mili con mega sería peor que no comparar nada.
+function _parseMedida(txt) {
+  const s = String(txt ?? '').trim().replace(/,/g, '.');
+  if (!s) return null;
+  const nums = s.match(/-?\d+(\.\d+)?/g);
+  if (!nums || !nums.length) return null;
+
+  const sufijo = s
+    .replace(/-?\d+(\.\d+)?/g, ' ')
+    .replace(/[–—\-~≈<>±.]/g, ' ')
+    .replace(/\b(a|entre)\b/gi, ' ')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+
+  const vals = nums.map(Number);
+  return { min: Math.min(...vals), max: Math.max(...vals), sufijo };
+}
+
+// Cuánto se puede desviar antes de considerarlo fuera de rango, por modo.
+// Los que no están acá no se evalúan solos (continuidad y señal son
+// cualitativos; el consumo depende de en qué momento del boot mediste).
+const PL_TOLERANCIA = { dcv: 0.08, diodo: 0.15, ohm: 0.20 };
+
+// Compara lo medido contra la referencia. Devuelve el id de resultado
+// sugerido, o null si no hay con qué comparar (ahí decidís vos).
+function _evaluarMedicion(medido, refValor, modo) {
+  const tol = PL_TOLERANCIA[modo];
+  if (tol === undefined) return null;
+
+  const m = _parseMedida(medido);
+  const r = _parseMedida(refValor);
+  if (!m || !r) return null;
+  // Unidades distintas: no arriesgo. "5 V" contra "5 mV" no es lo mismo.
+  if (m.sufijo !== r.sufijo) return null;
+
+  const val = m.min;
+  const ref = (r.min + r.max) / 2;
+
+  // Prácticamente en cero cuando debería haber algo
+  if (Math.abs(ref) > 0.05 && Math.abs(val) <= Math.abs(ref) * 0.05) {
+    return modo === 'diodo' ? 'corto' : 'cero';
+  }
+  if (val < r.min * (1 - tol)) return 'bajo';
+  if (val > r.max * (1 + tol)) return 'alto';
+  return 'ok';
+}
+
+// Aplica la evaluación automática a una fila sin re-renderizar todo
+// (si re-renderizo mientras escribe, se le va el foco del input).
+function _autoEvaluar(m) {
+  if (!m || m.autoOff) return;                 // el usuario lo puso a mano
+  const rp = _refPunto(_cur.modelo, m.punto, m.modo);
+  if (!rp) return;
+  const res = _evaluarMedicion(m.medido, rp.valor, m.modo);
+  if (res === null || res === m.resultado) return;
+
+  m.resultado = res;
+  m.auto = true;
+
+  const fila = document.querySelector(`[data-med="${m.id}"]`);
+  if (!fila) return;
+  fila.className = `pl-med pl-med--${res}`;
+  const sel = fila.querySelector('.pl-med-res');
+  if (sel) sel.value = res;
+  const badge = fila.querySelector('.pl-med-auto');
+  if (badge) badge.classList.remove('hidden');
+}
+
+// ── Guardar las mediciones de un caso como referencia ─────
+async function guardarComoReferencia() {
+  if (!_cur?.modelo) return toast('Poné el modelo primero', 'error');
+
+  const buenas = (_cur.mediciones || []).filter(m => m.punto && m.medido && m.resultado === 'ok');
+  if (!buenas.length) {
+    return toast('No hay mediciones marcadas OK para guardar', 'error');
+  }
+
+  const ref  = _getRef(_cur.modelo);
+  const prev = ref ? [...(ref.puntos || [])] : [];
+
+  let nuevos = 0, pisados = 0;
+  buenas.forEach(m => {
+    const i = prev.findIndex(p =>
+      normalizeText(p.punto) === normalizeText(m.punto) && p.modo === m.modo);
+    const punto = {
+      id: i >= 0 ? prev[i].id : _uid(),
+      punto: m.punto, modo: m.modo, valor: m.medido,
+      nota: m.nota || '', ts: new Date().toISOString(),
+    };
+    if (i >= 0) { prev[i] = punto; pisados++; }
+    else        { prev.push(punto); nuevos++; }
+  });
+
+  if (pisados && !confirm(
+      `Vas a actualizar ${pisados} ${pisados === 1 ? 'valor que ya tenías' : 'valores que ya tenías'} ` +
+      `de ${_cur.modelo} y sumar ${nuevos}. ¿Seguimos?`)) return;
+
+  try {
+    await _guardarRef({
+      modelo: _cur.modelo,
+      puntos: prev,
+      fuente: _cur.nOrden ? `Orden N°${_cur.nOrden}` : (_getRef(_cur.modelo)?.fuente || ''),
+    });
+    toast(`Referencia de ${_cur.modelo}: ${nuevos} nuevos, ${pisados} actualizados`);
+    renderDetalle();
+  } catch (e) {
+    console.error('[placas] guardarRef:', e);
+    toast('No pude guardar la referencia', 'error');
+  }
+}
+
+// Tu valor medido en una placa buena le gana siempre al valor genérico
+// que trae la rutina del síntoma.
+function _esperadoPara(punto, modo, fallback) {
+  return _refPunto(_cur?.modelo, punto, modo)?.valor || fallback || '';
+}
+
+// Trae a la tabla de mediciones todos los puntos de la referencia
+function cargarPuntosDeReferencia() {
+  const ref = _getRef(_cur.modelo);
+  if (!ref || !(ref.puntos || []).length) return;
+  const meds = _cur.mediciones = _cur.mediciones || [];
+  let nuevos = 0, actualizados = 0;
+
+  ref.puntos.forEach(p => {
+    const ya = meds.find(m =>
+      normalizeText(m.punto) === normalizeText(p.punto) && m.modo === p.modo);
+    if (ya) {
+      // Ya estaba (vino de la rutina del síntoma): le pongo TU valor, que
+      // vale más que el de referencia general que trae la rutina.
+      if (ya.esperado !== p.valor) { ya.esperado = p.valor; actualizados++; }
+      if (ya.medido) _autoEvaluar(ya);
+    } else {
+      meds.push({
+        id: _uid(), punto: p.punto, modo: p.modo, esperado: p.valor,
+        medido: '', resultado: '', nota: p.nota || '',
+      });
+      nuevos++;
+    }
+  });
+
+  if (!nuevos && !actualizados) return toast('Ya estaba todo al día');
+  _touch();
+  renderDetalle();
+  toast(nuevos && actualizados ? `${nuevos} puntos nuevos y ${actualizados} valores actualizados`
+      : nuevos ? `Sumé ${nuevos} puntos de tu referencia`
+      : `Actualicé ${actualizados} valores con tu referencia`);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -648,7 +854,8 @@ function elegirSintoma(id) {
     const rutina = PL_RUTINAS[id] || [];
     if (rutina.length && rutina[0].punto) {
       _cur.mediciones = rutina.map(r => ({
-        id: _uid(), punto: r.punto, modo: r.modo, esperado: r.esperado,
+        id: _uid(), punto: r.punto, modo: r.modo,
+        esperado: _esperadoPara(r.punto, r.modo, r.esperado),
         medido: '', resultado: '', nota: r.nota,
       }));
     }
@@ -693,13 +900,18 @@ function _renderPaso2() {
 
   return `
   <div class="pl-pane">
-    <div class="pl-hint">Cada fila es una medición. Cargá qué esperabas y qué te dio: lo que anotes
-    hoy es lo que la app te va a sugerir la próxima vez que midas ese mismo punto en este modelo.</div>
+    <div class="pl-hint">Cada fila es una medición. Cargá qué te dio y, si tenés referencia de este
+    modelo, el resultado se marca solo.</div>
+
+    ${_renderBarraRef()}
 
     <div class="pl-med-actions">
       <button class="pl-btn pl-btn--pri" onclick="addMedicion()">＋ Medición</button>
       ${rutina.length && rutina[0].punto
         ? `<button class="pl-btn" onclick="cargarRutina()">🧭 Cargar rutina de "${esc(_sintoma(_cur.sintoma).label)}"</button>`
+        : ''}
+      ${(_getRef(_cur.modelo)?.puntos || []).length
+        ? `<button class="pl-btn" onclick="cargarPuntosDeReferencia()">📐 Cargar puntos de la referencia</button>`
         : ''}
       ${meds.length ? `<button class="pl-btn pl-btn--ghost" onclick="copiarMediciones()">📋 Copiar tabla</button>` : ''}
     </div>
@@ -717,31 +929,68 @@ function _renderPaso2() {
     </div>`}
 
     ${_renderResumenMediciones()}
+    ${_renderGuardarRef()}
     <datalist id="pl-puntos-list">${_puntosConocidos().map(p => `<option value="${esc(p)}">`).join('')}</datalist>
   </div>`;
 }
 
+// Estado de la referencia del modelo, arriba de la tabla
+function _renderBarraRef() {
+  if (!_cur.modelo) {
+    return `<div class="pl-refbar pl-refbar--off">📐 Poné el modelo en el paso 1 y te comparo
+      las mediciones contra tu placa de referencia.</div>`;
+  }
+  const ref = _getRef(_cur.modelo);
+  const n = (ref?.puntos || []).length;
+  if (!n) {
+    return `<div class="pl-refbar pl-refbar--off">
+      <div>📐 <b>No tenés referencia de ${esc(_cur.modelo)} todavía.</b>
+      Cuando te entre una placa sana de este modelo, medí las líneas principales y guardalas:
+      a partir de ahí te marco solo lo que esté fuera de rango.</div>
+      <button class="pl-link" onclick="abrirRefs('${_js(_cur.modelo)}')">Capturar referencia ahora →</button>
+    </div>`;
+  }
+  return `<div class="pl-refbar">
+    <div>📐 <b>Referencia de ${esc(_cur.modelo)}:</b> ${n} ${n === 1 ? 'punto medido' : 'puntos medidos'}
+    ${ref.fuente ? `· ${esc(ref.fuente)}` : ''}. Lo que cargues se compara solo.</div>
+    <button class="pl-link" onclick="abrirRefs('${_js(_cur.modelo)}')">Ver / editar →</button>
+  </div>`;
+}
+
+// Ofrecer guardar las mediciones OK como referencia del modelo
+function _renderGuardarRef() {
+  const ok = (_cur.mediciones || []).filter(m => m.punto && m.medido && m.resultado === 'ok').length;
+  if (!ok || !_cur.modelo) return '';
+  return `<div class="pl-refsave">
+    <div>Tenés ${ok} ${ok === 1 ? 'medición marcada OK' : 'mediciones marcadas OK'}.
+    Si esta placa está sana, guardalas como referencia de ${esc(_cur.modelo)} y te sirven para siempre.</div>
+    <button class="pl-btn" onclick="guardarComoReferencia()">📐 Guardar como referencia del modelo</button>
+  </div>`;
+}
+
 function _renderMedicion(m, i) {
-  const r = _resultado(m.resultado);
+  const rp  = _refPunto(_cur.modelo, m.punto, m.modo);
+  const auto = m.auto && !m.autoOff;
   return `
-  <div class="pl-med pl-med--${m.resultado || 'none'}">
+  <div class="pl-med pl-med--${m.resultado || 'none'}" data-med="${esc(m.id)}">
     <div class="pl-med-hdr">
       <span class="pl-med-idx">${i + 1}</span>
       <input class="pl-med-punto" list="pl-puntos-list" value="${esc(m.punto)}"
              placeholder="Punto / línea (ej: PP_VCC_MAIN)"
              oninput="_setMed('${m.id}','punto', this.value)"
              onchange="_sugerirEsperado('${m.id}')">
+      <span class="pl-med-auto ${auto ? '' : 'hidden'}" title="Marcado solo, comparando contra tu referencia">auto</span>
       <button class="pl-med-del" onclick="delMedicion('${m.id}')" title="Borrar">✕</button>
     </div>
     <div class="pl-med-row">
       <label class="pl-mini">
         <span>Modo</span>
-        <select onchange="_setMed('${m.id}','modo', this.value)">
+        <select onchange="_setMed('${m.id}','modo', this.value); renderDetalle()">
           ${PL_MODOS.map(o => `<option value="${o.id}" ${m.modo === o.id ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}
         </select>
       </label>
       <label class="pl-mini">
-        <span>Esperado</span>
+        <span>Esperado${rp ? ' 📐' : ''}</span>
         <input value="${esc(m.esperado)}" placeholder="1,8 V" oninput="_setMed('${m.id}','esperado', this.value)">
       </label>
       <label class="pl-mini">
@@ -755,6 +1004,8 @@ function _renderMedicion(m, i) {
         </select>
       </label>
     </div>
+    ${rp ? `<div class="pl-med-ref">📐 Tu referencia: <b>${esc(rp.valor)}</b>
+      <span>(medido en placa buena el ${esc(_fechaLarga(rp.ts))})</span></div>` : ''}
     ${m.nota ? `<div class="pl-med-nota">💡 ${esc(m.nota)}</div>` : ''}
     <input class="pl-med-obs" value="${esc(m.obs || '')}" placeholder="Observación tuya…"
            oninput="_setMed('${m.id}','obs', this.value)">
@@ -825,7 +1076,11 @@ function cargarRutina() {
   const yaHay = new Set((_cur.mediciones || []).map(m => normalizeText(m.punto)));
   const nuevas = rutina
     .filter(r => r.punto && !yaHay.has(normalizeText(r.punto)))
-    .map(r => ({ id: _uid(), punto: r.punto, modo: r.modo, esperado: r.esperado, medido: '', resultado: '', nota: r.nota }));
+    .map(r => ({
+      id: _uid(), punto: r.punto, modo: r.modo,
+      esperado: _esperadoPara(r.punto, r.modo, r.esperado),
+      medido: '', resultado: '', nota: r.nota,
+    }));
   if (!nuevas.length) return toast('La rutina ya estaba cargada');
   _cur.mediciones = [...(_cur.mediciones || []), ...nuevas];
   _touch();
@@ -843,6 +1098,16 @@ function _setMed(id, campo, valor) {
   const m = (_cur.mediciones || []).find(x => x.id === id);
   if (!m) return;
   m[campo] = valor;
+
+  if (campo === 'resultado') {
+    // Lo eligió a mano: dejo de pisárselo con la comparación automática.
+    m.autoOff = true;
+    m.auto = false;
+  } else if (campo === 'medido' || campo === 'punto') {
+    // Si borró lo medido, vuelvo a dejar que el automático mande
+    if (campo === 'medido' && !String(valor).trim()) { m.autoOff = false; m.auto = false; }
+    _autoEvaluar(m);
+  }
   _touch();
 }
 
@@ -1259,6 +1524,223 @@ function renderKB() {
         <p>${resueltos.length ? 'Nada con ese filtro.' : 'Todavía no cerraste ningún caso con una causa cargada.'}</p>
       </div>`}
   `;
+}
+
+// ══════════════════════════════════════════════════════════
+//  GESTOR DE PLACAS DE REFERENCIA
+// ══════════════════════════════════════════════════════════
+
+let _refView = 'lista';   // 'lista' | 'editar'
+let _refEdit = null;      // { modelo, puntos: [], fuente }
+
+// Puntos que vale la pena medir en una placa sana: los de todas las rutinas,
+// sin repetir, priorizando los de alimentación.
+function _puntosSugeridos() {
+  const vistos = new Set();
+  const out = [];
+  Object.values(PL_RUTINAS).forEach(rutina => rutina.forEach(r => {
+    if (!r.punto) return;
+    if (!PL_TOLERANCIA[r.modo]) return;      // solo lo que se puede comparar
+    const k = normalizeText(r.punto) + '|' + r.modo;
+    if (vistos.has(k)) return;
+    vistos.add(k);
+    out.push({ punto: r.punto, modo: r.modo, nota: r.nota });
+  }));
+  return out;
+}
+
+function abrirRefs(modelo = '') {
+  if (modelo) {
+    const ref = _getRef(modelo);
+    _refEdit = ref
+      ? JSON.parse(JSON.stringify(ref))
+      : { modelo, puntos: [], fuente: '' };
+    _refView = 'editar';
+  } else {
+    _refView = 'lista';
+    _refEdit = null;
+  }
+  document.getElementById('pl-ref').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  renderRefs();
+}
+
+function closeRefs() {
+  document.getElementById('pl-ref').classList.add('hidden');
+  const detalleAbierto = !document.getElementById('pl-detail').classList.contains('hidden');
+  if (!detalleAbierto) document.body.style.overflow = '';
+  _refEdit = null;
+  // Si vengo de un caso abierto, refresco para que se apliquen las comparaciones
+  if (detalleAbierto) renderDetalle();
+}
+
+function renderRefs() {
+  document.getElementById('pl-ref-title').textContent =
+    _refView === 'editar' ? `📐 ${_refEdit.modelo || 'Nueva referencia'}` : '📐 Placas de referencia';
+  document.getElementById('pl-ref-body').innerHTML =
+    _refView === 'editar' ? _renderRefEditor() : _renderRefLista();
+}
+
+function _renderRefLista() {
+  const refs = Object.values(REFS).sort((a, b) => String(a.modelo).localeCompare(String(b.modelo)));
+  return `
+    <div class="pl-hint">Una placa de referencia es un modelo del que ya mediste las líneas
+    principales <b>con el equipo sano</b>. Guardalo una vez y desde ahí, en cada caso de ese modelo,
+    el sistema compara lo que medís y te marca solo lo que está fuera de rango.</div>
+
+    <div class="pl-hint pl-hint--sm">La forma barata de armarlas: cuando entra un equipo por pantalla
+    o por batería y la placa anda bien, antes de cerrarlo medís cuatro o cinco líneas y las guardás.
+    En un par de meses tenés la tabla de todos los modelos que más te entran.</div>
+
+    <div class="pl-med-actions">
+      <button class="pl-btn pl-btn--pri" onclick="nuevaRef()">＋ Capturar referencia</button>
+    </div>
+
+    ${refs.length ? refs.map(r => {
+      const n = (r.puntos || []).length;
+      return `
+      <div class="pl-kb-case" onclick="abrirRefs('${_js(r.modelo)}')">
+        <div class="pl-kb-case-hdr">
+          <b>${esc(r.modelo)}</b>
+          <span class="pl-chip pl-chip--ok">${n} ${n === 1 ? 'punto' : 'puntos'}</span>
+        </div>
+        ${r.fuente ? `<div class="pl-kb-case-sint">Tomada de: ${esc(r.fuente)}</div>` : ''}
+        <div class="pl-kb-case-foot">Actualizada el ${esc(_fechaLarga(r.updatedAt))}</div>
+      </div>`;
+    }).join('') : `
+      <div class="pl-empty-inline"><span>📐</span>
+        <p>Todavía no guardaste ninguna placa de referencia.</p>
+      </div>`}
+  `;
+}
+
+function nuevaRef() {
+  _refEdit = { modelo: '', puntos: [], fuente: '' };
+  _refView = 'editar';
+  renderRefs();
+}
+
+function _renderRefEditor() {
+  const puntos = _refEdit.puntos || [];
+  const sugeridos = _puntosSugeridos().filter(s =>
+    !puntos.some(p => normalizeText(p.punto) === normalizeText(s.punto) && p.modo === s.modo));
+
+  return `
+    <div class="pl-hint">Medí en una placa <b>que funcione</b> y anotá lo que te da el multímetro.
+    No hace falta que cargues todo de una: sumá los puntos a medida que los vayas midiendo.</div>
+
+    <div class="pl-grid2">
+      <label class="pl-field">
+        <span>Modelo</span>
+        <input list="pl-modelos-list" value="${esc(_refEdit.modelo)}" placeholder="iPhone 11 Pro"
+               oninput="_refEdit.modelo = this.value">
+      </label>
+      <label class="pl-field">
+        <span>De dónde la sacaste <em>(opcional)</em></span>
+        <input value="${esc(_refEdit.fuente)}" placeholder="Orden N°1234, equipo sano"
+               oninput="_refEdit.fuente = this.value">
+      </label>
+    </div>
+
+    <div class="pl-label">Puntos medidos</div>
+    ${puntos.length ? `<div class="pl-med-list">${puntos.map((p, i) => `
+      <div class="pl-med pl-med--ok">
+        <div class="pl-med-hdr">
+          <span class="pl-med-idx">${i + 1}</span>
+          <input class="pl-med-punto" list="pl-puntos-list" value="${esc(p.punto)}"
+                 placeholder="Punto / línea" oninput="_setRefPunto('${p.id}','punto', this.value)">
+          <button class="pl-med-del" onclick="delRefPunto('${p.id}')" title="Borrar">✕</button>
+        </div>
+        <div class="pl-med-row pl-med-row--ref">
+          <label class="pl-mini">
+            <span>Modo</span>
+            <select onchange="_setRefPunto('${p.id}','modo', this.value)">
+              ${PL_MODOS.map(o => `<option value="${o.id}" ${p.modo === o.id ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}
+            </select>
+          </label>
+          <label class="pl-mini">
+            <span>Valor en placa buena</span>
+            <input value="${esc(p.valor)}" placeholder="3,9 V"
+                   oninput="_setRefPunto('${p.id}','valor', this.value)">
+          </label>
+        </div>
+        <input class="pl-med-obs" value="${esc(p.nota || '')}" placeholder="Nota…"
+               oninput="_setRefPunto('${p.id}','nota', this.value)">
+      </div>`).join('')}</div>` : `
+      <div class="pl-empty-inline"><span>📐</span><p>Sin puntos todavía.</p></div>`}
+
+    <div class="pl-med-actions">
+      <button class="pl-btn" onclick="addRefPunto()">＋ Punto en blanco</button>
+    </div>
+
+    ${sugeridos.length ? `
+    <div class="pl-label">Sugeridos</div>
+    <div class="pl-hint pl-hint--sm">Tocá uno para sumarlo a la lista y cargarle el valor que midas.</div>
+    <div class="pl-chips">
+      ${sugeridos.slice(0, 18).map(s =>
+        `<button class="pl-tag" onclick="addRefPunto('${_js(s.punto)}','${_js(s.modo)}','${_js(s.nota || '')}')">
+          + ${esc(s.punto)} <small>(${esc(_modoLbl(s.modo).split(' ')[0])})</small>
+        </button>`).join('')}
+    </div>` : ''}
+
+    <div class="pl-final-actions">
+      <button class="pl-btn pl-btn--pri" onclick="saveRef()">Guardar referencia</button>
+      <button class="pl-btn pl-btn--ghost" onclick="_refView='lista'; _refEdit=null; renderRefs()">Volver a la lista</button>
+      ${_getRef(_refEdit.modelo) ? `<button class="pl-btn pl-btn--danger" onclick="delRef()">🗑️ Borrar esta referencia</button>` : ''}
+    </div>
+  `;
+}
+
+function addRefPunto(punto = '', modo = 'dcv', nota = '') {
+  _refEdit.puntos = _refEdit.puntos || [];
+  _refEdit.puntos.push({ id: _uid(), punto, modo, valor: '', nota, ts: new Date().toISOString() });
+  renderRefs();
+  if (!punto) {
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('#pl-ref-body .pl-med-punto');
+      inputs[inputs.length - 1]?.focus();
+    }, 50);
+  }
+}
+
+function _setRefPunto(id, campo, valor) {
+  const p = (_refEdit.puntos || []).find(x => x.id === id);
+  if (!p) return;
+  p[campo] = valor;
+  if (campo === 'valor') p.ts = new Date().toISOString();
+}
+
+function delRefPunto(id) {
+  _refEdit.puntos = (_refEdit.puntos || []).filter(p => p.id !== id);
+  renderRefs();
+}
+
+async function saveRef() {
+  if (!_refEdit.modelo?.trim()) return toast('Falta el modelo', 'error');
+  const conValor = (_refEdit.puntos || []).filter(p => p.punto?.trim() && p.valor?.trim());
+  if (!conValor.length) return toast('Cargá al menos un punto con su valor', 'error');
+  try {
+    await _guardarRef({ ..._refEdit, modelo: _refEdit.modelo.trim(), puntos: conValor });
+    toast(`Referencia de ${_refEdit.modelo.trim()} guardada`);
+    _refView = 'lista'; _refEdit = null;
+    renderRefs();
+  } catch (e) {
+    console.error('[placas] saveRef:', e);
+    toast('No pude guardar', 'error');
+  }
+}
+
+async function delRef() {
+  const modelo = _refEdit.modelo;
+  if (!confirm(`¿Borrar la referencia de ${modelo}? Perdés todos los valores medidos.`)) return;
+  try {
+    const slug = _refSlug(modelo);
+    await db.collection('placas_ref').doc(slug).delete();
+    delete REFS[slug];
+    toast('Referencia borrada');
+    _refView = 'lista'; _refEdit = null;
+    renderRefs();
+  } catch (e) { toast('No pude borrarla', 'error'); }
 }
 
 // ══════════════════════════════════════════════════════════

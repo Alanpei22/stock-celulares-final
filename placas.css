@@ -311,6 +311,47 @@
   .pl-med-row { grid-template-columns: 1fr 1fr; }
 }
 
+/* ── Placa de referencia ───────────────────────────────── */
+.pl-refbar {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 12px; padding: 11px 13px;
+  font-size: .78rem; line-height: 1.5; color: var(--text);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.pl-refbar--off {
+  background: var(--bg1); border: 1px dashed var(--border); color: var(--text2);
+}
+.pl-refbar .pl-link { padding: 0; }
+
+.pl-refsave {
+  background: rgba(4,120,87,.07);
+  border: 1px solid rgba(4,120,87,.25);
+  border-radius: 12px; padding: 12px 13px;
+  display: flex; flex-direction: column; gap: 9px;
+  font-size: .78rem; line-height: 1.5; color: var(--text);
+}
+.pl-refsave .pl-btn { align-self: flex-start; }
+
+.pl-med-ref {
+  font-size: .72rem; color: var(--text2);
+  background: var(--accent-soft); border-radius: 8px;
+  padding: 5px 9px;
+}
+.pl-med-ref b { color: var(--text); }
+.pl-med-ref span { color: var(--text3); }
+
+.pl-med-auto {
+  font-size: .58rem; font-weight: 800; letter-spacing: .06em;
+  text-transform: uppercase; flex-shrink: 0;
+  background: var(--accent); color: #fff;
+  border-radius: 5px; padding: 3px 5px;
+}
+
+.pl-med-row--ref { grid-template-columns: 1fr 1.4fr; }
+
+.pl-tag small { font-weight: 500; opacity: .65; }
+
 /* ── Resumen de mediciones ─────────────────────────────── */
 .pl-resumen {
   border-radius: 14px; padding: 13px 14px;
@@ -395,10 +436,13 @@
   border-top: 1px solid var(--border); padding-top: 16px;
 }
 
-/* ── Base de conocimiento ──────────────────────────────── */
-#pl-kb-body { padding: 18px 16px 40px; }
-#pl-kb-body > * { max-width: 760px; margin-left: auto; margin-right: auto; }
-#pl-kb-body > .pl-label, #pl-kb-body > .pl-hint { margin-bottom: 12px; }
+/* ── Base de conocimiento y referencias ────────────────── */
+#pl-kb-body, #pl-ref-body { padding: 18px 16px 40px; }
+#pl-kb-body > *, #pl-ref-body > * { max-width: 760px; margin-left: auto; margin-right: auto; }
+#pl-kb-body > .pl-label, #pl-kb-body > .pl-hint,
+#pl-ref-body > .pl-label, #pl-ref-body > .pl-hint,
+#pl-ref-body > .pl-grid2, #pl-ref-body > .pl-med-actions,
+#pl-ref-body > .pl-chips, #pl-ref-body > .pl-med-list { margin-bottom: 12px; }
 
 .pl-kb-top { display: flex; flex-direction: column; gap: 9px; margin-bottom: 18px; }
 .pl-kb-bar-lbl {

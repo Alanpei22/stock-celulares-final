@@ -32,12 +32,14 @@
         <h1>🔬 Diagnóstico de placa</h1>
       </div>
       <div class="hdr-actions">
+        <button class="hdr-btn" onclick="abrirRefs()" title="Placas de referencia">📐</button>
         <button class="hdr-btn" onclick="abrirKB()" title="Base de conocimiento">🧠</button>
         <button class="hdr-btn" id="pl-add-btn" onclick="nuevoCaso()" title="Nuevo caso">＋</button>
         <div class="hdr-menu-wrap">
           <button class="hdr-btn hdr-menu-btn" onclick="togglePlacasMenu()" title="Opciones">⋮</button>
           <div id="pl-menu" class="hdr-dropdown hidden">
             <button class="hdr-drop-item" onclick="toggleDarkMode();togglePlacasMenu()">🌙 Modo oscuro/claro</button>
+            <button class="hdr-drop-item" onclick="abrirRefs();togglePlacasMenu()">📐 Placas de referencia</button>
             <button class="hdr-drop-item" onclick="abrirKB();togglePlacasMenu()">🧠 Base de conocimiento</button>
             <button class="hdr-drop-item" onclick="exportarTodo()">⬇️ Exportar todo (.txt)</button>
           </div>
@@ -102,6 +104,15 @@
     <div class="pl-detail-title">🧠 Base de conocimiento</div>
   </div>
   <div class="pl-detail-body" id="pl-kb-body"></div>
+</div>
+
+<!-- ═══════════ PLACAS DE REFERENCIA ═══════════ -->
+<div id="pl-ref" class="pl-detail hidden">
+  <div class="pl-detail-hdr">
+    <button class="pl-detail-close" onclick="closeRefs()">←</button>
+    <div class="pl-detail-title" id="pl-ref-title">📐 Placas de referencia</div>
+  </div>
+  <div class="pl-detail-body" id="pl-ref-body"></div>
 </div>
 
 <!-- ═══════════ VISOR DE FOTO ═══════════ -->
