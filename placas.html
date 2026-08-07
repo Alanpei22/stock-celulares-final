@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TechPoint">
+  <meta name="theme-color" content="#F8F8F8">
+  <title>Diagnóstico de placa — TechPoint</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="placas.css">
+</head>
+<body>
+
+<!-- Auth guard — el login real está en login.html -->
+<div id="login-screen" style="display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;min-height:100dvh;background:#F8F8F8">
+  <img src="icon-192.png" alt="TechPoint" style="width:76px;height:76px;border-radius:20px">
+  <span style="font-size:15px;font-weight:700;color:#5C5C5C;letter-spacing:.02em">TechPoint</span>
+</div>
+
+<div id="app" class="app-hidden">
+
+  <header>
+    <div class="hdr-top">
+      <div class="hdr-brand">
+        <button class="hdr-btn hdr-back-btn" onclick="window.location.href='index.html?section=repairs'" title="Volver">←</button>
+        <h1>🔬 Diagnóstico de placa</h1>
+      </div>
+      <div class="hdr-actions">
+        <button class="hdr-btn" onclick="abrirKB()" title="Base de conocimiento">🧠</button>
+        <button class="hdr-btn" id="pl-add-btn" onclick="nuevoCaso()" title="Nuevo caso">＋</button>
+        <div class="hdr-menu-wrap">
+          <button class="hdr-btn hdr-menu-btn" onclick="togglePlacasMenu()" title="Opciones">⋮</button>
+          <div id="pl-menu" class="hdr-dropdown hidden">
+            <button class="hdr-drop-item" onclick="toggleDarkMode();togglePlacasMenu()">🌙 Modo oscuro/claro</button>
+            <button class="hdr-drop-item" onclick="abrirKB();togglePlacasMenu()">🧠 Base de conocimiento</button>
+            <button class="hdr-drop-item" onclick="exportarTodo()">⬇️ Exportar todo (.txt)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input id="pl-search" type="search" placeholder="Buscar modelo, síntoma, causa, orden…"
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+
+    <div class="filters">
+      <select class="pill" id="pl-f-estado"></select>
+      <select class="pill" id="pl-f-modelo"></select>
+      <select class="pill" id="pl-f-sintoma"></select>
+    </div>
+  </header>
+
+  <!-- Resumen -->
+  <div class="pl-stats">
+    <div class="pl-stat"><span class="pl-stat-num" id="pl-st-diag">0</span><span class="pl-stat-lbl">🔬 En diagnóstico</span></div>
+    <div class="pl-stat"><span class="pl-stat-num" id="pl-st-espera">0</span><span class="pl-stat-lbl">⏳ Esperando</span></div>
+    <div class="pl-stat"><span class="pl-stat-num" id="pl-st-ok">0</span><span class="pl-stat-lbl">✅ Reparadas</span></div>
+    <div class="pl-stat"><span class="pl-stat-num" id="pl-st-exito">—</span><span class="pl-stat-lbl">🎯 Efectividad</span></div>
+  </div>
+
+  <div id="pl-list" class="pl-list"></div>
+
+  <div class="empty-state" id="pl-empty" style="display:none">
+    <span class="empty-ico">🔬</span>
+    <p class="empty-txt" id="pl-empty-txt">Todavía no cargaste ninguna placa</p>
+    <button class="btn-primary" onclick="nuevoCaso()">Cargar la primera</button>
+  </div>
+
+  <button class="pl-fab" onclick="nuevoCaso()" title="Nuevo caso">＋</button>
+</div>
+
+<!-- ═══════════ DETALLE DEL CASO ═══════════ -->
+<div id="pl-detail" class="pl-detail hidden">
+  <div class="pl-detail-hdr">
+    <button class="pl-detail-close" onclick="closeDetalle()">←</button>
+    <div class="pl-detail-title" id="pl-detail-title"></div>
+    <span class="pl-save-state pl-save--ok" id="pl-save-state">Guardado ✓</span>
+  </div>
+
+  <div class="pl-stepper" id="pl-stepper"></div>
+
+  <div class="pl-detail-body" id="pl-detail-body"></div>
+
+  <div class="pl-detail-nav">
+    <button class="pl-btn pl-btn--ghost" id="pl-nav-prev" onclick="irAPaso(_stepActual()-1)">← Atrás</button>
+    <button class="pl-btn pl-btn--pri" id="pl-nav-next" onclick="irAPaso(_stepActual()+1)">Siguiente →</button>
+  </div>
+</div>
+
+<!-- ═══════════ BASE DE CONOCIMIENTO ═══════════ -->
+<div id="pl-kb" class="pl-detail hidden">
+  <div class="pl-detail-hdr">
+    <button class="pl-detail-close" onclick="closeKB()">←</button>
+    <div class="pl-detail-title">🧠 Base de conocimiento</div>
+  </div>
+  <div class="pl-detail-body" id="pl-kb-body"></div>
+</div>
+
+<!-- ═══════════ VISOR DE FOTO ═══════════ -->
+<div id="pl-lightbox" class="pl-lightbox hidden" onclick="cerrarFoto()">
+  <img id="pl-lightbox-img" src="" alt="">
+</div>
+
+<datalist id="pl-modelos-list"></datalist>
+
+<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script defer src="utils.js"></script>
+<script defer src="firebase-config.js"></script>
+<script defer src="auth.js"></script>
+<script defer src="placas.js"></script>
+<script>
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
+</script>
+</body>
+</html>

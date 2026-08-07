@@ -595,6 +595,7 @@ function toggleRepMenu() {
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
     { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
     { divider: true },
+    { icon: '🔬', label: 'Diagnóstico de placa', sub: 'Mediciones, pasos y base de conocimiento', onClick: () => location.href = 'placas.html' },
     { icon: '👥', label: 'Personal técnico', onClick: () => (typeof openPersonalModal === 'function') && openPersonalModal() },
     { icon: '📊', label: 'Estadísticas', onClick: () => document.getElementById('rep-stats-btn')?.click() },
     { icon: '📋', label: 'Actividad reciente', onClick: () => (typeof openActivityFeed === 'function') && openActivityFeed() },
