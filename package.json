@@ -4,7 +4,7 @@
   "description": "POS para taller de celulares — Vercel Functions para Web Push",
   "private": true,
   "scripts": {
-    "test": "echo \"No tests\" && exit 0"
+    "test": "node tests/run.js"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0",

@@ -1,0 +1,7 @@
+# Cosas que NO se suben a producción.
+# Vercel sirve la carpeta como sitio estático: sin esto, /tests/test-caja.js
+# quedaría accesible desde internet. No hay secretos adentro, pero no tiene
+# por qué estar publicado.
+
+tests/
+tools/
