@@ -1,4 +1,8 @@
-# Prompt para arrancar desde otro dispositivo
+# Prompt para arrancar un chat nuevo
+
+Sirve para empezar de cero en cualquier lado: la PC, la tablet o claude.ai/code.
+Conviene arrancar chat nuevo por cada tarea grande: el chat largo se vuelve caro
+porque todo lo hablado se relee en cada paso.
 
 Copiá y pegá esto como primer mensaje. Si ya estás dentro del repo, alcanza con:
 **"Leé `tools/prompt-tablet.md` y seguimos."**
@@ -51,12 +55,21 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - `webpush.js` + `api/send-push.js` — avisos a todos los dispositivos
 - `api/` — funciones serverless de Vercel (push, crons, bot de Telegram)
 
+## Lo último que se hizo (2026-08-10)
+
+La ventana de venta de la caja se rehizo para vender varias cosas: cada producto
+en dos filas con su subtotal, total y botón de cobrar fijos abajo, precio
+editable por línea, y no deja cobrar si a algo le falta el precio. Falta que la
+use en el mostrador y diga si algo molesta.
+
 ## Pendientes
 
 **Para mí (no los podés hacer vos):**
 - Deployar `firestore.rules` (cierra el listado de la colección pública del QR).
   Se puede desde la consola de Firebase en el navegador.
-- Mirar el uso de Firebase y pasar cuántos documentos tiene cada colección.
+- Mirar el uso de Firebase después del arreglo de cupo y pasar cuántos
+  documentos tiene cada colección (con la app abierta, F12 → Console):
+  `console.table({stock:STOCK.length, reparaciones:REPAIRS.length})`
 
 **Para charlar:**
 - El listener de `stock` todavía trae todos los equipos, incluidos los vendidos
