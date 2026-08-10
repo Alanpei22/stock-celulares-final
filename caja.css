@@ -474,6 +474,37 @@ body.dark .cqb-chevron { background: #D4A76A; color: #1a1a1a; }
  -webkit-overflow-scrolling: touch;
  box-shadow: 0 -8px 40px rgba(0,0,0,.12); max-width: 480px; margin: 0 auto;
 }
+
+/* ══ Ventana de venta: cuerpo con scroll + barra fija abajo ══
+   El total y el botón de cobrar tienen que verse siempre, cargues 2 productos
+   o 15. Antes había que scrollear hasta el fondo para poder confirmar. */
+#mov-modal {
+ display: flex; flex-direction: column;
+ padding-bottom: 0; overflow: hidden;   /* el scroll pasa a .mov-body */
+}
+#mov-modal .mov-body {
+ flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch;
+ margin: 0 -1.25rem; padding: 0 1.25rem;
+}
+#mov-modal .mov-footer {
+ flex: none; background: var(--card, #FFFFFF);
+ border-top: 1px solid var(--border, #E3E1DE);
+ margin: 0 -1.25rem; padding: 10px 1.25rem calc(14px + env(safe-area-inset-bottom, 0px));
+ box-shadow: 0 -6px 20px rgba(0,0,0,.06);
+}
+.mov-footer-tot { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+.mov-footer-tot .mov-resumen-txt {
+ font-size: .76rem; color: var(--text2); font-weight: 600;
+ overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mov-footer-tot .mov-resumen-total { font-size: 1.55rem; font-weight: 800; letter-spacing: -.02em; color: var(--text); flex: none; }
+.mov-footer-btns { display: flex; gap: 9px; }
+.mov-footer-btns .btn-secondary { flex: 0 0 34%; }
+.mov-footer-btns .btn-primary { flex: 1; }
+/* Con el teclado abierto la barra estorba: se esconde mientras se escribe */
+#mov-modal.mov-tecleando .mov-footer { display: none; }
+/* Botón bloqueado cuando falta un precio */
+.btn-primary.btn-bloqueado { opacity: .55; cursor: not-allowed; }
 .tipo-toggle { display: flex; gap: 8px; margin: .75rem 0; }
 .tipo-btn {
  flex: 1; padding: .6rem; border: 2px solid var(--border, #E3E1DE); border-radius: 14px;

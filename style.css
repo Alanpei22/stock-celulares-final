@@ -4857,6 +4857,39 @@ body.dark {
 .rep-card .tp-steps { margin: 8px 0 0; }
 .rep-card .tp-chip { font-size: .62rem; }
 
+/* ══ Línea del carrito en dos filas ══
+   Arriba el nombre a todo el ancho (antes le quedaban 124px y se cortaba);
+   abajo la cantidad y el subtotal, que es lo que se controla de un vistazo
+   cuando la venta tiene varias cosas. */
+.cart-line-main { flex: 1; min-width: 0; }
+.cart-line-top { display: flex; align-items: flex-start; gap: 8px; }
+.cart-line-top .sale-item-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; -webkit-line-clamp: 2; }
+.cart-line-bot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+/* El precio es un botón: tocarlo lo vuelve editable (hacer precio por línea) */
+.cart-line-precio {
+ display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15;
+ background: none; border: none; padding: 2px 0 2px 6px; cursor: pointer; text-align: right;
+ border-radius: 8px;
+}
+.cart-line-precio:active { background: var(--bg2); }
+.cart-line-precio small { font-size: .68rem; color: var(--text3); }
+.cart-line-precio b { font-size: .95rem; font-weight: 800; color: var(--text); }
+/* Falta el precio: la línea avisa y no deja cobrar hasta completarlo */
+.cart-line--sinprecio { border-color: var(--red); background: rgba(239,68,68,.06); }
+.cart-precio-edit { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 auto; }
+.cart-precio-edit .cart-price-input {
+ flex: 0 1 118px; min-width: 0; margin-top: 0; padding: 7px 9px;
+ font-size: .85rem; text-align: right;
+}
+.cart-precio-lbl { font-size: .68rem; color: var(--text3); flex: none; }
+.sale-item-warn--precio { color: var(--red); font-weight: 700; }
+
+/* Métodos de pago: los tres de siempre a la vista, el resto atrás de "Otros" */
+.metodos-group .metodo-otro { display: none; }
+.metodos-group.metodos-open .metodo-otro { display: inline-flex; }
+.metodo-btn.metodo-mas { border-style: dashed; color: var(--text2); }
+.metodo-btn.metodo-mas.hidden { display: none; }
+
 /* ── Carrito de venta (varios productos) ── */
 .cart-box { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .cart-line {

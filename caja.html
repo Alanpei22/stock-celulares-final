@@ -425,6 +425,9 @@
     <button class="mov-close-btn" onclick="closeMovForm()">✕</button>
   </div>
 
+  <!-- Cuerpo con scroll: el total y el botón de cobrar quedan fijos abajo -->
+  <div class="mov-body" id="mov-body">
+
   <!-- ░░ PASO 1 — Qué ░░ -->
   <div class="mov-step">
     <div class="mov-step-hdr">
@@ -439,16 +442,16 @@
       <!-- Item seleccionado (cantidad + stock) -->
       <div id="mov-sale-item-info" class="mov-sale-item-info hidden"></div>
     </div>
-    <!-- Categorías -->
-    <div class="fg" style="margin-top:.6rem">
+    <!-- Categorías — se ocultan cuando hay productos cargados (se deduce sola) -->
+    <div class="fg" style="margin-top:.6rem" id="mov-cat-wrap">
       <label class="fl">Categoría</label>
       <div id="mov-categorias" class="chip-group"></div>
-      <input type="hidden" id="mov-hidden-cat">
     </div>
+    <input type="hidden" id="mov-hidden-cat">
   </div>
 
-  <!-- ░░ PASO 2 — Cuánto ░░ -->
-  <div class="mov-step">
+  <!-- ░░ PASO 2 — Cuánto ░░ (solo cuando NO hay carrito: el total lo manda la lista) -->
+  <div class="mov-step" id="mov-step-monto">
     <div class="mov-step-hdr">
       <span class="mov-step-num">2</span>
       <span class="mov-step-lbl">¿Cuánto?</span>
@@ -481,9 +484,11 @@
       <button class="metodo-btn" data-m="Efectivo" onclick="selectMetodo('Efectivo')">💵 Efectivo</button>
       <button class="metodo-btn" data-m="Transferencia" onclick="selectMetodo('Transferencia')">🏦 Transferencia</button>
       <button class="metodo-btn" data-m="MercadoPago" onclick="selectMetodo('MercadoPago')"><img src="mp-logo.png" class="mp-logo-ico" alt=""> MercadoPago</button>
-      <button class="metodo-btn" data-m="Tarjeta débito" onclick="selectMetodo('Tarjeta débito')">💳 Débito</button>
-      <button class="metodo-btn" data-m="Tarjeta crédito" onclick="selectMetodo('Tarjeta crédito')">💳 Crédito</button>
-      <button class="metodo-btn" data-m="Dólares" onclick="selectMetodo('Dólares')">💲 Dólares</button>
+      <!-- Los tres de abajo son los ocasionales: se despliegan con "Otros" -->
+      <button class="metodo-btn metodo-otro" data-m="Tarjeta débito" onclick="selectMetodo('Tarjeta débito')">💳 Débito</button>
+      <button class="metodo-btn metodo-otro" data-m="Tarjeta crédito" onclick="selectMetodo('Tarjeta crédito')">💳 Crédito</button>
+      <button class="metodo-btn metodo-otro" data-m="Dólares" onclick="selectMetodo('Dólares')">💲 Dólares</button>
+      <button class="metodo-btn metodo-mas" id="btn-metodos-mas" onclick="toggleMetodosOtros()">＋ Otros</button>
     </div>
     <!-- Split section -->
     <div id="split-section" class="split-section hidden">
@@ -555,19 +560,23 @@
     </div>
   </div>
 
-  <!-- Resumen en vivo -->
-  <div class="mov-resumen-bar" id="mov-resumen-bar">
-    <span class="mov-resumen-txt" id="mov-resumen-txt">Completá la venta</span>
-    <span class="mov-resumen-total" id="mov-resumen-total">$0</span>
-  </div>
-
-  <!-- Actions -->
   <div id="mov-delete-wrap" style="display:none;margin-top:4px">
     <button class="btn-danger" onclick="deleteMov()">🗑 Eliminar</button>
   </div>
-  <div style="display:flex;gap:10px;margin-top:12px">
-    <button class="btn-secondary" onclick="closeMovForm()" style="flex:1">Cancelar</button>
-    <button class="btn-primary" id="mov-save-btn" onclick="saveMov()" style="flex:2">✅ Confirmar venta</button>
+
+  </div><!-- /mov-body -->
+
+  <!-- Barra fija: el total y el botón de cobrar se ven siempre, aunque la
+       lista de productos sea larga -->
+  <div class="mov-footer" id="mov-footer">
+    <div class="mov-footer-tot">
+      <span class="mov-resumen-txt" id="mov-resumen-txt">Completá la venta</span>
+      <b class="mov-resumen-total" id="mov-resumen-total">$0</b>
+    </div>
+    <div class="mov-footer-btns">
+      <button class="btn-secondary" onclick="closeMovForm()">Cancelar</button>
+      <button class="btn-primary" id="mov-save-btn" onclick="saveMov()">✅ Confirmar venta</button>
+    </div>
   </div>
 </div>
 

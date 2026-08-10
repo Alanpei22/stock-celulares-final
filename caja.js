@@ -1325,11 +1325,11 @@ function addQuickAmt(amt) {
 function _updateMovStepUI(tipo) {
   const s1  = document.getElementById('mov-step1-lbl');
   const s3  = document.getElementById('mov-step3-lbl');
-  const btn = document.getElementById('mov-save-btn');
   const esGasto = tipo === 'egreso';
   if (s1)  s1.textContent  = esGasto ? '¿Qué gasto?'      : '¿Qué vendés?';
   if (s3)  s3.textContent  = esGasto ? '¿Cómo pagaste?'   : '¿Cómo paga?';
-  if (btn) btn.textContent = esGasto ? '✅ Confirmar gasto' : '✅ Confirmar venta';
+  // El texto del botón lo maneja _actualizarBotonCobrar (dice el monto)
+  _updateMovResumen();
 }
 
 // ── Cobro didáctico: barra de resumen en vivo ──
@@ -1352,14 +1352,61 @@ function _updateMovResumen() {
   const metodo = document.getElementById('mov-hidden-metodo')?.value || '';
   const totEl  = document.getElementById('mov-resumen-total');
   const txtEl  = document.getElementById('mov-resumen-txt');
+  const hayCarrito = _cart.length > 0;
+
   if (totEl) totEl.textContent = monto > 0 ? fmt(monto) : '$0';
   if (txtEl) {
-    const partes = [];
-    if (desc)   partes.push(desc);
-    if (metodo) partes.push(metodo.toLowerCase());
-    txtEl.textContent = partes.length ? partes.join(' · ')
-                        : (tipo === 'egreso' ? 'Completá el gasto' : 'Completá la venta');
+    if (hayCarrito) {
+      // Con carrito, el renglón cuenta la venta en vez de repetir los nombres
+      const unidades = _cart.reduce((s, it) => s + (it.qty || 1), 0);
+      const partes = [`${unidades} ${unidades === 1 ? 'unidad' : 'unidades'} · ${_cart.length} ${_cart.length === 1 ? 'producto' : 'productos'}`];
+      if (_selectedRepairItem) partes.push('+ reparación');
+      if (metodo) partes.push(metodo.toLowerCase());
+      txtEl.textContent = partes.join(' · ');
+    } else {
+      const partes = [];
+      if (desc)   partes.push(desc);
+      if (metodo) partes.push(metodo.toLowerCase());
+      txtEl.textContent = partes.length ? partes.join(' · ')
+                          : (tipo === 'egreso' ? 'Completá el gasto' : 'Completá la venta');
+    }
   }
+
+  // Con productos cargados el monto sale de la lista: el teclado grande y los
+  // montos rápidos solo estorban (y descuadran el total contra las líneas).
+  const stepMonto = document.getElementById('mov-step-monto');
+  if (stepMonto) stepMonto.classList.toggle('hidden', hayCarrito);
+  // La categoría se deduce sola cuando hay productos
+  const catWrap = document.getElementById('mov-cat-wrap');
+  if (catWrap) catWrap.classList.toggle('hidden', hayCarrito && tipo === 'ingreso');
+
+  _actualizarBotonCobrar(monto, tipo);
+}
+
+// El botón de abajo dice el número y se bloquea si falta un precio.
+function _actualizarBotonCobrar(monto, tipo) {
+  const btn = document.getElementById('mov-save-btn');
+  if (!btn) return;
+  const falta = _cart.length > 0 && _cartSinPrecio();
+  btn.disabled = falta;
+  btn.classList.toggle('btn-bloqueado', falta);
+  if (falta) {
+    btn.textContent = '⚠️ Falta un precio';
+  } else if (tipo === 'egreso') {
+    btn.textContent = '✅ Confirmar gasto';
+  } else {
+    btn.textContent = monto > 0 ? `✅ Cobrar ${fmt(monto)}` : '✅ Confirmar venta';
+  }
+}
+
+// Métodos ocasionales (débito, crédito, dólares): se despliegan al pedirlos.
+function toggleMetodosOtros(forzar) {
+  const grupo = document.querySelector('.metodos-group');
+  if (!grupo) return;
+  const abrir = forzar !== undefined ? forzar : !grupo.classList.contains('metodos-open');
+  grupo.classList.toggle('metodos-open', abrir);
+  const btn = document.getElementById('btn-metodos-mas');
+  if (btn) btn.classList.toggle('hidden', abrir);
 }
 
 // ── Cliente opcional en venta (alimenta el CRM) ──
@@ -1547,6 +1594,10 @@ function selectMetodo(metodo) {
   document.querySelectorAll('.metodo-btn').forEach(btn => {
     btn.classList.toggle('metodo-active', btn.dataset.m === metodo);
   });
+  // Si el método elegido es uno de los ocasionales (por ejemplo al editar un
+  // movimiento viejo pagado con débito), se despliegan para que se vea cuál es.
+  const btnSel = document.querySelector(`.metodo-btn[data-m="${metodo}"]`);
+  if (btnSel && btnSel.classList.contains('metodo-otro')) toggleMetodosOtros(true);
   const hidden = document.getElementById('mov-hidden-metodo');
   if (hidden) hidden.value = metodo;
   updateSplitRemainder();
@@ -1733,6 +1784,24 @@ function _initMovDescAutocomplete() {
   input.setAttribute('autocomplete', 'off');
   // Primer contacto con el buscador → recién ahí se traen productos y equipos
   input.addEventListener('focus', _asegurarDatosVenta, { once: true });
+
+  // Con el teclado abierto, la barra fija de abajo queda tapada o estorba:
+  // se esconde mientras se escribe y vuelve al soltar el campo.
+  const modal = document.getElementById('mov-modal');
+  if (modal && !modal._tecladoBind) {
+    modal._tecladoBind = true;
+    modal.addEventListener('focusin', e => {
+      if (e.target.matches('input, textarea')) modal.classList.add('mov-tecleando');
+    });
+    modal.addEventListener('focusout', () => {
+      setTimeout(() => {
+        const a = document.activeElement;
+        if (!a || !modal.contains(a) || !a.matches('input, textarea')) {
+          modal.classList.remove('mov-tecleando');
+        }
+      }, 60);
+    });
+  }
   input.addEventListener('input', _onMovDescInput);
   input.addEventListener('focus', _onMovDescInput);
   // MED-10: 300ms en vez de 180ms para que el tap mobile registre antes de que se oculte
@@ -2074,20 +2143,22 @@ function _addFreeFromSearch() {
   // la reparación (pasaba al tocar Enter en el buscador).
   if (nombre === _repairDescAuto) return;
   _addToCart({ source: 'libre', id: null, nombre, precio: 0, costoUSD: 0, costoARS: 0, icon: '🏷️', stock: -1 });
-  // Enfocar el precio de la línea recién agregada
+  // Enfocar el precio de la línea recién agregada (el primero de la última
+  // línea: el segundo campo es el costo, opcional)
   setTimeout(() => {
-    const inputs = document.querySelectorAll('#mov-sale-item-info .cart-price-input');
-    inputs[inputs.length - 1]?.focus();
+    const lineas = document.querySelectorAll('#mov-sale-item-info .cart-line');
+    lineas[lineas.length - 1]?.querySelector('.cart-price-input')?.focus();
   }, 0);
 }
 
-// Setea el precio de un ítem libre sin re-renderizar (para no perder el foco mientras se tipea).
+// Precio por línea. Sirve tanto para un producto libre como para hacerle precio
+// a algo del inventario. Al confirmar (onchange) se re-dibuja para que la línea
+// muestre el subtotal nuevo.
 function _setCartPrice(i, val) {
   if (!_cart[i]) return;
   _cart[i].precio = Math.max(0, parseFloat(val) || 0);
-  const totalEl = document.querySelector('#mov-sale-item-info .cart-total-row b');
-  if (totalEl) totalEl.textContent = fmt(_cartTotal());
   _syncMontoFromCart();
+  _renderCart();
   _updateMovResumen();
 }
 
@@ -2161,51 +2232,88 @@ function _renderCart() {
 
   const repairLine = _selectedRepairItem ? _repairCartLineHtml() : '';
 
+  // Cada línea va en dos filas: arriba el nombre a todo el ancho, abajo la
+  // cantidad y el subtotal. Antes iba todo en una fila y al nombre le quedaban
+  // 124px en un celular, así que un modelo largo se cortaba.
   const lines = _cart.map((it, i) => {
     const isLibre  = it.source === 'libre';
     const isEquipo = it.source === 'equipo';
-    const sub = (Number(it.precio) || 0) * it.qty;
-    let metaHtml, extraHtml = '';
-    if (isLibre) {
-      metaHtml = `<span class="sale-item-meta">🏷️ Producto libre · se agrega al inventario</span>`;
-      extraHtml = `<div class="cart-libre-inputs">
-        <input type="number" class="cart-price-input" min="0" inputmode="numeric" value="${it.precio || ''}" placeholder="Precio venta $" oninput="_setCartPrice(${i}, this.value)">
-        <input type="number" class="cart-price-input cart-costo-input" min="0" inputmode="numeric" value="${it.costoARS || ''}" placeholder="Costo $ (opcional)" oninput="_setCartCosto(${i}, this.value)">
-      </div>`;
-    } else if (isEquipo) {
-      metaHtml = `<span class="sale-item-meta">📱 Equipo${it.extra ? ' · ' + esc(it.extra) : ''} · ${fmt(sub)}</span>`;
-    } else {
-      const stockBadgeCls = it.stock <= 0 ? 'sug-stock-zero'
-                          : it.stock <= 2 ? 'sug-stock-low'
-                          : 'sug-stock-ok';
-      metaHtml = `<span class="sale-item-meta">${it.source === 'producto' ? '📦 Accesorio' : '🔧 Repuesto'} · Stock: <b class="${stockBadgeCls}">${it.stock}</b> · ${fmt(sub)}</span>`;
-      if (it.stock <= 0) extraHtml = '<div class="sale-item-warn">⚠️ Sin stock — pedido especial</div>';
+    const precio = Number(it.precio) || 0;
+    const sub = precio * it.qty;
+    const sinPrecio = precio <= 0;
+
+    // Renglón chico de la izquierda: qué es y cuánto queda
+    let meta;
+    if (isLibre) meta = '🏷️ Producto libre';
+    else if (isEquipo) meta = '📱 Equipo' + (it.extra ? ' · ' + esc(it.extra) : '');
+    else {
+      const cls = it.stock <= 0 ? 'sug-stock-zero' : it.stock <= 2 ? 'sug-stock-low' : 'sug-stock-ok';
+      meta = `${it.source === 'producto' ? '📦 Accesorio' : '🔧 Repuesto'} · quedan <b class="${cls}">${it.stock}</b>`;
     }
+    // Con más de una unidad se aclara la cuenta: "2 × $5.000"
+    const detallePrecio = it.qty > 1 ? `${it.qty} × ${fmt(precio)}` : meta;
+
     return `
-      <div class="cart-line">
+      <div class="cart-line${sinPrecio ? ' cart-line--sinprecio' : ''}">
         <span class="cart-line-icon">${it.icon || '📦'}</span>
-        <div class="cart-line-text">
-          <span class="sale-item-name">${esc(it.nombre)}</span>
-          ${metaHtml}
+        <div class="cart-line-main">
+          <div class="cart-line-top">
+            <span class="sale-item-name">${esc(it.nombre)}</span>
+            <button class="sale-item-clear" onclick="_removeCartItem(${i})" type="button" title="Quitar">✕</button>
+          </div>
+          <div class="cart-line-bot">
+            <div class="sale-qty-controls">
+              <button type="button" class="qty-btn" onclick="_changeCartQty(${i},-1)">−</button>
+              <span class="cart-qty-val">${it.qty}</span>
+              <button type="button" class="qty-btn" onclick="_changeCartQty(${i},1)">+</button>
+            </div>
+            ${sinPrecio ? `
+              <div class="cart-precio-edit">
+                <input type="number" class="cart-price-input" min="0" inputmode="numeric"
+                       value="" placeholder="$ precio c/u" onchange="_setCartPrice(${i}, this.value)">
+              </div>`
+            : `
+              <button type="button" class="cart-line-precio" onclick="_editarPrecioLinea(${i})" title="Tocá para hacer precio">
+                <small>${detallePrecio}</small>
+                <b>${fmt(sub)}</b>
+              </button>`}
+          </div>
+          ${sinPrecio ? '<div class="sale-item-warn sale-item-warn--precio">⚠️ Falta el precio — no se puede cobrar así</div>' : ''}
+          ${it.stock <= 0 && !isLibre && !isEquipo ? '<div class="sale-item-warn">⚠️ Sin stock — pedido especial</div>' : ''}
+          ${isLibre ? `<div class="cart-libre-inputs">
+            <input type="number" class="cart-price-input cart-costo-input" min="0" inputmode="numeric"
+                   value="${it.costoARS || ''}" placeholder="Costo $ (opcional)" oninput="_setCartCosto(${i}, this.value)">
+          </div>` : ''}
         </div>
-        <div class="sale-qty-controls">
-          <button type="button" class="qty-btn" onclick="_changeCartQty(${i},-1)">−</button>
-          <span class="cart-qty-val">${it.qty}</span>
-          <button type="button" class="qty-btn" onclick="_changeCartQty(${i},1)">+</button>
-        </div>
-        <button class="sale-item-clear" onclick="_removeCartItem(${i})" type="button" title="Quitar">✕</button>
-        ${extraHtml}
       </div>`;
   }).join('');
 
-  const nItems = _cart.length + (_selectedRepairItem ? 1 : 0);
-  wrap.innerHTML = `
-    <div class="cart-box">
-      ${repairLine}
-      ${lines}
-      <div class="cart-total-row"><span>${nItems} ítem${nItems > 1 ? 's' : ''}</span><b>${fmt((Number(_repairAmt) || 0) + _cartTotal())}</b></div>
-    </div>`;
+  wrap.innerHTML = `<div class="cart-box">${repairLine}${lines}</div>`;
   wrap.classList.remove('hidden');
+}
+
+// Tocar el precio de una línea lo vuelve editable, para hacer precio sin tener
+// que tocar el total (que después no coincidía con la suma de las líneas).
+function _editarPrecioLinea(i) {
+  const it = _cart[i];
+  if (!it) return;
+  const linea = document.querySelectorAll('#mov-sale-item-info .cart-line')[i + (_selectedRepairItem ? 1 : 0)];
+  const cont = linea && linea.querySelector('.cart-line-bot');
+  if (!cont) return;
+  const btn = cont.querySelector('.cart-line-precio');
+  if (!btn) return;
+  btn.outerHTML = `<div class="cart-precio-edit">
+      <span class="cart-precio-lbl">Precio c/u</span>
+      <input type="number" class="cart-price-input" min="0" inputmode="numeric"
+             value="${Number(it.precio) || ''}" onchange="_setCartPrice(${i}, this.value)">
+    </div>`;
+  const input = cont.querySelector('.cart-price-input');
+  if (input) { input.focus(); input.select(); }
+}
+
+// ¿Hay algo en el carrito sin precio? Bloquea el cobro: si no, se vendía en $0.
+function _cartSinPrecio() {
+  return _cart.some(it => (Number(it.precio) || 0) <= 0);
 }
 
 // Línea de la reparación dentro del carrito, con su monto editable aparte.
@@ -2414,6 +2522,13 @@ async function saveMov() {
   // Evitar split entre dos métodos iguales (rompe el cálculo de efectivo)
   if (_splitActive && metodo2 && metodo2 === metodoPago) {
     toast('El 2do método no puede ser igual al primero', 'error');
+    return;
+  }
+  // Un producto sin precio entraba al carrito en $0 y se podía cobrar así: el
+  // total no lo incluía y se vendía regalado sin que nadie se diera cuenta.
+  if (_cart.length && !editingMovId && _cartSinPrecio()) {
+    const sinP = _cart.filter(it => (Number(it.precio) || 0) <= 0).map(it => it.nombre);
+    toast(`Falta el precio de: ${sinP.join(', ')}`, 'error');
     return;
   }
   // Venta mixta (reparación + productos): la parte de la reparación tiene que ser
