@@ -26,6 +26,7 @@ const QUE_CUBRE = {
   'test-push-sw.js':          'Notificaciones: cómo las muestra el service worker',
   'test-sync.js':             'Indicador de sincronización',
   'test-repuesto-nombre.js':  'Repuestos en caja: que se vea y se guarde el modelo',
+  'test-retiro-dueno.js':     'Retiro dueño: no es gasto, no baja el total del mes',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
 };
 

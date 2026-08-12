@@ -41,6 +41,12 @@ function _finrepPreset(preset) {
   });
 }
 
+// El retiro del dueño saca plata del cajón pero NO es un gasto del negocio:
+// es plata ya ganada que se lleva. Va en su propio renglón y no toca el neto.
+// (caja.js usa RETIRO_CAT y app.js RETIRO_CAT_DASH para lo mismo; el nombre
+//  cambia porque los tres archivos comparten el scope global del navegador.)
+const RETIRO_CAT_FIN = 'Retiro dueño';
+
 function _finMoney(n) {
   const v = Math.round(Number(n) || 0);
   return '$' + v.toLocaleString('es-AR');
@@ -87,14 +93,18 @@ async function generarFinanzasPDF() {
       const movs = snap.docs.map(d => d.data());
       const ingresos = movs.filter(m => m.tipo === 'ingreso');
       const egresos  = movs.filter(m => m.tipo === 'egreso');
+      const gastos   = egresos.filter(m => m.categoria !== RETIRO_CAT_FIN);
+      const retiros  = egresos.filter(m => m.categoria === RETIRO_CAT_FIN);
       const totalIng = ingresos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
-      const totalEg  = egresos.reduce((s, m)  => s + (Number(m.monto) || 0), 0);
+      const totalEg  = gastos.reduce((s, m)   => s + (Number(m.monto) || 0), 0);
+      const totalRet = retiros.reduce((s, m)  => s + (Number(m.monto) || 0), 0);
       const efecIng  = ingresos.reduce((s, m) => s + _finEfec(m), 0);
+      // Efectivo: acá los retiros SÍ cuentan, porque la plata sale del cajón.
       const efecEg   = egresos.reduce((s, m)  => s + _finEfec(m), 0);
-      // Por categoría
+      // Por categoría (los retiros no figuran entre los gastos)
       const porCatIng = {}, porCatEg = {};
       ingresos.forEach(m => { const c = m.categoria || 'Otro'; porCatIng[c] = (porCatIng[c]||0) + (Number(m.monto)||0); });
-      egresos.forEach(m  => { const c = m.categoria || 'Otro'; porCatEg[c]  = (porCatEg[c]||0)  + (Number(m.monto)||0); });
+      gastos.forEach(m   => { const c = m.categoria || 'Otro'; porCatEg[c]  = (porCatEg[c]||0)  + (Number(m.monto)||0); });
       // Por método de pago
       const porMetodo = {};
       ingresos.forEach(m => {
@@ -109,7 +119,7 @@ async function generarFinanzasPDF() {
         }
       });
       data.caja = {
-        count: movs.length, totalIng, totalEg, neto: totalIng - totalEg,
+        count: movs.length, totalIng, totalEg, totalRet, neto: totalIng - totalEg,
         efecIng, efecEg, porCatIng, porCatEg, porMetodo,
       };
     }
@@ -245,10 +255,11 @@ function _renderFinanzasPDF(data) {
         ${row('<b>Egresos totales</b>', '<b>' + _finMoney(c.totalEg) + '</b>', 'neg')}
         ${catEgRows}
         ${row('<b>NETO DE CAJA</b>', '<b>' + _finMoney(c.neto) + '</b>', c.neto>=0?'pos':'neg')}
+        ${c.totalRet > 0 ? row('🏧 Retiro dueño <i>(no es gasto, no baja el neto)</i>', _finMoney(c.totalRet)) : ''}
       </table>
       <h3>Por método de pago (ingresos)</h3>
       <table class="fr-table">${metRows || row('—','—')}</table>
-      <p class="fr-note">Movimientos en el período: ${c.count} · Efectivo neto: ${_finMoney(c.efecIng - c.efecEg)}</p>
+      <p class="fr-note">Movimientos en el período: ${c.count} · Efectivo neto: ${_finMoney(c.efecIng - c.efecEg)} (el efectivo sí descuenta los retiros: la plata sale del cajón)</p>
     `;
   }
 

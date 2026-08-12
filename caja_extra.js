@@ -7,6 +7,27 @@ let _cajaOwnerTimer = null;
 let _cajaIsOwner   = false;
 let _cajaOwnerCallback = null; // callback para acciones protegidas (borrar mov, etc.)
 
+// ── Retiros del dueño en los totales del historial ──────────
+// Un retiro saca plata del cajón, pero NO es un gasto del negocio: es plata
+// que el taller ya ganó y el dueño se lleva. Si se cuenta como egreso, el
+// total del día/mes/año queda más bajo de lo que en realidad se ganó.
+// (caja.js define RETIRO_CAT igual; va aparte para no depender del orden en
+//  que el navegador cargue los scripts.)
+const RETIRO_CAT_HIST = 'Retiro dueño';
+function _esRetiro(m)  { return m.categoria === RETIRO_CAT_HIST; }
+function _sumGastos(ms) {
+  return ms.reduce((s, m) => s + (m.tipo === 'egreso' && !_esRetiro(m) ? (Number(m.monto) || 0) : 0), 0);
+}
+function _sumRetiros(ms) {
+  return ms.reduce((s, m) => s + (m.tipo === 'egreso' && _esRetiro(m) ? (Number(m.monto) || 0) : 0), 0);
+}
+// Renglón "Retiros" para el bloque de totales; vacío si no hubo ninguno.
+function _totRetiroItem(total) {
+  if (!(total > 0)) return '';
+  return '<div class="hist-tot-item"><span class="hist-tot-lbl">🏧 Retiros dueño</span>' +
+    '<span class="hist-tot-val desglose-num--retiro">' + fmt(total) + '</span></div>';
+}
+
 function openCajaOwnerPin() {
   if (_cajaIsOwner) {
     lockCajaOwner(); return;
@@ -240,14 +261,15 @@ function buildHistorialHTML(movs, arqueos, desde, today, prevMovs, tab) {
     d.setDate(d.getDate() - 1);
   }
 
-  let totalIngresos = 0, totalEgresos = 0, diasActivos = 0;
+  let totalIngresos = 0, totalEgresos = 0, totalRetiros = 0, diasActivos = 0;
   const rows = dates.map(fecha => {
     const ms = byDate[fecha] || [];
     const ing = ms.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-    const eg  = ms.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const eg  = _sumGastos(ms);
+    const ret = _sumRetiros(ms);
     const neto = ing - eg;
-    if (ing > 0 || eg > 0) diasActivos++;
-    totalIngresos += ing; totalEgresos += eg;
+    if (ing > 0 || eg > 0 || ret > 0) diasActivos++;
+    totalIngresos += ing; totalEgresos += eg; totalRetiros += ret;
     const aper = arqueos[fecha] != null ? fmt(arqueos[fecha]) : '--';
     const fmtFecha = new Date(fecha + 'T12:00:00').toLocaleDateString('es-AR', { weekday:'short', day:'2-digit', month:'short' });
     return '<div class="hist-day-row" onclick="goToDate(\'' + fecha + '\')">' +
@@ -285,14 +307,16 @@ function buildHistorialHTML(movs, arqueos, desde, today, prevMovs, tab) {
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Total egresos</span><span class="hist-tot-val hist-day-eg">-' + fmt(totalEgresos) + '</span></div>' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Neto</span><span class="hist-tot-val ' + (totalNeto >= 0 ? 'neto-pos' : 'neto-neg') + '">' + fmt(totalNeto) + '</span></div>' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Prom. diario</span><span class="hist-tot-val">' + fmt(promDiario) + '</span></div>' +
+    _totRetiroItem(totalRetiros) +
     '</div>' + compHTML + rows;
 }
 
 function buildCajaStatsHTML(movs) {
   const ingresos = movs.filter(m => m.tipo === 'ingreso');
-  const egresos  = movs.filter(m => m.tipo === 'egreso');
+  const egresos  = movs.filter(m => m.tipo === 'egreso' && !_esRetiro(m));
   const totalIng = ingresos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const totalEg  = egresos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const totalRet = _sumRetiros(movs);
 
   const byMetodo = {};
   ingresos.forEach(m => {
@@ -343,6 +367,7 @@ function buildCajaStatsHTML(movs) {
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Egresos (30d)</span><span class="hist-tot-val hist-day-eg">-' + fmt(totalEg) + '</span></div>' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Neto</span><span class="hist-tot-val ' + (totalIng-totalEg >= 0 ? 'neto-pos' : 'neto-neg') + '">' + fmt(totalIng-totalEg) + '</span></div>' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Prom. diario</span><span class="hist-tot-val">' + fmt(prom30) + '</span></div>' +
+    _totRetiroItem(totalRet) +
     '</div>' +
     '<h4 class="stats-section-title">Metodos de pago (ingresos)</h4>' + metItems +
     '<h4 class="stats-section-title">Categorias de ingreso</h4>' + catItems +
@@ -367,13 +392,13 @@ function buildCajaAnualHTML(movs) {
   // Build sorted list of months (descending)
   const months = Object.keys(byMonth).sort().reverse();
 
-  let totalIng = 0, totalEg = 0;
+  let totalIng = 0, totalEg = 0, totalRet = 0;
   const rows = months.map((ym, idx) => {
     const ms = byMonth[ym];
     const ing = ms.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-    const eg  = ms.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
+    const eg  = _sumGastos(ms);
     const neto = ing - eg;
-    totalIng += ing; totalEg += eg;
+    totalIng += ing; totalEg += eg; totalRet += _sumRetiros(ms);
 
     // Compare with previous month in array (idx+1 is the prior month)
     let compHTML = '';
@@ -414,6 +439,7 @@ function buildCajaAnualHTML(movs) {
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Total egresos</span><span class="hist-tot-val hist-day-eg">-' + fmt(totalEg) + '</span></div>' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Neto anual</span><span class="hist-tot-val ' + (totalNeto >= 0 ? 'neto-pos' : 'neto-neg') + '">' + (totalNeto >= 0 ? '+' : '') + fmt(totalNeto) + '</span></div>' +
     '<div class="hist-tot-item"><span class="hist-tot-lbl">Prom. mensual</span><span class="hist-tot-val">' + fmt(months.length > 0 ? Math.round(totalIng / months.length) : 0) + '</span></div>' +
+    _totRetiroItem(totalRet) +
     '</div>' + rows;
 }
 
