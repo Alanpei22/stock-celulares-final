@@ -1434,10 +1434,11 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}) {
     }
   }
 
-  // ── GUARDIA: al pasar a "entregado", forzar carga de costo si falta ──
+  // ── Al pasar a "entregado", recordar cargar el costo si falta ──
+  // No es obligatorio: el modal trae "Entregar sin cargar el costo".
   if (newStatus === 'entregado' && _faltaCargarCosto(r)) {
     const ok = await openCostoRequeridoModal(r);
-    if (!ok) return; // canceló
+    if (!ok) return; // canceló la entrega
     // Refrescar referencia local
     const r2 = REPAIRS.find(x => x.id === id);
     if (r2) Object.assign(r, r2);
@@ -3114,10 +3115,11 @@ async function quickStatusChange(e, id, newStatus) {
     }
   }
 
-  // ── GUARDIA: al pasar a "entregado", forzar carga de costo si falta ──
+  // ── Al pasar a "entregado", recordar cargar el costo si falta ──
+  // No es obligatorio: el modal trae "Entregar sin cargar el costo".
   if (newStatus === 'entregado' && _faltaCargarCosto(rep)) {
     const ok = await openCostoRequeridoModal(rep);
-    if (!ok) return;
+    if (!ok) return; // canceló la entrega
     const r2 = REPAIRS.find(x => x.id === id);
     if (r2) Object.assign(rep, r2);
   }
@@ -3676,7 +3678,7 @@ async function deleteMarca(idx) {
 }
 
 // ══════════════════════════════════════════════════════════
-//  GUARDIA: forzar carga de costo antes de marcar "Entregado"
+//  RECORDATORIO de costo al marcar "Entregado" (no obligatorio)
 // ══════════════════════════════════════════════════════════
 
 // Devuelve true si la reparación NO tiene info de costo cargada todavía
@@ -3688,7 +3690,12 @@ function _faltaCargarCosto(r) {
   return c1 <= 0 && c2 <= 0;
 }
 
-// Modal bloqueante. Devuelve Promise<bool> — true si confirmó, false si canceló.
+// Devuelve Promise<bool>:
+//   true  → seguí con la entrega (cargó el costo, o eligió entregar sin cargarlo)
+//   false → cortá, el usuario canceló
+// Cargar el costo NO es obligatorio: frenaba la venta en el mostrador con el
+// cliente esperando. Si no se carga acá, se puede cargar después editando la
+// reparación (campo "Costo" de la ficha).
 function openCostoRequeridoModal(r) {
   return new Promise(resolve => {
     _costoRequiredCb = resolve;
@@ -3726,6 +3733,12 @@ function closeCostoRequeridoModal(confirmed) {
   }
   _costoRequiredRepair = null;
   _costoRequiredSelectedRep = null;
+}
+
+// "Entregar sin cargar el costo": cierra el modal y deja seguir la entrega sin
+// escribir nada en la reparación. El costo queda para cargar después.
+function entregarSinCargarCosto() {
+  closeCostoRequeridoModal(true);
 }
 
 // Cambia entre modos: catalog / manual / sin-repuesto

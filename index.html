@@ -1870,12 +1870,12 @@
 <div id="costo-req-overlay" class="modal-overlay hidden">
   <div class="modal-card costo-req-card">
     <div class="modal-header">
-      <h3>💵 Cargá el costo antes de entregar</h3>
+      <h3>💵 ¿Cuánto te costó esta reparación?</h3>
       <button class="modal-close" onclick="closeCostoRequeridoModal(false)">✕</button>
     </div>
     <div class="modal-body">
       <div class="costo-req-rep-info" id="costo-req-info"></div>
-      <p class="costo-req-hint">Para tener tu margen real al cierre del mes, cargá cómo se cubrió esta reparación:</p>
+      <p class="costo-req-hint">Sirve para tener tu margen real al cierre del mes. Si ahora no lo tenés a mano, entregá igual y cargalo después desde la reparación.</p>
 
       <!-- Tabs -->
       <div class="costo-req-tabs">
@@ -1922,6 +1922,8 @@
         <button class="btn-secondary" style="flex:1" onclick="closeCostoRequeridoModal(false)">Cancelar</button>
         <button class="btn-primary" style="flex:2" onclick="confirmCostoRequerido()">✅ Confirmar y entregar</button>
       </div>
+      <button class="btn-secondary costo-req-saltear" style="width:100%;margin-top:8px"
+              onclick="entregarSinCargarCosto()">Entregar sin cargar el costo →</button>
     </div>
   </div>
 </div>
