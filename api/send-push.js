@@ -1,9 +1,16 @@
 // Vercel Function — POST /api/send-push
 // Body: { targets: [deviceId|"all"], title, body, url, requireInteraction?, tag? }
-// Headers (opcional para crons): Authorization: Bearer <CRON_SECRET>
+//
+// Auth OBLIGATORIA (ver _auth.js). Dos formas válidas:
+//   · Navegador: Authorization: Bearer <ID token de Firebase de una cuenta
+//     de la allowlist>. Lo pone apiFetch() de utils.js.
+//   · Crons del server: Authorization: Bearer <CRON_SECRET>.
+// Sin esto cualquiera con la URL le mandaba notificaciones a todos los
+// dispositivos del negocio.
 
 import webpush from 'web-push';
 import admin from 'firebase-admin';
+import { esCron, exigirSesion } from './_auth.js';
 
 // ── Init Firebase Admin (singleton) ──
 function getAdmin() {
@@ -30,15 +37,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Auth opcional para cron (si CRON_SECRET está seteado y la request lo trae)
-  const authHeader = req.headers.authorization || '';
-  const cronSecret = process.env.CRON_SECRET;
-  const isCronAuth = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  // ¿Cron del server o sesión del navegador? Cualquiera de las dos sirve,
+  // pero alguna tiene que haber.
+  const isCronAuth = esCron(req);
+  if (!await exigirSesion(req, res, { permitirCron: true })) return;
 
-  // CORS básico (solo si tu propio dominio lo necesita; las funciones same-origin no)
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Sin CORS a propósito: la app llama a este endpoint desde su mismo dominio.
+  // Antes había Access-Control-Allow-Origin '*', que lo dejaba invocable desde
+  // cualquier página de internet.
 
   try {
     configureVapid();

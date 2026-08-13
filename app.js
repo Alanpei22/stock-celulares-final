@@ -2590,9 +2590,8 @@ async function addPhoneFromAI(phone) {
 async function callAI(action, data) {
   showAiPanel();
   try {
-    const res = await fetch('/api/ai', {
+    const res = await apiFetch('/api/ai', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ action, data })
     });
     const json = await res.json();
@@ -2718,9 +2717,8 @@ async function processAIAdd() {
     const action = _aiAddTipo === 'equipo' ? 'extractEquipo' : 'extractRepuesto';
     const payload = { texto };
     if (_aiAddImage) { payload.imageBase64 = _aiAddImage.base64; payload.imageMediaType = _aiAddImage.mediaType; }
-    const res = await fetch('/api/ai', {
+    const res = await apiFetch('/api/ai', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ action, data: payload })
     });
     const json = await res.json();
@@ -2897,9 +2895,8 @@ async function runBulkAIAnalysis() {
   document.getElementById('bulk-ai-error').textContent = '';
 
   try {
-    const res = await fetch('/api/ai', {
+    const res = await apiFetch('/api/ai', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'extractBulkEquipos', data: { text: texto } })
     });
     const json = await res.json();

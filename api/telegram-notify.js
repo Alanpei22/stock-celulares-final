@@ -1,11 +1,20 @@
 // Vercel Function — POST /api/telegram-notify
 // Body: { text } → lo manda al chat privado del dueño vía bot de Telegram.
 // Credenciales SOLO en env vars (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID).
+//
+// Auth OBLIGATORIA (ver _auth.js): Authorization: Bearer <ID token de Firebase>.
+// Sin esto cualquiera con la URL te escribía al Telegram privado.
+// (El sentido contrario — Telegram hablándole a la app — es telegram-webhook.js,
+//  que ya se valida con x-telegram-bot-api-secret-token.)
+
+import { exigirSesion } from './_auth.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  if (!await exigirSesion(req, res)) return;
 
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;

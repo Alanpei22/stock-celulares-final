@@ -87,7 +87,15 @@ run(`
   _normWaPhone = t => '549'+String(t).replace(/\\D/g,'');
   getDeviceId = () => 'ESTE-CELU';
   getNotifConfig = () => __CFG;
-  fetch = (u, o) => { __PUSH.push({ url: u, body: JSON.parse(o.body) }); return Promise.resolve({ ok: true, status: 200 }); };
+  fetch = (u, o) => { __PUSH.push({ url: u, body: JSON.parse(o.body), headers: o.headers || {} }); return Promise.resolve({ ok: true, status: 200 }); };
+  // apiFetch vive en utils.js, que esta prueba no carga. El stub imita lo que
+  // hace el de verdad: engancha el token de sesión y delega en fetch.
+  apiFetch = (u, o = {}) => fetch(u, Object.assign({}, o, {
+    headers: Object.assign(
+      { 'Content-Type': 'application/json', 'Authorization': 'Bearer TOKEN-DE-PRUEBA' },
+      o.headers || {}
+    ),
+  }));
 `);
 ctx.__PUSH = [];
 ctx.__CFG = { push: { enabled: true, repairNueva: true, repairEstado: true }, pushTargets: {} };
@@ -310,6 +318,8 @@ ctx.__PUSH = [];
 await get(`pushEquipos({pushKey:'repairNueva',title:'🔧 Equipo ingresado N°7100',body:'Samsung A54'})`);
 ok(ctx.__PUSH.length === 1, 'manda un push', ctx.__PUSH.length);
 ok(ultimoPush().url === '/api/send-push', 'al endpoint correcto', ultimoPush().url);
+ok(/^Bearer /.test(ultimoPush().headers['Authorization'] || ''),
+   'con el token de sesión (el endpoint lo exige)', ultimoPush().headers);
 ok(JSON.stringify(ultimoPush().body.targets) === '["ESTE-CELU_NEGATED"]',
    'va a TODOS los dispositivos menos el que cargó el equipo', ultimoPush().body.targets);
 ok(ultimoPush().body.pushKey === 'repairNueva', 'manda la clave para respetar los toggles del server');

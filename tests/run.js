@@ -27,6 +27,8 @@ const QUE_CUBRE = {
   'test-sync.js':             'Indicador de sincronización',
   'test-repuesto-nombre.js':  'Repuestos en caja: que se vea y se guarde el modelo',
   'test-retiro-dueno.js':     'Retiro dueño: no es gasto, no baja el total del mes',
+  'test-api-auth.js':         'Que ninguna función de /api quede abierta a internet',
+  'test-costo-opcional.js':   'Entregar una reparación sin que el costo sea obligatorio',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
 };
 

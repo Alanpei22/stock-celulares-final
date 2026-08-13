@@ -129,9 +129,8 @@ async function updateDeviceNameInFirestore(name) {
 async function sendTestPush() {
   try {
     const deviceId = getDeviceId();
-    const res = await fetch('/api/send-push', {
+    const res = await apiFetch('/api/send-push', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         targets: [deviceId],
         title: '🧪 Push de prueba',
@@ -176,9 +175,8 @@ async function pushEquipos({ pushKey, title, body, url, tag, requireInteraction,
       : (yo ? [yo + '_NEGATED'] : ['all']);
     if (!targets.length) return;   // el único elegido era este mismo aparato
 
-    await fetch('/api/send-push', {
+    await apiFetch('/api/send-push', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         targets, pushKey, title, body: body || '', url: url || '/index.html', tag,
         requireInteraction: !!requireInteraction,

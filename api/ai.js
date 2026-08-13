@@ -1,9 +1,18 @@
+// Auth OBLIGATORIA (ver _auth-edge.js): Authorization: Bearer <ID token de
+// Firebase de una cuenta de la allowlist>. Antes este endpoint era un proxy
+// abierto a la API de Anthropic con NUESTRA key: cualquiera con la URL podía
+// quemar los créditos y los pagábamos nosotros.
+import { corteSiNoAutorizadoEdge } from './_auth-edge.js';
+
 export const config = { runtime: 'edge' };
 
 export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
   }
+
+  const corte = await corteSiNoAutorizadoEdge(req);
+  if (corte) return corte;
 
   let body;
   try { body = await req.json(); } catch { body = {}; }

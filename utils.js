@@ -231,6 +231,31 @@ async function verifyOwnerPin(db, pin) {
 }
 
 // ══════════════════════════════════════════
+//  LLAMADAS A NUESTRAS FUNCIONES DE /api
+// ══════════════════════════════════════════
+// Las funciones de /api están abiertas en internet, así que ahora exigen el
+// token de sesión de Firebase para saber que la llamada sale de una cuenta del
+// negocio. Este envoltorio lo engancha solo: usalo en vez de fetch() para
+// cualquier URL que arranque con /api/.
+async function apiFetch(url, opts = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+  try {
+    const u = (typeof _fbAuth === 'function') ? _fbAuth().currentUser : null;
+    if (u) headers['Authorization'] = 'Bearer ' + (await u.getIdToken());
+  } catch (e) {
+    console.warn('[api] no se pudo leer el token de sesión:', e);
+  }
+  const res = await fetch(url, Object.assign({}, opts, { headers }));
+  if (res.status === 401) {
+    // Se avisa fuerte: varias de estas llamadas son fire-and-forget y si no
+    // dejaran rastro, un rechazo se vería como "dejó de andar" sin explicación.
+    console.warn('[api] ' + url + ' rechazó la sesión (401). ' +
+      'Cerrá sesión y volvé a entrar; si sigue, la cuenta no está en la allowlist.');
+  }
+  return res;
+}
+
+// ══════════════════════════════════════════
 //  TELEGRAM — aviso de movimientos al dueño
 //  Fire-and-forget: jamás bloquea ni rompe la operación que avisa.
 // ══════════════════════════════════════════
@@ -241,9 +266,8 @@ function tgNotify(texto) {
       const cfg = getNotifConfig();
       if (cfg?.telegram?.enabled === false) return;
     }
-    fetch('/api/telegram-notify', {
+    apiFetch('/api/telegram-notify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: String(texto || '') }),
     }).catch(() => {});
   } catch { /* nunca romper la app por una notificación */ }
