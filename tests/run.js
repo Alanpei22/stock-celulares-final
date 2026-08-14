@@ -30,6 +30,7 @@ const QUE_CUBRE = {
   'test-api-auth.js':         'Que ninguna función de /api quede abierta a internet',
   'test-costo-opcional.js':   'Entregar una reparación sin que el costo sea obligatorio',
   'test-falla.js':            'La falla que declara el cliente: se guarda y va a la boleta',
+  'test-arreglos.js':         'Varias reparaciones por equipo, con precio y tilde de hecha',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
 };
 

@@ -29,9 +29,12 @@ ok(html.indexOf('rep-fi-falla') < html.indexOf('rep-fi-arreglo'),
 const repairs = leer('repairs.js');
 ok(/rep-fi-falla/.test(repairs), 'repairs.js lo lee');
 // Que se limpie al abrir un alta nueva: si no, arrastra la falla del anterior.
-const bloqueReset = repairs.slice(repairs.indexOf("['rep-fi-marca'"),
-                                  repairs.indexOf("['rep-fi-marca'") + 400);
-ok(/rep-fi-falla/.test(bloqueReset), 'se limpia al abrir una reparación nueva');
+// Se ancla en la lista larga de campos del reset (hay otro array corto con
+// 'rep-fi-marca' arriba, el de los listeners del aviso de repuestos).
+const iReset = repairs.indexOf("['rep-fi-marca','rep-fi-modelo','rep-fi-imei'");
+ok(iReset > 0, 'se encontró el bloque que limpia el formulario');
+ok(/rep-fi-falla/.test(repairs.slice(iReset, iReset + 400)),
+   'se limpia al abrir una reparación nueva');
 
 // ── 2) Se guarda en Firestore ───────────────────────────────
 console.log('\n2) Se guarda con la reparación');

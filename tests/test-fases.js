@@ -396,6 +396,8 @@ const EXENTAS = [
   'tokenSeguimiento', // lo escribe el propio upsert
   'sena: firebase',   // revertir seña al borrar un movimiento
   '[campo]: v',       // tpGuardarCampo (diagnóstico/motivo son internos)
+  'arreglos: lista',  // tildar una reparación como hecha: el doc público no
+                      // tiene los arreglos, solo paso/equipo/fechas
 ];
 const sospechosas = [];
 for (const archivo of ['repairs.js', 'caja.js', 'tp-fases.js', 'seguimiento.js']) {

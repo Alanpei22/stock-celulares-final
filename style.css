@@ -727,6 +727,44 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 }
 .det-val { font-size: .9rem; color: var(--text); font-weight: 500; text-align: right; }
 .det-price { font-size: 1.3rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em; }
+
+/* ── Reparaciones a hacer ──────────────────────────────────
+   Un equipo puede entrar por varias cosas a la vez (módulo + batería + ficha),
+   cada una con su precio. En el alta se cargan; en la ficha se van tildando. */
+.arr-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.arr-line { display: flex; gap: 6px; align-items: center; }
+.arr-line-txt { flex: 1 1 auto; min-width: 0; }
+.arr-line-precio { flex: 0 0 92px; text-align: right; }
+.arr-line-del {
+ flex: 0 0 34px; height: 34px; border: 1px solid var(--border);
+ background: var(--bg2); color: var(--text3); border-radius: 8px;
+ font-size: .9rem; cursor: pointer;
+}
+.arr-line-del:hover { color: #dc2626; border-color: #dc2626; }
+.arr-total {
+ display: flex; justify-content: space-between; align-items: center;
+ margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+ font-size: .85rem; color: var(--text2);
+}
+.arr-total b { font-size: 1rem; color: var(--text); font-weight: 800; }
+
+/* Aviso de stock de repuestos al elegir la reparación */
+.arr-repuesto { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.arr-rep { font-size: .78rem; padding: 6px 9px; border-radius: 8px; line-height: 1.35; }
+.arr-rep small { color: var(--text3); }
+.arr-rep--ok { background: rgba(16, 185, 129, .1); color: #059669; }
+.arr-rep--no { background: rgba(245, 158, 11, .12); color: #b45309; }
+
+/* La lista dentro de la ficha, con el tilde de hecha */
+.det-arr-list { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.det-arr {
+ display: flex; align-items: center; gap: 8px;
+ padding: 7px 0; cursor: pointer; font-size: .9rem;
+}
+.det-arr input { width: 17px; height: 17px; flex-shrink: 0; accent-color: #10b981; }
+.det-arr-txt { flex: 1 1 auto; word-break: break-word; }
+.det-arr-precio { color: var(--text3); font-size: .82rem; white-space: nowrap; }
+.det-arr--hecha .det-arr-txt { text-decoration: line-through; color: var(--text3); }
 .det-imei { font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: .82rem; letter-spacing: .05em; }
 
 .det-sold-badge {

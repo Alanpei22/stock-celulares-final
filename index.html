@@ -973,9 +973,9 @@
         </div>
 
         <div class="fg fg--full">
-          <label class="fl">Tipo de arreglo *</label>
-          <select id="rep-fi-arreglo" class="fs">
-            <option value="">Seleccionar...</option>
+          <label class="fl">Reparaciones a hacer *</label>
+          <select id="rep-fi-arreglo" class="fs" onchange="_onArregloSelect(this)">
+            <option value="">+ Agregar reparación...</option>
             <option value="Módulo / Pantalla">Módulo / Pantalla</option>
             <option value="Ficha de carga">Ficha de carga</option>
             <option value="Batería">Batería</option>
@@ -988,7 +988,15 @@
             <option value="Altavoz / Micrófono">Altavoz / Micrófono</option>
             <option value="Otro">Otro...</option>
           </select>
-          <input id="rep-fi-arreglo-custom" class="fi" type="text" placeholder="Describir arreglo..." autocomplete="off" style="margin-top:6px;display:none">
+          <input id="rep-fi-arreglo-custom" class="fi" type="text"
+                 placeholder="Describir la reparación y Enter..." autocomplete="off"
+                 style="margin-top:6px;display:none"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();_addArregloCustom();}">
+
+          <!-- Lista de reparaciones cargadas, cada una con su precio -->
+          <div id="rep-arreglos-list" class="arr-list"></div>
+          <div id="rep-arreglos-total" class="arr-total hidden"></div>
+          <div id="rep-arreglos-repuesto" class="arr-repuesto hidden"></div>
         </div>
 
         <div class="fg fg--full">

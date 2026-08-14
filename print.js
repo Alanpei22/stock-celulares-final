@@ -351,6 +351,26 @@ function _clA5(rep) {
   return `<div class="box"><div class="box-t">Estado al recibir el equipo</div><div class="clgrid">${cells}</div></div>`;
 }
 
+// Las reparaciones a hacer, en la boleta.
+// Con una sola sale como siempre (una línea). Con varias sale el detalle con
+// el precio de cada una: el cliente firma sabiendo qué se le va a hacer y
+// cuánto vale cada cosa.
+// Las órdenes viejas no tienen `arreglos`, solo el texto `arreglo`: caen en el
+// mismo camino de una línea y se imprimen igual que antes.
+function _arreglosA5(rep) {
+  const lista = Array.isArray(rep.arreglos) ? rep.arreglos.filter(a => a && a.texto) : [];
+  if (lista.length < 2) return `<div class="desc">${_pr(rep.arreglo)}</div>`;
+  const conPrecio = lista.filter(a => Number(a.precio) > 0).length;
+  const filas = lista.map(a => `<div class="arr">
+      <span>• ${a.texto}</span>
+      ${Number(a.precio) > 0 ? `<b>${_prMoney(a.precio)}</b>` : '<b>—</b>'}
+    </div>`).join('');
+  const total = lista.reduce((s, a) => s + (Number(a.precio) || 0), 0);
+  return `<div class="arrs">${filas}${
+    conPrecio > 1 ? `<div class="arr arr-tot"><span>Total</span><b>${_prMoney(total)}</b></div>` : ''
+  }</div>`;
+}
+
 function _a5Body(rep, label) {
   const shop  = (window._DAKI_NAME || 'TechPoint').toUpperCase();
   const saldo = _prSaldo(rep);
@@ -406,7 +426,7 @@ function _a5Body(rep, label) {
           escrito con qué problema entró el equipo, que es lo que después se
           discute si hay reclamo. */ ''}
     ${rep.falla ? `<div class="f2"><span>Falla declarada:</span> ${rep.falla}</div>` : ''}
-    <div class="desc">${_pr(rep.arreglo)}</div>
+    ${_arreglosA5(rep)}
     ${rep.condicion ? `<div class="f2"><span>Condición estética al ingreso:</span> ${rep.condicion}</div>` : ''}
   </div>
 
@@ -472,6 +492,11 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-
 .f2 span{font-weight:700}
 .mono{font-family:'Courier New',monospace;font-size:8px;letter-spacing:-.2px}
 .desc{white-space:pre-wrap;word-break:break-word;font-weight:700;min-height:11px}
+.arrs{margin-top:1px}
+.arr{display:flex;justify-content:space-between;gap:6px;font-weight:700}
+.arr span{word-break:break-word}
+.arr b{white-space:nowrap}
+.arr-tot{border-top:.5px solid #000;margin-top:1.5px;padding-top:1.5px}
 .clgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px 6px}
 .cl{font-size:7.4px;white-space:nowrap}
 .cl b{display:inline-block;width:8px;font-weight:800}

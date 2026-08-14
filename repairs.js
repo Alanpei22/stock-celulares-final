@@ -127,9 +127,15 @@ function initRepairs() {
   document.getElementById('rep-form-modal').addEventListener('click', e => {
     if (e.target.id === 'rep-form-modal') closeRepairForm();
   });
-  document.getElementById('rep-fi-arreglo').addEventListener('change', function () {
-    document.getElementById('rep-fi-arreglo-custom').style.display =
-      this.value === 'Otro' ? '' : 'none';
+  // El <select> ahora AGREGA a la lista (ver _onArregloSelect en index.html).
+  // Si el usuario escribe el monto a mano, la suma de las reparaciones deja de
+  // pisárselo: está haciendo precio.
+  document.getElementById('rep-fi-monto').addEventListener('input', () => {
+    _montoTocadoAMano = true;
+  });
+  // El aviso de stock de repuestos depende del modelo, que se carga en el paso 1.
+  ['rep-fi-marca', 'rep-fi-modelo'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => _sugerirRepuestos());
   });
 
   document.getElementById('rep-detail-close').addEventListener('click', closeRepairDetail);
@@ -688,13 +694,232 @@ function _repwizValidarPaso() {
     if (!document.getElementById('rep-fi-modelo').value.trim()) { toast('Ingresá el modelo', 'error'); return false; }
   }
   if (_repwizIdx === 1) {
-    const arr = document.getElementById('rep-fi-arreglo').value;
-    if (!arr) { toast('Seleccioná el tipo de arreglo', 'error'); return false; }
-    if (arr === 'Otro' && !document.getElementById('rep-fi-arreglo-custom').value.trim()) {
-      toast('Describí el arreglo', 'error'); return false;
-    }
+    if (!_repArreglos.length) { toast('Agregá al menos una reparación', 'error'); return false; }
   }
   return true;
+}
+
+// ══════════════════════════════════════════════════════════
+//  REPARACIONES A HACER — varias por equipo, cada una con su precio
+// ══════════════════════════════════════════════════════════
+// Un equipo entra por más de una cosa (módulo + batería + ficha de carga) y
+// antes solo se podía anotar una.
+//
+// Cómo se guarda, sin romper lo que ya está en Firestore:
+//   · `arreglos`  → la lista de verdad: [{ texto, precio, hecho }]
+//   · `arreglo`   → SIGUE existiendo como texto, y pasa a ser el resumen
+//                   automático ("Módulo + Batería"). Las ~110 lecturas que ya
+//                   había en la app (tablero, filtros, WhatsApp, QR, Telegram)
+//                   no se tocan y siguen funcionando.
+//   · `monto`     → la suma de los precios, editable para hacer precio.
+// Es el mismo doble nivel que ya usa el carrito de la caja (items[] + totales)
+// y las fases (fase detallada + estado calculado).
+
+let _repArreglos = [];   // [{ texto, precio, hecho }]
+
+function _arreglosResumen(lista) {
+  return (lista || []).map(a => a.texto).filter(Boolean).join(' + ');
+}
+
+function _arreglosTotal(lista) {
+  return (lista || []).reduce((s, a) => s + (Number(a.precio) || 0), 0);
+}
+
+// Reparaciones viejas: no tienen `arreglos`, solo el texto `arreglo`. Se las
+// muestra como una sola línea para poder editarlas sin perder nada.
+function _arreglosDesdeRepair(r) {
+  if (Array.isArray(r?.arreglos) && r.arreglos.length) {
+    return r.arreglos.map(a => ({
+      texto: String(a.texto || ''),
+      precio: Number(a.precio) || 0,
+      hecho: !!a.hecho,
+    }));
+  }
+  if (r?.arreglo) return [{ texto: String(r.arreglo), precio: Number(r.monto) || 0, hecho: false }];
+  return [];
+}
+
+function _onArregloSelect(sel) {
+  const custom = document.getElementById('rep-fi-arreglo-custom');
+  if (sel.value === 'Otro') {
+    custom.style.display = '';
+    custom.value = '';
+    custom.focus();
+    return;
+  }
+  custom.style.display = 'none';
+  if (sel.value) _addArreglo(sel.value);
+  sel.value = '';   // vuelve a "+ Agregar reparación..." para sumar otra
+}
+
+function _addArregloCustom() {
+  const custom = document.getElementById('rep-fi-arreglo-custom');
+  const txt = custom.value.trim();
+  if (!txt) { toast('Escribí qué reparación es', 'error'); return; }
+  _addArreglo(txt);
+  custom.value = '';
+  custom.style.display = 'none';
+  document.getElementById('rep-fi-arreglo').value = '';
+}
+
+function _addArreglo(texto) {
+  const t = String(texto || '').trim();
+  if (!t) return;
+  // Repetir la misma reparación casi siempre es un doble toque sin querer.
+  if (_repArreglos.some(a => a.texto.toLowerCase() === t.toLowerCase())) {
+    toast('Esa reparación ya está en la lista', 'error');
+    return;
+  }
+  _repArreglos.push({ texto: t, precio: 0, hecho: false });
+  _renderArreglos();
+}
+
+function _removeArreglo(i) {
+  _repArreglos.splice(i, 1);
+  _renderArreglos();
+}
+
+function _setArregloTexto(i, val) {
+  if (_repArreglos[i]) _repArreglos[i].texto = String(val || '').trim();
+}
+
+function _setArregloPrecio(i, val) {
+  if (!_repArreglos[i]) return;
+  _repArreglos[i].precio = Math.max(0, parseFloat(val) || 0);
+  _syncMontoDesdeArreglos();
+  _renderArreglosTotal();
+}
+
+// El monto se autocompleta con la suma, igual que el carrito de la caja: se
+// puede pisar a mano para hacer precio y no se vuelve a tocar solo.
+let _montoTocadoAMano = false;
+function _syncMontoDesdeArreglos() {
+  const el = document.getElementById('rep-fi-monto');
+  if (!el || _montoTocadoAMano) return;
+  const total = _arreglosTotal(_repArreglos);
+  if (total > 0) el.value = total;
+}
+
+function _renderArreglosTotal() {
+  const wrap = document.getElementById('rep-arreglos-total');
+  if (!wrap) return;
+  const total = _arreglosTotal(_repArreglos);
+  if (_repArreglos.length < 2 || total <= 0) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = `<span>Total ${_repArreglos.length} reparaciones</span><b>${fmt(total)}</b>`;
+}
+
+function _renderArreglos() {
+  const wrap = document.getElementById('rep-arreglos-list');
+  if (!wrap) return;
+  if (!_repArreglos.length) {
+    wrap.innerHTML = '';
+    _renderArreglosTotal();
+    _sugerirRepuestos();
+    return;
+  }
+  wrap.innerHTML = _repArreglos.map((a, i) => `
+    <div class="arr-line">
+      <input class="fi arr-line-txt" type="text" value="${esc(a.texto)}"
+             onchange="_setArregloTexto(${i}, this.value)" placeholder="Reparación">
+      <input class="fi arr-line-precio" type="number" min="0" inputmode="numeric"
+             value="${a.precio || ''}" placeholder="$"
+             oninput="_setArregloPrecio(${i}, this.value)">
+      <button type="button" class="arr-line-del" onclick="_removeArreglo(${i})" title="Quitar">✕</button>
+    </div>`).join('');
+  _renderArreglosTotal();
+  _sugerirRepuestos();
+}
+
+// ── La lista en la ficha, con el tilde de "hecho" ───────────
+// Acá sí sirve tildar: si el equipo entró por módulo + batería y el módulo ya
+// está, verlo de un vistazo vale. En el alta no, porque no hay nada hecho.
+function _arreglosDetHtml(r) {
+  const lista = _arreglosDesdeRepair(r);
+  if (lista.length <= 1) {
+    return `<div class="det-row">
+      <span class="det-label">Arreglo</span>
+      <span class="det-val">${esc(r.arreglo || '—')}</span>
+    </div>`;
+  }
+  const hechas = lista.filter(a => a.hecho).length;
+  return `<div class="det-row det-row--full">
+    <span class="det-label">Reparaciones <small>(${hechas}/${lista.length})</small></span>
+    <div class="det-arr-list">
+      ${lista.map((a, i) => `
+        <label class="det-arr ${a.hecho ? 'det-arr--hecha' : ''}">
+          <input type="checkbox" ${a.hecho ? 'checked' : ''}
+                 onchange="toggleArregloHecho('${r.id}', ${i}, this.checked)">
+          <span class="det-arr-txt">${esc(a.texto)}</span>
+          ${a.precio > 0 ? `<span class="det-arr-precio">${fmt(a.precio)}</span>` : ''}
+        </label>`).join('')}
+    </div>
+  </div>`;
+}
+
+// Tildar una reparación como hecha. Solo toca `arreglos`: no mueve el estado ni
+// la fase del equipo, que siguen manejándose desde el tablero.
+async function toggleArregloHecho(repairId, i, hecho) {
+  const r = REPAIRS.find(x => x.id === repairId);
+  if (!r) return;
+  const lista = _arreglosDesdeRepair(r);
+  if (!lista[i]) return;
+  lista[i].hecho = !!hecho;
+  r.arreglos = lista;          // snapshot local, para que la ficha se refresque ya
+  try {
+    await db.collection('repairs').doc(repairId).update({ arreglos: lista });
+    const hechas = lista.filter(a => a.hecho).length;
+    if (hechas === lista.length) toast('✅ Todas las reparaciones hechas', 'success');
+  } catch (e) {
+    console.error('toggleArregloHecho:', e);
+    lista[i].hecho = !hecho;
+    r.arreglos = lista;
+    toast('No se pudo guardar', 'error');
+  }
+  if (typeof openRepairDetail === 'function') openRepairDetail(repairId);
+}
+
+// ── ¿Hay repuesto en stock para lo que se va a hacer? ───────
+// Saberlo al INGRESO cambia lo que le prometés al cliente. Antes te enterabas
+// recién al marcar "listo".
+//
+// CUPO: no dispara ninguna lectura a Firestore. Usa REPUESTOS solo si la
+// sección ya se abrió en esta sesión y por eso está en memoria; si no, no
+// muestra nada. Nunca engancha un listener.
+function _sugerirRepuestos() {
+  const wrap = document.getElementById('rep-arreglos-repuesto');
+  if (!wrap) return;
+  wrap.classList.add('hidden');
+  wrap.innerHTML = '';
+
+  if (typeof REPUESTOS === 'undefined' || !REPUESTOS.length) return;
+  if (!_repArreglos.length) return;
+
+  const marca  = (document.getElementById('rep-fi-marca')  || {}).value?.trim() || '';
+  const modelo = (document.getElementById('rep-fi-modelo') || {}).value?.trim() || '';
+  if (!marca && !modelo) return;
+
+  const avisos = [];
+  _repArreglos.forEach(a => {
+    if (!a.texto) return;
+    // La primera palabra del arreglo es la que nombra la pieza:
+    // "Módulo / Pantalla" → "Módulo", "Ficha de carga" → "Ficha".
+    const pieza = a.texto.split(/[\/\s]+/)[0];
+    if (!pieza || pieza.length < 3) return;
+    const candidatos = REPUESTOS.filter(r =>
+      searchMatch([r.nombre, r.marca, r.modelo, r.tipo], [pieza, marca, modelo].filter(Boolean).join(' '))
+    );
+    if (!candidatos.length) return;
+    const total = candidatos.reduce((s, r) => s + (Number(r.cantidad) || 0), 0);
+    avisos.push({ texto: a.texto, total, nombre: candidatos[0].nombre || '' });
+  });
+
+  if (!avisos.length) return;
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = avisos.map(v => v.total > 0
+    ? `<div class="arr-rep arr-rep--ok">🔩 <b>${esc(v.texto)}</b>: hay ${v.total} en stock <small>(${esc(v.nombre)})</small></div>`
+    : `<div class="arr-rep arr-rep--no">🔩 <b>${esc(v.texto)}</b>: sin stock — hay que pedirlo</div>`
+  ).join('');
 }
 
 function _repwizNext() {
@@ -737,9 +962,14 @@ function openRepairForm(id) {
     document.getElementById('rep-fi-modelo').value = r.modelo || '';
 
     const isCustom = r.arreglo && !COMMON_ARREGLOS.includes(r.arreglo);
-    document.getElementById('rep-fi-arreglo').value = isCustom ? 'Otro' : (r.arreglo || '');
-    document.getElementById('rep-fi-arreglo-custom').style.display = isCustom ? '' : 'none';
-    document.getElementById('rep-fi-arreglo-custom').value = isCustom ? r.arreglo : '';
+    // El select vuelve a "+ Agregar reparación..."; lo cargado va a la lista.
+    document.getElementById('rep-fi-arreglo').value = '';
+    document.getElementById('rep-fi-arreglo-custom').style.display = 'none';
+    document.getElementById('rep-fi-arreglo-custom').value = '';
+    _repArreglos = _arreglosDesdeRepair(r);
+    // Al editar, el monto ya está puesto: no lo pisa la suma.
+    _montoTocadoAMano = true;
+    _renderArreglos();
 
     const imeiEl = document.getElementById('rep-fi-imei');
     if (imeiEl) imeiEl.value = r.imei || '';
@@ -814,6 +1044,9 @@ function openRepairForm(id) {
     document.getElementById('rep-fi-arreglo').value = '';
     document.getElementById('rep-fi-arreglo-custom').style.display = 'none';
     document.getElementById('rep-fi-arreglo-custom').value = '';
+    _repArreglos = [];
+    _montoTocadoAMano = false;
+    _renderArreglos();
     ['acc-cargador','acc-funda','acc-caja','acc-auriculares'].forEach(fid => {
       document.getElementById(fid).checked = false;
     });
@@ -950,9 +1183,12 @@ function _stripUndefined(obj) {
 async function saveRepair() {
   const marca    = document.getElementById('rep-fi-marca').value.trim();
   const modelo   = document.getElementById('rep-fi-modelo').value.trim();
-  const arregloSel    = document.getElementById('rep-fi-arreglo').value;
-  const arregloCustom = document.getElementById('rep-fi-arreglo-custom').value.trim();
-  const arreglo  = arregloSel === 'Otro' ? arregloCustom : arregloSel;
+  // Si quedó texto escrito en "Otro" sin haberle dado Enter, se toma igual:
+  // en el mostrador es fácil escribirlo y pasar de largo.
+  const pendiente = document.getElementById('rep-fi-arreglo-custom').value.trim();
+  if (pendiente) _addArreglo(pendiente);
+  const arreglos = _repArreglos.filter(a => a.texto);
+  const arreglo  = _arreglosResumen(arreglos);   // resumen para todo el resto de la app
   const imei     = (document.getElementById('rep-fi-imei') || {}).value?.trim() || '';
   // La falla es lo que cuenta el cliente ("se apaga solo"). Es distinta del
   // tipo de arreglo (la categoría) y de la condición visual (los golpes).
@@ -986,7 +1222,7 @@ async function saveRepair() {
 
   if (!marca)   { toast('Ingresá la marca', 'error'); return; }
   if (!modelo)  { toast('Ingresá el modelo', 'error'); return; }
-  if (!arreglo) { toast('Seleccioná el tipo de arreglo', 'error'); return; }
+  if (!arreglos.length) { toast('Agregá al menos una reparación', 'error'); return; }
 
   const btn = document.getElementById('rep-form-save');
   btn.disabled = true;
@@ -997,7 +1233,7 @@ async function saveRepair() {
       if (!existing) { closeRepairForm(); return; }
       const updateData = {
         ...existing,
-        marca, modelo, arreglo, falla, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
+        marca, modelo, arreglo, arreglos, falla, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaIngreso: _repIngresoISO(),
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs, diasGarantia, checklist,
         seguimientoFecha, seguimientoNota, seguimientoAck: seguimientoFecha ? (existing.seguimientoFecha === seguimientoFecha ? (existing.seguimientoAck || false) : false) : null
@@ -1050,7 +1286,7 @@ async function saveRepair() {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const ahora = _repIngresoISO(); // fecha de ingreso elegida con las flechas (hoy por defecto)
       const newDoc = {
-        id, nOrden, marca, modelo, arreglo, falla, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
+        id, nOrden, marca, modelo, arreglo, arreglos, falla, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs,
         estado: 'reparando',
         // Fase inicial del tablero (mapea a estado 'reparando')
@@ -1214,10 +1450,7 @@ function openRepairDetail(id) {
       <span class="det-label">Falla declarada</span>
       <span class="det-val">${esc(r.falla)}</span>
     </div>` : ''}
-    <div class="det-row">
-      <span class="det-label">Arreglo</span>
-      <span class="det-val">${esc(r.arreglo || '—')}</span>
-    </div>
+    ${_arreglosDetHtml(r)}
     ${r.condicion ? `<div class="det-row det-row--full">
       <span class="det-label">Condición visual</span>
       <span class="det-val">${esc(r.condicion)}</span>
@@ -3553,9 +3786,7 @@ async function deleteStaffMember(name) {
 async function aiRepairDiagnosis() {
   const marca    = (document.getElementById('rep-fi-marca').value    || '').trim();
   const modelo   = (document.getElementById('rep-fi-modelo').value   || '').trim();
-  const arreglo  = document.getElementById('rep-fi-arreglo').value === 'Otro'
-    ? document.getElementById('rep-fi-arreglo-custom').value
-    : document.getElementById('rep-fi-arreglo').value;
+  const arreglo  = _arreglosResumen(_repArreglos);
   const condicion = (document.getElementById('rep-fi-condicion').value || '').trim();
   // La falla que contó el cliente va primero: es lo más útil para el diagnóstico.
   const falla     = ((document.getElementById('rep-fi-falla') || {}).value || '').trim();
@@ -3573,12 +3804,10 @@ async function aiRepairDiagnosis() {
 async function aiRepairTimePrice() {
   const marca   = (document.getElementById('rep-fi-marca').value   || '').trim();
   const modelo  = (document.getElementById('rep-fi-modelo').value  || '').trim();
-  const arreglo = document.getElementById('rep-fi-arreglo').value === 'Otro'
-    ? document.getElementById('rep-fi-arreglo-custom').value
-    : document.getElementById('rep-fi-arreglo').value;
+  const arreglo = _arreglosResumen(_repArreglos);
 
   if (!marca || !modelo || !arreglo) {
-    toast('Completá marca, modelo y tipo de arreglo', 'error'); return;
+    toast('Completá marca, modelo y agregá al menos una reparación', 'error'); return;
   }
 
   try {
