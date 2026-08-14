@@ -110,6 +110,7 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:9px;line-he
 .vfir-c{text-align:center;font-size:7px}
 .vfir-sp{height:13mm}
 .vfir-c .ln{border-top:.8px solid #000;margin-bottom:2px}
+.vfir-n{font-weight:700;margin-top:1px}
 .vqr{text-align:center;line-height:1.1}
 .vqr svg{width:19mm;height:19mm;display:block;margin:0 auto}
 .vqr span{font-size:5.8px;font-weight:700;display:block;margin-top:1px}
@@ -125,6 +126,14 @@ function _ventaA5Body(d, label) {
     p.ram ? ['RAM', p.ram] : null,
     p.bateria ? ['Batería', p.bateria + '%'] : null,
     p.color ? ['Color', p.color] : null,
+  ].filter(Boolean);
+
+  // Comprador. Campos nuevos: las ventas viejas no los tienen y el
+  // comprobante les sale igual que siempre, sin el recuadro.
+  const cli = [
+    p.clienteNombre ? ['Nombre', p.clienteNombre] : null,
+    p.clienteDni    ? ['DNI', p.clienteDni]       : null,
+    p.clienteTel    ? ['Teléfono', p.clienteTel]  : null,
   ].filter(Boolean);
 
   return `
@@ -145,6 +154,14 @@ function _ventaA5Body(d, label) {
     <span><b>Fecha:</b> ${d.fechaVenta}${d.horaVenta ? ' · ' + d.horaVenta : ''}</span>
     ${p.vendedor ? `<span><b>Vendedor:</b> ${_pr(p.vendedor)}</span>` : ''}
   </div>
+
+  ${cli.length ? `
+  <div class="vbox">
+    <div class="vbox-t">Comprador</div>
+    <div class="vgrid">
+      ${cli.map(([k, v]) => `<div class="vf"><span>${k}</span><b>${_pr(v)}</b></div>`).join('')}
+    </div>
+  </div>` : ''}
 
   <div class="vbox">
     <div class="vbox-t">Equipo</div>
@@ -184,7 +201,9 @@ function _ventaA5Body(d, label) {
 
   <div class="vfir">
     <div class="vfir-c"><div class="vfir-sp"></div><div class="ln"></div>Firma del vendedor</div>
-    <div class="vfir-c"><div class="vfir-sp"></div><div class="ln"></div>Firma y aclaración del comprador</div>
+    <div class="vfir-c"><div class="vfir-sp"></div><div class="ln"></div>Firma y aclaración del comprador${
+      p.clienteNombre ? `<div class="vfir-n">${p.clienteNombre}${p.clienteDni ? ` · DNI ${p.clienteDni}` : ''}</div>` : ''
+    }</div>
     ${d.qrSvgWa ? `<div class="vqr">${d.qrSvgWa}<span>Escribinos</span></div>` : ''}
   </div>
 

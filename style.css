@@ -5122,6 +5122,17 @@ body.dark {
   background: var(--border); border-radius: 1px; margin: 0 8px;
 }
 
+/* ── Comprador en el modal de venta de un equipo ────────── */
+.sell-cli {
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 13px 4px; margin-bottom: 12px;
+}
+.sell-cli-hdr {
+  font-size: .82rem; font-weight: 700; color: var(--text2); margin-bottom: 10px;
+}
+.sell-cli-hdr small { font-weight: 400; color: var(--text3); }
+.sell-cli-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
 /* Bloque "Más datos" del último paso. display:contents para que sus campos
    entren en la grilla del formulario como los demás; al plegarlo lo tapa
    `.hidden`, que ya es display:none !important. */

@@ -1654,6 +1654,13 @@ function openSellModal(id) {
   const selP = document.getElementById('sell-pago');
   selV.innerHTML = SELLERS.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
   selP.innerHTML = PAYMENTS.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  // Limpiar el comprador: si no, la próxima venta arrastra los datos del
+  // cliente anterior y sale un comprobante a nombre de otra persona.
+  ['sell-cli-nombre', 'sell-cli-dni', 'sell-cli-tel'].forEach(fid => {
+    const el = document.getElementById(fid);
+    if (el) el.value = '';
+  });
+  document.getElementById('sell-cli-hint')?.classList.add('hidden');
   document.getElementById('sell-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
@@ -1671,6 +1678,10 @@ async function confirmSell() {
   const vendedor   = document.getElementById('sell-vendedor').value;
   const formaPago  = document.getElementById('sell-pago').value;
   const regCaja    = document.getElementById('sell-caja-check')?.checked ?? true;
+  // Comprador: opcional. Si no se carga, el comprobante sale como antes.
+  const cliNombre  = (document.getElementById('sell-cli-nombre') || {}).value?.trim() || '';
+  const cliDni     = (document.getElementById('sell-cli-dni')    || {}).value?.trim() || '';
+  const cliTel     = (document.getElementById('sell-cli-tel')    || {}).value?.trim() || '';
 
   const ahora = new Date().toISOString();
   const confirmBtn = document.getElementById('sell-confirm');
@@ -1686,6 +1697,11 @@ async function confirmSell() {
       vendedor,
       forma_pago: formaPago,
     };
+    // Campos NUEVOS, y solo si se cargaron: las ventas viejas no los tienen y
+    // el comprobante las imprime igual que siempre.
+    if (cliNombre) stockUpdate.clienteNombre = cliNombre;
+    if (cliDni)    stockUpdate.clienteDni    = cliDni;
+    if (cliTel)    stockUpdate.clienteTel    = cliTel;
     // Garantía: calcular fechaHasta si tiene meses configurados
     if (p?.garantiaMeses > 0) {
       const fHasta = new Date();
@@ -1736,6 +1752,13 @@ async function confirmSell() {
 
     // BUG-FIX: await + propagación de error (no swallow silencioso)
     await batch.commit();
+
+    // El comprador va al CRM, igual que en la venta desde la caja. Fuera del
+    // batch a propósito: si falla, la venta ya quedó registrada igual.
+    if (cliTel && typeof upsertCliente === 'function') {
+      upsertCliente({ tlf: cliTel, nombre: cliNombre, dni: cliDni })
+        .catch(e => console.warn('upsertCliente (venta stock):', e));
+    }
 
     closeSellModal();
     closeDetail();

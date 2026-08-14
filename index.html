@@ -633,6 +633,29 @@
         <label class="fl">💳 Forma de pago</label>
         <select id="sell-pago" class="fs"></select>
       </div>
+
+      <!-- Comprador: opcional, pero sin esto el comprobante sale sin a quién
+           se le vendió, que es justo lo que hace falta si después reclama. -->
+      <div class="sell-cli">
+        <div class="sell-cli-hdr">🧾 Datos del comprador <small>— salen en el comprobante</small></div>
+        <div class="fg">
+          <label class="fl">Nombre y apellido</label>
+          <input id="sell-cli-nombre" class="fi" type="text" placeholder="Juan García" autocomplete="off">
+        </div>
+        <div class="sell-cli-row">
+          <div class="fg">
+            <label class="fl">DNI</label>
+            <input id="sell-cli-dni" class="fi" type="text" placeholder="26427682" inputmode="numeric">
+          </div>
+          <div class="fg">
+            <label class="fl">Teléfono</label>
+            <input id="sell-cli-tel" class="fi" type="tel" placeholder="1155667788" inputmode="numeric"
+                   onblur="_sellTelAutocomplete(this.value)">
+          </div>
+        </div>
+        <div id="sell-cli-hint" class="rep-cliente-hint hidden"></div>
+      </div>
+
       <!-- Registrar en caja -->
       <label class="sell-caja-row">
         <div class="sell-caja-info">

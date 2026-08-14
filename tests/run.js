@@ -34,6 +34,7 @@ const QUE_CUBRE = {
   'test-motivo-nova.js':      'Por qué no va: la categoría del cierre y su desglose',
   'test-cross-pagina.js':     'Que una pantalla no llame a algo que su página no carga',
   'test-repwiz.js':           'Los 3 pasos del ingreso: que no se pierda ningún campo',
+  'test-venta-comprador.js':  'Datos del comprador en el comprobante de venta de equipos',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
 };
 

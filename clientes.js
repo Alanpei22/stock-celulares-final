@@ -192,8 +192,23 @@ function _waPhone(tlf) {
 // Al salir del campo teléfono, si el cliente ya existe:
 // - completa nombre/dni si están vacíos
 // - muestra un hint con cuántas reparaciones tiene + link a la ficha
+// Al escribir el teléfono, completa nombre y DNI si el cliente ya vino antes.
+// Se usa desde el alta de reparación y desde la venta de un equipo, que tienen
+// los mismos tres campos con distintos ids.
 async function _repTelAutocomplete(tlf) {
-  const hint = document.getElementById('rep-cliente-hint');
+  return _telAutocomplete(tlf, {
+    hint: 'rep-cliente-hint', nombre: 'rep-fi-nombre', dni: 'rep-fi-dni',
+  });
+}
+
+async function _sellTelAutocomplete(tlf) {
+  return _telAutocomplete(tlf, {
+    hint: 'sell-cli-hint', nombre: 'sell-cli-nombre', dni: 'sell-cli-dni',
+  });
+}
+
+async function _telAutocomplete(tlf, ids) {
+  const hint = document.getElementById(ids.hint);
   const key = _cliKey(tlf);
   if (!key) { if (hint) hint.classList.add('hidden'); return; }
 
@@ -210,8 +225,8 @@ async function _repTelAutocomplete(tlf) {
   if (!cli) { if (hint) hint.classList.add('hidden'); return; }
 
   // Completar campos vacíos (no pisar lo que el usuario ya escribió)
-  const nomEl = document.getElementById('rep-fi-nombre');
-  const dniEl = document.getElementById('rep-fi-dni');
+  const nomEl = document.getElementById(ids.nombre);
+  const dniEl = document.getElementById(ids.dni);
   if (nomEl && !nomEl.value.trim() && cli.nombre) nomEl.value = cli.nombre;
   if (dniEl && !dniEl.value.trim() && cli.dni) dniEl.value = cli.dni;
 
