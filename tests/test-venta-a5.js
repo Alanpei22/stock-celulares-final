@@ -70,9 +70,33 @@ ok(!/printRepair\('80mm'\)/.test(indexHtml), 'no queda el botón 80mm de recepci
 ok(!/printRepairTermica\(\)/.test(indexHtml), 'no queda el botón BT 58mm de recepción');
 ok(/printRepair\('A5'\)/.test(indexHtml), 'sí queda el A5');
 ok(!/printPromptFmt\('A4'\)|printPromptFmt\('80mm'\)/.test(indexHtml), 'el cartel de después de cargar tampoco los ofrece');
-const cuerpoPrintRepair = printJs.slice(printJs.indexOf('function printRepair'), printJs.indexOf('function printDelivery'));
+const cuerpoPrintRepair = printJs.slice(printJs.indexOf('function printRepair'),
+                                        printJs.indexOf('const _CSS_VENTA_A5'));
 ok(/_buildA5/.test(cuerpoPrintRepair) && !/_buildA4|_build80mm/.test(cuerpoPrintRepair),
    'printRepair imprime A5 aunque le pidan otra cosa');
+
+// Los formatos que se sacaron de la interfaz ya no están ni en el código:
+// eran ~577 líneas que nadie llamaba y confundían al leer el archivo.
+[['printDelivery',        'la entrega por separado'],
+ ['_buildA4',             'el A4 de recepción'],
+ ['_build80mm',           'el ticket 80mm de recepción'],
+ ['_ticket80mmBody',      'el cuerpo del 80mm'],
+ ['_CSS_80MM',            'el CSS del 80mm'],
+ ['_buildDeliveryA4',     'el A4 de entrega'],
+ ['_buildDelivery80mm',   'el 80mm de entrega'],
+ ['_delivery80mmBody',    'el cuerpo del 80mm de entrega'],
+ ['printRepairTermica',   'la térmica BT de recepción'],
+ ['printDeliveryTermica', 'la térmica BT de entrega'],
+ ['_openPrintSequential', 'el flujo secuencial (solo lo usaban los 80mm)'],
+ ['_qrSeguimientoBox',    'el QR del A4'],
+ ['_qrSeguimientoHtml',   'el QR del 80mm'],
+].forEach(([fn, qué]) => {
+  ok(!new RegExp('function\\s+' + fn + '\\b|const\\s+' + fn + '\\b').test(printJs),
+     `se borró ${qué} (${fn})`);
+});
+// Y lo que quedó vivo, sigue vivo
+ok(/function _buildA5/.test(printJs) && /function printVentaTicket/.test(printJs),
+   'el A5 de recepción y el comprobante de venta siguen enteros');
 
 console.log('\n5) Entrega: se saca el bloque, se usa la misma hoja de recepción');
 ok(!/printDelivery\(/.test(indexHtml), 'no quedan botones de entrega');

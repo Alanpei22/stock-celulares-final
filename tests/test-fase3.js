@@ -119,31 +119,27 @@ ok(!!upd && typeof upd[3].tokenSeguimiento === 'string' && upd[3].tokenSeguimien
 
 // ── Impresión: el QR queda dentro del comprobante ──
 console.log('\n6) Comprobantes con el QR adentro (render en node)');
+// El A4 se borró de print.js (nadie lo llamaba desde la interfaz), así que
+// acá quedó solo el A5, que es el único comprobante de recepción que existe.
 const a5 = get('_buildA5(__REP)');
-const a4 = get('_buildA4(__REP)');
 ok(/<svg/.test(a5), 'A5 lleva el QR embebido', a5.length);
 ok(/fir-qr[\s\S]{0,400}<svg/.test(a5), 'A5: el QR va dentro del recuadro de firmas (no suma alto a la hoja)');
 ok(/Seguí tu reparación/.test(a5), 'A5 explica para qué es');
 ok(/\.fir-qr svg\{width:19mm/.test(a5), 'A5: QR de 19 mm (el alto de la hoja manda)');
 ok(/192\*MM/.test(a5), 'A5 trae el auto-ajuste a una hoja (192mm = 196 útiles − 4 de colchón)');
-ok(/<svg/.test(a4) && /width="25mm"/.test(a4), 'A4 lleva el QR de 25 mm');
-ok(/272\*MM/.test(a4), 'A4 trae el auto-ajuste a una hoja');
 
 // ── Las dos causas por las que salía una segunda hoja ──
 // 1) transform:scale() achica lo que se ve pero NO el espacio que ocupa, así que
 //    el navegador cortaba la hoja igual. Tiene que ser zoom.
 ok(!/transform\s*=\s*'scale/.test(a5) && /style\.zoom/.test(a5),
    'A5: el auto-ajuste usa zoom (transform no achica el espacio y la hoja se parte igual)');
-ok(!/transform\s*=\s*'scale/.test(a4) && /style\.zoom/.test(a4), 'A4: idem');
 // 2) page-break-after:always + :last-child dejó de aplicar cuando se agregó el
 //    script al final del body → salía una hoja en blanco.
 ok(/\.tk\{page-break-after:auto\}/.test(a5) && /\.tk \+ \.tk\{page-break-before:always\}/.test(a5),
    'A5: el corte de hoja va ENTRE comprobantes, nunca después del último');
-ok(/\.pg \+ \.pg \{ page-break-before: always; \}/.test(a4) && !/\.pg \{ page-break-after: always; \}/.test(a4),
-   'A4: idem');
-ok(!/:last-child\s*\{\s*page-break-after/.test(a5 + a4),
+ok(!/:last-child\s*\{\s*page-break-after/.test(a5),
    'no se depende de :last-child (el script del auto-ajuste va después y lo rompía)');
-ok(!/qrserver|<img[^>]+https?:/.test(a5 + a4), 'ningún comprobante pide imágenes a internet');
+ok(!/qrserver|<img[^>]+https?:/.test(a5), 'el comprobante no pide imágenes a internet');
 ok(a5.includes('356789102345678'), 'el IMEI completo SÍ va en el comprobante del cliente (es su equipo)');
 const svgA5 = a5.match(/<svg[\s\S]*?<\/svg>/)[0];
 ok(/viewBox="0 0 (\d+) \1"/.test(svgA5), 'QR cuadrado');
