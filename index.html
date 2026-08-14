@@ -925,8 +925,7 @@
     </div>
     <div class="modal-body">
       <div id="repwiz-hdr" class="repwiz-hdr" style="display:none">
-        <div class="repwiz-progress"><div id="repwiz-progress-fill" class="repwiz-progress-fill"></div></div>
-        <div class="repwiz-lbl" id="repwiz-lbl">Paso 1 de 5</div>
+        <div class="repwiz-steps" id="repwiz-steps"></div>
       </div>
       <div class="form-grid">
 
@@ -961,6 +960,29 @@
         <div class="fg fg--full">
           <label class="fl">IMEI <small style="color:var(--t2);font-weight:400">— opcional, el cliente ve solo los últimos 4</small></label>
           <input id="rep-fi-imei" class="fi" type="text" placeholder="356789102345678" inputmode="numeric" autocomplete="off" maxlength="20">
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Código / Patrón de seguridad</label>
+          <div class="pass-wrap">
+            <input id="rep-fi-codigo" class="fi" type="password" placeholder="PIN, patrón o contraseña" autocomplete="new-password">
+            <button type="button" class="pass-toggle" onclick="togglePassField('rep-fi-codigo', this)">👁️</button>
+          </div>
+          <div class="patron-form-row">
+            <button type="button" class="btn-patron-draw" onclick="openPatronModal()">🔐 Dibujar patrón</button>
+            <div id="patron-preview" class="patron-preview" style="display:none"></div>
+            <button type="button" id="btn-patron-clear" class="btn-patron-clear" onclick="clearPatronForm()" style="display:none">✕ Borrar</button>
+          </div>
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Accesorios recibidos</label>
+          <div class="accessories-grid">
+            <label class="acc-check"><input type="checkbox" id="acc-cargador"><span>🔌 Cargador</span></label>
+            <label class="acc-check"><input type="checkbox" id="acc-funda"><span>🛡️ Funda</span></label>
+            <label class="acc-check"><input type="checkbox" id="acc-caja"><span>📦 Caja</span></label>
+            <label class="acc-check"><input type="checkbox" id="acc-auriculares"><span>🎧 Auriculares</span></label>
+          </div>
         </div>
         </div><!-- /paso 1 -->
 
@@ -999,6 +1021,15 @@
           <div id="rep-arreglos-repuesto" class="arr-repuesto hidden"></div>
         </div>
 
+        <div class="fg">
+          <label class="fl">Precio cobrado ($) <small style="color:var(--t2);font-weight:400">— se suma solo</small></label>
+          <input id="rep-fi-monto" class="fi" type="number" placeholder="28000" min="0" inputmode="numeric">
+        </div>
+        <div class="fg">
+          <label class="fl">Seña / Anticipo ($)</label>
+          <input id="rep-fi-sena" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+        </div>
+
         <div class="fg fg--full">
           <label class="fl">Condición visual al ingreso</label>
           <textarea id="rep-fi-condicion" class="fi fi-area" placeholder="Rayones, pantalla rota, sin batería..." rows="2"></textarea>
@@ -1007,43 +1038,22 @@
           <button type="button" class="btn-ai" onclick="aiRepairDiagnosis()">🤖 Diagnóstico IA</button>
           <button type="button" class="btn-ai" onclick="aiRepairTimePrice()">⏱ Estimar precio</button>
         </div>
-
-        <div class="fg fg--full">
-          <label class="fl">Código / Patrón de seguridad</label>
-          <div class="pass-wrap">
-            <input id="rep-fi-codigo" class="fi" type="password" placeholder="PIN, patrón o contraseña" autocomplete="new-password">
-            <button type="button" class="pass-toggle" onclick="togglePassField('rep-fi-codigo', this)">👁️</button>
-          </div>
-          <div class="patron-form-row">
-            <button type="button" class="btn-patron-draw" onclick="openPatronModal()">🔐 Dibujar patrón</button>
-            <div id="patron-preview" class="patron-preview" style="display:none"></div>
-            <button type="button" id="btn-patron-clear" class="btn-patron-clear" onclick="clearPatronForm()" style="display:none">✕ Borrar</button>
-          </div>
-        </div>
-
-        <div class="fg fg--full">
-          <label class="fl">Accesorios recibidos</label>
-          <div class="accessories-grid">
-            <label class="acc-check"><input type="checkbox" id="acc-cargador"><span>🔌 Cargador</span></label>
-            <label class="acc-check"><input type="checkbox" id="acc-funda"><span>🛡️ Funda</span></label>
-            <label class="acc-check"><input type="checkbox" id="acc-caja"><span>📦 Caja</span></label>
-            <label class="acc-check"><input type="checkbox" id="acc-auriculares"><span>🎧 Auriculares</span></label>
-          </div>
-        </div>
         </div><!-- /paso 2 -->
 
         <div class="repwiz-step" data-rstep="3">
-        <div class="fg">
-          <label class="fl">Precio cobrado ($) <small style="color:var(--t2);font-weight:400">— lo que paga el cliente</small></label>
-          <input id="rep-fi-monto" class="fi" type="number" placeholder="28000" min="0" inputmode="numeric">
+        <div class="fg fg--full">
+          <label class="fl">Nombre del cliente</label>
+          <input id="rep-fi-nombre" class="fi" type="text" placeholder="Juan García" autocomplete="off">
         </div>
         <div class="fg">
-          <label class="fl">Seña / Anticipo ($)</label>
-          <input id="rep-fi-sena" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+          <label class="fl">Teléfono</label>
+          <input id="rep-fi-tlf" class="fi" type="tel" placeholder="1155667788" inputmode="numeric"
+            onblur="_repTelAutocomplete(this.value)">
+          <div id="rep-cliente-hint" class="rep-cliente-hint hidden"></div>
         </div>
         <div class="fg">
-          <label class="fl">Costo ($) <small id="rep-costo-lbl" style="color:var(--t2);font-weight:400">— se completa al usar repuesto</small></label>
-          <input id="rep-fi-costo" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+          <label class="fl">DNI</label>
+          <input id="rep-fi-dni" class="fi" type="text" placeholder="26427682" inputmode="numeric">
         </div>
 
         <div class="fg">
@@ -1063,28 +1073,6 @@
           </select>
           <input id="rep-fi-garantia-custom" class="fi" type="number" min="1" max="730" placeholder="Días" inputmode="numeric" style="margin-top:6px;display:none">
         </div>
-        </div><!-- /paso 3 -->
-
-        <div class="repwiz-step" data-rstep="4">
-        <div class="fg fg--full">
-          <label class="fl">Nombre del cliente</label>
-          <input id="rep-fi-nombre" class="fi" type="text" placeholder="Juan García" autocomplete="off">
-        </div>
-        <div class="fg">
-          <label class="fl">Teléfono</label>
-          <input id="rep-fi-tlf" class="fi" type="tel" placeholder="1155667788" inputmode="numeric"
-            onblur="_repTelAutocomplete(this.value)">
-          <div id="rep-cliente-hint" class="rep-cliente-hint hidden"></div>
-        </div>
-        <div class="fg">
-          <label class="fl">DNI</label>
-          <input id="rep-fi-dni" class="fi" type="text" placeholder="26427682" inputmode="numeric">
-        </div>
-
-        <div class="fg fg--full">
-          <label class="fl">Observaciones</label>
-          <textarea id="rep-fi-obs" class="fi fi-area" placeholder="Notas adicionales..." rows="2"></textarea>
-        </div>
 
         <div class="fg fg--full">
           <label class="fl">Tomado por</label>
@@ -1092,9 +1080,26 @@
             <option value="">— Sin asignar —</option>
           </select>
         </div>
-        </div><!-- /paso 4 -->
 
-        <div class="repwiz-step" data-rstep="5">
+        <!-- Lo que casi nunca se toca en el mostrador, plegado -->
+        <div class="fg fg--full">
+          <button type="button" class="cl-toggle-btn" onclick="toggleRepExtras()">
+            <span>➕ Más datos <small style="font-weight:400;color:var(--t2)">— costo, notas, checklist, foto</small></span>
+            <span class="cl-arrow" id="rep-extras-arrow">▼</span>
+          </button>
+        </div>
+
+        <div id="rep-extras-body" class="repwiz-extras hidden">
+        <div class="fg fg--full">
+          <label class="fl">Costo ($) <small id="rep-costo-lbl" style="color:var(--t2);font-weight:400">— se completa al usar repuesto</small></label>
+          <input id="rep-fi-costo" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+        </div>
+
+        <div class="fg fg--full">
+          <label class="fl">Observaciones</label>
+          <textarea id="rep-fi-obs" class="fi fi-area" placeholder="Notas adicionales..." rows="2"></textarea>
+        </div>
+
         <!-- Checklist de recepción -->
         <div class="fg fg--full">
           <button type="button" class="cl-toggle-btn" onclick="toggleChecklistForm()">
@@ -1153,7 +1158,8 @@
             </div>
           </div>
         </div>
-        </div><!-- /paso 5 -->
+        </div><!-- /más datos -->
+        </div><!-- /paso 3 -->
 
       </div>
       <div class="form-actions" id="repwiz-nav" style="display:none">

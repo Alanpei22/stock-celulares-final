@@ -644,7 +644,12 @@ function _repIngresoISO() {
 //  WIZARD de ingreso de reparación (solo al CREAR; editar usa el form clásico)
 //  Mismo formulario/IDs de siempre, presentado de a un paso: saveRepair no cambia.
 // ══════════════════════════════════════════
-const _REPWIZ_TITLES = ['📱 Equipo', '🔧 Arreglo y estado', '💰 Precio', '👤 Cliente', '📎 Extras (opcional)'];
+// Eran 5 pasos. Ahora 3: en el mostrador, con el cliente esperando, cinco
+// pantallas es mucho. Se agruparon por lo que hacés, no por tipo de dato:
+// primero el aparato que tenés en la mano, después qué le vas a hacer y
+// cuánto sale, y al final quién es y cuándo lo busca. Lo que casi nunca se
+// toca (costo, notas, checklist, foto) quedó plegado en el paso 3.
+const _REPWIZ_TITLES = ['El equipo', 'El trabajo', 'Cliente y entrega'];
 let _repwizIdx = -1; // -1 = wizard apagado (form clásico)
 
 function _repwizStart() {
@@ -676,16 +681,43 @@ function _repwizRender() {
   if (hdr) hdr.style.display = '';
   if (nav) nav.style.display = '';
   if (actions) actions.style.display = 'none';
-  document.getElementById('repwiz-lbl').textContent = `Paso ${_repwizIdx + 1} de ${total} · ${_REPWIZ_TITLES[_repwizIdx]}`;
-  document.getElementById('repwiz-progress-fill').style.width = Math.round(((_repwizIdx + 1) / total) * 100) + '%';
+  // Pasos numerados en vez de la barrita de progreso: se ve dónde estás, qué
+  // falta y cómo se llama cada paso, todo de un vistazo. Los ya hechos son
+  // clickeables para volver sin perder lo cargado.
+  document.getElementById('repwiz-steps').innerHTML = _REPWIZ_TITLES.map((t, i) => {
+    const estado = i < _repwizIdx ? 'hecho' : (i === _repwizIdx ? 'actual' : 'pend');
+    return `<button type="button" class="repwiz-dot repwiz-dot--${estado}"
+              ${i < _repwizIdx ? `onclick="_repwizIr(${i})"` : 'disabled'}>
+        <span class="repwiz-dot-n">${i < _repwizIdx ? '✓' : i + 1}</span>
+        <span class="repwiz-dot-t">${t}</span>
+      </button>`;
+  }).join('<span class="repwiz-sep"></span>');
   document.getElementById('repwiz-back').style.visibility = _repwizIdx === 0 ? 'hidden' : '';
   document.getElementById('repwiz-next').textContent = last ? '💾 Guardar' : 'Siguiente ➡️';
   // Scroll arriba y foco en el primer campo del paso
   const body = document.querySelector('#rep-form-modal .modal-body');
   if (body) body.scrollTop = 0;
-  const focos = { 0: 'rep-fi-marca', 1: 'rep-fi-arreglo', 2: 'rep-fi-monto', 3: 'rep-fi-nombre' };
+  const focos = { 0: 'rep-fi-marca', 1: 'rep-fi-arreglo', 2: 'rep-fi-nombre' };
   const fid = focos[_repwizIdx];
   if (fid) setTimeout(() => document.getElementById(fid)?.focus(), 150);
+}
+
+// Volver a un paso ya hecho tocando su número. Solo hacia atrás: para ir
+// adelante hay que pasar por la validación.
+function _repwizIr(i) {
+  if (i < 0 || i >= _REPWIZ_TITLES.length || i > _repwizIdx) return;
+  _repwizIdx = i;
+  _repwizRender();
+}
+
+// "Más datos" del paso 3, plegado por defecto.
+function toggleRepExtras() {
+  const body  = document.getElementById('rep-extras-body');
+  const arrow = document.getElementById('rep-extras-arrow');
+  if (!body) return;
+  const abierto = !body.classList.contains('hidden');
+  body.classList.toggle('hidden', abierto);
+  if (arrow) arrow.textContent = abierto ? '▼' : '▲';
 }
 
 function _repwizValidarPaso() {

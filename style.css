@@ -5083,18 +5083,49 @@ body.dark {
 /* display:contents => en modo clásico los wrappers no alteran la grilla del form */
 .repwiz-step { display: contents; }
 .repwiz-step--hidden { display: none; }
-.repwiz-hdr { margin-bottom: 12px; }
-.repwiz-progress {
-  height: 5px; background: var(--bg2); border-radius: 3px; overflow: hidden;
+/* Pasos numerados. Reemplazan a la barrita de progreso + "Paso 1 de 5":
+   se ve dónde estás, cuánto falta y cómo se llama cada paso de un vistazo. */
+.repwiz-hdr {
+  margin: -4px -4px 16px; padding: 12px 4px 14px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 3; background: var(--card);
 }
-.repwiz-progress-fill {
-  height: 100%; width: 20%; background: var(--accent);
-  border-radius: 3px; transition: width .25s;
+.repwiz-steps { display: flex; align-items: center; gap: 0; }
+.repwiz-dot {
+  display: flex; align-items: center; gap: 7px;
+  background: none; border: none; padding: 0; cursor: default;
+  color: var(--text3); font-family: inherit; min-width: 0;
 }
-.repwiz-lbl {
-  margin-top: 6px; font-size: .8rem; font-weight: 700; color: var(--text2);
-  text-align: right;
+.repwiz-dot[onclick] { cursor: pointer; }
+.repwiz-dot-n {
+  display: grid; place-items: center; flex-shrink: 0;
+  width: 26px; height: 26px; border-radius: 50%;
+  font-size: .8rem; font-weight: 800;
+  background: var(--bg2); color: var(--text3);
+  border: 1.5px solid transparent; transition: background .2s, color .2s;
 }
+.repwiz-dot-t {
+  font-size: .78rem; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* El paso actual es el único que muestra su nombre completo: en un celu
+   angosto los tres nombres juntos no entran. */
+.repwiz-dot--pend .repwiz-dot-t { display: none; }
+.repwiz-dot--hecho .repwiz-dot-t { display: none; }
+.repwiz-dot--actual { color: var(--text); }
+.repwiz-dot--actual .repwiz-dot-n {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.repwiz-dot--hecho .repwiz-dot-n { background: #10b981; color: #fff; }
+.repwiz-sep {
+  flex: 1 1 auto; height: 2px; min-width: 12px;
+  background: var(--border); border-radius: 1px; margin: 0 8px;
+}
+
+/* Bloque "Más datos" del último paso. display:contents para que sus campos
+   entren en la grilla del formulario como los demás; al plegarlo lo tapa
+   `.hidden`, que ya es display:none !important. */
+.repwiz-extras { display: contents; }
 .cierre-usd-arqueo-title {
   margin: 14px 0 8px; padding-top: 12px;
   border-top: 1px solid var(--border);
