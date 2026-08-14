@@ -1025,7 +1025,9 @@ function _a5Body(rep, label) {
   const saldo = _prSaldo(rep);
   const accs  = _prAccs(rep.accesorios);
   const garFin = rep.diasGarantia > 0 ? _garantiaFin(rep.diasGarantia) : null;
-  const patron = rep.patronImg ? `<div class="patron">${rep.patronImg}</div>` : '';
+  // El patrón de desbloqueo NO se imprime. La boleta se la lleva el cliente y
+  // además queda dando vueltas por el mostrador: es la llave del teléfono en
+  // papel. El técnico lo ve dibujado en la ficha de la app.
   // El QR va DENTRO del recuadro de firmas: aprovecha el alto que ese bloque ya
   // ocupa, así no le suma milímetros a la hoja (el A5 entra justo).
   const qrSvgSeg = (typeof qrSeguimientoSvg === 'function') ? qrSeguimientoSvg(rep, 25) : '';
@@ -1062,7 +1064,8 @@ function _a5Body(rep, label) {
       <div class="f"><span>Marca</span><b>${_pr(rep.marca)}</b></div>
       <div class="f"><span>Modelo</span><b>${_pr(rep.modelo)}</b></div>
       ${rep.imei ? `<div class="f"><span>IMEI</span><b class="mono">${rep.imei}</b></div>` : ''}
-      ${rep.codigo ? `<div class="f"><span>Clave</span><b class="mono">${rep.codigo}</b></div>` : ''}
+      ${/* La clave NO se imprime: la boleta queda en el mostrador y se la lleva
+            el cliente. El técnico la ve en la ficha de la app. */ ''}
     </div>
   </div>
 
@@ -1075,7 +1078,6 @@ function _a5Body(rep, label) {
   ${_clA5(rep)}
   ${_verifHtml()}
   ${_importanteHtml()}
-  ${patron ? `<div class="box"><div class="box-t">Patrón de desbloqueo</div>${patron}</div>` : ''}
 
   ${(accs || rep.observaciones) ? `<div class="box">
     ${accs ? `<div class="f2"><span>Accesorios entregados:</span> ${accs}</div>` : ''}
@@ -1139,8 +1141,6 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:8.4px;line-
 .cl{font-size:7.4px;white-space:nowrap}
 .cl b{display:inline-block;width:8px;font-weight:800}
 .cl b.x{text-decoration:none}
-.patron{text-align:center;padding:2px 0}
-.patron svg{width:26mm;height:26mm;filter:grayscale(1) contrast(3)}
 .tot{width:100%;border-collapse:collapse;margin-bottom:4px}
 .tot td{border:.7px solid #000;padding:1.8px 6px}
 .tot .a{text-align:right;font-weight:700;width:34%}

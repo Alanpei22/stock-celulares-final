@@ -93,5 +93,26 @@ ok(/Fecha de entrega/.test(a5rec) && /Saldo abonado/.test(a5rec), 'tiene fecha d
 ok(/Firma del cliente/.test(a5rec), 'y la firma del cliente al retirar');
 ok(/GARANTÍA 90 DÍAS/.test(a5rec), 'con la garantía y su vencimiento');
 
+console.log('\n6) La boleta NO lleva la llave del teléfono');
+// La hoja se la lleva el cliente y además queda dando vueltas por el mostrador.
+// La clave y el patrón se ven en la ficha de la app, no impresos.
+ctx.__REP2 = Object.assign({}, ctx.__REP, {
+  codigo: '4821',
+  patron: [0,1,2,5,8],
+  patronImg: '<svg id="patron-de-prueba"></svg>',
+});
+const a5clave = vm.runInContext('_buildA5(__REP2)', ctx);
+ok(!/4821/.test(a5clave),               'no se imprime la clave/PIN', '4821');
+ok(!/patron-de-prueba/.test(a5clave),   'no se imprime el dibujo del patrón');
+ok(!/Patrón de desbloqueo/.test(a5clave), 'no queda ni el recuadro del patrón');
+ok(!/>Clave</.test(a5clave),            'no queda el renglón "Clave" del equipo');
+// Que no se haya llevado puesto lo demás del equipo
+ok(/356789102345678/.test(vm.runInContext(
+     '_buildA5(Object.assign({}, __REP2, { imei: "356789102345678" }))', ctx)),
+   'el IMEI sí se sigue imprimiendo');
+// La condición legal sobre la clave es otra cosa: es texto del contrato, se queda.
+ok(/clave o patrón se utiliza únicamente para diagnóstico/.test(a5clave),
+   'la cláusula legal sobre la clave se mantiene');
+
 console.log(fails ? `\n${fails} FALLARON` : '\nTodo OK');
 process.exit(fails ? 1 : 0);
