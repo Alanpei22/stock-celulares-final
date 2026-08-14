@@ -1882,7 +1882,33 @@
 <!-- ══════════════════════════════════════════════════
      MODAL: Costo requerido al entregar reparación
 ══════════════════════════════════════════════════ -->
-<div id="costo-req-overlay" class="modal-overlay hidden">
+<!-- ── "No va": por qué se cierra y si ya se devolvió ────────── -->
+<div id="nova-overlay" class="modal-overlay hidden"></div>
+<div id="nova-modal" class="modal-card nova-card hidden">
+  <div class="modal-header">
+    <h3>↩️ ¿Por qué no va?</h3>
+    <button class="modal-close" onclick="closeNoVaModal(null)">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="nova-rep-info" id="nova-info"></div>
+    <p class="costo-req-hint">En tres meses esto te dice si estás perdiendo trabajos por precio o por otra cosa.</p>
+
+    <div class="nova-motivos" id="nova-motivos"></div>
+
+    <label class="nova-devuelto">
+      <input type="checkbox" id="nova-devuelto">
+      <span><b>Ya le devolví el equipo al cliente</b><br>
+      <span style="color:var(--text3);font-size:.78rem">Si no, queda marcado como PARA DEVOLVER</span></span>
+    </label>
+
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="btn-secondary" style="flex:1" onclick="closeNoVaModal(null)">Cancelar</button>
+      <button class="btn-primary" style="flex:2" onclick="confirmNoVa()">✅ Cerrar la orden</button>
+    </div>
+  </div>
+</div>
+
+<div id="costo-req-overlay" class="modal-overlay hidden"
   <div class="modal-card costo-req-card">
     <div class="modal-header">
       <h3>💵 ¿Cuánto te costó esta reparación?</h3>

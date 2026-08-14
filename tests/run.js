@@ -31,6 +31,7 @@ const QUE_CUBRE = {
   'test-costo-opcional.js':   'Entregar una reparación sin que el costo sea obligatorio',
   'test-falla.js':            'La falla que declara el cliente: se guarda y va a la boleta',
   'test-arreglos.js':         'Varias reparaciones por equipo, con precio y tilde de hecha',
+  'test-motivo-nova.js':      'Por qué no va: la categoría del cierre y su desglose',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
 };
 

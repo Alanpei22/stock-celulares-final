@@ -765,6 +765,34 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 .det-arr-txt { flex: 1 1 auto; word-break: break-word; }
 .det-arr-precio { color: var(--text3); font-size: .82rem; white-space: nowrap; }
 .det-arr--hecha .det-arr-txt { text-decoration: line-through; color: var(--text3); }
+
+/* ── "No va": por qué se cierra la orden ────────────────── */
+.nova-card { max-width: 420px; }
+.nova-rep-info {
+ background: var(--bg2); border-radius: 10px; padding: 10px 12px;
+ font-size: .9rem; margin-bottom: 10px;
+}
+.nova-motivos { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 14px; }
+.nova-motivo {
+ display: flex; align-items: center; gap: 10px; width: 100%;
+ padding: 11px 13px; border: 1px solid var(--border); border-radius: 10px;
+ background: var(--bg); color: var(--text); font-size: .9rem;
+ text-align: left; cursor: pointer;
+}
+.nova-motivo:hover { border-color: var(--text3); }
+.nova-motivo--sel { border-color: #f59e0b; background: rgba(245, 158, 11, .1); font-weight: 700; }
+.nova-motivo-ico { font-size: 1.1rem; flex-shrink: 0; }
+.nova-devuelto {
+ display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+ padding: 11px 13px; border: 1px solid var(--border); border-radius: 10px;
+}
+.nova-devuelto input { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
+
+/* Desglose de motivos en las estadísticas */
+.rstats-motivos { display: flex; flex-direction: column; gap: 7px; }
+.rstats-motivo { display: flex; align-items: center; gap: 10px; }
+.rstats-motivo-lbl { flex: 0 0 44%; font-size: .82rem; color: var(--text2); }
+.rstats-motivo-nota { font-size: .75rem; color: var(--text3); margin-top: 6px; }
 .det-imei { font-family: 'SF Mono', 'Cascadia Code', monospace; font-size: .82rem; letter-spacing: .05em; }
 
 .det-sold-badge {

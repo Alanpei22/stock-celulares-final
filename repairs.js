@@ -831,6 +831,83 @@ function _renderArreglos() {
   _sugerirRepuestos();
 }
 
+// ══════════════════════════════════════════════════════════
+//  "NO VA" — por qué se cierra la orden
+// ══════════════════════════════════════════════════════════
+// Antes solo se preguntaba si el equipo ya se había devuelto, y el motivo era
+// un texto libre que además solo se llegaba desde el tablero de fases. Texto
+// libre no se puede contar: para saber si estás perdiendo trabajos por precio
+// hace falta una categoría.
+//
+// `motivoCierre` es campo NUEVO (categoría). El `motivo` de texto libre del
+// tablero se queda como estaba, para el detalle.
+const NOVA_MOTIVOS = [
+  { k: 'presupuesto', ico: '💸', txt: 'Rechazó el presupuesto' },
+  { k: 'sin-arreglo', ico: '🔧', txt: 'No tiene arreglo' },
+  { k: 'sin-repuesto', ico: '📦', txt: 'No se consigue el repuesto' },
+  { k: 'no-aparecio', ico: '👻', txt: 'El cliente no apareció' },
+  { k: 'otro',        ico: '❓', txt: 'Otro' },
+];
+
+function novaMotivoLabel(k) {
+  const m = NOVA_MOTIVOS.find(x => x.k === k);
+  return m ? m.txt : '';
+}
+
+// Cuando el cierre viene del tablero, la fase ya dice la categoría.
+function _motivoDesdeFase(fase) {
+  if (fase === 'irreparable') return 'sin-arreglo';
+  if (fase === 'rechazado')   return 'presupuesto';
+  return null;
+}
+
+let _novaCb = null;
+let _novaMotivo = null;
+
+// Devuelve Promise<{ motivoCierre, devuelto } | null>. null = canceló.
+function openNoVaModal(r) {
+  return new Promise(resolve => {
+    _novaCb = resolve;
+    _novaMotivo = null;
+    document.getElementById('nova-info').innerHTML =
+      `<b>N°${r.nOrden || '?'}</b> — ${esc(r.marca || '')} ${esc(r.modelo || '')}`;
+    document.getElementById('nova-devuelto').checked = false;
+    _renderNovaMotivos();
+    document.getElementById('nova-overlay').classList.remove('hidden');
+    document.getElementById('nova-modal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  });
+}
+
+function _renderNovaMotivos() {
+  document.getElementById('nova-motivos').innerHTML = NOVA_MOTIVOS.map(m => `
+    <button type="button" class="nova-motivo${_novaMotivo === m.k ? ' nova-motivo--sel' : ''}"
+            onclick="_pickNovaMotivo('${m.k}')">
+      <span class="nova-motivo-ico">${m.ico}</span>${m.txt}
+    </button>`).join('');
+}
+
+function _pickNovaMotivo(k) {
+  _novaMotivo = k;
+  _renderNovaMotivos();
+}
+
+function closeNoVaModal(result) {
+  document.getElementById('nova-overlay').classList.add('hidden');
+  document.getElementById('nova-modal').classList.add('hidden');
+  document.body.style.overflow = '';
+  if (_novaCb) { const cb = _novaCb; _novaCb = null; cb(result); }
+  _novaMotivo = null;
+}
+
+function confirmNoVa() {
+  if (!_novaMotivo) { toast('Elegí por qué no va', 'error'); return; }
+  closeNoVaModal({
+    motivoCierre: _novaMotivo,
+    devuelto: document.getElementById('nova-devuelto').checked,
+  });
+}
+
 // ── La lista en la ficha, con el tilde de "hecho" ───────────
 // Acá sí sirve tildar: si el equipo entró por módulo + batería y el módulo ya
 // está, verlo de un vistazo vale. En el alta no, porque no hay nada hecho.
@@ -1652,12 +1729,27 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}) {
   const r = REPAIRS.find(x => x.id === id);
   if (!r) return;
 
-  // ── "No va" → preguntar si el equipo ya fue devuelto al cliente ──
+  // ── "No va" → por qué, y si el equipo ya se devolvió ──
   if (newStatus === 'no va' || newStatus === 'cancelado') {
-    const devuelto = confirm('↩️ ¿Ya le devolviste el equipo al cliente (sin reparar)?\n\nAceptar = DEVUELTO\nCancelar = queda PARA DEVOLVER');
+    // Si viene del tablero de fases, la categoría ya está: la fase misma
+    // distingue "no tiene arreglo" de "rechazó el presupuesto", y el tablero
+    // además ya pidió el motivo en texto libre. Preguntar de nuevo sería
+    // preguntar dos veces por lo mismo.
+    const desdeTablero = _motivoDesdeFase(faseExtra.fase);
+    if (desdeTablero) {
+      await _doChangeRepairStatus(id, 'no va', r, {
+        ...faseExtra,
+        motivoCierre: desdeTablero,
+        ...(faseExtra.devuelto ? {} : { devuelto: false }),
+      });
+      return;
+    }
+    const res = await openNoVaModal(r);
+    if (!res) return;   // canceló: la orden queda como estaba
     await _doChangeRepairStatus(id, 'no va', r, {
       ...faseExtra,
-      ...(devuelto ? { devuelto: true, fechaEntrega: new Date().toISOString() } : { devuelto: false }),
+      motivoCierre: res.motivoCierre,
+      ...(res.devuelto ? { devuelto: true, fechaEntrega: new Date().toISOString() } : { devuelto: false }),
     });
     return;
   }
@@ -2533,10 +2625,24 @@ function _calcStatsForPeriod(from, to) {
   });
   const ingresadas = reps.length;
   const entregadas = reps.filter(r => r.estado === 'entregado');
-  const canceladas = reps.filter(r => r.estado === 'cancelado' || r.estado === 'no_van');
+  // BUG-FIX: filtraban por 'no_van' con guión bajo, que la app nunca escribe
+  // (el estado real es 'no va'). El contador de canceladas daba casi siempre 0.
+  // _esNoVa cubre las tres variantes que hay en la base: 'no va', 'cancelado'
+  // y la legacy 'no van'.
+  const canceladas = reps.filter(r => _esNoVa(r.estado));
   const reparando  = reps.filter(r => r.estado === 'reparando');
   const listas     = reps.filter(r => r.estado === 'listo');
-  const noVan      = reps.filter(r => r.estado === 'no_van');
+  const noVan      = canceladas;
+
+  // Por qué se cerraron sin arreglar. Solo cuenta las que tienen `motivoCierre`
+  // (campo nuevo): las viejas no lo tienen y no se pueden inventar.
+  const motivos = {};
+  canceladas.forEach(r => {
+    if (!r.motivoCierre) return;
+    motivos[r.motivoCierre] = (motivos[r.motivoCierre] || 0) + 1;
+  });
+  const topMotivos = Object.entries(motivos).sort((a, b) => b[1] - a[1]);
+  const sinMotivo  = canceladas.filter(r => !r.motivoCierre).length;
 
   // Recaudado y ganancia: SOLO entregadas (el dinero entra cuando se entrega)
   const recaudado  = entregadas.reduce((s, r) => s + (Number(r.monto) || 0), 0);
@@ -2610,6 +2716,7 @@ function _calcStatsForPeriod(from, to) {
     avgIngresoListo, avgListoEntrega, avgTotal,
     tasaEntrega, tasaCancel,
     topMarcas, topArreglos, topTecnicos,
+    topMotivos, sinMotivo,
     conCosto: conCosto.length,
   };
 }
@@ -2712,6 +2819,18 @@ function buildRepairStatsHTML(tab) {
       <div class="rstats-rate"><span class="rstats-rate-lbl">Tasa de cancelación</span><span class="rstats-rate-val">${Math.round(cur.tasaCancel*100)}%</span></div>
       <div class="rstats-rate"><span class="rstats-rate-lbl">Ticket promedio</span><span class="rstats-rate-val">${_fmtMoney(cur.ticketProm)}</span></div>
     </div>
+    ${cur.topMotivos.length > 0 ? `
+      <h4 class="rstats-section-title">Por qué no se hicieron</h4>
+      <div class="rstats-motivos">
+        ${cur.topMotivos.map(([k, n]) => `
+          <div class="rstats-motivo">
+            <span class="rstats-motivo-lbl">${esc(novaMotivoLabel(k) || k)}</span>
+            <div class="rstats-funnel-bar"><div class="rstats-funnel-fill"
+                 style="width:${cur.canceladas > 0 ? Math.round(n*100/cur.canceladas) : 0}%;background:#f59e0b"></div></div>
+            <span class="rstats-funnel-val">${n}</span>
+          </div>`).join('')}
+        ${cur.sinMotivo > 0 ? `<p class="rstats-motivo-nota">${cur.sinMotivo} sin motivo cargado (son de antes de que se pidiera)</p>` : ''}
+      </div>` : ''}
   ` : '';
 
   // ── KPI MINIS ──
@@ -3341,11 +3460,14 @@ async function quickStatusChange(e, id, newStatus) {
   const rep = REPAIRS.find(x => x.id === id);
   if (!rep) return;
 
-  // ── "No va" → preguntar si ya fue devuelto ──
+  // ── "No va" → por qué, y si ya fue devuelto ──
   if (newStatus === 'no va' || newStatus === 'cancelado') {
-    const devuelto = confirm('↩️ ¿Ya le devolviste el equipo al cliente (sin reparar)?\n\nAceptar = DEVUELTO\nCancelar = queda PARA DEVOLVER');
-    await _doStatusChange(id, 'no va',
-      devuelto ? { devuelto: true, fechaEntrega: new Date().toISOString() } : { devuelto: false });
+    const res = await openNoVaModal(rep);
+    if (!res) return;   // canceló
+    await _doStatusChange(id, 'no va', {
+      motivoCierre: res.motivoCierre,
+      ...(res.devuelto ? { devuelto: true, fechaEntrega: new Date().toISOString() } : { devuelto: false }),
+    });
     return;
   }
 
