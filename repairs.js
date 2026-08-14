@@ -743,6 +743,7 @@ function openRepairForm(id) {
 
     const imeiEl = document.getElementById('rep-fi-imei');
     if (imeiEl) imeiEl.value = r.imei || '';
+    document.getElementById('rep-fi-falla').value      = r.falla        || '';
     document.getElementById('rep-fi-condicion').value  = r.condicion    || '';
     document.getElementById('rep-fi-codigo').value     = r.codigo       || '';
     document.getElementById('rep-fi-monto').value      = r.monto        || '';
@@ -804,7 +805,7 @@ function openRepairForm(id) {
       if (!ordenInput.value) ordenInput.value = suggested;
     }).catch(() => {});
 
-    ['rep-fi-marca','rep-fi-modelo','rep-fi-imei','rep-fi-condicion','rep-fi-codigo',
+    ['rep-fi-marca','rep-fi-modelo','rep-fi-imei','rep-fi-falla','rep-fi-condicion','rep-fi-codigo',
      'rep-fi-monto','rep-fi-sena','rep-fi-costo','rep-fi-fecha-est',
      'rep-fi-nombre','rep-fi-tlf','rep-fi-dni','rep-fi-obs'].forEach(fid => {
       const el = document.getElementById(fid);
@@ -953,6 +954,9 @@ async function saveRepair() {
   const arregloCustom = document.getElementById('rep-fi-arreglo-custom').value.trim();
   const arreglo  = arregloSel === 'Otro' ? arregloCustom : arregloSel;
   const imei     = (document.getElementById('rep-fi-imei') || {}).value?.trim() || '';
+  // La falla es lo que cuenta el cliente ("se apaga solo"). Es distinta del
+  // tipo de arreglo (la categoría) y de la condición visual (los golpes).
+  const falla    = (document.getElementById('rep-fi-falla') || {}).value?.trim() || '';
   const condicion= document.getElementById('rep-fi-condicion').value.trim();
   const codigo   = document.getElementById('rep-fi-codigo').value.trim();
   const monto       = parseFloat(document.getElementById('rep-fi-monto').value)       || 0;
@@ -993,7 +997,7 @@ async function saveRepair() {
       if (!existing) { closeRepairForm(); return; }
       const updateData = {
         ...existing,
-        marca, modelo, arreglo, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
+        marca, modelo, arreglo, falla, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaIngreso: _repIngresoISO(),
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs, diasGarantia, checklist,
         seguimientoFecha, seguimientoNota, seguimientoAck: seguimientoFecha ? (existing.seguimientoFecha === seguimientoFecha ? (existing.seguimientoAck || false) : false) : null
@@ -1046,7 +1050,7 @@ async function saveRepair() {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const ahora = _repIngresoISO(); // fecha de ingreso elegida con las flechas (hoy por defecto)
       const newDoc = {
-        id, nOrden, marca, modelo, arreglo, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
+        id, nOrden, marca, modelo, arreglo, falla, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs,
         estado: 'reparando',
         // Fase inicial del tablero (mapea a estado 'reparando')
@@ -1206,6 +1210,10 @@ function openRepairDetail(id) {
 
   document.getElementById('rep-det-body').innerHTML = `
     ${faseBloque}
+    ${r.falla ? `<div class="det-row det-row--full">
+      <span class="det-label">Falla declarada</span>
+      <span class="det-val">${esc(r.falla)}</span>
+    </div>` : ''}
     <div class="det-row">
       <span class="det-label">Arreglo</span>
       <span class="det-val">${esc(r.arreglo || '—')}</span>
@@ -3415,6 +3423,7 @@ function openTicket(id) {
 
     <div class="ticket-section">EQUIPO</div>
     <div class="ticket-row"><span class="ticket-lbl">Equipo</span><span class="ticket-val">${esc(r.marca)} ${esc(r.modelo)}</span></div>
+    ${r.falla ? `<div class="ticket-row tk-wrap"><span class="ticket-lbl">Falla</span><span class="ticket-val">${esc(r.falla)}</span></div>` : ''}
     <div class="ticket-row"><span class="ticket-lbl">Arreglo</span><span class="ticket-val">${esc(r.arreglo || '—')}</span></div>
     ${r.condicion ? `<div class="ticket-row tk-wrap"><span class="ticket-lbl">Condición</span><span class="ticket-val">${esc(r.condicion)}</span></div>` : ''}
     ${accs ? `<div class="ticket-row tk-wrap"><span class="ticket-lbl">Accesorios</span><span class="ticket-val">${accs}</span></div>` : ''}
@@ -3548,10 +3557,12 @@ async function aiRepairDiagnosis() {
     ? document.getElementById('rep-fi-arreglo-custom').value
     : document.getElementById('rep-fi-arreglo').value;
   const condicion = (document.getElementById('rep-fi-condicion').value || '').trim();
-  const problema  = [arreglo, condicion].filter(Boolean).join('. ');
+  // La falla que contó el cliente va primero: es lo más útil para el diagnóstico.
+  const falla     = ((document.getElementById('rep-fi-falla') || {}).value || '').trim();
+  const problema  = [falla, arreglo, condicion].filter(Boolean).join('. ');
 
   if (!marca || !modelo)  { toast('Completá marca y modelo primero', 'error'); return; }
-  if (!problema)          { toast('Seleccioná el tipo de arreglo', 'error'); return; }
+  if (!problema)          { toast('Escribí la falla o elegí el tipo de arreglo', 'error'); return; }
 
   try {
     const text = await callAI('diagnosis', { marca, modelo, problema });

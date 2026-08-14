@@ -29,6 +29,7 @@ const QUE_CUBRE = {
   'test-retiro-dueno.js':     'Retiro dueño: no es gasto, no baja el total del mes',
   'test-api-auth.js':         'Que ninguna función de /api quede abierta a internet',
   'test-costo-opcional.js':   'Entregar una reparación sin que el costo sea obligatorio',
+  'test-falla.js':            'La falla que declara el cliente: se guarda y va a la boleta',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
 };
 

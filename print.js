@@ -402,6 +402,10 @@ function _a5Body(rep, label) {
 
   <div class="box">
     <div class="box-t">Trabajo a realizar</div>
+    ${/* La falla que declaró el cliente va antes que el arreglo: deja por
+          escrito con qué problema entró el equipo, que es lo que después se
+          discute si hay reclamo. */ ''}
+    ${rep.falla ? `<div class="f2"><span>Falla declarada:</span> ${rep.falla}</div>` : ''}
     <div class="desc">${_pr(rep.arreglo)}</div>
     ${rep.condicion ? `<div class="f2"><span>Condición estética al ingreso:</span> ${rep.condicion}</div>` : ''}
   </div>
