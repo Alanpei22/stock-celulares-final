@@ -13,6 +13,8 @@ const el = id => els[id] = { id, value: '', textContent: '', innerHTML: '', styl
 ['mov-fi-desc', 'mov-desc-suggest', 'mov-fi-monto', 'mov-sale-item-info'].forEach(el);
 
 const ctx = {
+  // fmt() y _todayAR() viven en utils.js, que este harness no carga.
+  _todayAR: () => '2026-08-14',
   console, setTimeout: () => 0, clearTimeout,
   document: { getElementById: id => els[id] || null, querySelector: () => null, querySelectorAll: () => [],
               createElement: () => el('tmp'), addEventListener() {},

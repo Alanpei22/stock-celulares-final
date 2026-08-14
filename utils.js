@@ -23,6 +23,20 @@ function fmtMoney(n) {
     .toLocaleString('es-AR');
 }
 
+// Igual que fmtMoney, con el nombre corto que usa media app.
+// VIVE ACÁ, no en caja.js: index.html no carga caja.js, así que todo lo que
+// llame a fmt() desde reparaciones o stock reventaba con ReferenceError.
+function fmt(n) {
+  return '$' + Math.abs(Math.round(Number(n) || 0)).toLocaleString('es-AR');
+}
+
+// Fecha de HOY en horario de Argentina (UTC-3), formato YYYY-MM-DD.
+// Misma historia que fmt(): la usa la caja y también el cobro de una
+// reparación, que se dispara desde index.html.
+const _todayAR = () => new Date()
+  .toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' })
+  .slice(0, 10);
+
 // Formato numérico: 12.500 (sin signo $)
 function fmtNum(n) {
   return Number(n || 0).toLocaleString('es-AR', {

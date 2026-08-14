@@ -448,7 +448,18 @@ async function tpCambiarFase(id, nuevaFase) {
   // Si además cambia el estado, va por el camino de siempre: ahí viven el
   // cobro en caja, el descuento de repuesto, la guardia de costo, el aviso
   // de Telegram y el seguimiento público del QR.
+  //
+  // changeRepairStatus vive en repairs.js, que carga index.html y NO caja.html
+  // (allá este archivo se carga solo por tpFaseDe/tpHistorial, que usa
+  // seguimiento.js). El tablero no se dibuja en la caja, así que esto no
+  // debería pasar nunca: si pasa, que se vea, en vez de tirar un error suelto
+  // que nadie mira.
   if (estadoNuevo !== r.estado) {
+    if (typeof changeRepairStatus !== 'function') {
+      console.error('tpCambiarFase: changeRepairStatus no está cargado en esta página');
+      if (typeof toast === 'function') toast('Esta acción solo funciona desde Reparaciones', 'error');
+      return;
+    }
     await changeRepairStatus(id, estadoNuevo, faseExtra);
     return;
   }

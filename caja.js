@@ -28,8 +28,8 @@ let ARQUEO = null;
 let _movTipo = 'ingreso'; // HIGH-02: track tipo via module variable
 let _cajaChicaFecha = null; // fecha del preset de caja chica encontrado
 let _dateToken = 0; // BUG-FIX: token que se incrementa al cambiar de fecha; los async viejos descartan su resultado si ya cambió
-// Fecha en horario Argentina (UTC-3)
-const _todayAR = () => new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
+// _todayAR() vive en utils.js: también la usa el cobro de una reparación,
+// que corre en index.html, donde caja.js no se carga.
 let currentDate = _todayAR();
 let movListener = null;
 let editingMovId = null;
@@ -3469,9 +3469,7 @@ async function saveCierreParcial() {
 // ══════════════════════════════════════════
 // LOW-03: esc() defined in utils.js — duplicate removed
 
-function fmt(n) {
-  return '$' + Math.abs(Math.round(n)).toLocaleString('es-AR');
-}
+// fmt() vive en utils.js — se movió porque index.html no carga caja.js.
 
 function toast(msg, type = 'success') {
   const el = document.createElement('div');

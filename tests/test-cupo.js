@@ -27,6 +27,8 @@ function fakeQuery(nombre, filtros = []) {
 }
 
 const ctx = {
+  // fmt() y _todayAR() viven en utils.js, que este harness no carga.
+  _todayAR: () => '2026-08-14',
   console, setTimeout: () => 0, clearTimeout, setInterval: () => 0, clearInterval: () => {},
   document: { getElementById: id => els[id] || el(id), querySelector: () => null, querySelectorAll: () => [],
               createElement: () => el('tmp'), addEventListener() {}, hidden: false,

@@ -32,6 +32,7 @@ const QUE_CUBRE = {
   'test-falla.js':            'La falla que declara el cliente: se guarda y va a la boleta',
   'test-arreglos.js':         'Varias reparaciones por equipo, con precio y tilde de hecha',
   'test-motivo-nova.js':      'Por qué no va: la categoría del cierre y su desglose',
+  'test-cross-pagina.js':     'Que una pantalla no llame a algo que su página no carga',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
 };
 

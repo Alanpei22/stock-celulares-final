@@ -31,6 +31,8 @@ const sandboxDoc = {
 };
 
 const ctx = {
+  // fmt() y _todayAR() viven en utils.js, que este harness no carga.
+  _todayAR: () => '2026-08-14',
   console, setTimeout, clearTimeout, requestAnimationFrame: f => f(),
   document: sandboxDoc,
   window: { addEventListener(){}, matchMedia: () => ({ matches:false, addEventListener(){} }), location:{href:''} },
