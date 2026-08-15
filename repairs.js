@@ -411,7 +411,7 @@ function renderRepairs() {
           <div class="card-info">
             <span class="card-marca">📱 ${esc(r.marca || '')} · N°${r.nOrden || '?'}</span>
             <span class="card-modelo">${esc(r.modelo || '')}</span>
-            <span class="card-specs">🔧 ${esc(r.arreglo || '')}</span>
+            ${_arregloCardHtml(r)}
           </div>
           <div class="card-right">
             ${typeof tpChipHtml === 'function' ? tpChipHtml(r) : `<span class="badge ${st.cls}">${st.label}</span>`}
@@ -938,6 +938,24 @@ function confirmNoVa() {
     motivoCierre: _novaMotivo,
     devuelto: document.getElementById('nova-devuelto').checked,
   });
+}
+
+// ── El arreglo en la card de la lista ───────────────────────
+// Con varias reparaciones, `arreglo` es el resumen ("Módulo + Batería + Ficha
+// de carga") y en una card angosta eso envolvía a tres líneas. Acá va solo la
+// primera, en una línea, y al lado cuántas hechas sobre el total. La lista
+// completa está en la ficha.
+function _arregloCardHtml(r) {
+  const lista = _arreglosDesdeRepair(r);
+  if (lista.length <= 1) {
+    return `<span class="card-specs">🔧 ${esc(r.arreglo || '')}</span>`;
+  }
+  const hechas = lista.filter(a => a.hecho).length;
+  const todas  = hechas === lista.length;
+  return `<span class="card-specs">
+    <span class="card-arr-txt">🔧 ${esc(lista[0].texto)}</span>
+    <span class="card-arr-n ${todas ? 'card-arr-n--ok' : ''}">${todas ? '✓ ' : ''}${hechas}/${lista.length}</span>
+  </span>`;
 }
 
 // ── La lista en la ficha, con el tilde de "hecho" ───────────

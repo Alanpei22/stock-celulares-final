@@ -147,6 +147,44 @@ WRITES.length = 0;
   ok(Object.keys(w[2]).length === 1,
      'solo escribe `arreglos`: no pisa estado, fase ni monto', Object.keys(w[2]));
 
+  // ── 5b) La card de la lista ───────────────────────────────
+  console.log('\n5b) La card no se estira con varias reparaciones');
+  // El resumen ("Módulo + Batería + Ficha de carga") envolvía a tres renglones
+  // y dejaba las cards de distinto alto. En la card va solo la primera, en una
+  // línea, con el contador al lado. La lista completa está en la ficha.
+  ctx.__UNA = { id: 'u', arreglo: 'Módulo / Pantalla', monto: 85000 };
+  const cardUna = get('_arregloCardHtml(__UNA)');
+  ok(/🔧 Módulo \/ Pantalla/.test(cardUna), 'con una sola, se ve igual que antes');
+  ok(!/card-arr-n/.test(cardUna), 'y sin contador al lado');
+
+  ctx.__TRES = { id: 't', arreglo: 'Módulo + Batería + Ficha', arreglos: [
+    { texto: 'Módulo / Pantalla', precio: 85000, hecho: true },
+    { texto: 'Batería', precio: 25000, hecho: false },
+    { texto: 'Ficha de carga', precio: 18000, hecho: false },
+  ] };
+  const cardTres = get('_arregloCardHtml(__TRES)');
+  ok(/🔧 Módulo \/ Pantalla/.test(cardTres), 'con varias, muestra la primera');
+  ok(!/Batería|Ficha de carga/.test(cardTres),
+     'y NO las demás (era lo que estiraba la card)', cardTres);
+  ok(/card-arr-n[^>]*>1\/3</.test(cardTres),
+     'con el contador de hechas sobre el total', cardTres);
+  ok(/card-arr-txt/.test(cardTres),
+     'el texto va en su propio span, para poder cortarlo con puntos suspensivos');
+
+  ctx.__LISTA = { id: 'l', arreglo: 'A + B', arreglos: [
+    { texto: 'A', hecho: true }, { texto: 'B', hecho: true },
+  ] };
+  const cardOk = get('_arregloCardHtml(__LISTA)');
+  ok(/card-arr-n--ok/.test(cardOk) && /✓ 2\/2/.test(cardOk),
+     'cuando están todas hechas se ve de un vistazo', cardOk);
+
+  // El CSS que impide que se estire
+  const cssTxt = leer('style.css');
+  ok(/\.card-arr-txt[^}]*text-overflow: ellipsis/.test(cssTxt),
+     'el CSS corta el texto largo en vez de envolverlo');
+  ok(/\.card-specs\s*\{[^}]*display: flex/.test(cssTxt),
+     'y el contador queda al lado, no abajo');
+
   // ── 6) El aviso de repuestos no gasta cupo ────────────────
   console.log('\n6) El aviso de stock de repuestos');
   const cuerpo = leer('repairs.js');
