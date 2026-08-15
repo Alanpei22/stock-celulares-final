@@ -375,35 +375,7 @@ function renderRepairs() {
       ? `<span class="rep-cl-badge">${clFallas} falla${clFallas > 1 ? 's' : ''} al ingreso</span>`
       : '';
 
-    // Quick action chips
-    const CHIP_CFG = {
-      listo:     { ico: '✅', label: 'LISTO',      cls: 'chip-listo'     },
-      entregado: { ico: '📦', label: 'ENTREGADO',  cls: 'chip-entregado' },
-      reparando: { ico: '🔧', label: 'REPARANDO',  cls: 'chip-reparando' },
-      cancelado: { ico: '✖',  label: 'NO VAN',     cls: 'chip-cancelado' },
-    };
-    const CHIP_MAP = {
-      reparando: ['listo', 'cancelado'],
-      listo:     ['entregado', 'reparando', 'cancelado'],
-      entregado: ['reparando'],
-      cancelado: ['entregado', 'reparando'],  // después de "no van" → se puede entregar o volver a reparar
-      'no van':  ['entregado', 'reparando'],  // soporte para datos legacy
-    };
-    const chipsToShow = (CHIP_MAP[r.estado] || []);
-    const chipsHTML = chipsToShow.map(st => {
-      const c = CHIP_CFG[st];
-      return `<button class="card-chip ${c.cls}" onclick="quickStatusChange(event,'${r.id}','${st}')">${c.ico} ${c.label}</button>`;
-    }).join('');
-    const garantiaChip = !r.esGarantia && r.estado !== 'cancelado'
-      ? `<button class="card-chip chip-garantia" onclick="event.stopPropagation();openGarantiaModal('${r.id}')">🔄 GARANTÍA</button>`
-      : '';
-    // Chip COBRAR: solo si tiene monto, no fue cobrado aún, y estado es listo o entregado
-    const cobrarChip = (r.monto > 0 && !r.cobrado && (r.estado === 'listo' || r.estado === 'entregado'))
-      ? `<button class="card-chip chip-cobrar" onclick="event.stopPropagation();openCobroModal(REPAIRS.find(x=>x.id==='${r.id}'))">💰 COBRAR</button>`
-      : '';
-    const quickBtn = (chipsHTML || garantiaChip || cobrarChip)
-      ? `<div class="card-quick-actions" onclick="event.stopPropagation()">${chipsHTML}${garantiaChip}${cobrarChip}</div>`
-      : '';
+    const acciones = _cardAccionesHtml(r);
 
     return `
       <div class="card rep-card ${cardClass}" onclick="openRepairDetail('${r.id}')">
@@ -419,7 +391,9 @@ function renderRepairs() {
             ${typeof tpDesde === 'function'
               ? `<span class="tp-dias ${isDemorado ? 'rojo' : ''}">${tpTxtTiempo(tpDesde(r))} acá${isDemorado ? ' ⚠️' : ''}</span>`
               : (isDemorado ? '<span class="badge" style="margin-top:3px;background:#fee2e2;color:#dc2626;font-size:.6rem">⚠️ Demorado</span>' : '')}
-            ${r.tlf ? `<button class="card-wa-btn" title="WhatsApp" onclick="event.stopPropagation();repairWhatsApp('${r.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#25D366" width="28" height="28"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg></button>` : ''}
+            ${/* El ícono de WhatsApp se fue de acá: ahora es el chip "Avisar",
+                  con el resto de las acciones. Tenerlo en dos lugares de la
+                  misma card era ruido. */ ''}
           </div>
         </div>
         ${typeof tpStepsHtml === 'function' ? tpStepsHtml(r) : ''}
@@ -434,10 +408,7 @@ function renderRepairs() {
         ${saldoVal ? `<div class="card-saldo-row">${saldoHTML}</div>` : ''}
         ${diasBadgeHTML || clHTML ? `<div class="card-extras-row">${diasBadgeHTML}${clHTML}</div>` : ''}
         ${notaHTML}
-        <div class="card-quick-actions" onclick="event.stopPropagation()">
-          ${chipsHTML}${garantiaChip}${cobrarChip}
-          <button class="card-chip chip-nota" onclick="openNotaModal('${r.id}')">${r.notaRapida ? '📝' : '📝 NOTA'}</button>
-        </div>
+        ${acciones}
       </div>`;
   }).join('');
 }
@@ -938,6 +909,102 @@ function confirmNoVa() {
     motivoCierre: _novaMotivo,
     devuelto: document.getElementById('nova-devuelto').checked,
   });
+}
+
+// ══════════════════════════════════════════════════════════
+//  ACCIONES DE LA CARD
+// ══════════════════════════════════════════════════════════
+// Antes eran hasta 4 chips del mismo peso en una fila envuelta: la acción que
+// hacés veinte veces por día (avanzar el estado) competía visualmente con
+// GARANTÍA, que tocás una vez cada tanto.
+//
+// Ahora hay dos niveles:
+//   · Primarias: lo del día a día. Sólidas, grandes, fáciles de acertar en el
+//     celu. Como mucho tres: avanzar el estado, cobrar y avisar al cliente.
+//   · Secundarias: el resto, en fantasma y más chicas. Están cuando las
+//     necesitás pero no le gritan al ojo.
+
+const _EST_CFG = {
+  listo:     { ico: '✅', label: 'Listo',     cls: 'chip-listo'     },
+  entregado: { ico: '📦', label: 'Entregado', cls: 'chip-entregado' },
+  reparando: { ico: '🔧', label: 'Reparando', cls: 'chip-reparando' },
+  cancelado: { ico: '✖',  label: 'No va',     cls: 'chip-cancelado' },
+};
+// A qué estados se puede saltar desde cada uno
+const _EST_MAP = {
+  reparando: ['listo', 'cancelado'],
+  listo:     ['entregado', 'reparando', 'cancelado'],
+  entregado: ['reparando'],
+  cancelado: ['entregado', 'reparando'],  // "no va" → se puede entregar o reabrir
+  'no van':  ['entregado', 'reparando'],  // datos legacy
+};
+// El paso natural: el que hacés sin pensar. Va como acción principal.
+const _EST_SIGUIENTE = { reparando: 'listo', listo: 'entregado' };
+
+function _cardAccionesHtml(r) {
+  const pri = [], sec = [];
+  const chip = (cls, extra, onclick, ico, label) =>
+    `<button class="card-chip ${cls} ${extra}" onclick="${onclick}">${ico} ${label}</button>`;
+
+  // ── Primarias ──
+  const sig = _EST_SIGUIENTE[r.estado];
+  if (sig) {
+    const c = _EST_CFG[sig];
+    pri.push(chip(c.cls, 'card-chip--pri', `quickStatusChange(event,'${r.id}','${sig}')`, c.ico, c.label));
+  }
+  if (r.monto > 0 && !r.cobrado && (r.estado === 'listo' || r.estado === 'entregado')) {
+    pri.push(chip('chip-cobrar', 'card-chip--pri',
+      `event.stopPropagation();abrirCobro('${r.id}')`, '💰', 'Cobrar'));
+  }
+  // Avisar por WhatsApp: la acción más usada del día, y hasta ahora estaba
+  // como un ícono suelto arriba, lejos del resto de los botones.
+  if (r.tlf) {
+    pri.push(chip('chip-wa', 'card-chip--pri',
+      `event.stopPropagation();repairWhatsApp('${r.id}')`, '📲', 'Avisar'));
+  }
+
+  // ── Secundarias ──
+  (_EST_MAP[r.estado] || []).filter(st => st !== sig).forEach(st => {
+    const c = _EST_CFG[st];
+    sec.push(chip(c.cls, 'card-chip--sec', `quickStatusChange(event,'${r.id}','${st}')`, c.ico, c.label));
+  });
+  if (r.tlf) {
+    sec.push(chip('chip-tel', 'card-chip--sec',
+      `event.stopPropagation();window.location.href='tel:${String(r.tlf).replace(/\D/g, '')}'`, '📞', 'Llamar'));
+  }
+  // Reimprimir la boleta: pasaba seguido y había que abrir la ficha para eso.
+  sec.push(chip('chip-boleta', 'card-chip--sec',
+    `event.stopPropagation();reimprimirBoleta('${r.id}')`, '🖨', 'Boleta'));
+  // Garantía: solo tiene sentido en un equipo YA entregado que volvió. Antes
+  // aparecía en casi todas las cards, incluso en las que seguían en el taller.
+  if (!r.esGarantia && r.estado === 'entregado') {
+    sec.push(chip('chip-garantia', 'card-chip--sec',
+      `event.stopPropagation();openGarantiaModal('${r.id}')`, '🔄', 'Garantía'));
+  }
+  sec.push(chip('chip-nota', 'card-chip--sec',
+    `event.stopPropagation();openNotaModal('${r.id}')`, '📝', r.notaRapida ? 'Ver nota' : 'Nota'));
+
+  return `
+    <div class="card-acciones" onclick="event.stopPropagation()">
+      ${pri.length ? `<div class="card-acc-pri">${pri.join('')}</div>` : ''}
+      <div class="card-acc-sec">${sec.join('')}</div>
+    </div>`;
+}
+
+// Abrir el cobro desde la card. Antes el onclick traía la búsqueda entera
+// escrita adentro (`REPAIRS.find(x=>x.id===...)`), con un ">" que ensucia el
+// atributo HTML.
+function abrirCobro(id) {
+  const r = REPAIRS.find(x => x.id === id);
+  if (r) openCobroModal(r);
+}
+
+// Reimprimir la boleta desde la lista, sin abrir la ficha.
+function reimprimirBoleta(id) {
+  const r = REPAIRS.find(x => x.id === id);
+  if (!r) return;
+  window._printRep = r;          // print.js lee de acá
+  printRepair('A5');
 }
 
 // ── El arreglo en la card de la lista ───────────────────────

@@ -1448,16 +1448,8 @@ body.dark .rep-print-btn--out:hover { background: rgba(34,197,94,0.15); border-c
  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
-/* ── WA BUTTON ON CARD ── */
-.card-wa-btn {
- background: none; border: none;
- line-height: 1; cursor: pointer;
- padding: 2px; display: block; margin-top: 4px;
- opacity: .9; transition: opacity .15s, transform .15s;
- touch-action: manipulation;
-}
-.card-wa-btn svg { display: block; }
-.card-wa-btn:active { opacity: 1; transform: scale(1.2); }
+/* El ícono suelto de WhatsApp de la card se fue: ahora es el chip "Avisar",
+   junto al resto de las acciones. */
 
 /* ── STATE HISTORY TIMELINE ── */
 .state-timeline { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
@@ -1520,8 +1512,7 @@ body.dark .rep-print-btn--out:hover { background: rgba(34,197,94,0.15); border-c
  font-weight: 500; cursor: pointer; line-height: 1.3;
  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.chip-nota { background: var(--bg1); color: var(--text2); border: 1.5px solid var(--border); }
-.chip-nota:hover { background: var(--bg2); color: var(--text); }
+/* .chip-nota ya no tiene estilo propio: usa .card-chip--sec como las demas secundarias. */
 
 /* ── NOTA MODAL ── */
 .nota-overlay { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,.2); backdrop-filter: blur(8px); }
@@ -1561,30 +1552,52 @@ body.dark .rep-print-btn--out:hover { background: rgba(34,197,94,0.15); border-c
 .btn-nota-save:active { transform: scale(.97); }
 
 /* ── QUICK ACTION CHIPS ── */
-.card-quick-actions {
- padding: 7px 12px 10px;
- display: flex; gap: 5px; flex-wrap: wrap;
+/* ── ACCIONES DE LA CARD ──────────────────────────────────
+   Dos niveles. Arriba lo del día a día (sólido, grande, fácil de acertar con
+   el pulgar). Abajo el resto, en fantasma: están cuando las necesitás pero no
+   le gritan al ojo. Antes eran todos iguales y "Garantía" pesaba lo mismo que
+   "Listo". */
+.card-acciones {
+ padding: 9px 12px 11px; margin-top: 4px;
  border-top: 1px solid var(--border);
- margin-top: 4px;
+ display: flex; flex-direction: column; gap: 7px;
 }
+.card-acc-pri { display: flex; gap: 7px; flex-wrap: wrap; }
+.card-acc-sec { display: flex; gap: 5px; flex-wrap: wrap; }
+
 .card-chip {
- border-radius: 50px;
- padding: 4px 12px; font-size: .66rem; font-weight: 700;
- cursor: pointer; letter-spacing: .02em;
- transition: all .15s ease; white-space: nowrap;
+ border-radius: 50px; cursor: pointer; white-space: nowrap;
+ font-weight: 700; font-family: inherit;
+ display: inline-flex; align-items: center; gap: 5px;
+ transition: transform .12s ease, background .15s ease, border-color .15s ease;
 }
-.card-chip:hover { transform: translateY(-1px); }
-.card-chip:active { transform: scale(.93); }
-.chip-listo { background: #D1FAE5; color: #065F46; border: 1.5px solid #A7F3D0; }
-.chip-entregado { background: #E0E7FF; color: #3730A3; border: 1.5px solid #C7D2FE; }
-.chip-reparando { background: #FEF3C7; color: #92400E; border: 1.5px solid #FDE68A; }
-.chip-cancelado { background: #FEE2E2; color: #991B1B; border: 1.5px solid #FECACA; }
-.chip-garantia { background: var(--bg1); color: var(--text2); border: 1.5px solid var(--border); }
-.chip-cobrar {
- background: #f0fdf4; color: #15803d; border: 1.5px solid #bbf7d0;
- font-weight: 700;
+.card-chip:active { transform: scale(.94); }
+
+/* Principales: alto de dedo (36 px) y texto legible de verdad */
+.card-chip--pri {
+ flex: 1 1 auto; justify-content: center;
+ min-height: 36px; padding: 0 14px; font-size: .8rem;
+ border-width: 1.5px; border-style: solid;
 }
-.chip-cobrar:hover { background: #dcfce7; border-color: #86efac; }
+.card-chip--pri:hover { transform: translateY(-1px); }
+
+/* Secundarias: fantasma, sin color propio, para que no compitan */
+.card-chip--sec {
+ min-height: 28px; padding: 0 11px; font-size: .72rem;
+ background: transparent; color: var(--text3);
+ border: 1px solid var(--border);
+}
+.card-chip--sec:hover { background: var(--bg2); color: var(--text2); }
+
+/* Colores solo para las principales */
+.card-chip--pri.chip-listo     { background: #D1FAE5; color: #065F46; border-color: #6EE7B7; }
+.card-chip--pri.chip-entregado { background: #E0E7FF; color: #3730A3; border-color: #A5B4FC; }
+.card-chip--pri.chip-reparando { background: #FEF3C7; color: #92400E; border-color: #FCD34D; }
+.card-chip--pri.chip-cancelado { background: #FEE2E2; color: #991B1B; border-color: #FCA5A5; }
+.card-chip--pri.chip-cobrar    { background: #059669; color: #fff; border-color: #059669; }
+.card-chip--pri.chip-cobrar:hover { background: #047857; }
+.card-chip--pri.chip-wa        { background: #25D366; color: #fff; border-color: #25D366; }
+.card-chip--pri.chip-wa:hover  { background: #1eb855; }
 
 /* ── BOTÓN AGREGAR MARCA ── */
 .btn-add-marca {
@@ -2188,8 +2201,8 @@ body.owner-mode .owner-lock-btn { color: var(--accent); font-weight: 700; }
 .sell-caja-cb:checked + .sell-caja-toggle { background: #22c55e; }
 .sell-caja-cb:checked + .sell-caja-toggle::after { transform: translateX(18px); }
 
-body.dark .chip-cobrar { background: rgba(34,197,94,0.12); color: #4ade80; border-color: rgba(34,197,94,0.3); }
-body.dark .chip-cobrar:hover { background: rgba(34,197,94,0.2); }
+body.dark .card-chip--pri.chip-cobrar { background: #059669; color: #fff; border-color: #059669; }
+body.dark .card-chip--pri.chip-cobrar:hover { background: #047857; }
 body.dark .cobro-monto-wrap { background: #1E1E20; border-color: rgba(255,255,255,0.08); }
 body.dark .cobro-metodo-btn { background: #1E1E20; border-color: rgba(255,255,255,0.1); color: #F2F2F7; }
 body.dark .cobro-metodo-btn:hover { background: #28282A; border-color: var(--accent); }
@@ -3529,7 +3542,6 @@ body.dark .nota-modal { background: #161618; border: 1px solid rgba(255,255,255,
 body.dark .nota-input { background: #222224; color: #F2F2F7; border-color: transparent; }
 body.dark .nota-input:focus { border-color: var(--accent); }
 body.dark .btn-nota-clear { background: #222224; border-color: rgba(255,255,255,0.08); color: #A1A1A6; }
-body.dark .chip-nota { background: #222224; border-color: rgba(255,255,255,0.08); color: #A1A1A6; }
 body.dark .card-nota { background: rgba(212,167,106,0.08); border-left-color: var(--accent); }
 
 /* ─ Detail rows ─ */
@@ -4386,12 +4398,12 @@ body.dark .card-saldo-badge { background: #162032; color: #34d399; }
 body.dark .card-saldo-row   { background: #162032; }
 
 /* Chips */
-body.dark .chip-listo     { background: #052e16; color: #34d399; border-color: #16a34a; }
-body.dark .chip-entregado { background: #1e1b4b; color: #a78bfa; border-color: #7c3aed; }
-body.dark .chip-reparando { background: #1c1700; color: #fbbf24; border-color: #d97706; }
-body.dark .chip-cancelado { background: #2d0b0b; color: #f87171; border-color: #dc2626; }
-body.dark .chip-garantia  { background: #1c0a00; color: #fb923c; border-color: #ea580c; }
-body.dark .chip-nota      { background: #1e293b; color: #64748b; border-color: #334155; }
+/* Solo las principales llevan color; las secundarias son fantasma tambien
+   en oscuro (ver .card-chip--sec). */
+body.dark .card-chip--pri.chip-listo     { background: #052e16; color: #34d399; border-color: #16a34a; }
+body.dark .card-chip--pri.chip-entregado { background: #1e1b4b; color: #a78bfa; border-color: #7c3aed; }
+body.dark .card-chip--pri.chip-reparando { background: #1c1700; color: #fbbf24; border-color: #d97706; }
+body.dark .card-chip--pri.chip-cancelado { background: #2d0b0b; color: #f87171; border-color: #dc2626; }
 
 /* Badges */
 body.dark .badge           { filter: brightness(.85) saturate(.9); }
