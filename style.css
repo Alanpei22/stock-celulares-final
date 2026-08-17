@@ -1605,6 +1605,16 @@ body.dark .rep-print-btn--out:hover { background: rgba(34,197,94,0.15); border-c
 .avisos-fila:last-child { border-bottom: none; }
 .avisos-fila:hover { background: var(--bg2); }
 .avisos-fila--nueva { background: rgba(59, 130, 246, .06); }
+
+/* Barrita de color a la izquierda, solo en los cambios de estado: de un
+   vistazo se ve si algo se entregó, si algo se cayó o si sigue en curso, sin
+   tener que leer fila por fila. Mismos colores que los chips de la card. */
+.avisos-fila { border-left: 3px solid transparent; }
+.avisos-fila--wait { border-left-color: #94a3b8; }   /* esperando algo */
+.avisos-fila--work { border-left-color: #f59e0b; }   /* en curso */
+.avisos-fila--ok   { border-left-color: #10b981; }   /* listo para retirar */
+.avisos-fila--fin  { border-left-color: #6366f1; }   /* entregado */
+.avisos-fila--bad  { border-left-color: #dc2626; }   /* no va / rechazado */
 .avisos-ico { font-size: 1rem; flex-shrink: 0; line-height: 1.3; }
 .avisos-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .avisos-desc {

@@ -98,8 +98,9 @@ function _avisosRender() {
   lista.innerHTML = filas.map(g => {
     const ev = g.ultimo;
     const eq = (ev.extra && ev.extra.nOrden) ? `N°${ev.extra.nOrden}` : '';
+    const tono = _avisosTono(ev);
     return `
-      <button type="button" class="avisos-fila ${g.nuevos > 0 ? 'avisos-fila--nueva' : ''}"
+      <button type="button" class="avisos-fila ${g.nuevos > 0 ? 'avisos-fila--nueva' : ''} ${tono ? 'avisos-fila--' + tono : ''}"
               onclick="avisosAbrirReparacion('${_avEsc(g.repairId)}')">
         <span class="avisos-ico">${_avisosIco(ev.tipo)}</span>
         <span class="avisos-txt">
@@ -117,6 +118,31 @@ function _avisosRender() {
 
 function _avisosIco(tipo) {
   return { estado: '🔄', ingreso: '📥', edicion: '✏️', whatsapp: '📲' }[tipo] || '🔧';
+}
+
+// ── Barrita de color del cambio de estado ───────────────────
+// Todas las filas se veían iguales y había que leerlas una por una para saber
+// si algo se entregó o si algo se cayó. La barrita da eso de un vistazo.
+//
+// Los eventos de estado vienen en dos formatos, según de dónde salió el
+// cambio: `extra.estadoNuevo` si fue desde los botones de la card
+// (repairs.js), o `extra.faseNueva` si fue desde el tablero (tp-fases.js).
+// Se mapean los dos acá y no se depende de TP_FASES: avisos.js tiene que
+// funcionar igual en caja.html.
+const AVISOS_TONO = {
+  // estados (repairs.js)
+  reparando: 'work', listo: 'ok', entregado: 'fin', 'no va': 'bad', cancelado: 'bad',
+  // fases (tp-fases.js)
+  ingresado: 'wait', diagnostico: 'work', presupuestado: 'wait', aprobado: 'work',
+  repuesto: 'wait', reparacion: 'work',
+  irreparable: 'bad', rechazado: 'bad', abandonado: 'bad',
+};
+
+function _avisosTono(ev) {
+  if (!ev || ev.tipo !== 'estado') return '';   // solo los cambios de estado
+  const x = ev.extra || {};
+  const destino = x.estadoNuevo || x.faseNueva || '';
+  return AVISOS_TONO[destino] || '';
 }
 
 // "hace 5 min" / "hace 2 h" / "ayer" / fecha corta

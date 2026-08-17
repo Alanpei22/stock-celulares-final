@@ -155,6 +155,44 @@ ok(els['avisos-popup'].classList.contains('hidden'), 'y se cierra');
 emitir([{ repairId: 'r2', tipo: 'estado', desc: 'G32 → Reparando', fecha: hace(40), extra: {} }]);
 ok(!badgeVisible(), 'lo viejo no vuelve a encender el globito', badge());
 
+console.log('\n5b) La barrita de color del cambio de estado');
+// Todas las filas se veían iguales. La barrita dice de un vistazo si algo se
+// entregó, si se cayó o si sigue en curso.
+STORE = {};
+emitir([
+  { repairId: 'a', tipo: 'estado', desc: 'A → Listo',     fecha: hace(1), extra: { estadoNuevo: 'listo' } },
+  { repairId: 'b', tipo: 'estado', desc: 'B → Entregado', fecha: hace(2), extra: { estadoNuevo: 'entregado' } },
+  { repairId: 'c', tipo: 'estado', desc: 'C → No va',     fecha: hace(3), extra: { estadoNuevo: 'no va' } },
+  { repairId: 'd', tipo: 'estado', desc: 'D → Reparando', fecha: hace(4), extra: { estadoNuevo: 'reparando' } },
+]);
+const h5 = () => els['avisos-lista'].innerHTML;
+ok(/avisos-fila--ok/.test(h5()),   'listo → verde');
+ok(/avisos-fila--fin/.test(h5()),  'entregado → su propio color, no el mismo que listo');
+ok(/avisos-fila--bad/.test(h5()),  'no va → rojo');
+ok(/avisos-fila--work/.test(h5()), 'reparando → ámbar');
+
+// Los cambios que salen del tablero de fases guardan `faseNueva`, no
+// `estadoNuevo`. Si solo se mirara uno, la mitad quedaría sin color.
+emitir([
+  { repairId: 'e', tipo: 'estado', desc: 'E → Esperando repuesto', fecha: hace(1), extra: { faseNueva: 'repuesto' } },
+  { repairId: 'f', tipo: 'estado', desc: 'F → Sin reparación',     fecha: hace(2), extra: { faseNueva: 'irreparable' } },
+]);
+ok(/avisos-fila--wait/.test(h5()), 'fase del tablero: esperando repuesto → gris');
+ok(/avisos-fila--bad/.test(h5()),  'fase del tablero: irreparable → rojo');
+
+// Solo los cambios de estado llevan barrita: era lo pedido.
+emitir([
+  { repairId: 'g', tipo: 'whatsapp', desc: 'WhatsApp enviado', fecha: hace(1), extra: {} },
+  { repairId: 'h', tipo: 'ingreso',  desc: 'Ingresó un equipo', fecha: hace(2), extra: {} },
+]);
+ok(!/avisos-fila--(ok|fin|bad|work|wait)/.test(h5()),
+   'un WhatsApp o un ingreso no llevan color de estado', h5().slice(0, 120));
+
+// Un estado que no conocemos no puede romper el marcado
+emitir([{ repairId: 'i', tipo: 'estado', desc: 'X → ???', fecha: hace(1), extra: { estadoNuevo: 'inventado' } }]);
+ok(/class="avisos-fila /.test(h5()) && !/avisos-fila--undefined/.test(h5()),
+   'un estado desconocido queda sin color, sin ensuciar la clase', h5().slice(0, 140));
+
 console.log('\n6) Solo reparaciones');
 STORE = {};
 emitir([
