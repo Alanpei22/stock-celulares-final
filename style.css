@@ -1572,8 +1572,10 @@ body.dark .rep-print-btn--out:hover { background: rgba(34,197,94,0.15); border-c
 
 .avisos-backdrop { position: fixed; inset: 0; z-index: 640; background: transparent; }
 
+/* Fijo, no colgado del botón: el botón está repetido en el header de cada
+   sección, pero el popup es UNO solo a nivel de página. */
 .avisos-popup {
-  position: absolute; z-index: 641; top: calc(100% + 8px); right: 0;
+  position: fixed; z-index: 641; top: 62px; right: 14px;
   width: 360px; max-width: calc(100vw - 24px);
   max-height: min(70vh, 480px);
   display: flex; flex-direction: column;

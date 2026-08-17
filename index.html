@@ -64,19 +64,8 @@
           <h1>📱 Stock de Celulares</h1>
         </div>
         <div class="hdr-actions">
-          <div id="avisos-backdrop" class="avisos-backdrop hidden" onclick="cerrarAvisos()"></div>
-          <!-- Campanita de novedades (avisos.js). El mismo bloque va en caja.html. -->
           <div class="avisos-wrap">
-            <button class="hdr-btn avisos-btn" onclick="toggleAvisos()" title="Novedades">
-              🔔<span id="avisos-badge" class="avisos-badge hidden">0</span>
-            </button>
-            <div id="avisos-popup" class="avisos-popup hidden">
-              <div class="avisos-hdr">
-                <span>Novedades de reparaciones</span>
-                <button type="button" class="avisos-cerrar" onclick="cerrarAvisos()">✕</button>
-              </div>
-              <div id="avisos-lista" class="avisos-lista"></div>
-            </div>
+            <button class="hdr-btn avisos-btn" onclick="toggleAvisos()" title="Novedades">🔔<span class="avisos-badge hidden">0</span></button>
           </div>
           <div class="hdr-menu-wrap">
             <button class="hdr-btn hdr-menu-btn" id="hdr-menu-btn" onclick="toggleHdrMenu()" title="Opciones">⋮</button>
@@ -173,6 +162,9 @@
           <h1>🔧 Reparaciones</h1>
         </div>
         <div class="hdr-actions">
+          <div class="avisos-wrap">
+            <button class="hdr-btn avisos-btn" onclick="toggleAvisos()" title="Novedades">🔔<span class="avisos-badge hidden">0</span></button>
+          </div>
           <div class="hdr-menu-wrap">
             <button class="hdr-btn hdr-menu-btn" id="rep-menu-btn" onclick="toggleRepMenu()" title="Opciones">⋮</button>
             <div id="rep-menu-dropdown" class="hdr-dropdown hidden">
@@ -266,6 +258,9 @@
       <div class="hdr-top">
         <div class="hdr-brand"><h1>🔩 Repuestos</h1></div>
         <div class="hdr-actions">
+          <div class="avisos-wrap">
+            <button class="hdr-btn avisos-btn" onclick="toggleAvisos()" title="Novedades">🔔<span class="avisos-badge hidden">0</span></button>
+          </div>
           <div class="hdr-menu-wrap">
             <button class="hdr-btn hdr-menu-btn" id="rep2-menu-btn" onclick="toggleRep2Menu()" title="Opciones">⋮</button>
             <div id="rep2-menu-dropdown" class="hdr-dropdown hidden">
@@ -1390,6 +1385,17 @@
 </div>
 
 <div id="toast" class="toast"></div>
+<!-- Campanita de novedades (avisos.js). UNO solo por pagina: el boton se
+     repite en el header de cada seccion, pero el popup es unico. -->
+<div id="avisos-backdrop" class="avisos-backdrop hidden" onclick="cerrarAvisos()"></div>
+<div id="avisos-popup" class="avisos-popup hidden">
+  <div class="avisos-hdr">
+    <span>Novedades de reparaciones</span>
+    <button type="button" class="avisos-cerrar" onclick="cerrarAvisos()">&#10005;</button>
+  </div>
+  <div id="avisos-lista" class="avisos-lista"></div>
+</div>
+
 <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>

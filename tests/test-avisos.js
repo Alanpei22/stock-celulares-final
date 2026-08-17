@@ -32,14 +32,20 @@ function el(id) {
     },
   };
 }
-['avisos-badge', 'avisos-popup', 'avisos-backdrop', 'avisos-lista'].forEach(id => el(id));
+['avisos-popup', 'avisos-backdrop', 'avisos-lista'].forEach(id => el(id));
+// Tres globitos: uno por sección. Cada página tiene un header por sección y
+// el botón se repite en todos, así que el código tiene que pintarlos TODOS.
+const BADGES = [el('b1'), el('b2'), el('b3')];
 
 let STORE = {};
 let SUSCRIPCION = null;   // lo que le pidió al Firestore falso
 
 const ctx = {
   console, setTimeout: f => f(), clearTimeout,
-  document: { getElementById: id => els[id] || null },
+  document: {
+    getElementById: id => els[id] || null,
+    querySelectorAll: sel => (sel === '.avisos-badge' ? BADGES : []),
+  },
   window: {}, location: { href: '' },
   localStorage: {
     getItem: k => (k in STORE ? STORE[k] : null),
@@ -64,8 +70,13 @@ const get = e => vm.runInContext(e, ctx);
 
 // Empujar eventos como si vinieran de Firestore
 const emitir = evs => SUSCRIPCION.cb({ docs: evs.map(e => ({ data: () => e })) });
-const badge = () => els['avisos-badge'].textContent;
-const badgeVisible = () => !els['avisos-badge'].classList.contains('hidden');
+const badge = () => BADGES[0].textContent;
+const badgeVisible = () => !BADGES[0].classList.contains('hidden');
+// Todos los globitos tienen que decir lo mismo: si solo se pintara el primero,
+// en las demás secciones no aparecería nada. (Fue exactamente el bug.)
+const badgesCoinciden = () =>
+  BADGES.every(b => b.textContent === BADGES[0].textContent
+                 && b.classList.contains('hidden') === BADGES[0].classList.contains('hidden'));
 
 const hace = min => new Date(Date.now() - min * 60000).toISOString();
 
@@ -114,6 +125,8 @@ console.log('\n3) El globito cuenta EQUIPOS, no cambios');
 // filas, y el número no cerraría con lo que se ve.
 ok(badge() === '2', 'globito = 2 (los dos equipos con novedades)', badge());
 ok(badgeVisible(), 'y se ve');
+ok(badgesCoinciden(), 'y se ve IGUAL en las tres secciones, no solo en la primera',
+   BADGES.map(b => b.textContent + (b.classList.contains('hidden') ? ' (oculto)' : '')));
 
 console.log('\n4) Lo ya visto deja de contar');
 STORE['avisos_visto'] = hace(30);   // vi la campana hace media hora
@@ -130,6 +143,7 @@ console.log('\n5) Abrir el popup apaga el globito');
 run('abrirAvisos()');
 ok(!els['avisos-popup'].classList.contains('hidden'), 'el popup se abre');
 ok(!badgeVisible(), 'el globito se apaga', badge());
+ok(badgesCoinciden(), 'se apagan los de todas las secciones');
 ok(!!STORE['avisos_visto'], 'y queda anotado que se miró');
 // Es un popup, no un modal: no bloquea el scroll de la página de atrás.
 ok(!/document\.body\.style\.overflow/.test(src),
@@ -173,10 +187,30 @@ ok(/function _avEsc/.test(src), 'tiene su propio escape (no depende de utils.js)
 const idx = leer('index.html'), caj = leer('caja.html');
 [['index.html', idx], ['caja.html', caj]].forEach(([n, h]) => {
   ok(/src="avisos\.js"/.test(h), `${n} carga avisos.js`);
-  ok(/id="avisos-badge"/.test(h) && /id="avisos-popup"/.test(h) && /id="avisos-lista"/.test(h),
-     `${n} tiene el botón y el popup`);
+  ok(/id="avisos-popup"/.test(h) && /id="avisos-lista"/.test(h), `${n} tiene el popup`);
   ok(/onclick="toggleAvisos\(\)"/.test(h), `${n} tiene la campana clickeable`);
+
+  // ESTE fue el bug: cada sección tiene su propio <header>, y la campana
+  // estaba solo en el primero. Desde Reparaciones no se veía nada.
+  const headers = (h.match(/<div class="hdr-actions">/g) || []).length;
+  const botones = (h.match(/class="hdr-btn avisos-btn"/g) || []).length;
+  ok(headers > 1, `${n} tiene un header por sección (${headers})`, headers);
+  ok(botones === headers,
+     `${n}: la campana está en TODOS los headers, no solo en el primero`,
+     { headers, botones });
+
+  // Y el popup tiene que ser uno solo: repetido, getElementById agarra el
+  // primero y los demás quedan muertos.
+  ok((h.match(/id="avisos-popup"/g) || []).length === 1, `${n}: un solo popup`);
+  ok((h.match(/id="avisos-lista"/g) || []).length === 1, `${n}: una sola lista`);
+  ok((h.match(/id="avisos-badge"/g) || []).length === 0,
+     `${n}: el globito va por clase, no por id (se repite en cada header)`);
 });
+// El código tiene que pintarlos todos, no solo el primero.
+ok(/querySelectorAll\('\.avisos-badge'\)/.test(src),
+   'avisos.js busca TODOS los globitos');
+ok(!/getElementById\('avisos-badge'\)/.test(src),
+   'y ninguno por id, que solo devolvería el primero');
 ok(/initAvisos\(\)/.test(leer('app.js')) && /initAvisos\(\)/.test(leer('caja.js')),
    'las dos páginas lo arrancan');
 ok(/\?repair=|params\.get\('repair'\)/.test(leer('app.js')),

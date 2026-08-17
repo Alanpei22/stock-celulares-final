@@ -31,6 +31,12 @@ let _avisosUnsub = null;
 let _avisosData  = [];   // eventos crudos, ya filtrados a reparaciones
 let _avisosOpen  = false;
 
+// Todos los globitos de la página (uno por sección, ver _avisosRender).
+function _avisosBadges() {
+  try { return Array.from(document.querySelectorAll('.avisos-badge')); }
+  catch { return []; }
+}
+
 // ── Última vez que este dispositivo miró la campana ─────────
 function _avisosVisto() {
   try { return localStorage.getItem(AVISOS_VISTO_KEY) || ''; } catch { return ''; }
@@ -75,11 +81,13 @@ function _avisosRender() {
   const filas = _avisosAgrupar(_avisosData);
   const n = _avisosNoLeidos(filas);
 
-  const badge = document.getElementById('avisos-badge');
-  if (badge) {
-    badge.textContent = n > 99 ? '99+' : String(n);
-    badge.classList.toggle('hidden', n === 0);
-  }
+  // Cada sección tiene su propio header, así que el botón está repetido y hay
+  // que pintarlos TODOS. Por eso el globito va por clase y no por id: con id
+  // solo se actualizaría el primero y en las demás secciones no aparecería.
+  _avisosBadges().forEach(b => {
+    b.textContent = n > 99 ? '99+' : String(n);
+    b.classList.toggle('hidden', n === 0);
+  });
 
   const lista = document.getElementById('avisos-lista');
   if (!lista) return;
@@ -147,7 +155,7 @@ function abrirAvisos() {
   _avisosMarcarVisto();
   // El globito se apaga al toque; las filas nuevas quedan resaltadas hasta
   // que se cierra, así se ve qué cambió.
-  document.getElementById('avisos-badge')?.classList.add('hidden');
+  _avisosBadges().forEach(b => b.classList.add('hidden'));
 }
 
 function cerrarAvisos() {
