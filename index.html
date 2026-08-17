@@ -64,6 +64,20 @@
           <h1>📱 Stock de Celulares</h1>
         </div>
         <div class="hdr-actions">
+          <div id="avisos-backdrop" class="avisos-backdrop hidden" onclick="cerrarAvisos()"></div>
+          <!-- Campanita de novedades (avisos.js). El mismo bloque va en caja.html. -->
+          <div class="avisos-wrap">
+            <button class="hdr-btn avisos-btn" onclick="toggleAvisos()" title="Novedades">
+              🔔<span id="avisos-badge" class="avisos-badge hidden">0</span>
+            </button>
+            <div id="avisos-popup" class="avisos-popup hidden">
+              <div class="avisos-hdr">
+                <span>Novedades de reparaciones</span>
+                <button type="button" class="avisos-cerrar" onclick="cerrarAvisos()">✕</button>
+              </div>
+              <div id="avisos-lista" class="avisos-lista"></div>
+            </div>
+          </div>
           <div class="hdr-menu-wrap">
             <button class="hdr-btn hdr-menu-btn" id="hdr-menu-btn" onclick="toggleHdrMenu()" title="Opciones">⋮</button>
             <div id="hdr-menu-dropdown" class="hdr-dropdown hidden">
@@ -2010,6 +2024,7 @@
 <script defer src="pedidos.js"></script>
 <script defer src="notifications.js"></script>
 <script defer src="webpush.js"></script>
+<script defer src="avisos.js"></script>
 <script defer src="app.js"></script>
 <script defer src="stock-extras.js"></script>
 <script defer src="print.js"></script>

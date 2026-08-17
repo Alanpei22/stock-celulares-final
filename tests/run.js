@@ -36,6 +36,7 @@ const QUE_CUBRE = {
   'test-repwiz.js':           'Los 3 pasos del ingreso: que no se pierda ningún campo',
   'test-venta-comprador.js':  'Datos del comprador en el comprobante de venta de equipos',
   'test-card-chips.js':       'Botones de la card: cuáles salen en cada estado',
+  'test-avisos.js':           'Campanita de novedades: agrupado, globito y cupo',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
 };
 

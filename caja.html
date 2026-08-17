@@ -55,6 +55,20 @@
         <h1>💰 Caja Diaria</h1>
       </div>
       <div class="hdr-actions">
+        <div id="avisos-backdrop" class="avisos-backdrop hidden" onclick="cerrarAvisos()"></div>
+          <!-- Campanita de novedades (avisos.js). El mismo bloque va en index.html. -->
+        <div class="avisos-wrap">
+          <button class="hdr-btn avisos-btn" onclick="toggleAvisos()" title="Novedades">
+            🔔<span id="avisos-badge" class="avisos-badge hidden">0</span>
+          </button>
+          <div id="avisos-popup" class="avisos-popup hidden">
+            <div class="avisos-hdr">
+              <span>Novedades de reparaciones</span>
+              <button type="button" class="avisos-cerrar" onclick="cerrarAvisos()">✕</button>
+            </div>
+            <div id="avisos-lista" class="avisos-lista"></div>
+          </div>
+        </div>
         <button class="hdr-btn hdr-menu-btn" id="caja-menu-btn" onclick="toggleCajaMenu()" title="Opciones">⋮</button>
       </div>
     </div>
@@ -971,6 +985,7 @@
 <script src="bluetooth-print.js"></script>
 <script src="notifications.js"></script>
 <script src="webpush.js"></script>
+<script src="avisos.js"></script>
 <script>
 // PWA: registrar service worker también desde caja (push + instalación)
 if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }

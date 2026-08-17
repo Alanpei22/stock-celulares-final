@@ -117,6 +117,8 @@ function showApp() {
 function initApp() {
   initDarkMode();
   db = _fbInit();
+  // Campanita de novedades. CUPO: listener acotado a 60 docs, ver avisos.js.
+  if (typeof initAvisos === 'function') initAvisos();
   updateDateLabel();
   listenMovimientos();
   loadArqueo();

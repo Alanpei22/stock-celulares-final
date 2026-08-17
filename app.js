@@ -414,6 +414,8 @@ function initApp() {
   appInited = true;
   initDarkMode();
   db = _fbInit();
+  // Campanita de novedades. CUPO: listener acotado a 60 docs, ver avisos.js.
+  if (typeof initAvisos === 'function') initAvisos();
   window._DAKI_NAME = 'TechPoint';
   loadConfig();
   loadWaTemplates();
@@ -2433,6 +2435,33 @@ function _handleUrlAction() {
         } else if (retry < 15) setTimeout(() => trySec(retry + 1), 400);
       };
       setTimeout(() => trySec(0), 300);
+    }
+
+    // ?repair=<id> → abrir esa ficha. Lo usa la campanita desde la caja, que
+    // no tiene repairs.js cargado y por eso navega para acá.
+    const repairId = params.get('repair');
+    if (repairId) {
+      params.delete('repair');
+      const s2 = params.toString();
+      history.replaceState({}, '', location.pathname + (s2 ? '?' + s2 : ''));
+      const tryRep = (retry = 0) => {
+        const app = document.getElementById('app');
+        if (!app || app.classList.contains('app-hidden')) {
+          if (retry < 20) setTimeout(() => tryRep(retry + 1), 400);
+          return;
+        }
+        // Entrar a la sección PRIMERO: las reparaciones se cargan recién ahí
+        // (cupo). Si esperáramos a que REPAIRS tenga el id sin entrar, no
+        // llegaría nunca.
+        if (typeof switchSection === 'function') switchSection('repairs');
+        if (typeof openRepairDetail === 'function'
+            && typeof REPAIRS !== 'undefined' && REPAIRS.some(r => r.id === repairId)) {
+          openRepairDetail(repairId);
+        } else if (retry < 20) {
+          setTimeout(() => tryRep(retry + 1), 400);
+        }
+      };
+      setTimeout(() => tryRep(0), 600);
     }
 
     const action = params.get('action');
