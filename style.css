@@ -2448,6 +2448,29 @@ body.dark .sell-caja-toggle { background: #3A3A3C; }
   scrollbar-width:none;
 }
 .rstats-period-bar::-webkit-scrollbar { display:none; }
+
+/* Rango a medida de las estadísticas. Aparece bajo la barra de períodos
+   cuando se elige "📅 Elegir". */
+.rstats-custom-bar {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+  padding: 10px 12px 12px;
+  border-bottom: 1px solid var(--border, #e3e1de);
+  background: var(--bg1, #f7f7f7);
+}
+.rstats-custom-f { display: flex; flex-direction: column; gap: 4px; flex: 1 1 130px; min-width: 0; }
+.rstats-custom-f span {
+  font-size: 10px; font-weight: 700; color: var(--text3, #999);
+  text-transform: uppercase; letter-spacing: .07em;
+}
+.rstats-custom-f input { width: 100%; }
+.rstats-custom-rapidos { display: flex; gap: 5px; flex-wrap: wrap; flex: 1 1 100%; }
+.rstats-custom-rapidos button {
+  padding: 5px 11px; border-radius: 20px; cursor: pointer;
+  background: transparent; color: var(--text3, #999);
+  border: 1px solid var(--border, #e3e1de);
+  font-size: .72rem; font-weight: 700; font-family: inherit; white-space: nowrap;
+}
+.rstats-custom-rapidos button:hover { background: var(--bg2, #eee); color: var(--text, #222); }
 .rstats-period {
   flex-shrink:0; padding:7px 14px;
   background:var(--bg1,#f3f3f3); color:var(--t2,#666);

@@ -1299,6 +1299,23 @@
       <button class="rstats-period" data-period="ult-30"  onclick="switchRepairStatsTab('ult-30')">Últimos 30d</button>
       <button class="rstats-period" data-period="ult-90"  onclick="switchRepairStatsTab('ult-90')">Últimos 90d</button>
       <button class="rstats-period" data-period="anual"   onclick="switchRepairStatsTab('anual')">Año</button>
+      <button class="rstats-period" data-period="custom"  onclick="switchRepairStatsTab('custom')">📅 Elegir</button>
+    </div>
+    <!-- Rango a medida. Aparece solo con el botón "Elegir". -->
+    <div id="rstats-custom-bar" class="rstats-custom-bar hidden">
+      <label class="rstats-custom-f">
+        <span>Desde</span>
+        <input type="date" id="rstats-desde" class="fi" onchange="_statsCustomAplicar()">
+      </label>
+      <label class="rstats-custom-f">
+        <span>Hasta</span>
+        <input type="date" id="rstats-hasta" class="fi" onchange="_statsCustomAplicar()">
+      </label>
+      <div class="rstats-custom-rapidos">
+        <button type="button" onclick="_statsCustomRapido('semana')">Esta semana</button>
+        <button type="button" onclick="_statsCustomRapido('trimestre')">Trimestre</button>
+        <button type="button" onclick="_statsCustomRapido('anio-1')">Año pasado</button>
+      </div>
     </div>
     <div class="modal-body" id="rep-stats-body"></div>
   </div>

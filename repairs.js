@@ -2640,15 +2640,16 @@ let repStatsTab = 'mes';
 
 function openRepairStats() {
   repStatsTab = 'mes';
-  _statsSource = null; // 'mes' entra en los 120 días → usa REPAIRS (instantáneo)
+  _statsSource = null; // 'mes' entra en la ventana de REPAIRS → instantáneo
   _renderStatsPeriodBar('mes');
+  document.getElementById('rstats-custom-bar')?.classList.add('hidden');
   document.getElementById('rep-stats-body').innerHTML = buildRepairStatsHTML('mes');
   document.getElementById('rep-stats-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
 
-// Tabs cuyo período (o su comparación "vs anterior") supera los 120 días
-// del listener → necesitan el histórico completo.
+// Tabs cuyo período (o su comparación "vs anterior") supera la ventana de
+// REPAIRS_DIAS_VENTANA → necesitan el histórico completo.
 const _STATS_TABS_FULL = new Set(['ult-90', 'anual']);
 
 function closeRepairStats() {
@@ -2660,14 +2661,29 @@ async function switchRepairStatsTab(tab) {
   repStatsTab = tab;
   _renderStatsPeriodBar(tab);
   const body = document.getElementById('rep-stats-body');
-  if (_STATS_TABS_FULL.has(tab)) {
-    // Necesita más de 120 días → traer histórico completo on-demand (cacheado por sesión)
+  // La barra de fechas solo aparece con "Elegir"
+  document.getElementById('rstats-custom-bar')?.classList.toggle('hidden', tab !== 'custom');
+  if (tab === 'custom' && !_statsCustomFrom) {
+    // Recién abierto y sin fechas: por defecto, lo que va del mes
+    const hoy = new Date();
+    const ini = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    document.getElementById('rstats-desde').value = _fechaISO(ini);
+    document.getElementById('rstats-hasta').value = _hoyISO();
+    _statsCustomFrom = _fechaISO(ini);
+    _statsCustomTo   = _hoyISO();
+  }
+  // 'custom' pide el histórico SOLO si el rango se sale de lo que ya está en
+  // memoria. Un rango de este mes no lee nada de Firestore.
+  const necesitaFull = _STATS_TABS_FULL.has(tab)
+    || (tab === 'custom' && _statsCustomNecesitaHistorial());
+  if (necesitaFull) {
+    // Se sale de la ventana → histórico completo on-demand (cacheado por sesión)
     body.innerHTML = '<div class="list-loading"><span class="list-loading__spinner"></span>Cargando historial…</div>';
     try {
       _statsSource = await loadAllRepairsHistory();
     } catch (e) {
       console.error('year stats:', e);
-      _statsSource = null; // fallback: usa los 120 días que ya están
+      _statsSource = null; // fallback: usa lo que ya está en memoria
     }
     if (repStatsTab !== tab) return; // el usuario cambió de tab mientras cargaba
   } else {
@@ -2681,6 +2697,72 @@ function _renderStatsPeriodBar(tab) {
   document.querySelectorAll('.rstats-period').forEach(b => {
     b.classList.toggle('rstats-period--active', b.dataset.period === tab);
   });
+}
+
+// ── Período a medida ───────────────────────
+// Los botones fijos (mes, 30d, 90d, año) no alcanzan cuando querés mirar una
+// quincena, una temporada o el año pasado entero.
+let _statsCustomFrom = null;   // 'YYYY-MM-DD'
+let _statsCustomTo   = null;
+
+function _fmtRangoCorto(d) {
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
+    + (d.getFullYear() !== new Date().getFullYear() ? " '" + String(d.getFullYear()).slice(2) : '');
+}
+
+// Fecha LOCAL en YYYY-MM-DD. No sirve toISOString(): es UTC, y en Argentina
+// (UTC-3) despues de las 21:00 la fecha UTC ya es la de manana. O sea que
+// abrir las estadisticas a la noche ponia "hasta" en el dia siguiente y el
+// rango se iba un dia para adelante.
+// (Los atajos con medianoche local no se veian afectados: 00:00 en UTC-3 son
+//  las 03:00 UTC del MISMO dia. Igual va todo por aca, para no depender de
+//  en que huso corre el navegador.)
+const _fechaISO = d => [d.getFullYear(),
+                        String(d.getMonth() + 1).padStart(2, '0'),
+                        String(d.getDate()).padStart(2, '0')].join('-');
+const _hoyISO = () => _fechaISO(new Date());
+
+// Atajos del rango a medida
+function _statsCustomRapido(cual) {
+  const hoy = new Date();
+  let desde, hasta = hoy;
+  if (cual === 'semana') {
+    // Semana corriente arrancando el lunes
+    const dia = (hoy.getDay() + 6) % 7;
+    desde = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - dia);
+  } else if (cual === 'trimestre') {
+    const q = Math.floor(hoy.getMonth() / 3);
+    desde = new Date(hoy.getFullYear(), q * 3, 1);
+  } else { // 'anio-1'
+    desde = new Date(hoy.getFullYear() - 1, 0, 1);
+    hasta = new Date(hoy.getFullYear() - 1, 11, 31);
+  }
+  document.getElementById('rstats-desde').value = _fechaISO(desde);
+  document.getElementById('rstats-hasta').value = _fechaISO(hasta);
+  _statsCustomAplicar();
+}
+
+function _statsCustomAplicar() {
+  const d = document.getElementById('rstats-desde').value;
+  const h = document.getElementById('rstats-hasta').value;
+  if (!d || !h) return;                       // todavía falta una punta
+  if (d > h) { toast('La fecha "Desde" es posterior a "Hasta"', 'error'); return; }
+  _statsCustomFrom = d;
+  _statsCustomTo   = h;
+  switchRepairStatsTab('custom');
+}
+
+// ¿El rango pedido se sale de los días que ya están en memoria?
+// CUPO: solo así se trae el histórico completo. Si el rango entra en la ventana
+// que la app ya tiene cargada, no se lee NADA de Firestore.
+function _statsCustomNecesitaHistorial() {
+  if (!_statsCustomFrom) return false;
+  const corte = new Date();
+  corte.setDate(corte.getDate() - REPAIRS_DIAS_VENTANA);
+  // El período de comparación va todavía más atrás: se mide desde ahí.
+  const desde = new Date(_statsCustomFrom + 'T00:00:00');
+  const largo = new Date(_statsCustomTo + 'T23:59:59').getTime() - desde.getTime();
+  return new Date(desde.getTime() - largo) < corte;
 }
 
 // ── Helpers de período ──────────────────────
@@ -2716,6 +2798,16 @@ function _periodRange(tab) {
     prevFrom = new Date(now.getTime() - 180 * ms);
     prevTo   = new Date(now.getTime() - 90 * ms);
     prevLabel = '90 días previos';
+  } else if (tab === 'custom') {
+    // Rango a medida. El período de comparación es el mismo largo, pegado antes:
+    // si mirás del 1 al 15, "vs anterior" es del 16 al 31 del mes pasado.
+    from = _statsCustomFrom ? new Date(_statsCustomFrom + 'T00:00:00') : new Date(now.getFullYear(), now.getMonth(), 1);
+    to   = _statsCustomTo   ? new Date(_statsCustomTo   + 'T23:59:59') : now;
+    const largo = Math.max(1, to.getTime() - from.getTime());
+    label = _fmtRangoCorto(from) + ' → ' + _fmtRangoCorto(to);
+    prevTo   = new Date(from.getTime() - 1);
+    prevFrom = new Date(from.getTime() - largo);
+    prevLabel = _fmtRangoCorto(prevFrom) + ' → ' + _fmtRangoCorto(prevTo);
   } else { // 'anual'
     from = new Date(now.getFullYear(), 0, 1);
     to   = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
@@ -2727,8 +2819,8 @@ function _periodRange(tab) {
   return { from, to, label, prevFrom, prevTo, prevLabel };
 }
 
-// Fuente de datos de las stats: null = REPAIRS (120 días, rápido); si el tab
-// necesita más historia, switchRepairStatsTab la carga y la setea acá.
+// Fuente de datos de las stats: null = REPAIRS (la ventana en memoria, rápido);
+// si el tab necesita más historia, switchRepairStatsTab la carga y la setea acá.
 let _statsSource = null;
 
 function _calcStatsForPeriod(from, to) {

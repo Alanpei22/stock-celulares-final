@@ -37,6 +37,7 @@ const QUE_CUBRE = {
   'test-venta-comprador.js':  'Datos del comprador en el comprobante de venta de equipos',
   'test-card-chips.js':       'Botones de la card: cuáles salen en cada estado',
   'test-avisos.js':           'Campanita de novedades: agrupado, globito y cupo',
+  'test-stats-periodo.js':    'Estadisticas por periodo a medida (y su costo de cupo)',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
 };
 
