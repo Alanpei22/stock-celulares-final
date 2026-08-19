@@ -244,6 +244,22 @@ async function verifyOwnerPin(db, pin) {
   return { ok: false, created: false };
 }
 
+// ── Métodos de pago ─────────────────────────────
+// El método se guarda como texto, y hubo dos escrituras del mismo:
+// "MercadoPago" (los botones de la caja) y "Mercado Pago" (el listado por
+// defecto del alta de stock, ya corregido). Sin unificar, el desglose del
+// cierre muestra DOS métodos donde hay uno.
+//
+// Los documentos viejos NO se reescriben — la app no rompe datos que ya están
+// en Firestore. Se normaliza al LEER, que arregla el pasado y el futuro.
+const _METODOS_CANON = ['Efectivo', 'Transferencia', 'MercadoPago',
+                        'Tarjeta débito', 'Tarjeta crédito', 'Dólares'];
+function metodoCanonico(m) {
+  const s = String(m == null || m === '' ? 'Efectivo' : m);
+  const k = s.toLowerCase().replace(/\s+/g, '');
+  return _METODOS_CANON.find(c => c.toLowerCase().replace(/\s+/g, '') === k) || s;
+}
+
 // ══════════════════════════════════════════
 //  LLAMADAS A NUESTRAS FUNCIONES DE /api
 // ══════════════════════════════════════════

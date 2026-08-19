@@ -320,7 +320,7 @@ function buildCajaStatsHTML(movs) {
 
   const byMetodo = {};
   ingresos.forEach(m => {
-    const met = m.metodoPago || 'Efectivo';
+    const met = metodoCanonico(m.metodoPago);
     byMetodo[met] = (byMetodo[met] || 0) + (Number(m.monto) || 0);
   });
   const metRanking = Object.entries(byMetodo).sort((a, b) => b[1] - a[1]);

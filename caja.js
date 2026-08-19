@@ -795,12 +795,15 @@ function _metodoInfo(metodo) {
     'Tarjeta crédito': { icon: '💳', cls: 'metodo-tarj',   short: 'Crédito' },
     'Dólares':         { icon: '💲', cls: 'metodo-usd',    short: 'Dólares' },
   };
-  return map[metodo] || { icon: '💰', cls: 'metodo-otro', short: metodo || 'Efectivo' };
+  // Ultima red: si viene sin normalizar (una venta vieja guardada como
+  // 'Mercado Pago'), igual encuentra su icono en vez de caer al genérico.
+  const canon = (typeof metodoCanonico === 'function') ? metodoCanonico(metodo) : metodo;
+  return map[canon] || { icon: '💰', cls: 'metodo-otro', short: metodo || 'Efectivo' };
 }
 
 // Badge(s) de método para una tarjeta (contempla pago dividido)
 function _metodoBadges(m) {
-  const inf = _metodoInfo(m.metodoPago || 'Efectivo');
+  const inf = _metodoInfo(metodoCanonico(m.metodoPago));
   if (m.metodoPago === 'Dólares') {
     const usd = Number(m.montoUSD) || 0;
     const vuelto = Number(m.vueltoPesos) || 0;
@@ -1124,7 +1127,7 @@ function _vsearchRender() {
       ? new Date(m.createdAt).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' })
       : '';
     const signo = m.tipo === 'ingreso' ? '+' : '−';
-    const inf = _metodoInfo(m.metodoPago || 'Efectivo');
+    const inf = _metodoInfo(metodoCanonico(m.metodoPago));
     return `<div class="vsearch-item" onclick="_vsGoTo('${esc(m.fecha || '')}')">
       <div class="vsearch-item-main">
         <span class="vsearch-item-desc">${esc(m.descripcion || '—')}</span>

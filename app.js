@@ -7,7 +7,11 @@ const BIZ_KEY = 'cel_biz';
 const AUTH_DAYS = 30;
 
 const DEFAULT_SELLERS = ['Vendedor 1', 'Vendedor 2'];
-const DEFAULT_PAYMENTS = ['Efectivo', 'Transferencia', 'Tarjeta débito', 'Tarjeta crédito', 'Mercado Pago'];
+// 'MercadoPago' junto, igual que los botones de la caja y del cobro de
+// reparacion. Antes acá decía 'Mercado Pago' (separado) y una venta de equipo
+// quedaba guardada distinto que todo lo demás: el cierre mostraba dos métodos
+// donde hay uno solo.
+const DEFAULT_PAYMENTS = ['Efectivo', 'Transferencia', 'Tarjeta débito', 'Tarjeta crédito', 'MercadoPago'];
 const PRICES_KEY = 'cel_prices';
 const DEFAULT_PRICES = { transfer: 0, c3: 15, c6: 25 };
 

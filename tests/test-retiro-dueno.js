@@ -52,6 +52,9 @@ const ctxFin = {
   document: { getElementById: id => els[id] || null, querySelectorAll: () => [] },
   window: { open: () => ({ document: { write(h) { PDF += h; }, close(){} }, focus(){}, print(){} }) },
   alert: () => {}, toast: () => {},
+  // metodoCanonico vive en utils.js, que este harness no carga. Unifica
+  // 'Mercado Pago' y 'MercadoPago', que quedaron guardados distinto.
+  metodoCanonico: m => String(m || 'Efectivo').replace(/^Mercado Pago$/, 'MercadoPago'),
   db: {
     collection: name => {
       const q = { where: () => q, get: async () => ({
@@ -115,7 +118,9 @@ els['finrep-inc-caja'].checked = true;   // solo caja: es donde estaba el bug
   //  2) Caja › Historial (caja_extra.js)
   // ══════════════════════════════════════════════════════════
   console.log('\n  ── Caja › Historial (día / mes / año) ──');
-  const ctxHist = { console, fmt, esc, document: { getElementById: () => null } };
+  // metodoCanonico vive en utils.js, que este harness no carga.
+  const ctxHist = { console, fmt, esc, metodoCanonico: ctxFin.metodoCanonico,
+                    document: { getElementById: () => null } };
   ctxHist.globalThis = ctxHist; ctxHist.self = ctxHist;
   vm.createContext(ctxHist);
   vm.runInContext(fs.readFileSync(raiz('caja_extra.js'), 'utf8'), ctxHist, { filename: 'caja_extra.js' });
