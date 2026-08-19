@@ -128,6 +128,37 @@ try {
   ok(arca.xmlValor('<x><![CDATA[hola]]></x>', 'x') === 'hola', 'y adentro de un CDATA');
   ok(arca.xmlValor('<a>1</a>', 'token') === null, 'si no está, devuelve null');
 
+  console.log('\n5b) La respuesta REAL de WSAA viene escapada');
+  // Esto fallo en produccion el 19/08/2026: WSAA no manda el ticket en un
+  // CDATA, lo manda ESCAPADO adentro de <loginCmsReturn> (&lt;token&gt;...).
+  // Buscar <token> directo no encontraba nada y parecia que WSAA no contesto.
+  const escXml = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const ticket = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<loginTicketResponse version="1.0"><header>'
+    + '<expirationTime>2026-08-20T05:20:00.000-03:00</expirationTime></header>'
+    + '<credentials><token>TOKEN123</token><sign>SIGN456</sign></credentials>'
+    + '</loginTicketResponse>';
+  const respuestaWsaa = '<soapenv:Envelope><soapenv:Body><loginCmsResponse>'
+    + '<loginCmsReturn>' + escXml(ticket) + '</loginCmsReturn>'
+    + '</loginCmsResponse></soapenv:Body></soapenv:Envelope>';
+
+  // Sin desescapar no se encuentra nada: es exactamente el bug que hubo.
+  ok(arca.xmlValor(respuestaWsaa, 'token') === null,
+     'buscar <token> en la respuesta cruda NO encuentra nada (era el bug)');
+
+  const desescapado = arca.desescapar(arca.xmlValor(respuestaWsaa, 'loginCmsReturn'));
+  ok(arca.xmlValor(desescapado, 'token') === 'TOKEN123', 'desescapado, sale el token');
+  ok(arca.xmlValor(desescapado, 'sign') === 'SIGN456', 'y el sign');
+  ok(arca.xmlValor(desescapado, 'expirationTime') === '2026-08-20T05:20:00.000-03:00',
+     'y el vencimiento');
+
+  ok(/loginCmsReturn/.test(src) && /desescapar\(/.test(src),
+     'obtenerTA desescapa antes de buscar el token');
+  // El & tiene que desescaparse ULTIMO, si no rompe a los demas.
+  ok(arca.desescapar('&amp;lt;x&amp;gt;') === '&lt;x&gt;',
+     'un & escapado no se convierte por error en una etiqueta');
+
   console.log('\n6) Los errores no se pueden tragar');
   // WSFEv1 contesta HTTP 200 con un bloque <Errors> adentro. Si no se mira,
   // un rechazo parece un éxito.

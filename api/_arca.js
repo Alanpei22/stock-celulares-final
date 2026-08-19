@@ -110,6 +110,17 @@ export function firmarTRA(tra, certPem, keyPem) {
   return forge.util.encode64(forge.asn1.toDer(p7.toAsn1()).getBytes());
 }
 
+// ── Desescapar entidades XML ─────────────────────
+// WSAA devuelve el ticket ESCAPADO adentro de <loginCmsReturn>, no en un
+// CDATA: llega como &lt;token&gt;... Sin desescapar, buscar <token> no
+// encuentra nada y parece que WSAA no contestó.
+export function desescapar(s) {
+  return String(s == null ? '' : s)
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&');   // &amp; ÚLTIMO, si no rompe los de arriba
+}
+
 // ── Sacar un valor de un XML, sin traer un parser entero ─────
 // Las respuestas de ARCA son chicas y de forma conocida. Contempla CDATA.
 export function xmlValor(xml, tag) {
@@ -177,10 +188,16 @@ export async function obtenerTA({ forzar = false } = {}) {
   const falla = xmlValor(xml, 'faultstring');
   if (falla) throw new Error('WSAA rechazó: ' + falla);
 
-  const token = xmlValor(xml, 'token');
-  const sign  = xmlValor(xml, 'sign');
-  const expira = xmlValor(xml, 'expirationTime');
-  if (!token || !sign) throw new Error('WSAA no devolvió token. Respuesta: ' + xml.slice(0, 400));
+  // El ticket viene adentro de <loginCmsReturn>, ESCAPADO como entidades XML
+  // (&lt;token&gt;...), no en un CDATA. Hay que desescaparlo antes de buscar
+  // nada adentro. Si algún día viniera sin escapar, desescapar no lo rompe.
+  const ticket = desescapar(xmlValor(xml, 'loginCmsReturn') || xml);
+  const token = xmlValor(ticket, 'token');
+  const sign  = xmlValor(ticket, 'sign');
+  const expira = xmlValor(ticket, 'expirationTime');
+  if (!token || !sign) {
+    throw new Error('WSAA no devolvió token. Respuesta: ' + xml.slice(0, 1500));
+  }
 
   try {
     await _docTA(cfg.entorno).set({
