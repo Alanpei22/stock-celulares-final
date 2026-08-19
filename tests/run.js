@@ -38,6 +38,7 @@ const QUE_CUBRE = {
   'test-card-chips.js':       'Botones de la card: cuáles salen en cada estado',
   'test-avisos.js':           'Campanita de novedades: agrupado, globito y cupo',
   'test-stats-periodo.js':    'Estadisticas por periodo a medida (y su costo de cupo)',
+  'test-arca.js':             'Conexion con ARCA: firma, entornos y que la fase 1 no emita',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
 };
 

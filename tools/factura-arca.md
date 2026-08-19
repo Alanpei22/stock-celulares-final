@@ -161,7 +161,7 @@ distintos**. No se mezclan.
 | Fase | Qué | Quién |
 |---|---|---|
 | **0** | Certificado de homologación + PV tipo Web Services + confirmar con el contador | Dueño |
-| **1** | `/api/factura` + WSAA + consultar último número. **Solo leer** | Claude |
+| **1** | `/api/factura` + WSAA + consultar último número. **Solo leer** | HECHO 19/08 |
 | **2** | Emitir en homologación, con numeración idempotente | Claude |
 | **3** | La factura impresa con CAE, vencimiento y QR | Claude |
 | **3b** | Estado por venta, reintento y lista de sin facturar (ver riesgo 1b) | Claude |
@@ -170,6 +170,49 @@ distintos**. No se mezclan.
 **La fase 1 es la que despeja las dudas grandes**: si el timeout de Vercel
 alcanza y si el flujo del certificado funciona. Antes de pasar eso, no vale la
 pena escribir el resto.
+
+---
+
+## Endpoints (verificados el 19/08/2026 pidiendo el WSDL)
+
+|  | Homologación | Producción |
+|---|---|---|
+| **WSAA** | `wsaahomo.afip.gov.ar/ws/services/LoginCms` | `wsaa.afip.gov.ar/ws/services/LoginCms` |
+| **WSFEv1** | `wswhomo.afip.gov.ar/wsfev1/service.asmx` | `servicios1.afip.gov.ar/wsfev1/service.asmx` |
+
+**`wsfev1homo.afip.gov.ar` NO existe**, aunque circule en tutoriales. El host
+de homologación es `wswhomo`. Se comprobó: no resuelve.
+
+---
+
+## Estado de la fase 1 (19/08/2026)
+
+Escrita, con prueba, **sin correr nunca contra ARCA todavía**. Falta cargar
+las env vars en Vercel.
+
+Archivos: `api/_arca.js` (ayudante) y `api/factura.js` (endpoint).
+Dependencia nueva: `node-forge`, para firmar en CMS/PKCS#7.
+
+Acciones disponibles, todas de lectura:
+- `config` — qué falta configurar. No llama a ARCA.
+- `dummy`  — ¿está viva ARCA? No usa el certificado. Sirve para separar
+  "no llego a ARCA" de "mi certificado está mal", que se parecen desde afuera.
+- `token`  — ¿WSAA da token? No lo devuelve al navegador: es una credencial.
+- `ultimo` — FECompUltimoAutorizado. Qué número sigue.
+
+Cada respuesta trae `ms`: cuánto tardó. Es el dato que decide si esto entra en
+los 10 segundos de Vercel cuando haya que emitir.
+
+**Env vars que hay que cargar en Vercel:**
+
+    ARCA_ENTORNO    homologacion      (el default ya es este, a proposito)
+    ARCA_CUIT       20385199628
+    ARCA_PTO_VENTA  <el numero del PV tipo Web Services>
+    ARCA_CERT       <el .crt entero, en PEM>
+    ARCA_KEY        <la clave privada entera, en PEM>
+
+**Duda abierta:** la firma va con SHA-256. Si WSAA la rechazara, el otro
+candidato es SHA-1. Es el único parámetro del código con margen de duda.
 
 ---
 
