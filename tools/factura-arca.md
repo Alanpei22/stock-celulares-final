@@ -173,6 +173,39 @@ pena escribir el resto.
 
 ---
 
+## QUE se factura (decidido el 19/08/2026)
+
+**Solo los cobros digitales, y siempre preguntando.** La app nunca emite sola.
+
+Que se factura y que no depende del metodo de pago. Los valores reales que usa
+la app hoy:
+
+| Metodo | Factura? |
+|---|---|
+| Transferencia | si |
+| MercadoPago | si |
+| Tarjeta debito | si |
+| Tarjeta credito | si |
+| Efectivo | no |
+| Dolares | no (es efectivo fisico) |
+
+**Como pregunta:** al terminar el cobro aparece un cartel "Facturar esta
+venta?" con Si / Ahora no. Igual al que ya existe para el comprobante.
+
+**Pago dividido:** la caja deja cobrar con dos metodos (mitad efectivo, mitad
+transferencia). Si CUALQUIERA de los dos es digital, se ofrece facturar la
+venta ENTERA. Facturar media venta no tiene sentido.
+
+**Ojo, inconsistencia encontrada:** caja.html usa `MercadoPago` (junto) y
+app.js:10 usa `Mercado Pago` (separado) en DEFAULT_PAYMENTS. La regla va a ser
+"distinto de efectivo/dolares", asi que hoy no molesta -- pero si alguna vez se
+compara contra una lista de nombres, uno de los dos no matchea.
+
+**Nota:** que se factura y que no es decision del duenio y su contador. Aca
+solo queda escrita la regla que pidio, para poder programarla.
+
+---
+
 ## Endpoints (verificados el 19/08/2026 pidiendo el WSDL)
 
 |  | Homologación | Producción |
