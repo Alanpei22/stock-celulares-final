@@ -114,7 +114,18 @@ async function autoBackup() {
       stock_count: STOCK.length,
       stock: STOCK.map(p => ({ ...p })),
     };
-    await db.collection('backups').doc(today).set(backupData);
+    // Las reglas de Firestore hacen los backups INMUTABLES (allow update: if
+    // false): un backup no se pisa. Y el guardia de arriba es localStorage,
+    // que es por dispositivo -- el segundo aparato que abra la app el mismo
+    // dia intentaria .set() sobre un doc que ya existe, o sea un update, y se
+    // comeria un permission-denied todos los dias.
+    // Una lectura por dispositivo por dia: despreciable.
+    const ref = db.collection('backups').doc(today);
+    if ((await ref.get()).exists) {
+      localStorage.setItem('lastAutoBackup', today);   // ya lo hizo otro aparato
+      return;
+    }
+    await ref.set(backupData);
     localStorage.setItem('lastAutoBackup', today);
     toast('💾 Backup diario guardado', 'success');
   } catch(e) {
