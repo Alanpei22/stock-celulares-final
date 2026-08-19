@@ -1,18 +1,17 @@
 {
   "indexes": [
     {
-      "collectionGroup": "repairs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "fechaIngreso", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "caja_movimientos",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "fecha", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "fecha",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],
