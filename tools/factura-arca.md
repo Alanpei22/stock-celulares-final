@@ -34,10 +34,21 @@ Hay que cachearlo: no se pide uno por factura.
 
 ### 2. WSFEv1 — el comprobante
 
-**Cuidado con el nombre del servicio al autorizar el certificado:**
-- `wsfe` = V0, solo comprobantes A y B. Discontinuado desde el 1-jul-2011.
-- `wsfev1` = V1, comprobantes **A, B, C y M**. **Es el que hace falta**:
-  la Factura C (monotributo) solo existe en la V1.
+**Sobre `wsfe` vs `wsfev1` — no confundirse:**
+
+La página de ARCA los lista como dos servicios, y eso hace pensar que hay que
+autorizar `wsfev1`. Pero son dos cosas distintas:
+
+- **Endpoint SOAP**: `wsfev1` es la versión vigente (comprobantes A, B, **C** y
+  M). El `wsfe` V0 quedó discontinuado el 1-jul-2011.
+- **Identificador de servicio para WSAA**: es **`wsfe`**, aunque después se
+  llame al endpoint de `wsfev1`. Es una rareza histórica de AFIP.
+
+En el desplegable de WSASS lo que aparece es **`wsfe`**, y es lo correcto.
+El 19/08/2026 se autorizó así (`ws://wsfe`).
+
+Si en la fase 1 WSAA rechazara el token, ahí sí habría que probar con
+`wsfev1`. Pero la apuesta es que `wsfe` es el bueno.
 
 Con ese token:
 - `FECompUltimoAutorizado` → qué número sigue para ese punto de venta y tipo
