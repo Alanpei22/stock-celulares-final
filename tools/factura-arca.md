@@ -101,8 +101,25 @@ Eso se prueba contra **homologación**, y para eso hace falta el certificado.
    (autogestión de certificados para el ambiente de prueba).
 2. **Certificado de producción** — desde el "Administrador de Certificados
    Digitales", con clave fiscal.
-3. **Punto de venta habilitado para web service.** Ojo: el de "Comprobantes en
-   línea" NO sirve, es otro. Hay que dar de alta uno nuevo del tipo correcto.
+3. **Punto de venta del tipo "Web Services".** Se da de alta en ARCA desde
+   "Administración de puntos de venta y domicilios".
+
+   **Un "punto de venta" NO es un local: es una serie de numeración.** El
+   local sigue siendo uno solo, mismo CUIT, mismas facturas. Lo único que
+   cambia es que cada serie numera por su cuenta:
+
+       PV 0001 (Comprobantes en línea, la web) -> 0001-00000045, 46, 47...
+       PV 0002 (Web Services, esta app)         -> 0002-00000001, 2, 3...
+
+   ARCA exige que los PV de Comprobantes en línea, Facturador Plus y Web
+   Services sean **distintos entre sí**, y el motivo es justamente el riesgo
+   n° 1 de más abajo: si compartieran serie, la web y la app pedirían el
+   mismo número siguiente y se pisarían.
+
+   **Efecto lateral bueno:** el PV viejo sigue andando. Si se cae Vercel, se
+   rompe un deploy o ARCA rechaza algo, se factura a mano desde la web de ARCA
+   sin romper la numeración de la app. Acá no hay staging, así que ese plan B
+   vale.
 4. **Asociar el certificado al servicio** en el Administrador de Relaciones de
    Clave Fiscal.
 
@@ -144,3 +161,5 @@ no un detalle técnico, y la tiene que tomar el dueño sabiendo eso.
 - [Webservices de factura electrónica](https://www.afip.gob.ar/ws/documentacion/ws-factura-electronica.asp)
 - [Generación de certificados para producción](https://www.afip.gob.ar/ws/wsaa/wsaa.obtenercertificado.pdf)
 - [Ayuda — Factura electrónica](https://www.afip.gob.ar/fe/ayuda/webservice.asp)
+- [Habilitación de puntos de venta](https://www.afip.gob.ar/derechos-de-exportacion-de-servicios/comprobantes-y-facturacion/puntos-de-venta.asp)
+- [Monotributo — Factura electrónica](https://www.afip.gob.ar/facturacion/monotributo/factura-electronica.asp)
