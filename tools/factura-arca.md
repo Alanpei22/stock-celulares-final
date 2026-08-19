@@ -60,7 +60,7 @@ condición de IVA propia, punto de venta. No hay ni uno cargado.
 
 ---
 
-## Los tres riesgos, en orden
+## Los riesgos, en orden
 
 ### 1. La numeración no puede tener huecos ni repetidos
 El bug clásico: se pide el CAE, se corta la conexión por timeout, el software
@@ -70,6 +70,20 @@ duplicado o salteado.
 Eso **no es un bug de pantalla, es un problema fiscal**. La solución tiene que
 ser idempotente: antes de reintentar, consultar con `FECompConsultar` si ese
 número ya se emitió.
+
+### 1b. La app es el UNICO camino para facturar
+Consecuencia de la decision de arriba: si ARCA no contesta, se cae Vercel o
+vence el certificado, **no hay forma alternativa de emitir**. Si la web de ARCA
+fuera el plan B esto podria ser mas relajado; siendo el unico camino, no.
+
+Lo que obliga a que tenga la app:
+- **Estado visible por venta**: facturada / sin facturar / fallo. Nunca en
+  silencio.
+- **Reintentar** una que fallo, sin duplicar el numero (ver riesgo n1).
+- **Lista de ventas sin facturar**, para que no se pierda ninguna a fin de mes.
+- **Aviso cuando el certificado esta por vencer** (duran 2 anios). Si vence sin
+  que nadie mire, se corta la facturacion de un dia para el otro. Ya hay
+  Telegram armado para avisar.
 
 ### 2. El timeout de Vercel
 En el plan gratis las funciones node cortan a los **10 segundos**. WSAA +
@@ -102,24 +116,21 @@ Eso se prueba contra **homologación**, y para eso hace falta el certificado.
 2. **Certificado de producción** — desde el "Administrador de Certificados
    Digitales", con clave fiscal.
 3. **Punto de venta del tipo "Web Services".** Se da de alta en ARCA desde
-   "Administración de puntos de venta y domicilios".
+   "Administración de puntos de venta y domicilios". Es **uno solo**.
 
-   **Un "punto de venta" NO es un local: es una serie de numeración.** El
-   local sigue siendo uno solo, mismo CUIT, mismas facturas. Lo único que
-   cambia es que cada serie numera por su cuenta:
+   Un "punto de venta" en ARCA NO es un local: es una serie de numeración. El
+   local sigue siendo uno, mismo CUIT.
 
-       PV 0001 (Comprobantes en línea, la web) -> 0001-00000045, 46, 47...
-       PV 0002 (Web Services, esta app)         -> 0002-00000001, 2, 3...
+   **DECISION TOMADA (19/08/2026): se factura SOLO desde la app.** O sea que
+   alcanza con un unico PV, tipo Web Services. No hace falta el de
+   "Comprobantes en linea".
 
-   ARCA exige que los PV de Comprobantes en línea, Facturador Plus y Web
-   Services sean **distintos entre sí**, y el motivo es justamente el riesgo
-   n° 1 de más abajo: si compartieran serie, la web y la app pedirían el
-   mismo número siguiente y se pisarían.
+   (Para el registro: ARCA exige que los PV de Comprobantes en linea,
+   Facturador Plus y Web Services sean distintos entre si. Si alguna vez se
+   quisiera facturar tambien desde la web de ARCA como plan B, habria que dar
+   de alta un segundo PV. Se puede hacer despues, en minutos: no es una
+   decision para hoy.)
 
-   **Efecto lateral bueno:** el PV viejo sigue andando. Si se cae Vercel, se
-   rompe un deploy o ARCA rechaza algo, se factura a mano desde la web de ARCA
-   sin romper la numeración de la app. Acá no hay staging, así que ese plan B
-   vale.
 4. **Asociar el certificado al servicio** en el Administrador de Relaciones de
    Clave Fiscal.
 
@@ -132,10 +143,11 @@ distintos**. No se mezclan.
 
 | Fase | Qué | Quién |
 |---|---|---|
-| **0** | Certificado de homologación + confirmar con el contador | Dueño |
+| **0** | Certificado de homologación + PV tipo Web Services + confirmar con el contador | Dueño |
 | **1** | `/api/factura` + WSAA + consultar último número. **Solo leer** | Claude |
 | **2** | Emitir en homologación, con numeración idempotente | Claude |
 | **3** | La factura impresa con CAE, vencimiento y QR | Claude |
+| **3b** | Estado por venta, reintento y lista de sin facturar (ver riesgo 1b) | Claude |
 | **4** | Producción con el certificado real | Los dos |
 
 **La fase 1 es la que despeja las dudas grandes**: si el timeout de Vercel
