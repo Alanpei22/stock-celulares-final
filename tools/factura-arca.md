@@ -16,7 +16,7 @@ Dos cosas que salieron al investigar y que **no son decisión del programador**:
    agosto de 2026** la obligación de pedir el **CAE en tiempo real**. Aplica a
    responsables inscriptos. Siendo monotributo probablemente no aplique, pero
    que lo confirme el contador.
-2. **Manual de WSFEv1 versión 4.5**: hace obligatorio el campo
+2. **Manual de WSFEv1 versión 4.6** (la vigente al 19/08/2026): hace obligatorio el campo
    `CondicionIVAReceptorId` en los comprobantes alcanzados. Si falta, ARCA
    rechaza la emisión. O sea: **hay que preguntarle la condición de IVA al
    cliente** al facturar.
@@ -33,6 +33,12 @@ del CUIT, y devuelve un **token + sign** que vale **12 horas**.
 Hay que cachearlo: no se pide uno por factura.
 
 ### 2. WSFEv1 — el comprobante
+
+**Cuidado con el nombre del servicio al autorizar el certificado:**
+- `wsfe` = V0, solo comprobantes A y B. Discontinuado desde el 1-jul-2011.
+- `wsfev1` = V1, comprobantes **A, B, C y M**. **Es el que hace falta**:
+  la Factura C (monotributo) solo existe en la V1.
+
 Con ese token:
 - `FECompUltimoAutorizado` → qué número sigue para ese punto de venta y tipo
 - `FECAESolicitar` → pide el CAE
