@@ -218,10 +218,28 @@ de homologación es `wswhomo`. Se comprobó: no resuelve.
 
 ---
 
-## Estado de la fase 1 (19/08/2026)
+## Estado de la fase 1 (19/08/2026) — VERIFICADA CONTRA ARCA
 
-Escrita, con prueba, **sin correr nunca contra ARCA todavía**. Falta cargar
-las env vars en Vercel.
+Corrida de verdad contra homologación. Resultado:
+
+    TOKEN {ok: true, expira: '2026-08-20T07:22:56.078-03:00',
+           deCache: false, ms: 1814}
+
+**Las tres dudas que estaban abiertas quedaron resueltas:**
+
+1. **¿Entra en los 10 s de Vercel?** WSAA respondió en **1814 ms**. Entra
+   holgado. Era el riesgo que podía obligar a replantear todo el enfoque.
+2. **¿SHA-256 o SHA-1 para la firma CMS?** SHA-256. WSAA la aceptó.
+3. **¿El servicio era `wsfe` o `wsfev1`?** `wsfe`, como estaba.
+
+**Un bug que apareció en esa primera corrida:** WSAA devuelve el ticket
+ESCAPADO como entidades XML adentro de `<loginCmsReturn>` (`&lt;token&gt;`),
+NO dentro de un CDATA. Buscar `<token>` directo no encontraba nada y el error
+decía "WSAA no devolvió token" cuando sí lo había devuelto. Arreglado con
+`desescapar()`, y con prueba que arma una respuesta con la forma real.
+
+Env vars ya cargadas en Vercel: ARCA_ENTORNO, ARCA_CUIT, ARCA_CERT, ARCA_KEY.
+Falta ARCA_PTO_VENTA (el PV todavía no se dio de alta).
 
 Archivos: `api/_arca.js` (ayudante) y `api/factura.js` (endpoint).
 Dependencia nueva: `node-forge`, para firmar en CMS/PKCS#7.
