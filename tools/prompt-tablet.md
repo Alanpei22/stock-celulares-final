@@ -60,78 +60,114 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   exigen el ID token de Firebase de una cuenta de la allowlist
 
 
-## Lo último que se hizo (2026-08-19)
+## Lo ultimo que se hizo (2026-08-19)
 
-Un día largo: 18 commits. Todo pusheado y en producción, pero **casi nada
-probado en el mostrador todavía**. Si algo molesta, cada cosa se revierte por
-separado (`git log --oneline` y `git revert <hash>`).
+Un dia largo: 22 commits, todo pusheado y en produccion. **Casi nada probado
+en el mostrador todavia.** Si algo molesta, cada cosa se revierte por separado
+(`git log --oneline` y `git revert <hash>`).
 
-**Seguridad**
+**Seguridad e infraestructura**
 - `/api/ai`, `/api/send-push` y `/api/telegram-notify` estaban ABIERTOS a
-  internet. Ahora exigen el ID token de Firebase contra la misma allowlist de
+  internet. Ahora exigen el ID token de Firebase contra la allowlist de
   `firestore.rules`. `apiFetch()` en utils.js engancha el token solo.
+- **`firestore.rules` y `firestore.indexes.json` DEPLOYADOS** (por fin). El
+  archivo de indices tenia una entrada invalida (un indice de un solo campo)
+  que hacia fallar el deploy entero: por eso nunca se habia podido subir.
 
 **Reparaciones**
-- **Varias reparaciones por equipo**, cada una con su precio. `arreglos[]` es la
-  lista; `arreglo` sigue existiendo como resumen ("Módulo + Batería") para que
-  las ~110 lecturas que ya había no se rompan. En la ficha se tildan a medida
-  que se hacen.
-- Campo **`falla`**: lo que cuenta el cliente. Va a la boleta antes del trabajo.
-- **`motivoCierre`**: al marcar "No va" pide una categoría (rechazó presupuesto /
-  no tiene arreglo / no se consigue / no apareció). Hay desglose en estadísticas.
+- **Varias reparaciones por equipo**, cada una con su precio. `arreglos[]` es
+  la lista; `arreglo` sigue siendo el resumen ("Modulo + Bateria") para que
+  las ~110 lecturas que ya habia no se rompan.
+- Campo **`falla`**: lo que cuenta el cliente. Va a la boleta.
+- **`motivoCierre`**: al marcar "No va" pide una categoria. Desglose en stats.
 - Cargar el **costo ya no es obligatorio** para entregar.
-- El **ingreso pasó de 5 pasos a 3**, con pasos numerados arriba.
-- Las **cards** tienen dos niveles de botones: sólidos lo del día (estado,
-  cobrar, avisar por WhatsApp), fantasma el resto (llamar, boleta, garantía,
-  nota). Garantía ahora sale solo en equipos ya entregados.
-- **Estadísticas con período a medida** (botón "Elegir"), con atajos.
+- El **ingreso paso de 5 pasos a 3**, con pasos numerados.
+- Las **cards**: dos niveles de botones (solidos lo del dia, fantasma el resto).
+- **Estadisticas con periodo a medida** (boton "Elegir"), con atajos.
 
 **Otros**
-- **Campanita de novedades** en las dos páginas, agrupada por equipo, con
-  globito y barrita de color por estado.
-- El **comprobante de venta** ahora lleva los datos del comprador.
-- La **clave y el patrón ya NO se imprimen** en la boleta.
-- `print.js` bajó de 1256 a 679 líneas (se borraron A4, 80mm y térmica).
+- **Campanita de novedades** en las dos paginas, agrupada por equipo.
+- El **comprobante de venta** lleva los datos del comprador.
+- La **clave y el patron ya NO se imprimen** en la boleta.
+- `print.js` bajo de 1256 a 679 lineas.
 
 **Bugs que aparecieron y se arreglaron**
-- No se podía **cobrar una reparación** desde la pantalla de Reparaciones:
-  `_todayAR()` y `fmt()` vivían en `caja.js`, que `index.html` no carga.
-  Se mudaron a `utils.js`. Lo vigila `tests/test-cross-pagina.js`.
-- El **retiro dueño** se contaba como gasto y bajaba el total del mes.
-- Las estadísticas filtraban las canceladas por `'no_van'`, un estado que la
-  app nunca escribe: ese contador daba casi siempre 0.
-- Las fechas de las estadísticas salían de `toISOString()` (UTC): después de
-  las 21:00 el rango se iba un día para adelante.
+- No se podia **cobrar una reparacion** desde Reparaciones: `_todayAR()` y
+  `fmt()` vivian en `caja.js`, que `index.html` no carga. Se mudaron a
+  `utils.js`. Lo vigila `tests/test-cross-pagina.js`.
+- El **retiro dueno** se contaba como gasto y bajaba el total del mes.
+- Las stats filtraban las canceladas por `'no_van'`, un estado que la app
+  nunca escribe: ese contador daba casi siempre 0.
+- Las fechas de las stats salian de `toISOString()` (UTC): despues de las
+  21:00 el rango se iba un dia para adelante.
+- **Avisos en vivo de cobros entre dispositivos**: nunca funcionaron, faltaba
+  el indice compuesto que el deploy roto nunca subio.
+- **Backup diario**: hacia `.set()` sobre el doc del dia, que las reglas hacen
+  inmutable. El 2do dispositivo de cada dia se comia un permission-denied.
+- **"Mercado Pago" vs "MercadoPago"**: se guardaban distinto segun de donde
+  saliera la venta, y el cierre mostraba dos metodos donde hay uno.
+
+## FACTURACION ARCA - EN PAUSA, fase 1 terminada
+
+**Lee `tools/factura-arca.md` antes de tocar nada de esto.** Ahi esta el
+analisis completo, los riesgos y el plan por fases.
+
+Estado al 19/08/2026:
+
+- **Fase 0 lista**: certificado de homologacion sacado y autorizado para
+  `wsfe`. Los archivos estan en `Documents/arca-certificados/` (FUERA del
+  repo a proposito), con un LEEME que explica cada uno.
+- **Fase 1 lista y VERIFICADA contra ARCA**: `/api/factura` con cuatro
+  acciones de lectura (`config`, `dummy`, `token`, `ultimo`). WSAA devolvio
+  token en **1814 ms**, o sea que entra holgado en los 10 s de Vercel, que
+  era el riesgo que podia obligar a replantear todo.
+- **Env vars cargadas en Vercel**: ARCA_ENTORNO=homologacion, ARCA_CUIT,
+  ARCA_CERT, ARCA_KEY.
+
+**Lo unico que falta para cerrar la fase 1:** dar de alta el punto de venta
+tipo "Web Services" en ARCA, cargar `ARCA_PTO_VENTA` y probar la accion
+`ultimo`. Para homologacion probablemente alcance con el numero 1 sin hacer
+tramite; no se llego a probar.
+
+**Decisiones ya tomadas** (estan en factura-arca.md, no volver a preguntarlas):
+monotributo -> Factura C; se factura SOLO desde la app; solo los cobros
+digitales (transferencia, MercadoPago, tarjeta); efectivo y dolares no; y la
+app SIEMPRE pregunta antes de emitir, nunca sola.
 
 ## Pendientes
 
-**Para mí (no los podés hacer vos):**
-- Deployar `firestore.rules` (cierra el listado de la colección pública del QR).
-  Se puede desde la consola de Firebase en el navegador. **Sigue sin hacerse.**
-- Mirar el uso de Firebase y pasar cuántos documentos tiene cada colección
-  (con la app abierta, F12 → Console):
+**Lo primero, antes de escribir una linea nueva:**
+Entraron 22 commits en un dia y casi nada se probo en el mostrador. Preguntar
+que molesto de lo nuevo ANTES de agregar mas. Meterle features encima de algo
+sin estrenar es como se acumulan los problemas.
+
+**Para el dueno (Claude no puede):**
+- **Mirar el uso de Firebase.** Con la app abierta, F12 -> Console:
   `console.table({stock:STOCK.length, reparaciones:REPAIRS.length})`
-  Ahora importa más: la campanita es lo primero que lee al abrir, sin entrar a
-  ninguna sección. Calculado ~330 lecturas/día, pero es una cuenta, no una
-  medición. Si sube de más, bajar `AVISOS_LIMITE` de 60 a 30 es una línea.
-- **Facturación con ARCA**: hace falta el certificado digital. El análisis
-  completo, los riesgos y los pasos están en `tools/factura-arca.md`.
+  Importa mas que antes: la campanita lee al abrir sin entrar a ninguna
+  seccion. Calculado ~330 lecturas/dia, pero es una cuenta, no una medicion.
+  Si sube de mas, bajar `AVISOS_LIMITE` de 60 a 30 en avisos.js es una linea.
+- **Bajar el escudo de Brave** para stock-celulares-final.vercel.app. Estaba
+  bloqueando trafico de firestore.googleapis.com (ERR_BLOCKED_BY_CLIENT).
+- **Punto de venta de ARCA**, si se retoma la facturacion.
 
 **Para charlar:**
-- El listener de `stock` todavía trae todos los equipos, incluidos los vendidos
-  hace meses. Falta acotarlo, pero antes quiero ver los números.
-- Aviso de transferencias de MercadoPago: hay que elegir entre cobrar con QR
-  (webhook oficial, instantáneo) o reenviar la notificación del celu con
-  MacroDroid. Ver `tools/gmail-aviso-mp.gs`.
-- Las plantillas de WhatsApp de las fases nuevas funcionan pero todavía no se
-  editan desde Configuración.
+- El listener de `stock` todavia trae todos los equipos, incluidos los
+  vendidos hace meses. Falta acotarlo, pero antes hay que ver los numeros.
 - Las fotos de reparaciones se guardan en base64 dentro del documento de
-  Firestore. Es lo que más va a comer el cupo. Las del stock ya usan Firebase
-  Storage, que es como debería ser.
+  Firestore. Es lo que mas va a comer el cupo. Las del stock ya usan Firebase
+  Storage, que es como deberia ser.
+- Aviso de transferencias de MercadoPago: elegir entre cobrar con QR (webhook
+  oficial, instantaneo) o reenviar la notificacion del celu con MacroDroid.
+  Ver `tools/gmail-aviso-mp.gs`.
+- Las plantillas de WhatsApp de las fases nuevas funcionan pero todavia no se
+  editan desde Configuracion.
 - Falta el backup JSON descargable.
-- `comprobante-venta.html` pesa 389 KB (una imagen en base64 adentro) y duplica
-  lo que hace `print.js`. Falta decidir cuál se usa y borrar el otro.
-- `rep-fi-presupuesto` lo lee `saveRepair` pero el campo nunca existió en el
+- `comprobante-venta.html` pesa 389 KB (una imagen en base64 adentro) y
+  duplica lo que hace `print.js`. Falta decidir cual se usa y borrar el otro.
+- `rep-fi-presupuesto` lo lee `saveRepair` pero el campo nunca existio en el
   formulario: ese dato siempre se guarda en 0.
-- El alta de stock no tiene campos para accesorios incluidos ni IMEI 2, así que
-  no pueden salir en el comprobante de venta.
+- El alta de stock no tiene campos para accesorios incluidos ni IMEI 2, asi
+  que no pueden salir en el comprobante de venta.
+- `repairs.js` tiene ~4400 lineas, `caja.js` ~3600, `app.js` ~3000. No es un
+  problema hoy; lo va a ser el dia que haya que cambiar algo del medio.
