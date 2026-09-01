@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 27 suites, ~1080 chequeos, 3 segundos.
+2. **`npm test` antes de cada push.** Son 28 suites, ~1110 chequeos, 3 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -74,6 +74,18 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - Bugs: las plantillas `fase_*` se guardaban pero **no volvian de Firestore**
   (el loader solo copiaba las 4 viejas), y "Restablecer" del modal viejo se
   las llevaba puestas. `repair_presupuesto` por fin se puede editar.
+
+**Buscar una reparacion por N° de orden al cobrar (estaba roto)**
+- Tipeabas el numero y la orden no aparecia. `searchMatch` busca por
+  SUBCADENA, asi que un numero suelto pega en los IMEI (15 digitos) y en las
+  capacidades del stock ("128" matchea todo equipo de 128 GB). Como las
+  reparaciones iban forzadas al final de una lista cortada en 10, veinte
+  equipos se metian adelante y la orden quedaba afuera.
+- Ahora, si lo tipeado son solo numeros, se trata como N° de orden: exacta >
+  empieza con > lo contiene, y va PRIMERA de todo.
+- El corte de 10 reserva hasta 3 lugares para reparaciones
+  (`_cortarSugerencias`), asi una orden nunca desaparece de la lista.
+- Buscar por nombre, por IMEI completo y por texto sigue igual que antes.
 
 **"¿Se lleva el equipo?" — se fueron los confirm() del navegador**
 - Los tres lugares que preguntaban por la entrega (cobrar desde la caja, y

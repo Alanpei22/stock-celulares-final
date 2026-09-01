@@ -2088,17 +2088,31 @@ function _onMovDescInput() {
   }
 
   // ── Reparaciones ──
-  const qIsNumeric = /^\d+$/.test(q.replace(/\s/g, ''));
+  // Si tipeás solo números es un NÚMERO DE ORDEN, y esa reparación tiene que
+  // salir primera.
+  //
+  // Antes no aparecía nunca: las reparaciones se mandaban siempre al final de
+  // la lista y el corte era de 10. Como searchMatch busca por subcadena, un
+  // número suelto pega en los IMEI (15 dígitos) y en las capacidades del stock
+  // — "128" matchea todo equipo de 128 GB —, así que diez equipos se metían
+  // adelante y la orden buscada quedaba afuera del corte.
+  const qDigits    = q.replace(/\D/g, '');
+  const qIsNumeric = qDigits.length > 0 && !/[a-zñáéíóú]/i.test(q);
   CAJA_REPAIRS.forEach(r => {
     // Omitir canceladas y las ya cobradas+entregadas
     if (r.estado === 'cancelado' || r.estado === 'no van' || r.estado === 'no va') return;
     if (r.cobrado && r.estado === 'entregado') return;
 
-    let matches = false;
-    if (qIsNumeric) {
-      const nStr = String(r.nOrden || '');
-      matches = nStr.startsWith(q.replace(/\s/g, ''));
+    // 3 = el número exacto · 2 = empieza igual · 1 = lo contiene · 0 = no es por número
+    let ordenMatch = 0;
+    const nStr = String(r.nOrden || '');
+    if (qIsNumeric && nStr) {
+      if (nStr === qDigits)             ordenMatch = 3;
+      else if (nStr.startsWith(qDigits)) ordenMatch = 2;
+      else if (nStr.includes(qDigits))   ordenMatch = 1;
     }
+
+    let matches = ordenMatch > 0;
     if (!matches) {
       matches = searchMatch([r.nombre, r.marca, r.modelo, r.arreglo, String(r.nOrden || '')], q);
     }
@@ -2115,6 +2129,7 @@ function _onMovDescInput() {
       precio: saldo || r.monto || 0,
       saldo,
       estado: r.estado,
+      ordenMatch,
       icon: '🔧',
       costoUSD: 0,
       costoARS: 0,
@@ -2124,6 +2139,10 @@ function _onMovDescInput() {
   // Priorizar coincidencia al inicio del nombre, después por stock disponible, después alfabético
   const qNorm = normalizeText(q);
   results.sort((a, b) => {
+    // Una orden que coincide por número manda sobre todo lo demás: si tipeaste
+    // 1287 es porque querés la orden 1287, no un equipo con 1287 en el IMEI.
+    const aO = a.ordenMatch || 0, bO = b.ordenMatch || 0;
+    if (aO !== bO) return bO - aO;
     // Reparaciones "listo" primero dentro de su grupo
     if (a.source === 'repair' && b.source === 'repair') {
       const aL = a.estado === 'listo' ? 0 : 1;
@@ -2144,7 +2163,19 @@ function _onMovDescInput() {
     return a.nombre.localeCompare(b.nombre);
   });
 
-  _showMovSuggestions(results.slice(0, 10), q);
+  _showMovSuggestions(_cortarSugerencias(results), q);
+}
+
+// El corte de la lista no puede dejar afuera a las reparaciones.
+// Se les reservan hasta 3 lugares de los 10: aunque la búsqueda devuelva
+// veinte accesorios, la orden que estás buscando se ve. El orden relativo que
+// definió el sort se respeta.
+function _cortarSugerencias(results, max = 10, minReps = 3) {
+  if (results.length <= max) return results;
+  const reps  = results.filter(r => r.source === 'repair').slice(0, minReps);
+  const resto = results.filter(r => !reps.includes(r)).slice(0, max - reps.length);
+  const elegidas = new Set([...reps, ...resto]);
+  return results.filter(r => elegidas.has(r));
 }
 
 function _showMovSuggestions(results, q) {

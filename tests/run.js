@@ -43,6 +43,7 @@ const QUE_CUBRE = {
   'test-wa-plantillas.js':    'Mensajes de WhatsApp por fase y su editor en la ficha',
   'test-venta-caja.js':       'Vender un equipo desde la caja y su comprobante A5',
   'test-entrega.js':          '"¿Se lleva el equipo?": el cartel al cobrar y al pasar a Listo',
+  'test-buscar-orden.js':     'Buscar una reparación por número de orden al cobrar',
 };
 
 const archivos = fs.readdirSync(__dirname)
