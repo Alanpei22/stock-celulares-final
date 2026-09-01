@@ -1579,3 +1579,34 @@ body.dark .vsearch-item-desc { color:#eee; }
 .comprobante-item-imei { font-size:.72rem; font-weight:700; font-family:'Courier New',monospace; color:var(--t1,#1a1a1a); letter-spacing:-.2px; }
 .comprobante-item-imei--none { font-weight:500; font-style:italic; color:#d97706; font-family:inherit; }
 body.dark .comprobante-item-imei { color:#eee; }
+
+/* ── Formulario de venta de equipo (reemplaza a comprobante-venta.html) ── */
+.ventaeq-body { max-height:62vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-right:2px; }
+.ventaeq-sec {
+  font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--t2,#666); border-bottom:1.5px solid var(--border,#e3e1de);
+  padding-bottom:4px; margin:14px 0 10px;
+}
+.ventaeq-body > .ventaeq-sec:first-child, #ve-mas > .ventaeq-sec:first-child { margin-top:2px; }
+.ventaeq-g2 { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
+.ventaeq-mas {
+  width:100%; margin:6px 0 4px; padding:11px 12px;
+  border:1.5px dashed var(--border,#e3e1de); border-radius:11px;
+  background:var(--bg1,#f1f0ee); color:var(--t2,#666);
+  font-size:.82rem; font-weight:700; cursor:pointer;
+}
+.ventaeq-chks { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.ventaeq-chk {
+  display:flex; align-items:center; gap:8px;
+  padding:8px 10px; border:1.5px solid var(--border,#e3e1de);
+  border-radius:10px; cursor:pointer; font-size:.82rem;
+  background:var(--card,#fff); color:var(--t1,#1a1a1a);
+}
+.ventaeq-chk input[type="checkbox"] { width:18px; height:18px; cursor:pointer; flex-shrink:0; }
+.ventaeq-chk:has(input:checked) { border-color:#10b981; background:rgba(16,185,129,.06); }
+.ventaeq-toggle {
+  display:flex; align-items:center; gap:10px; margin-top:14px;
+  padding:11px 12px; border:1.5px solid var(--border,#e3e1de); border-radius:11px;
+  font-size:.84rem; font-weight:600; cursor:pointer; color:var(--t1,#1a1a1a);
+}
+.ventaeq-toggle input { width:20px; height:20px; cursor:pointer; }

@@ -5041,6 +5041,86 @@ body.dark {
  white-space: pre-wrap; margin-top: 6px;
 }
 
+/* ── "¿Se lleva el equipo?" — reemplaza al confirm() del navegador ──
+   Va en style.css a propósito: caja.html también lo carga, y las dos
+   páginas tienen que preguntar exactamente igual. */
+.tpent-overlay {
+ position: fixed; inset: 0; z-index: 1400;
+ background: rgba(0,0,0,.5); backdrop-filter: blur(2px);
+}
+.tpent-modal {
+ position: fixed; z-index: 1401;
+ left: 50%; bottom: 0; transform: translateX(-50%);
+ width: 100%; max-width: 420px;
+ background: var(--card, #fff); color: var(--text, #1a1a1a);
+ border-radius: 22px 22px 0 0; padding: 18px 18px 24px;
+ box-shadow: 0 -8px 40px rgba(0,0,0,.22);
+ max-height: 90vh; overflow-y: auto;
+}
+@media (min-width: 600px) {
+ .tpent-modal { bottom: auto; top: 50%; transform: translate(-50%, -50%); border-radius: 20px; }
+}
+.tpent-hd {
+ display: flex; align-items: center; justify-content: space-between;
+ font-size: 1.05rem; font-weight: 800; margin-bottom: 12px;
+}
+.tpent-x {
+ background: none; border: 0; font-size: 1.1rem; cursor: pointer;
+ color: var(--text3, #999); padding: 4px 8px;
+}
+/* Qué equipo es. El confirm viejo no lo decía y con dos órdenes del mismo
+   cliente en el mostrador era adivinar. */
+.tpent-info {
+ background: var(--bg1, #f1f0ee); border-radius: 12px;
+ padding: 11px 13px; font-size: .92rem; line-height: 1.5;
+}
+.tpent-cli { display: block; font-size: .84rem; color: var(--text2, #5c5c5c); margin-top: 2px; }
+.tpent-plata { font-size: .84rem; color: var(--text2, #5c5c5c); margin: 9px 2px 14px; line-height: 1.5; }
+.tpent-plata:empty { display: none; }
+.tpent-debe { color: #d97706; font-weight: 700; }
+.tpent-wachk {
+ display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+ padding: 11px 12px; border: 1.5px solid var(--border, #e3e1de);
+ border-radius: 12px; font-size: .85rem; cursor: pointer;
+}
+.tpent-wachk input { width: 20px; height: 20px; cursor: pointer; flex-shrink: 0; }
+.tpent-btn {
+ display: block; width: 100%; min-height: 54px; margin-bottom: 9px;
+ border-radius: 14px; border: 1.5px solid var(--border, #e3e1de);
+ background: var(--card, #fff); color: var(--text, #1a1a1a);
+ font-size: .95rem; font-weight: 700; cursor: pointer;
+ transition: transform .12s;
+}
+.tpent-btn:active { transform: scale(.98); }
+.tpent-btn--si { background: var(--wa, #25d366); border-color: var(--wa, #25d366); color: #fff; }
+.tpent-volver {
+ display: block; width: 100%; margin-top: 4px; padding: 10px;
+ background: none; border: 0; cursor: pointer;
+ font-size: .82rem; font-weight: 600; color: var(--text3, #999);
+ text-decoration: underline;
+}
+
+/* Editor del mensaje de la fase (modal wa-fase-modal) */
+.wf-vars { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.wf-var {
+ padding: 6px 10px; min-height: 34px;
+ background: var(--bg1); color: var(--text2);
+ border: 1px solid var(--border); border-radius: 999px;
+ font-family: ui-monospace, 'Courier New', monospace;
+ font-size: .72rem; font-weight: 700; cursor: pointer;
+}
+.wf-var:active { background: var(--wa); color: #fff; border-color: var(--wa); }
+/* La previa imita la burbuja de WhatsApp: es más fácil ver si el texto quedó
+   largo o si un *negrita* quedó abierto. */
+.wf-prev {
+ background: var(--bg1); border: 1px solid var(--border);
+ border-left: 3px solid var(--wa); border-radius: var(--radius-sm);
+ padding: 10px 12px; margin-top: 6px;
+ font-size: .84rem; line-height: 1.55; word-break: break-word;
+ max-height: 34vh; overflow-y: auto;
+}
+.wf-prev b { font-weight: 800; }
+
 /* Historial con duración por etapa */
 .tp-hist { display: grid; gap: 0; margin-top: 6px; }
 .tp-h {

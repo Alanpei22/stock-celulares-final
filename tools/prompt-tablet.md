@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 23 suites, ~800 chequeos, 3 segundos.
+2. **`npm test` antes de cada push.** Son 27 suites, ~1080 chequeos, 3 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -60,7 +60,48 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   exigen el ID token de Firebase de una cuenta de la allowlist
 
 
-## Lo ultimo que se hizo (2026-08-19)
+## Lo ultimo que se hizo (2026-08-20)
+
+**Mensajes de WhatsApp**
+- Los avisos de las 11 fases se **editan desde la ficha** de la reparacion
+  ("Aviso al cliente → ✏️ Editar texto"), con chips de variables y vista
+  previa en vivo. Se guardan en `config/waTemplates` como `fase_<clave>`.
+- Textos reescritos. El de "Listo" ahora dice el **saldo** (total menos seña),
+  no el total: antes el cliente venia con plata de mas.
+- `{FALLA}` usa el campo `falla` (antes agarraba la condicion estetica).
+- Variables nuevas: `{SALDO}`, `{SENA}`, `{DETALLE}` (los arreglos con su
+  precio), `{HORARIO}`, `{TELEFONO}`.
+- Bugs: las plantillas `fase_*` se guardaban pero **no volvian de Firestore**
+  (el loader solo copiaba las 4 viejas), y "Restablecer" del modal viejo se
+  las llevaba puestas. `repair_presupuesto` por fin se puede editar.
+
+**"¿Se lleva el equipo?" — se fueron los confirm() del navegador**
+- Los tres lugares que preguntaban por la entrega (cobrar desde la caja, y
+  pasar a Listo desde la ficha y desde la lista) ahora usan UN modal propio,
+  `tpEntregaModal` en tp-fases.js (vive en las dos paginas).
+- Dice de QUE equipo habla (N° de orden, modelo, cliente) y cuanta plata
+  entra y queda debiendo. El confirm viejo no decia nada de eso.
+- Tres salidas escritas: se lo lleva / queda en el local / volver. Antes
+  "Cancelar" se leia como "cancelar el cobro" pero el cobro se hacia igual;
+  ahora volver de verdad no cobra nada.
+- Al entregar escribe tambien la FASE (antes solo el `estado`, asi que la
+  entrega no quedaba en el historial del tablero) y lo anota en `actividad`,
+  asi la entrega hecha desde la caja aparece en la campanita.
+- Opcion de mandar el WhatsApp de gracias + garantia ahi mismo.
+- `tpWaFono` / `tpWaAbrir` se mudaron a tp-fases.js: el normalizador de
+  telefono estaba solo en repairs.js, que caja.html no carga.
+
+**Comprobante de venta desde la caja**
+- Se borro `comprobante-venta.html` (389 KB). La caja ahora abre un formulario
+  propio e imprime con `print.js`, el MISMO A5 que sale desde Stock.
+- El A5 de venta acepta todo lo que tenia la pagina vieja, **todo opcional**:
+  IMEI 2, N° de serie, ciclos, estado estetico, libre de fabrica, cuentas
+  removidas, accesorios, funciones probadas, permuta con su valor tomado,
+  cuotas, saldo abonado y N° de comprobante. Lo que no cargas, no se imprime.
+- Con permuta aparece una clausula extra de procedencia licita.
+- `caja.html` ahora carga `qr.js` y `print.js`.
+
+## Lo que se hizo el 2026-08-19
 
 Un dia largo: 22 commits, todo pusheado y en produccion. **Casi nada probado
 en el mostrador todavia.** Si algo molesta, cada cosa se revierte por separado
@@ -160,14 +201,11 @@ sin estrenar es como se acumulan los problemas.
 - Aviso de transferencias de MercadoPago: elegir entre cobrar con QR (webhook
   oficial, instantaneo) o reenviar la notificacion del celu con MacroDroid.
   Ver `tools/gmail-aviso-mp.gs`.
-- Las plantillas de WhatsApp de las fases nuevas funcionan pero todavia no se
-  editan desde Configuracion.
 - Falta el backup JSON descargable.
-- `comprobante-venta.html` pesa 389 KB (una imagen en base64 adentro) y
-  duplica lo que hace `print.js`. Falta decidir cual se usa y borrar el otro.
 - `rep-fi-presupuesto` lo lee `saveRepair` pero el campo nunca existio en el
   formulario: ese dato siempre se guarda en 0.
-- El alta de stock no tiene campos para accesorios incluidos ni IMEI 2, asi
-  que no pueden salir en el comprobante de venta.
+- El ALTA DE STOCK sigue sin campos para accesorios ni IMEI 2. Al vender
+  desde la caja ahora se cargan a mano y salen en el comprobante; al vender
+  desde Stock (index.html) todavia no.
 - `repairs.js` tiene ~4400 lineas, `caja.js` ~3600, `app.js` ~3000. No es un
   problema hoy; lo va a ser el dia que haya que cambiar algo del medio.

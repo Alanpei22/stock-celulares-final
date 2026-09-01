@@ -95,6 +95,9 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:9px;line-he
 .vgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px 10px}
 .vf{display:flex;justify-content:space-between;gap:6px;font-size:8.6px}
 .vf b{font-weight:700;text-align:right}
+.vf2{font-size:8.4px;margin-top:1.5px;word-break:break-word}
+.vf2 span{font-weight:700}
+.vnro{font-size:8.6px;font-weight:800;margin-top:2px}
 .vimei{font-family:'Courier New',monospace;font-size:9px;letter-spacing:-.2px}
 .vtot{width:100%;border-collapse:collapse;margin-bottom:5px}
 .vtot td{border:.8px solid #000;padding:2.5px 7px}
@@ -118,14 +121,37 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;font-size:9px;line-he
 @media screen{body{width:134mm;margin:0 auto}}
 @media print{body{-webkit-print-color-adjust:economy;print-color-adjust:economy}}`;
 
+// Sí / No / nada. Los tildes del formulario llegan como true, false o
+// undefined: si no se contestó, el renglón no se imprime.
+function _prSiNo(v) {
+  if (v === true  || v === 'si' || v === 'sí' || v === 'Sí') return 'Sí';
+  if (v === false || v === 'no' || v === 'No') return 'No';
+  return null;
+}
+// Lista (accesorios, funciones probadas) como array o como texto ya armado.
+function _prLista(v) {
+  if (!v) return '';
+  if (Array.isArray(v)) return v.filter(Boolean).join(' · ');
+  return String(v);
+}
+
 function _ventaA5Body(d, label) {
   const p = d.p;
+  // TODO el detalle del equipo es opcional: cada renglón aparece solo si el
+  // dato está cargado. Así el comprobante de una venta rápida sale corto y el
+  // de un usado con todo el detalle sale completo, sin renglones en "—".
+  const libre   = _prSiNo(p.libre);
+  const cuentas = _prSiNo(p.cuentas);
   const filas = [
     p.estado ? ['Condición', p.estado] : null,
+    p.estetico ? ['Estado estético', p.estetico] : null,
     p.almacenamiento ? ['Almacenamiento', p.almacenamiento] : null,
     p.ram ? ['RAM', p.ram] : null,
     p.bateria ? ['Batería', p.bateria + '%'] : null,
+    p.ciclos ? ['Ciclos de batería', p.ciclos] : null,
     p.color ? ['Color', p.color] : null,
+    libre   ? ['Libre de fábrica', libre] : null,
+    cuentas ? ['iCloud / Google removido', cuentas] : null,
   ].filter(Boolean);
 
   // Comprador. Campos nuevos: las ventas viejas no los tienen y el
@@ -135,6 +161,13 @@ function _ventaA5Body(d, label) {
     p.clienteDni    ? ['DNI', p.clienteDni]       : null,
     p.clienteTel    ? ['Teléfono', p.clienteTel]  : null,
   ].filter(Boolean);
+
+  const accs    = _prLista(p.accesorios);
+  const pruebas = _prLista(p.pruebas);
+  // Permuta: el equipo que se toma en parte de pago. Va en la tabla de
+  // totales para que se lea de dónde sale el número final.
+  const permutaVal = Number(p.permutaValor) || 0;
+  const saldoAb    = Number(p.saldoAbonado) || 0;
 
   return `
 <div class="tk">
@@ -146,6 +179,7 @@ function _ventaA5Body(d, label) {
     </div>
     <div class="vhd-r">
       <div class="vtit">COMPROBANTE DE VENTA</div>
+      ${p.comprobanteNro ? `<div class="vnro">N° ${_pr(p.comprobanteNro)}</div>` : ''}
       <div class="vcopia">${label}</div>
     </div>
   </div>
@@ -166,16 +200,24 @@ function _ventaA5Body(d, label) {
   <div class="vbox">
     <div class="vbox-t">Equipo</div>
     <div class="veq">${_pr(p.marca)} ${_pr(p.modelo)}</div>
-    ${p.imei ? `<div class="vf"><span>IMEI</span><b class="vimei">${_pr(p.imei)}</b></div>` : ''}
+    ${p.imei  ? `<div class="vf"><span>IMEI 1</span><b class="vimei">${_pr(p.imei)}</b></div>` : ''}
+    ${p.imei2 ? `<div class="vf"><span>IMEI 2 / eSIM</span><b class="vimei">${_pr(p.imei2)}</b></div>` : ''}
+    ${p.serie ? `<div class="vf"><span>N° de serie</span><b class="vimei">${_pr(p.serie)}</b></div>` : ''}
     <div class="vgrid">
       ${filas.map(([k, v]) => `<div class="vf"><span>${k}</span><b>${_pr(v)}</b></div>`).join('')}
     </div>
-    ${p.notas ? `<div class="vf" style="margin-top:2px"><span>Observaciones</span><b>${_pr(p.notas)}</b></div>` : ''}
+    ${accs ? `<div class="vf2"><span>Accesorios incluidos:</span> ${accs}</div>` : ''}
+    ${pruebas ? `<div class="vf2"><span>Probado en el local:</span> ${pruebas}</div>` : ''}
+    ${p.notas ? `<div class="vf2"><span>Observaciones:</span> ${_pr(p.notas)}</div>` : ''}
   </div>
 
   <table class="vtot">
-    ${p.forma_pago ? `<tr><td class="a">Forma de pago</td><td>${_pr(p.forma_pago)}</td></tr>` : ''}
+    ${p.forma_pago ? `<tr><td class="a">Forma de pago</td><td>${_pr(p.forma_pago)}${
+      Number(p.cuotas) > 1 ? ` · ${p.cuotas} cuotas` : ''}</td></tr>` : ''}
+    ${p.permuta ? `<tr><td class="a">Recibido en parte de pago</td><td>${_pr(p.permuta)}</td></tr>` : ''}
+    ${permutaVal > 0 ? `<tr><td class="a">Valor tomado</td><td>− ${_prMoney(permutaVal)}</td></tr>` : ''}
     <tr class="hl"><td class="a">TOTAL</td><td>${_prMoney(p.precio)}</td></tr>
+    ${saldoAb > 0 ? `<tr class="hl"><td class="a">SALDO ABONADO</td><td>${_prMoney(saldoAb)}</td></tr>` : ''}
   </table>
 
   ${p.garantiaMeses > 0 ? `
@@ -195,7 +237,8 @@ function _ventaA5Body(d, label) {
       <p><b>2. Garantía.</b> Cuando corresponda, cubre fallas de funcionamiento no provocadas por el uso, conforme la Ley 24.240 de Defensa del Consumidor. Se hace válida únicamente presentando este comprobante.</p>
       <p><b>3. Exclusiones.</b> No cubre golpes, caídas, contacto con líquidos o humedad, sobretensión del cargador, fallas de software o configuración, ni equipos abiertos o intervenidos por terceros.</p>
       <p><b>4. Datos y cuentas.</b> El equipo se entrega sin cuentas vinculadas y con los datos borrados. El respaldo de la información posterior a la compra queda a cargo del comprador.</p>
-      <p><b>5. Conformidad.</b> La firma del presente implica la aceptación del estado del equipo y de estas condiciones.</p>
+      ${p.permuta ? `<p><b>5. Equipo entregado en parte de pago.</b> El comprador declara ser el legítimo titular del equipo que entrega en permuta, que su procedencia es lícita y que no registra denuncia de robo o extravío, haciéndose responsable por cualquier reclamo de terceros sobre el mismo.</p>` : ''}
+      <p><b>${p.permuta ? '6' : '5'}. Conformidad.</b> La firma del presente implica la aceptación del estado del equipo y de estas condiciones.</p>
     </div>
   </div>
 

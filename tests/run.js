@@ -40,6 +40,9 @@ const QUE_CUBRE = {
   'test-stats-periodo.js':    'Estadisticas por periodo a medida (y su costo de cupo)',
   'test-arca.js':             'Conexion con ARCA: firma, entornos y que la fase 1 no emita',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
+  'test-wa-plantillas.js':    'Mensajes de WhatsApp por fase y su editor en la ficha',
+  'test-venta-caja.js':       'Vender un equipo desde la caja y su comprobante A5',
+  'test-entrega.js':          '"¿Se lleva el equipo?": el cartel al cobrar y al pasar a Listo',
 };
 
 const archivos = fs.readdirSync(__dirname)

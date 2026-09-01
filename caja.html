@@ -982,6 +982,10 @@
 <script src="tp-fases.js"></script>
 <script src="seguimiento.js"></script>
 <script src="caja.js"></script>
+<!-- Comprobante de venta A5: el mismo que usa Stock. qr.js va antes porque
+     print.js le pide el QR de WhatsApp. -->
+<script src="qr.js"></script>
+<script src="print.js"></script>
 <script src="caja_extra.js"></script>
 <script src="clientes.js"></script>
 <script src="inventario.js"></script>
@@ -1199,7 +1203,7 @@ function switchCajaTab(tab) {
     <span>🧾 Comprobante de venta</span>
     <button onclick="closeComprobanteModal()">✕</button>
   </div>
-  <p class="arqueo-sub">Elegí el equipo y se autocompleta modelo, capacidad, IMEI, batería y precio. El resto lo completás en el generador.</p>
+  <p class="arqueo-sub">Elegí el equipo y se autocompleta marca, modelo, capacidad, IMEI, batería y precio. Lo que no completes, no sale impreso.</p>
   <div class="precios-search-wrap" style="margin-top:8px">
     <span class="precios-search-ico">🔍</span>
     <input id="comprobante-search" type="search" placeholder="Buscar equipo del stock…" autocomplete="off" oninput="_renderComprobanteList()">
@@ -1208,6 +1212,151 @@ function switchCajaTab(tab) {
   <div style="display:flex;gap:8px;margin-top:12px">
     <button class="btn-secondary" onclick="closeComprobanteModal()" style="flex:1">Cancelar</button>
     <button class="btn-primary" onclick="_abrirComprobante(null)" style="flex:2">📄 En blanco</button>
+  </div>
+</div>
+
+<!-- ═══════════ MODAL: ¿SE LLEVA EL EQUIPO? ═══════════
+     Lo maneja tp-fases.js. El mismo bloque está en index.html: se entrega un
+     equipo desde dos lugares (cobrar acá y cambiar el estado allá) y tienen
+     que preguntar igual.                                                  -->
+<div id="tpent-overlay" class="tpent-overlay hidden" onclick="tpEntregaCancelar()"></div>
+<div id="tpent-modal" class="tpent-modal hidden">
+  <div class="tpent-hd">
+    <span>📦 ¿Se lleva el equipo?</span>
+    <button class="tpent-x" onclick="tpEntregaCancelar()">✕</button>
+  </div>
+  <div class="tpent-info" id="tpent-info"></div>
+  <div class="tpent-plata" id="tpent-plata"></div>
+  <label class="tpent-wachk hidden" id="tpent-wa-wrap">
+    <input type="checkbox" id="tpent-wa">
+    <span>Avisarle por WhatsApp (gracias + garantía)</span>
+  </label>
+  <button class="tpent-btn tpent-btn--si" onclick="tpEntregaSi()">📦 Sí, se lo lleva ahora</button>
+  <button class="tpent-btn tpent-btn--no" onclick="tpEntregaNo()">🏠 No, queda en el local</button>
+  <button class="tpent-volver" onclick="tpEntregaCancelar()">Volver sin cobrar</button>
+</div>
+
+<!-- ═══════════ MODAL: VENTA DE EQUIPO + COMPROBANTE ═══════════
+     Reemplaza a comprobante-venta.html. Todo es opcional menos el precio:
+     lo que quede vacío no se imprime en el comprobante.                -->
+<div id="ventaeq-overlay" class="nota-overlay hidden" onclick="closeVentaEqModal()"></div>
+<div id="ventaeq-modal" class="arqueo-modal hidden" style="max-width:460px">
+  <div class="nota-modal-hdr">
+    <span id="ventaeq-tit">🧾 Venta de equipo</span>
+    <button onclick="closeVentaEqModal()">✕</button>
+  </div>
+  <div class="ventaeq-body">
+
+    <div class="ventaeq-sec">Equipo</div>
+    <div class="ventaeq-g2">
+      <div class="precio-fg"><label>Marca</label>
+        <input id="ve-marca" class="precio-input" type="text" placeholder="Samsung" autocomplete="off"></div>
+      <div class="precio-fg"><label>Modelo</label>
+        <input id="ve-modelo" class="precio-input" type="text" placeholder="Galaxy A54" autocomplete="off"></div>
+    </div>
+    <div class="precio-fg"><label>IMEI 1</label>
+      <input id="ve-imei" class="precio-input" type="text" inputmode="numeric" placeholder="Marcá *#06# en el equipo" autocomplete="off"></div>
+
+    <div class="ventaeq-g2">
+      <div class="precio-fg"><label>Precio total *</label>
+        <input id="ve-precio" class="precio-input" type="number" inputmode="numeric" placeholder="520000"></div>
+      <div class="precio-fg"><label>Forma de pago</label>
+        <select id="ve-pago" class="precio-input" onchange="_veToggleCuotas()">
+          <option>Efectivo</option><option>Transferencia</option><option>MercadoPago</option>
+          <option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Dólares</option>
+        </select></div>
+    </div>
+    <div class="ventaeq-g2">
+      <div class="precio-fg hidden" id="ve-cuotas-wrap"><label>Cuotas</label>
+        <input id="ve-cuotas" class="precio-input" type="number" inputmode="numeric" placeholder="3"></div>
+      <div class="precio-fg"><label>Garantía (meses)</label>
+        <input id="ve-garantia" class="precio-input" type="number" inputmode="numeric" placeholder="0"></div>
+    </div>
+
+    <div class="ventaeq-sec">Comprador</div>
+    <div class="precio-fg"><label>Apellido y nombre</label>
+      <input id="ve-cli-nombre" class="precio-input" type="text" placeholder="Pérez, Juan" autocomplete="off"></div>
+    <div class="ventaeq-g2">
+      <div class="precio-fg"><label>DNI</label>
+        <input id="ve-cli-dni" class="precio-input" type="text" inputmode="numeric" autocomplete="off"></div>
+      <div class="precio-fg"><label>Teléfono</label>
+        <input id="ve-cli-tel" class="precio-input" type="tel" placeholder="11 2345-6789" autocomplete="off"></div>
+    </div>
+
+    <button type="button" class="ventaeq-mas" id="ve-mas-btn" onclick="_veToggleMas()">➕ Más detalles del equipo y de la operación</button>
+
+    <div id="ve-mas" class="hidden">
+      <div class="ventaeq-sec">Detalle del equipo</div>
+      <div class="ventaeq-g2">
+        <div class="precio-fg"><label>Capacidad</label>
+          <input id="ve-capacidad" class="precio-input" type="text" placeholder="128 GB" autocomplete="off"></div>
+        <div class="precio-fg"><label>Color</label>
+          <input id="ve-color" class="precio-input" type="text" autocomplete="off"></div>
+      </div>
+      <div class="ventaeq-g2">
+        <div class="precio-fg"><label>IMEI 2 / eSIM</label>
+          <input id="ve-imei2" class="precio-input" type="text" inputmode="numeric" autocomplete="off"></div>
+        <div class="precio-fg"><label>N° de serie</label>
+          <input id="ve-serie" class="precio-input" type="text" autocomplete="off"></div>
+      </div>
+      <div class="ventaeq-g2">
+        <div class="precio-fg"><label>Salud de batería (%)</label>
+          <input id="ve-bateria" class="precio-input" type="number" inputmode="numeric" placeholder="89"></div>
+        <div class="precio-fg"><label>Ciclos de batería</label>
+          <input id="ve-ciclos" class="precio-input" type="number" inputmode="numeric"></div>
+      </div>
+      <div class="ventaeq-g2">
+        <div class="precio-fg"><label>Condición</label>
+          <select id="ve-condicion" class="precio-input">
+            <option value="">—</option><option>Nuevo</option><option>Usado</option>
+            <option>Excelente</option><option>Muy bueno</option><option>Bueno</option>
+          </select></div>
+        <div class="precio-fg"><label>Estado estético</label>
+          <select id="ve-estetico" class="precio-input">
+            <option value="">—</option>
+            <option value="A · impecable">A · impecable</option>
+            <option value="B · buen estado">B · buen estado</option>
+            <option value="C · con marcas de uso">C · con marcas de uso</option>
+          </select></div>
+      </div>
+      <div class="ventaeq-g2">
+        <div class="precio-fg"><label>¿Libre de fábrica?</label>
+          <select id="ve-libre" class="precio-input"><option value="">—</option><option value="si">Sí</option><option value="no">No</option></select></div>
+        <div class="precio-fg"><label>¿iCloud / Google removido?</label>
+          <select id="ve-cuentas" class="precio-input"><option value="">—</option><option value="si">Sí</option><option value="no">No</option></select></div>
+      </div>
+      <div class="precio-fg"><label>Accesorios que se entregan</label>
+        <div class="ventaeq-chks" id="ve-accesorios"></div></div>
+      <div class="precio-fg"><label>Funciones probadas en el mostrador</label>
+        <div class="ventaeq-chks" id="ve-pruebas"></div></div>
+
+      <div class="ventaeq-sec">Operación</div>
+      <div class="precio-fg"><label>Permuta · equipo recibido en parte de pago</label>
+        <input id="ve-permuta" class="precio-input" type="text" placeholder="Modelo e IMEI · vacío si no hay" autocomplete="off"></div>
+      <div class="ventaeq-g2">
+        <div class="precio-fg"><label>Valor tomado</label>
+          <input id="ve-permuta-val" class="precio-input" type="number" inputmode="numeric"></div>
+        <div class="precio-fg"><label>Saldo abonado</label>
+          <input id="ve-saldo" class="precio-input" type="number" inputmode="numeric"></div>
+      </div>
+      <div class="ventaeq-g2">
+        <div class="precio-fg"><label>N° de comprobante</label>
+          <input id="ve-nro" class="precio-input" type="text" autocomplete="off"></div>
+        <div class="precio-fg"><label>Vendedor</label>
+          <input id="ve-vendedor" class="precio-input" type="text" autocomplete="off"></div>
+      </div>
+      <div class="precio-fg"><label>Observaciones</label>
+        <textarea id="ve-notas" class="precio-input" rows="2"></textarea></div>
+    </div>
+
+    <label class="ventaeq-toggle">
+      <input type="checkbox" id="ve-reg-caja" checked>
+      <span>Registrar el ingreso en la caja de hoy</span>
+    </label>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <button class="btn-secondary" onclick="closeVentaEqModal()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" id="ve-confirm" onclick="confirmVentaEquipo()" style="flex:2">🧾 Vender e imprimir</button>
   </div>
 </div>
 

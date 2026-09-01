@@ -1329,7 +1329,8 @@
       <button class="modal-close" onclick="closeWaTplModal()">✕</button>
     </div>
     <div class="modal-body">
-      <p class="fi-helper" style="margin-bottom:10px">Variables: <code>{nombre}</code> <code>{equipo}</code> <code>{nOrden}</code> <code>{marca}</code> <code>{modelo}</code> <code>{precio}</code></p>
+      <p class="fi-helper" style="margin-bottom:10px">Variables: <code>{nombre}</code> <code>{equipo}</code> <code>{nOrden}</code> <code>{marca}</code> <code>{modelo}</code> <code>{arreglo}</code> <code>{monto}</code></p>
+      <p class="fi-helper" style="margin-bottom:10px">Los avisos del <b>tablero de fases</b> se editan en la ficha de cada reparación, en “Aviso al cliente → ✏️ Editar texto”.</p>
       <div class="fg fg--full">
         <label class="fl">Reparando</label>
         <textarea id="wt-reparando" class="fi fi-area" rows="3"></textarea>
@@ -1342,6 +1343,10 @@
         <label class="fl">Genérico (otros estados)</label>
         <textarea id="wt-default" class="fi fi-area" rows="2"></textarea>
       </div>
+      <div class="fg fg--full">
+        <label class="fl">Presupuesto (botón 💬 de la ficha)</label>
+        <textarea id="wt-presup" class="fi fi-area" rows="4"></textarea>
+      </div>
       <div class="fg fg--full" style="margin-top:4px">
         <label class="fl">Stock (equipo en venta)</label>
         <textarea id="wt-stock" class="fi fi-area" rows="3"></textarea>
@@ -1349,6 +1354,50 @@
       <div class="form-actions" style="margin-top:8px">
         <button class="btn-secondary" onclick="resetWaTemplates()">Restablecer</button>
         <button class="btn-primary" onclick="saveWaTemplates()">💾 Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ¿SE LLEVA EL EQUIPO? — lo maneja tp-fases.js.
+     El mismo bloque está en caja.html: los dos lugares desde donde se entrega
+     un equipo (cobrar y cambiar el estado) preguntan igual. -->
+<div id="tpent-overlay" class="tpent-overlay hidden" onclick="tpEntregaCancelar()"></div>
+<div id="tpent-modal" class="tpent-modal hidden">
+  <div class="tpent-hd">
+    <span>📦 ¿Se lleva el equipo?</span>
+    <button class="tpent-x" onclick="tpEntregaCancelar()">✕</button>
+  </div>
+  <div class="tpent-info" id="tpent-info"></div>
+  <div class="tpent-plata" id="tpent-plata"></div>
+  <label class="tpent-wachk hidden" id="tpent-wa-wrap">
+    <input type="checkbox" id="tpent-wa">
+    <span>Avisarle por WhatsApp (gracias + garantía)</span>
+  </label>
+  <button class="tpent-btn tpent-btn--si" onclick="tpEntregaSi()">📦 Sí, se lo lleva ahora</button>
+  <button class="tpent-btn tpent-btn--no" onclick="tpEntregaNo()">🏠 No, queda en el local</button>
+  <button class="tpent-volver" onclick="tpEntregaCancelar()">Volver sin hacer nada</button>
+</div>
+
+<!-- MODAL EDITOR DE MENSAJE DE FASE (se abre desde la ficha de la reparación) -->
+<div id="wa-fase-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:520px">
+    <div class="modal-header">
+      <h3 id="wf-titulo">💬 Mensaje de la fase</h3>
+      <button class="modal-close" onclick="closeWaFaseModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="fi-helper" id="wf-sub" style="margin-bottom:10px"></p>
+      <div class="fg fg--full">
+        <label class="fl">Texto del mensaje</label>
+        <textarea id="wf-txt" class="fi fi-area" rows="8" oninput="tpWaPrevia()"></textarea>
+      </div>
+      <div class="wf-vars" id="wf-vars"></div>
+      <label class="fl" style="margin-top:12px;display:block">Así le llega al cliente</label>
+      <div class="wf-prev" id="wf-prev"></div>
+      <div class="form-actions" style="margin-top:12px">
+        <button class="btn-secondary" onclick="tpWaResetPlantilla()">↩️ Texto original</button>
+        <button class="btn-primary" onclick="tpWaGuardarPlantilla()">💾 Guardar</button>
       </div>
     </div>
   </div>

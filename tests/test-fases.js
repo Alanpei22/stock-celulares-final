@@ -84,6 +84,14 @@ run(`
   openCobroModal = () => {};
   _refreshDashIfVisible = () => {};
   WA_TEMPLATES = {};
+  // "¿Se lleva el equipo?" ya no es un confirm() del navegador sino el modal
+  // de tp-fases.js. Acá se lo reemplaza por una cola de respuestas; el modal
+  // de verdad (textos, botones, el parche que escribe) se prueba entero en
+  // test-entrega.js.
+  tpEntregaModal = (r, o) => {
+    __ENTREGAS.push({ nOrden: r.nOrden, contexto: (o||{}).contexto });
+    return Promise.resolve(__ENTREGA_ANSWERS.shift() ?? { entregado: false, avisar: false });
+  };
   _normWaPhone = t => '549'+String(t).replace(/\\D/g,'');
   getDeviceId = () => 'ESTE-CELU';
   getNotifConfig = () => __CFG;
@@ -100,6 +108,8 @@ run(`
 ctx.__PUSH = [];
 ctx.__CFG = { push: { enabled: true, repairNueva: true, repairEstado: true }, pushTargets: {} };
 ctx.__SEG = [];
+ctx.__ENTREGAS = [];
+ctx.__ENTREGA_ANSWERS = [];
 
 let fails = 0;
 function ok(c, label, extra) {
@@ -107,7 +117,7 @@ function ok(c, label, extra) {
   if (!c) fails++;
 }
 const hAgo = h => new Date(Date.now()-h*3600000).toISOString();
-function setRepairs(arr) { ctx.__R = arr; run('REPAIRS = __R'); W.updates=[]; W.sets=[]; TOASTS=[]; CONFIRMS=[]; ctx.__SEG=[]; }
+function setRepairs(arr) { ctx.__R = arr; run('REPAIRS = __R'); W.updates=[]; W.sets=[]; TOASTS=[]; CONFIRMS=[]; ctx.__SEG=[]; ctx.__ENTREGAS=[]; ctx.__ENTREGA_ANSWERS=[]; }
 const R = id => get('REPAIRS').find(x=>x.id===id);
 
 (async () => {
@@ -164,14 +174,14 @@ ok(W.sets.filter(s=>s[0]==='backups').length === 1, 'hizo el backup previo una v
 console.log('\n6) Avanzar cruzando de estado: pasa por el camino de siempre');
 setRepairs([{ id:'e1', nOrden:7011, estado:'reparando', fase:'reparacion',
               faseHist:[{f:'reparacion',t:hAgo(10)}], marca:'iPhone', modelo:'13', monto:50000, tlf:'1155667788' }]);
-CONFIRM_ANSWERS = [false];   // "¿ya se lo llevó?" → NO, queda listo
+ctx.__ENTREGA_ANSWERS = [{ entregado:false, avisar:false }];   // "¿se lo lleva?" → NO, queda listo
 await get(`tpCambiarFase('e1','listo')`);
 const u6 = W.updates.find(u=>u[0]==='repairs');
 ok(!!u6, 'escribió en repairs', W.updates);
 ok(u6[2].estado === 'listo', 'estado → listo', u6 && u6[2].estado);
 ok(u6[2].fase === 'listo', 'fase → listo', u6 && u6[2].fase);
 ok(Array.isArray(u6[2].estadoHistorial), 'estadoHistorial actualizado (lo lee la impresión y el QR)', u6[2].estadoHistorial);
-ok(CONFIRMS.some(c=>/ya se llev/i.test(c)), 'preguntó si el cliente se lo llevó', CONFIRMS);
+ok(ctx.__ENTREGAS.some(e => e.nOrden === 7011), 'preguntó si el cliente se lo lleva', ctx.__ENTREGAS);
 ok(ctx.__SEG.includes('e1'), 'actualizó el seguimiento público del QR', ctx.__SEG);
 
 console.log('\n7) Chip rápido de la lista: ahora también deja historial y sincroniza fase');

@@ -21,6 +21,16 @@ const CAT_ICONS = {
   'Compra repuesto': '🛒', 'Gasto fijo': '📋', 'Retiro dueño': '🏧', 'Otro gasto': '💸'
 };
 
+// Datos del negocio para el encabezado de los comprobantes. Se editan en
+// index.html (Configuración) y quedan cacheados en localStorage: acá se leen
+// de ahí y no de Firestore, para no gastar una lectura por apertura de caja.
+const BIZDATA_KEY = 'cel_bizdata';
+let BIZ_DATA = { dir: 'J.J. de Urquiza 4741 — Local 22', tel: '11 7239-2511', extra: '' };
+try {
+  const _bd = JSON.parse(localStorage.getItem(BIZDATA_KEY) || 'null');
+  if (_bd && typeof _bd === 'object') BIZ_DATA = { dir: _bd.dir || '', tel: _bd.tel || '', extra: _bd.extra || '' };
+} catch {}
+
 let db = null;
 let _fabOpen = false;
 let MOVIMIENTOS = [];
@@ -140,8 +150,9 @@ function initApp() {
 
   // ── URL action handler (?action=cierre desde notifs/banners) ──
   _handleUrlAction();
-  _checkVentaPendiente();                                   // venta hecha en el generador
-  window.addEventListener('focus', _checkVentaPendiente);   // al volver de esa pestaña
+  // (Antes acá se miraba si había una venta pendiente dejada por
+  //  comprobante-venta.html. Esa página ya no existe: la venta se registra en
+  //  el momento, dentro de confirmVentaEquipo.)
 
   // ── Notifications boot (Fase 1) ──
   if (typeof loadNotifConfig === 'function') {
@@ -1204,8 +1215,20 @@ function _renderComprobanteList() {
     </div>`;
   }).join('');
 }
-// ── Venta hecha desde el generador de comprobantes: registrarla en caja ──
-const _VENTA_PEND_KEY = 'techpoint_venta_pendiente';
+// Anota en `actividad` (lo que lee la campanita). `logActivity` vive en
+// repairs.js, que caja.html no carga: si algún día se cargara, se usa esa.
+async function _logActividadCaja({ tipo, desc, repairId, tecnico, extra = {} }) {
+  if (typeof logActivity === 'function') return logActivity({ tipo, desc, repairId, tecnico, extra });
+  try {
+    await db.collection('actividad').add({
+      tipo, desc,
+      repairId: repairId || null,
+      tecnico:  tecnico  || null,
+      extra,
+      fecha: new Date().toISOString(),
+    });
+  } catch (e) { /* silencioso: no vale romper un cobro por el log */ }
+}
 
 function _metodoDesdeTexto(t) {
   const s = (t || '').toLowerCase();
@@ -1217,79 +1240,205 @@ function _metodoDesdeTexto(t) {
   return 'Efectivo';
 }
 
-async function _checkVentaPendiente() {
-  let v = null;
-  try { v = JSON.parse(localStorage.getItem(_VENTA_PEND_KEY) || 'null'); } catch {}
-  if (!v) return;
-  localStorage.removeItem(_VENTA_PEND_KEY);
-  const monto = parseInt(String(v.precio || '').replace(/[^\d]/g, '')) || 0;
-  if (monto <= 0) { toast('El comprobante no tenía precio: registrá la venta a mano', 'error'); return; }
+// ══════════════════════════════════════════
+//  VENTA DE EQUIPO DESDE LA CAJA
+//  ─────────────────────────────────────────
+//  Antes esto abría comprobante-venta.html: una página aparte de 389 KB que
+//  imprimía su propio diseño y volvía por localStorage a registrar la venta.
+//  Ahora se carga acá y se imprime con print.js, el mismo comprobante A5 que
+//  sale al vender desde Stock. Un solo comprobante para mantener.
+//  Todo el formulario es opcional menos el precio: lo que no cargues, no se
+//  imprime (no salen renglones en "—").
+// ══════════════════════════════════════════
+const VE_ACCESORIOS = ['Caja', 'Cargador', 'Cable', 'Auriculares', 'Vidrio', 'Funda'];
+const VE_PRUEBAS    = ['Pantalla', 'Táctil', 'Cámaras', 'Audio', 'Micrófono', 'Botones', 'Wi-Fi y señal', 'Carga'];
 
-  const metodo = _metodoDesdeTexto(v.pago);
-  const desc = `Venta: ${v.modelo || 'Equipo'}${v.imei ? ' · IMEI ' + v.imei : ''}`;
-  if (!confirm(`💰 ¿Registrar esta venta en la caja?\n\n${desc}\n${fmt(monto)} · ${metodo}${v.nombre ? '\nCliente: ' + v.nombre : ''}`)) return;
+let _veStockId = null;   // null = venta "en blanco" (equipo que no está en el stock)
+
+const _veV = id => (document.getElementById(id)?.value || '').trim();
+const _veN = id => { const n = parseInt(String(_veV(id)).replace(/[^\d]/g, ''), 10); return isNaN(n) ? 0 : n; };
+const _veChks = cont => Array.from(document.querySelectorAll('#' + cont + ' input:checked')).map(c => c.value);
+
+function _veChkHtml(cont, opts) {
+  const el = document.getElementById(cont);
+  if (el) el.innerHTML = opts.map(o =>
+    `<label class="ventaeq-chk"><input type="checkbox" value="${esc(o)}"><span>${esc(o)}</span></label>`).join('');
+}
+
+function _veToggleCuotas() {
+  const wrap = document.getElementById('ve-cuotas-wrap');
+  if (wrap) wrap.classList.toggle('hidden', !/crédit|credit/i.test(_veV('ve-pago')));
+}
+
+function _veToggleMas() {
+  const box = document.getElementById('ve-mas');
+  const btn = document.getElementById('ve-mas-btn');
+  if (!box) return;
+  const abierto = box.classList.toggle('hidden') === false;
+  if (btn) btn.textContent = abierto ? '➖ Ocultar los detalles' : '➕ Más detalles del equipo y de la operación';
+}
+
+// Abre el formulario. Con `id` lo precarga desde el stock; sin `id` queda en
+// blanco, para vender un equipo que no está cargado.
+function openVentaEqModal(id) {
+  const p = id ? (CAJA_STOCK || []).find(x => x.id === id) : null;
+  _veStockId = p ? p.id : null;
+
+  _veChkHtml('ve-accesorios', VE_ACCESORIOS);
+  _veChkHtml('ve-pruebas', VE_PRUEBAS);
+
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = (v == null ? '' : String(v)); };
+  set('ve-marca', p?.marca);      set('ve-modelo', p?.modelo);
+  set('ve-imei', p?.imei);        set('ve-precio', p?.precio);
+  set('ve-capacidad', p?.almacenamiento); set('ve-color', p?.color);
+  set('ve-bateria', p?.bateria);  set('ve-garantia', p?.garantiaMeses);
+  set('ve-condicion', p?.estado); set('ve-notas', p?.notas);
+  ['ve-imei2','ve-serie','ve-ciclos','ve-estetico','ve-libre','ve-cuentas','ve-permuta',
+   've-permuta-val','ve-saldo','ve-nro','ve-cuotas','ve-cli-nombre','ve-cli-dni','ve-cli-tel'].forEach(k => set(k, ''));
+  set('ve-vendedor', localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '');
+
+  const reg = document.getElementById('ve-reg-caja'); if (reg) reg.checked = true;
+  document.getElementById('ve-mas')?.classList.add('hidden');
+  const mb = document.getElementById('ve-mas-btn');
+  if (mb) mb.textContent = '➕ Más detalles del equipo y de la operación';
+  _veToggleCuotas();
+
+  const tit = document.getElementById('ventaeq-tit');
+  if (tit) tit.textContent = p ? `🧾 Vender ${p.marca || ''} ${p.modelo || ''}`.trim() : '🧾 Venta de equipo';
+
+  document.getElementById('ventaeq-overlay')?.classList.remove('hidden');
+  document.getElementById('ventaeq-modal')?.classList.remove('hidden');
+}
+
+function closeVentaEqModal() {
+  document.getElementById('ventaeq-overlay')?.classList.add('hidden');
+  document.getElementById('ventaeq-modal')?.classList.add('hidden');
+}
+
+// Junta el formulario en el objeto que entiende printVentaTicket.
+// Las claves vacías NO se agregan: print.js imprime solo lo que existe.
+function _veDatos() {
+  const d = {};
+  const put = (k, v) => { if (v !== '' && v !== null && v !== undefined && v !== 0) d[k] = v; };
+  put('marca', _veV('ve-marca'));
+  put('modelo', _veV('ve-modelo'));
+  put('imei', _veV('ve-imei'));
+  put('imei2', _veV('ve-imei2'));
+  put('serie', _veV('ve-serie'));
+  put('almacenamiento', _veV('ve-capacidad'));
+  put('color', _veV('ve-color'));
+  put('bateria', _veN('ve-bateria'));
+  put('ciclos', _veN('ve-ciclos'));
+  put('estado', _veV('ve-condicion'));
+  put('estetico', _veV('ve-estetico'));
+  // Los tildes: solo si se contestaron. Sin respuesta el renglón no se imprime.
+  if (_veV('ve-libre'))   d.libre   = _veV('ve-libre') === 'si';
+  if (_veV('ve-cuentas')) d.cuentas = _veV('ve-cuentas') === 'si';
+  const accs = _veChks('ve-accesorios'); if (accs.length) d.accesorios = accs;
+  const prb  = _veChks('ve-pruebas');    if (prb.length)  d.pruebas    = prb;
+  put('precio', _veN('ve-precio'));
+  put('forma_pago', _veV('ve-pago'));
+  put('cuotas', _veN('ve-cuotas'));
+  put('permuta', _veV('ve-permuta'));
+  put('permutaValor', _veN('ve-permuta-val'));
+  put('saldoAbonado', _veN('ve-saldo'));
+  put('garantiaMeses', _veN('ve-garantia'));
+  put('comprobanteNro', _veV('ve-nro'));
+  put('vendedor', _veV('ve-vendedor'));
+  put('notas', _veV('ve-notas'));
+  put('clienteNombre', _veV('ve-cli-nombre'));
+  put('clienteDni', _veV('ve-cli-dni'));
+  put('clienteTel', _veV('ve-cli-tel'));
+  d.fecha_venta = new Date().toISOString();
+  return d;
+}
+
+async function confirmVentaEquipo() {
+  const btn = document.getElementById('ve-confirm');
+  const d = _veDatos();
+  if (!d.precio) { toast('Cargá el precio de venta', 'error'); return; }
+  if (!d.marca && !d.modelo) { toast('Cargá al menos la marca o el modelo', 'error'); return; }
+
+  const equipo  = `${d.marca || ''} ${d.modelo || ''}`.trim();
+  const metodo  = _metodoDesdeTexto(d.forma_pago);
+  const regCaja = document.getElementById('ve-reg-caja')?.checked !== false;
+  if (btn) btn.disabled = true;
 
   try {
-    const equipo = (CAJA_STOCK || []).find(x => x.id === v.stockId);
-    const data = {
-      tipo: 'ingreso', categoria: 'Venta equipo', descripcion: desc,
-      monto, metodoPago: metodo, fecha: currentDate,
-      createdAt: new Date().toISOString(),
-      comprobanteNro: v.nro || null,
-      _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
-    };
-    if (v.stockId) { data.itemId = v.stockId; data.itemSource = 'equipo'; data.itemQty = 1; data.itemNombre = v.modelo || ''; }
-    if (equipo && Number(equipo.costo) > 0) {
-      data.costoARSTotal = Number(equipo.costo);
-      data.gananciaARS = monto - Number(equipo.costo);
-    }
-    if (v.nombre) data.clienteNombre = v.nombre;
-    if (v.tel) data.clienteTel = v.tel;
-    const vendedor = localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '';
-    if (vendedor) data.vendedor = vendedor;
+    const stock = _veStockId ? (CAJA_STOCK || []).find(x => x.id === _veStockId) : null;
 
-    const movRef = await db.collection('caja_movimientos').add(data);
-
-    // Marcar el equipo como vendido
-    if (v.stockId) {
-      try {
-        await db.collection('stock').doc(v.stockId).update({
-          vendido: true, fecha_venta: new Date().toISOString(),
-          forma_pago: metodo, vendedor: vendedor || null, ventaMovId: movRef.id,
-        });
-      } catch (e) { console.error('marcar vendido:', e); toast('Venta registrada, pero no pude marcar el equipo como vendido', 'error'); }
+    // ── Ingreso en la caja del día ──
+    let movId = null;
+    if (regCaja) {
+      const data = {
+        tipo: 'ingreso', categoria: 'Venta equipo',
+        descripcion: `Venta: ${equipo}${d.imei ? ' · IMEI ' + d.imei : ''}`,
+        monto: d.precio, metodoPago: metodo, fecha: currentDate,
+        createdAt: d.fecha_venta,
+        comprobanteNro: d.comprobanteNro || null,
+        _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
+      };
+      if (_veStockId) { data.itemId = _veStockId; data.itemSource = 'equipo'; data.itemQty = 1; data.itemNombre = equipo; }
+      if (stock && Number(stock.costo) > 0) {
+        data.costoARSTotal = Number(stock.costo);
+        data.gananciaARS   = d.precio - Number(stock.costo);
+      }
+      if (d.clienteNombre) data.clienteNombre = d.clienteNombre;
+      if (d.clienteTel)    data.clienteTel    = d.clienteTel;
+      if (d.vendedor)      data.vendedor      = d.vendedor;
+      const movRef = await db.collection('caja_movimientos').add(data);
+      movId = movRef.id;
     }
-    if (v.tel && typeof upsertCliente === 'function') upsertCliente({ tlf: v.tel, nombre: v.nombre || '', dni: v.dni || '' }).catch(() => {});
-    toast(`✅ Venta registrada — ${fmt(monto)}`, 'success');
+
+    // ── Marcar el equipo del stock como vendido ──
+    if (_veStockId) {
+      const upd = {
+        vendido: true, fecha_venta: d.fecha_venta,
+        forma_pago: d.forma_pago || metodo, vendedor: d.vendedor || null,
+      };
+      if (movId) upd.ventaMovId = movId;
+      // Campos del comprador: se agregan solo si se cargaron, igual que en la
+      // venta desde Stock.
+      if (d.clienteNombre) upd.clienteNombre = d.clienteNombre;
+      if (d.clienteDni)    upd.clienteDni    = d.clienteDni;
+      if (d.clienteTel)    upd.clienteTel    = d.clienteTel;
+      if (d.garantiaMeses > 0) {
+        const fh = new Date(); fh.setMonth(fh.getMonth() + d.garantiaMeses);
+        upd.garantiaMeses = d.garantiaMeses;
+        upd.garantiaHasta = fh.toISOString();
+      }
+      try { await db.collection('stock').doc(_veStockId).update(upd); }
+      catch (e) { console.error('marcar vendido:', e); toast('Venta registrada, pero no pude marcar el equipo como vendido', 'error'); }
+    }
+
+    if (d.clienteTel && typeof upsertCliente === 'function') {
+      upsertCliente({ tlf: d.clienteTel, nombre: d.clienteNombre || '', dni: d.clienteDni || '' }).catch(() => {});
+    }
+
+    toast(regCaja ? `✅ Venta registrada — ${fmt(d.precio)}` : '✅ Venta guardada', 'success');
     if (typeof tgNotify === 'function') {
-      tgNotify(`📱 <b>Equipo vendido — ${tgMonto(monto)}</b>\n${esc(v.modelo || '')}${v.imei ? '\n🔑 ' + esc(v.imei) : ''}\n💳 ${esc(metodo)}${v.nombre ? ' · 👤 ' + esc(v.nombre) : ''} · 🕐 ${tgHora()}`);
+      tgNotify(`📱 <b>Equipo vendido — ${tgMonto(d.precio)}</b>\n${esc(equipo)}${d.imei ? '\n🔑 ' + esc(d.imei) : ''}\n💳 ${esc(metodo)}${d.clienteNombre ? ' · 👤 ' + esc(d.clienteNombre) : ''} · 🕐 ${tgHora()}`);
     }
+
+    closeVentaEqModal();
+    // El comprobante va último: si la impresión falla, la venta ya quedó hecha.
+    setTimeout(() => {
+      if (typeof printVentaTicket === 'function') printVentaTicket(_veStockId, d, 'A5');
+      else toast('No se pudo abrir el comprobante', 'error');
+    }, 250);
   } catch (e) {
-    console.error('registrar venta pendiente:', e);
-    toast('Error al registrar la venta', 'error');
+    console.error('venta de equipo:', e);
+    toast(e?.code === 'resource-exhausted'
+      ? '⚠️ Cupo diario de Firebase agotado — la venta NO se guardó'
+      : 'Error al registrar la venta', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
 function _abrirComprobante(id) {
-  try {
-    let prefill = {};
-    if (id) {
-      const p = (CAJA_STOCK || []).find(x => x.id === id);
-      if (p) {
-        prefill = {
-          stockId: p.id,
-          modelo: `${p.marca || ''} ${p.modelo || ''}`.trim(),
-          capacidad: p.almacenamiento || '',
-          imei1: p.imei || '',
-          bateria: p.bateria != null ? String(p.bateria) : '',
-          precio: p.precio != null ? String(p.precio) : '',
-        };
-      }
-    }
-    localStorage.setItem('techpoint_prefill', JSON.stringify(prefill));
-  } catch (e) { console.error('comprobante prefill:', e); }
   closeComprobanteModal();
-  window.open('comprobante-venta.html', '_blank');
+  openVentaEqModal(id);
 }
 // HIGH-01: listener registrado una sola vez en initApp (ver abajo), no en top-level
 let _cajaMenuClickHandler = null;
@@ -2586,6 +2735,7 @@ async function saveMov() {
   let nuevosProductos = [];   // productos libres a dar de alta en el inventario
   let equiposVendidos = [];   // equipos del stock a marcar como vendidos
   let repairUpdate = null;
+  let _entregaAvisar = false;   // el cliente pidió el WhatsApp de entrega
   // Parte del cobro que va a la reparación. Sin carrito es el monto entero.
   let repAmt = 0;
 
@@ -2672,14 +2822,18 @@ async function saveMov() {
         metodoCobro: metodoPago,
         fechaCobro: new Date().toISOString(),
       };
-      // Preguntar si el cliente se lleva el equipo → marcar ENTREGADO
+      // ¿El cliente se lleva el equipo? → marcar ENTREGADO.
+      // Se pregunta ANTES de escribir nada, con el modal de tp-fases.js: así
+      // "volver" de verdad cancela el cobro. Con el confirm() viejo, apretar
+      // Cancelar igual cobraba y solo se salteaba la entrega.
       if (repair.estado !== 'entregado') {
-        const yaEntregado = confirm('📦 ¿El cliente ya se lleva el equipo?\n\nAceptar = marcar ENTREGADO\nCancelar = dejar el estado como está (queda solo cobrado)');
-        if (yaEntregado) {
-          upd.estado = 'entregado';
-          upd.fechaEntrega = new Date().toISOString();
-          const prevHist = Array.isArray(repair.estadoHistorial) ? repair.estadoHistorial : [];
-          upd.estadoHistorial = [...prevHist, { estado: 'entregado', fecha: upd.fechaEntrega }];
+        const res = (typeof tpEntregaModal === 'function')
+          ? await tpEntregaModal(repair, { contexto: 'cobro', cobra: repAmt })
+          : { entregado: false, avisar: false };
+        if (!res) return;                       // volvió atrás: no se cobra nada
+        if (res.entregado) {
+          Object.assign(upd, tpEntregaPatch(repair));
+          _entregaAvisar = res.avisar;
         }
       }
       repairUpdate = { id: repair.id, ...upd };
@@ -2777,7 +2931,24 @@ async function saveMov() {
           if (repFields.estado && typeof pushCambioEquipo === 'function' && _selectedRepairItem && _selectedRepairItem.repair) {
             pushCambioEquipo({ ..._selectedRepairItem.repair, id: repId }, repFields.fase, repFields.estado);
           }
-          toastMsg = `Movimiento registrado · Reparación ${repairUpdate.cobrado ? 'cobrada ✅' : 'seña actualizada ✅'}`;
+          // La entrega hecha desde la caja tiene que aparecer en la campanita
+          // igual que la hecha desde Reparaciones. Antes no quedaba registrada.
+          if (repFields.estado === 'entregado' && _selectedRepairItem?.repair) {
+            const rr = _selectedRepairItem.repair;
+            _logActividadCaja({
+              tipo: 'estado',
+              desc: `${rr.marca || ''} ${rr.modelo || ''} N°${rr.nOrden} → Entregado`,
+              repairId: repId, tecnico: rr.tecnico || null,
+              extra: { estadoAnterior: rr.estado, estadoNuevo: 'entregado', nOrden: rr.nOrden },
+            });
+            // WhatsApp de gracias + garantía, si lo pidió en el modal
+            if (_entregaAvisar && typeof tpWaAbrir === 'function') {
+              tpWaAbrir({ ...rr, ...repFields, id: repId });
+            }
+          }
+          toastMsg = `Movimiento registrado · Reparación ${
+            repFields.estado === 'entregado' ? 'cobrada y entregada 📦'
+            : repairUpdate.cobrado ? 'cobrada ✅' : 'seña actualizada ✅'}`;
         } catch (repErr) {
           console.error('Repair update error:', repErr);
           toast('Movimiento guardado, pero falló la actualización de la reparación', 'error');

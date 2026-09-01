@@ -17,11 +17,15 @@ const DEFAULT_PRICES = { transfer: 0, c3: 15, c6: 25 };
 
 // ── WA Templates ─────────────────────────────────────────
 const WA_TEMPLATES_KEY = 'cel_wa_templates';
+// Mensajes rápidos de la tarjeta y del stock. Los mensajes por FASE
+// (los del tablero) viven en tp-fases.js y se editan desde la ficha de la
+// reparación: se guardan acá mismo con la clave `fase_<fase>`.
 const WA_TPL_DEFAULTS = {
-  repair_reparando: 'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}). Estamos trabajando en ella 🔧',
-  repair_listo:     'Hola {nombre}! 👋\nTu {equipo} (Orden N°{nOrden}) ya está *lista para retirar* 🔧✅\n_Cuando puedas coordinamos el horario._',
-  repair_default:   'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}).',
-  stock:            '📱 *{marca} {modelo}*\n{specs}\n✅ Estado: {estado}\n💰 Precio: {precio}\n\n_Consultá disponibilidad_ 👋'
+  repair_reparando:   'Hola {nombre}! 👋\nTe escribo por tu *{equipo}* (orden N°{nOrden}). Lo tenemos en el banco de trabajo 🔧\nApenas esté listo te aviso por acá.',
+  repair_listo:       'Hola {nombre}! 👋\nTu *{equipo}* (orden N°{nOrden}) ya está *listo para retirar* ✅\nAcordate de traer el comprobante. ¡Te esperamos!',
+  repair_default:     'Hola {nombre}! 👋\nTe escribo de parte del taller por tu *{equipo}* (orden N°{nOrden}).',
+  repair_presupuesto: 'Hola {nombre}! 👋\nTe paso el presupuesto de tu *{equipo}* (orden N°{nOrden}):\n\n🔧 Trabajo: {arreglo}\n💰 Presupuesto: *${monto}*\n\n¿Querés que lo hagamos? Cualquier consulta, avisame 😊',
+  stock:              '📱 *{marca} {modelo}*\n{specs}\n✅ Estado: {estado}\n💰 Precio: {precio}\n\n_Consultá disponibilidad_ 👋'
 };
 let WA_TEMPLATES = {};
 // ── Firebase — ver firebase-config.js ────────────────────
@@ -2544,13 +2548,17 @@ function loadWaTemplates() {
   // Carga desde localStorage primero
   try { WA_TEMPLATES = JSON.parse(localStorage.getItem(WA_TEMPLATES_KEY)) || {}; } catch { WA_TEMPLATES = {}; }
   Object.keys(WA_TPL_DEFAULTS).forEach(k => { if (!WA_TEMPLATES[k]) WA_TEMPLATES[k] = WA_TPL_DEFAULTS[k]; });
-  // Luego sincroniza desde Firestore
+  // Luego sincroniza desde Firestore.
+  // Se copian TODAS las claves del documento, no solo las de WA_TPL_DEFAULTS:
+  // los mensajes de las fases se guardan como `fase_<clave>` y antes se
+  // grababan bien pero al recargar no volvían, así que cada dispositivo
+  // seguía mostrando el texto de fábrica.
   db.collection('config').doc('waTemplates').get().then(doc => {
     if (!doc.exists) return;
-    const d = doc.data();
+    const d = doc.data() || {};
     let updated = false;
-    Object.keys(WA_TPL_DEFAULTS).forEach(k => {
-      if (d[k]) { WA_TEMPLATES[k] = d[k]; updated = true; }
+    Object.keys(d).forEach(k => {
+      if (typeof d[k] === 'string' && d[k]) { WA_TEMPLATES[k] = d[k]; updated = true; }
     });
     if (updated) localStorage.setItem(WA_TEMPLATES_KEY, JSON.stringify(WA_TEMPLATES));
   }).catch(() => {});
@@ -2561,6 +2569,7 @@ function openWaTplModal() {
   document.getElementById('wt-reparando').value = WA_TEMPLATES.repair_reparando;
   document.getElementById('wt-listo').value     = WA_TEMPLATES.repair_listo;
   document.getElementById('wt-default').value   = WA_TEMPLATES.repair_default;
+  document.getElementById('wt-presup').value    = WA_TEMPLATES.repair_presupuesto;
   document.getElementById('wt-stock').value     = WA_TEMPLATES.stock;
   document.getElementById('wa-tpl-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -2577,6 +2586,7 @@ function saveWaTemplates() {
   WA_TEMPLATES.repair_reparando = document.getElementById('wt-reparando').value;
   WA_TEMPLATES.repair_listo     = document.getElementById('wt-listo').value;
   WA_TEMPLATES.repair_default   = document.getElementById('wt-default').value;
+  WA_TEMPLATES.repair_presupuesto = document.getElementById('wt-presup').value;
   WA_TEMPLATES.stock            = document.getElementById('wt-stock').value;
   localStorage.setItem(WA_TEMPLATES_KEY, JSON.stringify(WA_TEMPLATES));
   // Guardar en Firestore
@@ -2586,11 +2596,15 @@ function saveWaTemplates() {
 }
 
 function resetWaTemplates() {
-  if (!confirm('¿Restablecer todos los mensajes a los valores por defecto?')) return;
-  WA_TEMPLATES = { ...WA_TPL_DEFAULTS };
+  if (!confirm('¿Restablecer estos mensajes a los valores por defecto?')) return;
+  // Solo los de esta pantalla. Antes acá se hacía WA_TEMPLATES = {...defaults},
+  // que de paso borraba los mensajes de las fases (las claves `fase_*`), que
+  // se editan desde la ficha de la reparación y no se ven en este modal.
+  Object.assign(WA_TEMPLATES, WA_TPL_DEFAULTS);
   document.getElementById('wt-reparando').value = WA_TEMPLATES.repair_reparando;
   document.getElementById('wt-listo').value     = WA_TEMPLATES.repair_listo;
   document.getElementById('wt-default').value   = WA_TEMPLATES.repair_default;
+  document.getElementById('wt-presup').value    = WA_TEMPLATES.repair_presupuesto;
   document.getElementById('wt-stock').value     = WA_TEMPLATES.stock;
 }
 

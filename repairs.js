@@ -1611,6 +1611,7 @@ function openRepairDetail(id) {
       <div class="tp-acciones">
         ${r.tlf ? `<button class="tp-btn pri" onclick="tpWaEnviar('${id}')">🟢 Abrir WhatsApp</button>` : '<span class="tp-nota">Sin teléfono cargado.</span>'}
         <button class="tp-btn" onclick="tpWaCopiar('${id}', this)">Copiar</button>
+        <button class="tp-btn" onclick="tpWaEditar('${id}')">✏️ Editar texto</button>
       </div>
     </div>` : ''}
     <div class="det-row det-row--full tp-bloque">
@@ -1838,6 +1839,19 @@ async function logActivity({ tipo, desc, repairId, tecnico, extra = {} }) {
   } catch (e) { /* silencioso */ }
 }
 
+// Abre el WhatsApp de "entregado" (gracias + garantía) un rato después de
+// escribir el estado. Se le pasa una copia ya en entregado: el snapshot de
+// Firestore puede tardar y si no el mensaje saldría con el texto de la fase
+// anterior.
+function _tpAvisarTrasEntrega(id) {
+  setTimeout(() => {
+    const r = (typeof REPAIRS !== 'undefined' ? REPAIRS : []).find(x => x.id === id);
+    if (r && typeof tpWaAbrir === 'function') {
+      tpWaAbrir({ ...r, estado: 'entregado', fase: 'entregado' });
+    }
+  }, 700);
+}
+
 // ── Cambio de estado ──────────────────────
 // faseExtra: {fase, faseHist} cuando el cambio viene del tablero de fases
 // (tp-fases.js). Se escribe junto con el estado para que no queden desfasados
@@ -1875,11 +1889,16 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}) {
 
   // ── "Listo" → preguntar si el cliente ya se lo llevó ──
   if (newStatus === 'listo') {
-    if (confirm('📦 ¿El cliente ya se llevó el equipo?\n\nAceptar = marcar ENTREGADO\nCancelar = queda LISTO para retirar')) {
+    const res = (typeof tpEntregaModal === 'function')
+      ? await tpEntregaModal(r, { contexto: 'estado' })
+      : { entregado: false, avisar: false };
+    if (!res) return;   // volvió atrás: la orden queda como estaba
+    if (res.entregado) {
       // Si venía del tablero, la fase también pasa a "entregado"
       const fx = faseExtra.fase
         ? { fase: 'entregado', faseHist: [...(faseExtra.faseHist || []).slice(0, -1), { f: 'entregado', t: new Date().toISOString() }] }
         : {};
+      if (res.avisar) _tpAvisarTrasEntrega(id);
       return changeRepairStatus(id, 'entregado', fx);
     }
   }
@@ -3682,7 +3701,12 @@ async function quickStatusChange(e, id, newStatus) {
 
   // ── "Listo" → preguntar si el cliente ya se lo llevó ──
   if (newStatus === 'listo') {
-    if (confirm('📦 ¿El cliente ya se llevó el equipo?\n\nAceptar = marcar ENTREGADO\nCancelar = queda LISTO para retirar')) {
+    const res = (typeof tpEntregaModal === 'function')
+      ? await tpEntregaModal(rep, { contexto: 'estado' })
+      : { entregado: false, avisar: false };
+    if (!res) return;   // volvió atrás: la orden queda como estaba
+    if (res.entregado) {
+      if (res.avisar) _tpAvisarTrasEntrega(id);
       return quickStatusChange(e, id, 'entregado');
     }
   }
