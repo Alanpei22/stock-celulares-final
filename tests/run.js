@@ -43,6 +43,7 @@ const QUE_CUBRE = {
   'test-wa-plantillas.js':    'Mensajes de WhatsApp por fase y su editor en la ficha',
   'test-venta-caja.js':       'Vender un equipo desde la caja y su comprobante A5',
   'test-entrega.js':          '"¿Se lleva el equipo?": el cartel al cobrar y al pasar a Listo',
+  'test-buscar-ventas.js':    'Buscador de ventas: acentos, monto, fecha y filtro por tipo',
   'test-buscar-orden.js':     'Buscar una reparación por número de orden al cobrar',
   'test-caja-auditoria.js':   'Auditoría de la caja: desglose del día y borrado de movimientos',
   'test-planes.js':           'Planes de ahorro, reservas y que la seña no se cuente dos veces',

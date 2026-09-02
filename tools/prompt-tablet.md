@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 30 suites, ~1240 chequeos, 4 segundos.
+2. **`npm test` antes de cada push.** Son 31 suites, ~1300 chequeos, 4 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -75,6 +75,25 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - Bugs: las plantillas `fase_*` se guardaban pero **no volvian de Firestore**
   (el loader solo copiaba las 4 viejas), y "Restablecer" del modal viejo se
   las llevaba puestas. `repair_presupuesto` por fin se puede editar.
+
+**El buscador de ventas** (2026-09-01) — `tests/test-buscar-ventas.js`
+- Comparaba con `includes()` sobre el texto en minusculas, sin normalizar:
+  buscar "reparacion" NO encontraba "Reparación" y "modulo" no encontraba
+  "módulo". Era lo que lo hacia sentir roto. Ahora usa `searchMatch`
+  (utils.js), que saca acentos y expande sinonimos.
+- Se puede buscar **por monto** ("50000" o "50.000") y **por fecha**
+  ("14/08/2026" o "2026-08-14"). Antes ninguna de las dos.
+- Al abrir muestra los movimientos del periodo en vez de una pantalla en
+  blanco esperando que escribas.
+- Chips nuevos de **tipo** (Todo / Ingresos / Egresos), en su propia fila:
+  mezclados, "Todo" quedaba al lado de "1 año" y parecia otro periodo.
+- Muestra los **dos totales** (ingresos y egresos). Antes decia "ingresos $0"
+  cuando buscabas un egreso.
+- Cada resultado dice el cliente.
+- El rango arrancaba con `toISOString()` (UTC): despues de las 21:00 empezaba
+  un dia tarde.
+- El cache por periodo no se invalidaba nunca: una venta recien cargada no
+  aparecia en toda la sesion. Ahora lo invalida el listener del dia.
 
 **El cartel de "¿le aviso al cliente?"** (2026-09-01)
 - Al marcar una reparacion como Listo salia un `confirm()` del navegador que

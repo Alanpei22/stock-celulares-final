@@ -557,8 +557,9 @@ function listenMovimientos() {
       if (snap.docChanges().length === 0 && MOVIMIENTOS.length) return;
       MOVIMIENTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       MOVIMIENTOS.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-      // Cambió algo del día: el historial guardado en memoria quedó viejo.
+      // Cambió algo del día: lo que está guardado en memoria quedó viejo.
       if (typeof _histInvalidar === 'function') _histInvalidar();
+      _vsInvalidar();
       renderMovimientos();
       renderStats();
     }, err => {
@@ -1056,10 +1057,16 @@ const _VS_PERIODOS = [
 let _vsPeriodo = 90;
 let _vsCache = {};      // { dias: [movs] } — se lee una vez por período/sesión
 let _vsLoading = false;
+let _vsTipo = 'todos';  // todos | ingreso | egreso
+
+// Si se registra o se borra un movimiento, lo que está cacheado dejó de ser
+// cierto: la venta que acabás de cargar tiene que aparecer en la búsqueda.
+function _vsInvalidar() { _vsCache = {}; }
 
 function openVentasSearch() {
   const inp = document.getElementById('vsearch-input');
   if (inp) inp.value = '';
+  _vsTipo = 'todos';
   _vsRenderChips();
   document.getElementById('vsearch-overlay').classList.remove('hidden');
   document.getElementById('vsearch-modal').classList.remove('hidden');
@@ -1075,15 +1082,30 @@ function closeVentasSearch() {
 function _vsRenderChips() {
   const cont = document.getElementById('vsearch-chips');
   if (!cont) return;
-  cont.innerHTML = _VS_PERIODOS.map(p =>
+  const periodos = _VS_PERIODOS.map(p =>
     `<button class="precio-chip${p.d === _vsPeriodo ? ' precio-chip--active' : ''}" onclick="_vsSetPeriodo(${p.d})">${p.label}</button>`
   ).join('');
+  // Filtro por tipo: buscar "repuesto" traía las compras mezcladas con las
+  // ventas y no había forma de quedarse con unas u otras.
+  const tipos = [['todos', 'Todo'], ['ingreso', '💰 Ingresos'], ['egreso', '💸 Egresos']].map(([k, t]) =>
+    `<button class="precio-chip${_vsTipo === k ? ' precio-chip--active' : ''}" onclick="_vsSetTipo('${k}')">${t}</button>`
+  ).join('');
+  // En dos filas: mezclados, "Todo" quedaba al lado de "1 año" y parecía otro
+  // período.
+  cont.innerHTML = `<div class="vsearch-chip-row">${periodos}</div>`
+                 + `<div class="vsearch-chip-row">${tipos}</div>`;
 }
 
 function _vsSetPeriodo(d) {
   _vsPeriodo = d;
   _vsRenderChips();
   _vsLoad(d);
+}
+
+function _vsSetTipo(t) {
+  _vsTipo = t;
+  _vsRenderChips();
+  _vsearchRender();
 }
 
 async function _vsLoad(dias) {
@@ -1094,12 +1116,16 @@ async function _vsLoad(dias) {
   if (res) res.innerHTML = '';
   _vsLoading = true;
   try {
-    const desde = new Date();
+    // Desde el día de ACÁ, anclado al mediodía: con toISOString() a secas,
+    // después de las 21:00 el rango arrancaba un día tarde.
+    const hoy = (typeof _todayAR === 'function') ? _todayAR() : new Date().toISOString().slice(0, 10);
+    const desde = new Date(hoy + 'T12:00:00');
     desde.setDate(desde.getDate() - dias);
+    const desdeStr = `${desde.getFullYear()}-${String(desde.getMonth() + 1).padStart(2, '0')}-${String(desde.getDate()).padStart(2, '0')}`;
     const snap = await db.collection('caja_movimientos')
-      .where('fecha', '>=', desde.toISOString().slice(0, 10))
+      .where('fecha', '>=', desdeStr)
       .get();
-    _vsCache[dias] = snap.docs.map(d => d.data());
+    _vsCache[dias] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (e) {
     console.error('buscar ventas:', e);
     if (info) info.textContent = e?.code === 'resource-exhausted'
@@ -1112,35 +1138,68 @@ async function _vsLoad(dias) {
   _vsearchRender();
 }
 
-// Texto donde se busca: descripción, ítems del carrito, cliente, N° de orden, etc.
+// Texto donde se busca: descripción, ítems del carrito, cliente, N° de orden,
+// el monto y la fecha.
+//
+// El monto va en las DOS formas ("50000" y "50.000") porque el cajero escribe
+// cualquiera de las dos, y la fecha también en formato de acá ("14/08/2026"),
+// que es como uno se acuerda de una venta.
 function _vsTexto(m) {
   const items = Array.isArray(m.items) ? m.items.map(i => i.nombre).join(' ') : '';
-  return [m.descripcion, m.itemNombre, items, m.categoria, m.metodoPago, m.metodoPago2,
-          m.vendedor, m.clienteNombre, m.clienteTel,
-          m.repairNOrden ? '#' + m.repairNOrden : '']
-    .filter(Boolean).join(' ').toLowerCase();
+  const monto = Number(m.monto) || 0;
+  const f = String(m.fecha || '');
+  return [
+    m.descripcion, m.itemNombre, items, m.categoria, m.metodoPago, m.metodoPago2,
+    m.vendedor, m.clienteNombre, m.clienteTel, m.clienteDni,
+    m.repairNOrden ? '#' + m.repairNOrden + ' orden ' + m.repairNOrden : '',
+    m.comprobanteNro || '',
+    monto ? String(monto) + ' ' + monto.toLocaleString('es-AR') : '',
+    f, f.split('-').reverse().join('/'),
+  ].filter(Boolean).join(' ');
+}
+
+// El filtro de verdad. Usa searchMatch (utils.js), que normaliza acentos y
+// expande sinónimos: antes se comparaba con includes() a secas sobre el texto
+// en minúsculas, así que buscar "reparacion" no encontraba "Reparación" y
+// "modulo" no encontraba "Módulo". Es lo que hacía sentir que no andaba.
+function _vsFiltrar(movs, q, tipo) {
+  return movs.filter(m => {
+    if (tipo && tipo !== 'todos' && m.tipo !== tipo) return false;
+    if (!q) return true;
+    return (typeof searchMatch === 'function')
+      ? searchMatch([_vsTexto(m)], q)
+      : _vsTexto(m).toLowerCase().includes(q.toLowerCase());
+  });
 }
 
 function _vsearchRender() {
   const res  = document.getElementById('vsearch-results');
   const info = document.getElementById('vsearch-info');
   if (!res || _vsLoading) return;
-  const q = (document.getElementById('vsearch-input')?.value || '').trim().toLowerCase();
+  const q = (document.getElementById('vsearch-input')?.value || '').trim();
   const todos = _vsCache[_vsPeriodo] || [];
 
-  if (!q) {
-    if (info) info.textContent = `${todos.length} movimientos en el período · escribí para buscar`;
-    res.innerHTML = '';
-    return;
-  }
-  const terms = q.split(/\s+/).filter(Boolean);
-  const hits = todos.filter(m => { const t = _vsTexto(m); return terms.every(x => t.includes(x)); });
+  const hits = _vsFiltrar(todos, q, _vsTipo);
   hits.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
 
-  const total = hits.reduce((s, m) => s + (m.tipo === 'ingreso' ? (Number(m.monto) || 0) : 0), 0);
-  if (info) info.innerHTML = hits.length
-    ? `<b>${hits.length}</b> resultado${hits.length !== 1 ? 's' : ''} · ingresos ${fmt(total)}`
-    : 'Sin resultados en el período — probá ampliarlo ↑';
+  // Los dos totales por separado. Antes decía "ingresos $0" al buscar un
+  // egreso, que no ayudaba a nadie.
+  const totIng = hits.reduce((s, m) => s + (m.tipo === 'ingreso' ? (Number(m.monto) || 0) : 0), 0);
+  const totEg  = hits.reduce((s, m) => s + (m.tipo === 'egreso'  ? (Number(m.monto) || 0) : 0), 0);
+  if (info) {
+    if (!hits.length) {
+      info.innerHTML = q
+        ? 'Sin resultados en el período — probá ampliarlo ↑'
+        : 'No hay movimientos en el período';
+    } else {
+      const partes = [`<b>${hits.length}</b> ${q ? 'resultado' + (hits.length !== 1 ? 's' : '') : 'movimiento' + (hits.length !== 1 ? 's' : '')}`];
+      if (totIng > 0) partes.push(`💰 ${fmt(totIng)}`);
+      if (totEg  > 0) partes.push(`💸 ${fmt(totEg)}`);
+      // Sin búsqueda se muestran los últimos: que se note que no es todo
+      if (!q && hits.length > 60) partes.push('mostrando los 60 más nuevos');
+      info.innerHTML = partes.join(' · ');
+    }
+  }
 
   res.innerHTML = hits.slice(0, 60).map(m => {
     const f = (m.fecha || '').split('-').reverse().join('/');
@@ -1153,7 +1212,9 @@ function _vsearchRender() {
       <div class="vsearch-item-main">
         <span class="vsearch-item-desc">${esc(m.descripcion || '—')}</span>
         <span class="vsearch-item-meta">${f}${hora ? ' · ' + hora : ''} · ${esc(m.categoria || '')}${m.repairNOrden ? ' · 🔧 #' + m.repairNOrden : ''}</span>
-        <span class="vsearch-item-meta ${inf.cls}">${inf.icon} ${esc(inf.short)}${m.vendedor ? ' · 👤 ' + esc(m.vendedor) : ''}</span>
+        <span class="vsearch-item-meta ${inf.cls}">${inf.icon} ${esc(inf.short)}${
+          m.clienteNombre ? ' · 🧑 ' + esc(m.clienteNombre) : ''}${
+          m.vendedor ? ' · 👤 ' + esc(m.vendedor) : ''}</span>
       </div>
       <span class="vsearch-item-monto mov-${esc(m.tipo)}">${signo}${fmt(m.monto)}</span>
     </div>`;
