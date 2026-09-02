@@ -2343,6 +2343,7 @@ function openSettings() {
   updateBizPreview();
   _fillBizDataForm();
   if (typeof updateWaNotifyStatus === 'function') updateWaNotifyStatus();
+  if (typeof _syncWaListoPref === 'function') _syncWaListoPref();
   document.getElementById('settings-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }

@@ -895,6 +895,14 @@
       <div class="settings-section">
         <h4 class="settings-title">🛠 Herramientas</h4>
         <button class="btn-secondary" style="width:100%;margin-bottom:8px" onclick="openWaTplModal()">💬 Editar mensajes de WhatsApp</button>
+        <div class="fg fg--full" style="margin-bottom:8px">
+          <label class="fl">Al marcar una reparación como Listo</label>
+          <select id="wa-listo-pref" class="fi" onchange="setWaListoPref(this.value)">
+            <option value="ask">Preguntarme si le aviso</option>
+            <option value="auto">Mandar el WhatsApp solo</option>
+            <option value="never">No avisar</option>
+          </select>
+        </div>
         <button class="btn-secondary" style="width:100%" onclick="openAccessLogModal()">🔐 Historial de accesos</button>
       </div>
 
@@ -1357,6 +1365,26 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- MODAL: ¿LE AVISO AL CLIENTE? — sale al marcar una reparación como Listo.
+     Reemplaza al confirm() del navegador: acá se ve el mensaje que se manda. -->
+<div id="avisowa-overlay" class="tpent-overlay hidden" onclick="closeAvisoWaModal()"></div>
+<div id="avisowa-modal" class="tpent-modal hidden">
+  <div class="tpent-hd">
+    <span>📲 ¿Le aviso al cliente?</span>
+    <button class="tpent-x" onclick="closeAvisoWaModal()">✕</button>
+  </div>
+  <div class="tpent-info" id="avisowa-info"></div>
+  <label class="fl" style="margin-top:12px;display:block">Esto le llega</label>
+  <div class="wf-prev" id="avisowa-prev"></div>
+  <button class="tpent-btn tpent-btn--si" onclick="avisoWaEnviar()">🟢 Abrir WhatsApp</button>
+  <button class="tpent-btn" onclick="avisoWaCopiar(this)">📋 Copiar el texto</button>
+  <label class="tpent-wachk" style="margin-top:10px">
+    <input type="checkbox" id="avisowa-nomas">
+    <span>No preguntarme más al marcar Listo</span>
+  </label>
+  <button class="tpent-volver" onclick="closeAvisoWaModal()">Ahora no</button>
 </div>
 
 <!-- MODAL: ¿SE LLEVA EL EQUIPO? — lo maneja tp-fases.js.

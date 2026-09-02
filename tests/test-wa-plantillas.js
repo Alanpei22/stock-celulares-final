@@ -117,6 +117,119 @@ ok(/id="wa-fase-modal"/.test(idx), 'modal wa-fase-modal');
   ok(idx.includes('id="' + k + '"'), 'el modal tiene #' + k));
 ok(/oninput="tpWaPrevia\(\)"/.test(idx), 'la previa se actualiza al tipear');
 
+console.log('\n9b) El cartel de "¿le aviso al cliente?"');
+// Antes era un confirm() del navegador: decía el nombre y el modelo, pero no
+// QUÉ mensaje se iba a mandar (y el texto se edita, así que puede decir
+// cualquier cosa). Y el "no preguntar más" del código no se podía activar.
+const els3 = {};
+const el3 = id => els3[id] = {
+  id, value: '', textContent: '', innerHTML: '', checked: false, style: {},
+  classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+               toggle(c, f) { f ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+  closest: () => null, focus() {}, setAttribute() {}, addEventListener() {},
+  querySelector: () => null, querySelectorAll: () => [],
+};
+['avisowa-overlay','avisowa-modal','avisowa-info','avisowa-prev','avisowa-nomas','wa-listo-pref',
+ 'rep-list','rep-empty','rep-det-body','rep-det-actions','rep-det-marca','rep-det-modelo',
+ 'rep-detail-modal','rep-det-foto-wrap','rep-det-foto-img','rep-search','rep-f-estado',
+ 'rep-f-marca','rep-f-fecha','rep-sort','rs-reparando','rs-listo','rs-demorados','rs-devolver',
+ 'rep-fi-imei','rep-fi-condicion','rep-fi-codigo'].forEach(el3);
+
+let COPIADO = '', ABIERTO = '';
+const ctx3 = {
+  console, setTimeout: f => { f(); return 0; }, clearTimeout, requestAnimationFrame: f => f(),
+  document: {
+    getElementById: id => els3[id] || null,
+    querySelector: () => null, querySelectorAll: () => [],
+    createElement: () => el3('tmp'), addEventListener: () => {},
+    body: { style: {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
+    documentElement: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, style: { setProperty() {} } },
+  },
+  window: { addEventListener() {}, _DAKI_NAME: 'TechPoint',
+            matchMedia: () => ({ matches: false, addEventListener() {} }),
+            open: u => { ABIERTO = u; } },
+  localStorage: { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } },
+  navigator: { userAgent: 'node', clipboard: { writeText: t => { COPIADO = t; return Promise.resolve(); } } },
+  firebase: { firestore: { FieldValue: { increment: n => n, delete: () => null } } },
+  confirm: () => { ctx3.__HUBO_CONFIRM = true; return true; },
+  prompt: () => null, alert: () => {},
+  BIZ_DATA: { dir: 'Urquiza 4741', tel: '1172392511' },
+};
+ctx3.globalThis = ctx3; ctx3.self = ctx3;
+vm.createContext(ctx3);
+vm.runInContext(fs.readFileSync(DIR + 'tp-fases.js', 'utf8'), ctx3, { filename: 'tp-fases.js' });
+vm.runInContext(fs.readFileSync(DIR + 'repairs.js', 'utf8'), ctx3, { filename: 'repairs.js' });
+vm.runInContext(`
+  db = null; toast = () => {}; esc = s => String(s == null ? '' : s); fmt = n => '$' + n;
+  logActivity = () => {}; renderRepairs = () => {}; updateNavBadge = () => {};
+  WA_TEMPLATES = {};
+  REPAIRS = [{ id:'w1', nOrden:1287, nombre:'Juan Pérez', tlf:'1155554433',
+               marca:'Samsung', modelo:'Galaxy A54', estado:'listo' }];
+`, ctx3);
+const r3 = e => vm.runInContext(e, ctx3);
+
+const repSrc = fs.readFileSync(DIR + 'repairs.js', 'utf8');
+// Sin los comentarios: el comentario que explica el cambio nombra al confirm()
+const ofrecer = repSrc
+  .slice(repSrc.indexOf('function _ofrecerAvisoListo'), repSrc.indexOf('function openAvisoWaModal'))
+  .replace(/\/\/.*/g, '');
+ok(!/confirm\(/.test(ofrecer), 'ya no usa el confirm() del navegador', ofrecer.match(/.*confirm\(.*/));
+
+r3("openAvisoWaModal('w1')");
+ok(!els3['avisowa-modal'].classList.contains('hidden'), 'se abre el cartel');
+ok(/Juan Pérez/.test(els3['avisowa-info'].innerHTML), 'dice el cliente');
+ok(/1287/.test(els3['avisowa-info'].innerHTML) && /Galaxy A54/.test(els3['avisowa-info'].innerHTML),
+   'la orden y el equipo', els3['avisowa-info'].innerHTML);
+ok(/11 5555-4433|1155554433/.test(els3['avisowa-info'].innerHTML), 'y el teléfono al que va');
+const prev3 = els3['avisowa-prev'].innerHTML;
+ok(/listo para retirar/.test(prev3), 'muestra el mensaje que se va a mandar  ← esto no estaba', prev3);
+ok(/<b>Samsung Galaxy A54<\/b>/.test(prev3), 'con el *negrita* dibujado como lo ve el cliente');
+ok(/<br>/.test(prev3), 'y los saltos de línea');
+
+console.log('\n9c) El texto de la previa es EXACTAMENTE el que se manda');
+r3('avisoWaEnviar()');
+ok(/wa\.me\/5491155554433/.test(ABIERTO), 'abre WhatsApp al número normalizado', ABIERTO);
+const mandado = decodeURIComponent((ABIERTO.split('text=')[1] || ''));
+const dePrevia = prev3.replace(/<br>/g, '\n').replace(/<\/?b>/g, '*').replace(/<\/?i>/g, '_');
+ok(mandado === dePrevia, 'lo mandado y lo previsualizado son el mismo texto', { mandado, dePrevia });
+ok(els3['avisowa-modal'].classList.contains('hidden'), 'y el cartel se cierra');
+
+r3("openAvisoWaModal('w1'); avisoWaCopiar(null);");
+ok(COPIADO === mandado, 'copiar deja el mismo texto en el portapapeles', COPIADO);
+r3('closeAvisoWaModal()');
+
+console.log('\n9d) "No preguntarme más" por fin se puede activar (y desactivar)');
+r3("openAvisoWaModal('w1')");
+els3['avisowa-nomas'].checked = true;
+r3('closeAvisoWaModal()');
+ok(ctx3.localStorage.getItem('waListoPref') === 'never', 'queda guardado', ctx3.localStorage.getItem('waListoPref'));
+ctx3.__HUBO_CONFIRM = false;
+els3['avisowa-modal'].classList.add('hidden');
+r3("_ofrecerAvisoListo('w1', REPAIRS[0])");
+ok(els3['avisowa-modal'].classList.contains('hidden'), 'y ya no molesta al marcar Listo');
+// Automático: manda sin preguntar
+ABIERTO = '';
+r3("setWaListoPref('auto'); _ofrecerAvisoListo('w1', REPAIRS[0]);");
+ok(/wa\.me/.test(ABIERTO), 'en modo automático manda solo', ABIERTO);
+ok(els3['avisowa-modal'].classList.contains('hidden'), 'sin abrir el cartel');
+// Y se puede volver a "preguntar"
+r3("setWaListoPref('ask')");
+ok(ctx3.localStorage.getItem('waListoPref') === 'ask', 'se puede volver atrás');
+ok(!ctx3.__HUBO_CONFIRM, 'en ningún momento se usó un confirm() del navegador');
+
+console.log('\n9e) Se puede llegar a la preferencia desde Configuración');
+ok(/id="wa-listo-pref"/.test(idx), 'está el selector en Configuración');
+ok(/onchange="setWaListoPref\(this\.value\)"/.test(idx), 'y guarda al cambiarlo');
+ok(/_syncWaListoPref/.test(fs.readFileSync(DIR + 'app.js', 'utf8')),
+   'al abrir Configuración muestra lo que hay guardado');
+ok(/id="avisowa-modal"/.test(idx), 'y el cartel está en index.html');
+
+console.log('\n9f) Sin el cartel en la página, no se traba');
+els3['avisowa-modal'] = null;
+ABIERTO = '';
+r3("setWaListoPref('ask'); openAvisoWaModal('w1');");
+ok(/wa\.me/.test(ABIERTO), 'abre WhatsApp derecho en vez de colgarse', ABIERTO);
+
 console.log('\n10) loadWaTemplates trae las plantillas de fase desde Firestore');
 // Se ejecuta la función REAL sacada de app.js, con un Firestore de mentira.
 const app = fs.readFileSync(DIR + 'app.js', 'utf8');

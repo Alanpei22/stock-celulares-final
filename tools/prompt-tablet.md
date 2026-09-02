@@ -76,6 +76,20 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   (el loader solo copiaba las 4 viejas), y "Restablecer" del modal viejo se
   las llevaba puestas. `repair_presupuesto` por fin se puede editar.
 
+**El cartel de "¿le aviso al cliente?"** (2026-09-01)
+- Al marcar una reparacion como Listo salia un `confirm()` del navegador que
+  decia el nombre y el modelo pero NO que mensaje se iba a mandar. Como el
+  texto se edita desde la ficha, podia decir cualquier cosa.
+- Ahora es un cartel propio (`openAvisoWaModal` en repairs.js) con la vista
+  previa del mensaje REAL, el `*negrita*` dibujado como lo ve el cliente, y
+  tres salidas: abrir WhatsApp / copiar el texto / ahora no.
+- `_repairWaMsg()` arma el texto una sola vez: la previa y lo que se manda no
+  pueden quedar distintos.
+- **`setWaListoPref` era codigo muerto**: el comentario hablaba de "no
+  preguntar mas" pero no habia forma de activarlo. Ahora esta el tilde en el
+  cartel y un selector en Configuracion (preguntar / mandar solo / no avisar),
+  asi se puede volver atras.
+
 **Auditoria de la caja** (2026-09-01) — `tests/test-caja-auditoria.js`
 - **El desglose del dia no sumaba.** Una reparacion cobrada por transferencia
   contaba en "Digital" Y en "Reparaciones"; una cobrada en efectivo no

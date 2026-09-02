@@ -2026,17 +2026,83 @@ function _ofrecerAvisoListo(id, r) {
     if (r2 && typeof toast === 'function') toast('📤 WhatsApp enviado a ' + (r2.nombre || r2.tlf), 'success');
     return;
   }
-  // pref === 'ask' → mostrar prompt nativo con opciones rápidas
-  const nombre = r.nombre || r.tlf;
-  const ok = confirm(`📲 Avisar al cliente que el equipo está listo?\n\nCliente: ${nombre}\nN°${r.nOrden} — ${r.marca} ${r.modelo}\n\nVa a abrir WhatsApp con el mensaje pre-armado.`);
-  if (ok && typeof repairWhatsApp === 'function') repairWhatsApp(id);
+  // pref === 'ask' → cartel propio, con el mensaje a la vista
+  openAvisoWaModal(id);
 }
 
-// Permite cambiar la preferencia desde otro lado (menú config)
-function setWaListoPref(pref) {
+// ══════════════════════════════════════════
+//  "¿LE AVISO AL CLIENTE?" — cartel propio
+//  ─────────────────────────────────────────
+//  Antes era un confirm() del navegador que solo decía el nombre y el modelo.
+//  Dos problemas: no se veía QUÉ se le iba a mandar (y el texto se edita, así
+//  que puede decir cualquier cosa), y el "no preguntar más" que menciona el
+//  código no se podía activar desde ningún lado.
+// ══════════════════════════════════════════
+let _avisoWaId = null;
+
+function openAvisoWaModal(id) {
+  const modal = document.getElementById('avisowa-modal');
+  const r = REPAIRS.find(x => x.id === id);
+  if (!r) return;
+  // Sin el cartel (o sin teléfono) no se traba nada: se abre WhatsApp derecho.
+  if (!modal) { if (r.tlf) repairWhatsApp(id); return; }
+  if (!r.tlf) { toast('No hay teléfono registrado', 'error'); return; }
+
+  _avisoWaId = id;
+  document.getElementById('avisowa-info').innerHTML =
+    `<b>${esc(r.nombre || 'Sin nombre')}</b><span class="tpent-cli">N°${esc(String(r.nOrden || '?'))} · ${esc(r.marca || '')} ${esc(r.modelo || '')} · ${esc(r.tlf)}</span>`;
+  // La previa muestra el mensaje REAL, con el *negrita* como lo ve el cliente
+  const _e = (typeof esc === 'function') ? esc : (s => String(s == null ? '' : s));
+  document.getElementById('avisowa-prev').innerHTML = _e(_repairWaMsg(r))
+    .replace(/\*([^*\n]+)\*/g, '<b>$1</b>')
+    .replace(/_([^_\n]+)_/g, '<i>$1</i>')
+    .replace(/\n/g, '<br>');
+  const chk = document.getElementById('avisowa-nomas'); if (chk) chk.checked = false;
+
+  document.getElementById('avisowa-overlay')?.classList.remove('hidden');
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAvisoWaModal() {
+  // Si tildó "no preguntarme más", queda guardado aunque cierre con la ✕
+  if (document.getElementById('avisowa-nomas')?.checked) setWaListoPref('never', true);
+  document.getElementById('avisowa-overlay')?.classList.add('hidden');
+  document.getElementById('avisowa-modal')?.classList.add('hidden');
+  document.body.style.overflow = '';
+  _avisoWaId = null;
+}
+
+function avisoWaEnviar() {
+  const id = _avisoWaId;
+  closeAvisoWaModal();
+  if (id && typeof repairWhatsApp === 'function') repairWhatsApp(id);
+}
+
+function avisoWaCopiar(btn) {
+  const r = REPAIRS.find(x => x.id === _avisoWaId);
+  if (!r) return;
+  navigator.clipboard.writeText(_repairWaMsg(r)).then(() => {
+    if (btn) { const t = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = t, 1500); }
+  }).catch(() => toast('No se pudo copiar', 'error'));
+}
+
+// Preferencia de qué hacer al marcar una reparación como Listo.
+// `silencioso` = no mostrar el toast (cuando se guarda de paso al cerrar).
+function setWaListoPref(pref, silencioso) {
   if (!['ask', 'auto', 'never'].includes(pref)) return;
   localStorage.setItem('waListoPref', pref);
-  toast(`Preferencia guardada: ${pref === 'auto' ? 'enviar automático' : pref === 'never' ? 'nunca avisar' : 'preguntar'}`, 'info');
+  const sel = document.getElementById('wa-listo-pref');
+  if (sel && sel.value !== pref) sel.value = pref;
+  if (!silencioso) {
+    toast(`Al marcar Listo: ${pref === 'auto' ? 'se manda solo' : pref === 'never' ? 'no avisar' : 'preguntar'}`, 'success');
+  }
+}
+
+// Deja el selector de Configuración mostrando lo que hay guardado.
+function _syncWaListoPref() {
+  const sel = document.getElementById('wa-listo-pref');
+  if (sel) sel.value = localStorage.getItem('waListoPref') || 'ask';
 }
 
 // ── Registrar cobro en caja ─────────────────────────────
@@ -2134,6 +2200,30 @@ async function confirmarCobro() {
 }
 
 // ── WhatsApp ──────────────────────────────
+// Texto del WhatsApp rápido de la card (los tres mensajes de siempre).
+// Está separado para que el cartel de "¿le aviso?" muestre EXACTAMENTE lo que
+// se va a mandar: si el texto se armara en dos lugares, la vista previa y el
+// mensaje real podrían terminar diciendo cosas distintas.
+function _repairWaMsg(r) {
+  const nombre = r.nombre ? r.nombre.split(' ')[0] : '';
+  const equipo = `${r.marca || ''} ${r.modelo || ''}`.trim();
+  const tpls = (typeof WA_TEMPLATES !== 'undefined' && WA_TEMPLATES) || {};
+  let tpl;
+  if (r.estado === 'listo') {
+    tpl = tpls.repair_listo     || 'Hola {nombre}! 👋\nTu *{equipo}* (orden N°{nOrden}) ya está *listo para retirar* ✅\nAcordate de traer el comprobante. ¡Te esperamos!';
+  } else if (r.estado === 'reparando') {
+    tpl = tpls.repair_reparando || 'Hola {nombre}! 👋\nTe escribo por tu *{equipo}* (orden N°{nOrden}). Lo tenemos en el banco de trabajo 🔧\nApenas esté listo te aviso por acá.';
+  } else {
+    tpl = tpls.repair_default   || 'Hola {nombre}! 👋\nTe escribo de parte del taller por tu *{equipo}* (orden N°{nOrden}).';
+  }
+  return tpl
+    .replace(/{nombre}/g, nombre)
+    .replace(/{equipo}/g, equipo)
+    .replace(/{nOrden}/g, r.nOrden || '—')
+    .replace(/{marca}/g, r.marca || '')
+    .replace(/{modelo}/g, r.modelo || '');
+}
+
 function repairWhatsApp(id) {
   const r = REPAIRS.find(x => x.id === id);
   if (!r || !r.tlf) { toast('No hay teléfono registrado', 'error'); return; }
@@ -2150,26 +2240,7 @@ function repairWhatsApp(id) {
   else if (phone.length === 11 && phone.startsWith('0')) phone = '549' + phone.slice(1); // LOW-08: always add mobile 9
   else if (!phone.startsWith('54'))             phone = '549' + phone;
 
-  const nombre = r.nombre ? r.nombre.split(' ')[0] : '';
-  const equipo = `*${r.marca} ${r.modelo}*`;
-
-  const tpls = (typeof WA_TEMPLATES !== 'undefined' && WA_TEMPLATES) || {};
-  let tpl;
-  if (r.estado === 'listo') {
-    tpl = tpls.repair_listo     || 'Hola {nombre}! 👋\nTu {equipo} (Orden N°{nOrden}) ya está *lista para retirar* 🔧✅\n_Cuando puedas coordinamos el horario._';
-  } else if (r.estado === 'reparando') {
-    tpl = tpls.repair_reparando || 'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}). Estamos trabajando en ella 🔧';
-  } else {
-    tpl = tpls.repair_default   || 'Hola {nombre}! 👋\nTe contactamos por tu {equipo} (Orden N°{nOrden}).';
-  }
-  const msg = tpl
-    .replace(/{nombre}/g, nombre)
-    .replace(/{equipo}/g, equipo.replace(/\*/g, ''))
-    .replace(/{nOrden}/g, r.nOrden || '—')
-    .replace(/{marca}/g, r.marca || '')
-    .replace(/{modelo}/g, r.modelo || '');
-
-  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(_repairWaMsg(r)), '_blank');
 }
 
 // ══════════════════════════════════════════
