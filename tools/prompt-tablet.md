@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 28 suites, ~1110 chequeos, 3 segundos.
+2. **`npm test` antes de cada push.** Son 30 suites, ~1240 chequeos, 4 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -46,7 +46,8 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - `tp-fases.js` — tablero de fases: 11 fases con transiciones válidas y SLA.
   Doble nivel a propósito: `fase` es el detalle y `estado` (los 4 de siempre) se
   calcula desde la fase, así el resto de la app no se entera
-- `caja.html` + `caja.js` — caja diaria, cobros, carrito de venta
+- `caja.html` + `caja.js` — caja diaria, cobros, carrito de venta, venta de
+  equipos y planes de ahorro (colección `planes`)
 - `print.js` — comprobantes A5 (recepción, que también sirve de entrega) y venta
   A5 con original + copia. Todo B/N, con auto-ajuste para que entre en una hoja
 - `qr.js` — generador de QR propio, sin librerías ni internet
@@ -74,6 +75,58 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - Bugs: las plantillas `fase_*` se guardaban pero **no volvian de Firestore**
   (el loader solo copiaba las 4 viejas), y "Restablecer" del modal viejo se
   las llevaba puestas. `repair_presupuesto` por fin se puede editar.
+
+**Auditoria de la caja** (2026-09-01) — `tests/test-caja-auditoria.js`
+- **El desglose del dia no sumaba.** Una reparacion cobrada por transferencia
+  contaba en "Digital" Y en "Reparaciones"; una cobrada en efectivo no
+  aparecia en ninguno de los dos. Ahora Ef. ventas + Dig. ventas +
+  Reparaciones = todo lo que entro. La etiqueta paso a "Dig. ventas".
+- **Los dolares se contaban como "Digital"** en el cierre de turno. Ya no:
+  tienen su propio renglon en u$.
+- **"Efectivo en caja" estaba calculado en dos lugares distintos** (el panel
+  del dia y el cierre). Ahora el panel llama a `_getCierreEsperado()`, que es
+  la unica cuenta.
+- **Borrar un movimiento dejaba datos colgados**, todo con su deshacer:
+  · un cobro de reparacion la dejaba marcada como cobrada sin la plata → ahora
+    se le saca `cobrado` (el ESTADO no se toca: si se entrego, se entrego);
+  · una entrega de plan ahorro no se le descontaba al plan;
+  · la seña de una reserva no se le sacaba al equipo, y con el arreglo del
+    doble conteo eso le habria descontado del precio una plata inexistente.
+- El pago del plan y su movimiento de caja comparten la marca de tiempo: es lo
+  que permite borrar el movimiento y sacar el pago EXACTO y no otro igual.
+- **CUPO — el historial**: cada pestaña hace un `.get()` sobre
+  `caja_movimientos` y Firebase cobra por DOCUMENTO. "Anual" son ~18.000
+  lecturas de las 50.000 gratis EN UN TOQUE. Ahora el resultado queda en
+  memoria 5 minutos y se invalida solo si cambia un movimiento del dia
+  (`_histInvalidar`). Sigue siendo la consulta mas cara de la app: si algun
+  dia molesta, hay que guardar totales por mes en vez de releer los
+  movimientos.
+- `_planFechaLimite` armaba la fecha con `toISOString` (UTC): despues de las
+  21:00 el plazo salia un dia largo. Ahora parte del dia argentino.
+
+**Planes de ahorro y comprobante de reserva** (2026-09-01)
+- **Planes de ahorro**: el cliente va dejando plata y al completar se lleva el
+  equipo. Colección nueva `planes`. Se entra por el FAB de la caja (🐷).
+  Alta, registro de entregas, lista con barra de avance, entrega final y
+  cancelacion. Cada entrega imprime su comprobante A5 con el acumulado, lo
+  que falta y el historial de pagos (la "libreta" del cliente).
+- Reglas del negocio, escritas en el comprobante: **precio congelado hasta la
+  fecha limite** (por defecto 90 dias; pasado el plazo lo entregado conserva
+  su valor en pesos y se aplica al precio del dia), y si abandona, lo
+  entregado **queda como credito** para otra compra, NO se devuelve efectivo.
+- El equipo puede ser del stock (queda reservado, reusando los campos
+  `reserva*` que ya existian) o uno a pedido descrito a mano.
+- **CUPO**: `planes` se lee con un `.get()` puntual al abrir la seccion, con
+  limit(100). NUNCA un listener. Lo vigila `tests/test-planes.js`.
+- **Comprobante de reserva** A5: la reserva ya existia en Stock, le faltaba
+  el papel. Sale al reservar y se puede reimprimir desde el detalle del
+  equipo. Ahora la reserva ademas guarda un `reservaNro` correlativo.
+- **BUG DE PLATA**: al vender un equipo reservado se registraba el precio
+  COMPLETO en la caja, asi que la seña quedaba contada dos veces. Ahora se
+  cobra solo el saldo. La ganancia sigue siendo la de la venta entera, asi
+  que sumando los dos dias la plata y el margen cierran.
+- Al entregar un plan NO entra plata nueva a la caja: ya entro entrega por
+  entrega. Esa es la trampa de este modulo, y hay prueba que la vigila.
 
 **Buscar una reparacion por N° de orden al cobrar (estaba roto)**
 - Tipeabas el numero y la orden no aparecia. `searchMatch` busca por

@@ -98,7 +98,7 @@
     </div>
     <div class="caja-desglose">
       <div class="desglose-item"><span class="desglose-num" id="desglose-efectivo">$0</span><span class="desglose-lbl">💵 Ef. ventas</span></div>
-      <div class="desglose-item"><span class="desglose-num" id="desglose-digital">$0</span><span class="desglose-lbl">💳 Digital</span></div>
+      <div class="desglose-item"><span class="desglose-num" id="desglose-digital">$0</span><span class="desglose-lbl">💳 Dig. ventas</span></div>
       <div class="desglose-item"><span class="desglose-num" id="desglose-reparac">$0</span><span class="desglose-lbl">🔧 Reparac.</span></div>
       <div class="desglose-item"><span class="desglose-num desglose-num--gasto" id="desglose-gastos">$0</span><span class="desglose-lbl">💸 Gastos</span></div>
       <div class="desglose-item" id="desglose-retiros-wrap" style="display:none"><span class="desglose-num desglose-num--retiro" id="desglose-retiros">$0</span><span class="desglose-lbl">🏧 Retiro</span></div>
@@ -141,6 +141,10 @@
     <!-- Botón directo de precios (arriba del FAB +) -->
     <button class="fab-precios" id="fab-precios" onclick="openPreciosModal()" title="Precios de reparación">💲</button>
     <div class="fab-actions hidden" id="fab-actions">
+      <div class="fab-action-row">
+        <span class="fab-lbl">Planes de ahorro</span>
+        <button class="fab-sub fab-sub-plan" onclick="closeFabMenu();openPlanesModal()">🐷</button>
+      </div>
       <div class="fab-action-row">
         <span class="fab-lbl">Comprobante</span>
         <button class="fab-sub fab-sub-comp" onclick="closeFabMenu();openComprobanteModal()">🧾</button>
@@ -1212,6 +1216,131 @@ function switchCajaTab(tab) {
   <div style="display:flex;gap:8px;margin-top:12px">
     <button class="btn-secondary" onclick="closeComprobanteModal()" style="flex:1">Cancelar</button>
     <button class="btn-primary" onclick="_abrirComprobante(null)" style="flex:2">📄 En blanco</button>
+  </div>
+</div>
+
+<!-- ═══════════ PLANES DE AHORRO ═══════════
+     Tres modales: la lista, el alta y la entrega de plata. El detalle de un
+     plan sale del mismo listado.                                         -->
+<div id="planes-overlay" class="nota-overlay hidden" onclick="closePlanesModal()"></div>
+<div id="planes-modal" class="arqueo-modal hidden" style="max-width:460px">
+  <div class="nota-modal-hdr">
+    <span>🐷 Planes de ahorro</span>
+    <button onclick="closePlanesModal()">✕</button>
+  </div>
+  <p class="arqueo-sub">El cliente va dejando plata y al completar se lleva el equipo.</p>
+  <div class="planes-chips" id="planes-chips"></div>
+  <div class="planes-lista" id="planes-lista"></div>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button class="btn-secondary" onclick="closePlanesModal()" style="flex:1">Cerrar</button>
+    <button class="btn-primary" onclick="openPlanForm()" style="flex:2">➕ Nuevo plan</button>
+  </div>
+</div>
+
+<div id="planform-overlay" class="nota-overlay hidden" onclick="closePlanForm()"></div>
+<div id="planform-modal" class="arqueo-modal hidden" style="max-width:460px">
+  <div class="nota-modal-hdr">
+    <span>🐷 Nuevo plan de ahorro</span>
+    <button onclick="closePlanForm()">✕</button>
+  </div>
+  <div class="ventaeq-body">
+    <div class="ventaeq-sec">Cliente</div>
+    <div class="precio-fg"><label>Apellido y nombre *</label>
+      <input id="pf-cli-nombre" class="precio-input" type="text" placeholder="Pérez, Juan" autocomplete="off"></div>
+    <div class="ventaeq-g2">
+      <div class="precio-fg"><label>DNI</label>
+        <input id="pf-cli-dni" class="precio-input" type="text" inputmode="numeric" autocomplete="off"></div>
+      <div class="precio-fg"><label>Teléfono</label>
+        <input id="pf-cli-tel" class="precio-input" type="tel" autocomplete="off"></div>
+    </div>
+
+    <div class="ventaeq-sec">Equipo</div>
+    <div class="precio-fg"><label>Buscar en el stock (opcional)</label>
+      <input id="pf-buscar" class="precio-input" type="search" placeholder="Marca, modelo o IMEI…" autocomplete="off" oninput="_planBuscarStock()">
+      <div id="pf-stock-res" class="pf-stock-res"></div></div>
+    <div class="ventaeq-g2">
+      <div class="precio-fg"><label>Marca</label>
+        <input id="pf-marca" class="precio-input" type="text" placeholder="Samsung" autocomplete="off"></div>
+      <div class="precio-fg"><label>Modelo</label>
+        <input id="pf-modelo" class="precio-input" type="text" placeholder="Galaxy A54" autocomplete="off"></div>
+    </div>
+    <div class="ventaeq-g2">
+      <div class="precio-fg"><label>Capacidad</label>
+        <input id="pf-capacidad" class="precio-input" type="text" placeholder="128 GB" autocomplete="off"></div>
+      <div class="precio-fg"><label>Color</label>
+        <input id="pf-color" class="precio-input" type="text" autocomplete="off"></div>
+    </div>
+    <div class="precio-fg"><label>Detalle (si es a pedido)</label>
+      <input id="pf-desc" class="precio-input" type="text" placeholder="Se encarga al completar el plan" autocomplete="off"></div>
+
+    <div class="ventaeq-sec">Condiciones</div>
+    <div class="ventaeq-g2">
+      <div class="precio-fg"><label>Precio pactado *</label>
+        <input id="pf-precio" class="precio-input" type="number" inputmode="numeric" placeholder="720000"></div>
+      <div class="precio-fg"><label>Congelado por (días)</label>
+        <input id="pf-plazo" class="precio-input" type="number" inputmode="numeric" value="90"></div>
+    </div>
+    <div class="ventaeq-g2">
+      <div class="precio-fg"><label>Cuota sugerida</label>
+        <input id="pf-cuota" class="precio-input" type="number" inputmode="numeric" placeholder="60000"></div>
+      <div class="precio-fg"><label>Vendedor</label>
+        <input id="pf-vendedor" class="precio-input" type="text" autocomplete="off"></div>
+    </div>
+
+    <div class="ventaeq-sec">Primera entrega (opcional)</div>
+    <div class="ventaeq-g2">
+      <div class="precio-fg"><label>Monto</label>
+        <input id="pf-pago1" class="precio-input" type="number" inputmode="numeric" placeholder="0"></div>
+      <div class="precio-fg"><label>Forma de pago</label>
+        <select id="pf-pago1-metodo" class="precio-input">
+          <option>Efectivo</option><option>Transferencia</option><option>MercadoPago</option>
+          <option>Tarjeta débito</option><option>Tarjeta crédito</option>
+        </select></div>
+    </div>
+    <label class="ventaeq-toggle">
+      <input type="checkbox" id="pf-reg-caja" checked>
+      <span>Registrar la entrega en la caja de hoy</span>
+    </label>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px">
+    <button class="btn-secondary" onclick="closePlanForm()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" id="pf-confirm" onclick="confirmPlan()" style="flex:2">🐷 Crear el plan</button>
+  </div>
+</div>
+
+<div id="plandet-overlay" class="nota-overlay hidden" onclick="closePlanDetalle()"></div>
+<div id="plandet-modal" class="arqueo-modal hidden" style="max-width:440px">
+  <div class="nota-modal-hdr">
+    <span id="pd-tit">🐷 Plan</span>
+    <button onclick="closePlanDetalle()">✕</button>
+  </div>
+  <div id="pd-body" class="pd-body"></div>
+  <div id="pd-acciones" class="pd-acciones"></div>
+</div>
+
+<div id="planpago-overlay" class="nota-overlay hidden" onclick="closePlanPago()"></div>
+<div id="planpago-modal" class="arqueo-modal hidden" style="max-width:400px">
+  <div class="nota-modal-hdr">
+    <span>💵 Entrega del plan</span>
+    <button onclick="closePlanPago()">✕</button>
+  </div>
+  <p class="arqueo-sub" id="pp-info"></p>
+  <div class="ventaeq-g2">
+    <div class="precio-fg"><label>¿Cuánto deja?</label>
+      <input id="pp-monto" class="precio-input" type="number" inputmode="numeric" placeholder="60000"></div>
+    <div class="precio-fg"><label>Forma de pago</label>
+      <select id="pp-metodo" class="precio-input">
+        <option>Efectivo</option><option>Transferencia</option><option>MercadoPago</option>
+        <option>Tarjeta débito</option><option>Tarjeta crédito</option>
+      </select></div>
+  </div>
+  <label class="ventaeq-toggle">
+    <input type="checkbox" id="pp-reg-caja" checked>
+    <span>Registrar el ingreso en la caja de hoy</span>
+  </label>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button class="btn-secondary" onclick="closePlanPago()" style="flex:1">Cancelar</button>
+    <button class="btn-primary" id="pp-confirm" onclick="confirmPlanPago()" style="flex:2">💵 Registrar e imprimir</button>
   </div>
 </div>
 

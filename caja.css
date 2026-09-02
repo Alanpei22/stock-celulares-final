@@ -1610,3 +1610,57 @@ body.dark .comprobante-item-imei { color:#eee; }
   font-size:.84rem; font-weight:600; cursor:pointer; color:var(--t1,#1a1a1a);
 }
 .ventaeq-toggle input { width:20px; height:20px; cursor:pointer; }
+
+/* ── Planes de ahorro ── */
+.planes-chips { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0 10px; }
+.planes-chip {
+  padding:7px 13px; border-radius:999px; cursor:pointer;
+  border:1.5px solid var(--border,#e3e1de); background:var(--card,#fff);
+  color:var(--t2,#666); font-size:.78rem; font-weight:700;
+}
+.planes-chip--on { background:var(--t1,#1a1a1a); color:#fff; border-color:var(--t1,#1a1a1a); }
+.planes-lista { display:flex; flex-direction:column; gap:8px; max-height:56vh; overflow-y:auto; }
+.planes-empty { text-align:center; font-size:.82rem; color:var(--t3,#999); padding:14px 6px; margin:0; }
+.plan-row {
+  display:block; width:100%; text-align:left; cursor:pointer;
+  padding:11px 13px; border-radius:13px;
+  border:1.5px solid var(--border,#e3e1de); background:var(--card,#fff); color:var(--t1,#1a1a1a);
+}
+.plan-row:active { transform:scale(.99); }
+.plan-row-top { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+.plan-row-cli { font-size:.88rem; font-weight:800; }
+.plan-row-monto { font-size:.8rem; font-weight:700; white-space:nowrap; }
+.plan-row-eq { display:block; font-size:.78rem; color:var(--t2,#666); margin-top:2px; }
+.plan-bar { height:7px; border-radius:99px; background:var(--bg1,#f1f0ee); overflow:hidden; margin:7px 0 5px; }
+.plan-bar--big { height:11px; margin:10px 0 12px; }
+.plan-bar-f { height:100%; background:#10b981; border-radius:99px; }
+.plan-row-bot { display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:.74rem; color:var(--t2,#666); }
+.plan-tag { padding:2px 8px; border-radius:99px; background:var(--bg1,#f1f0ee); font-weight:700; font-size:.7rem; }
+.plan-tag--ok { background:rgba(16,185,129,.14); color:#047857; }
+.plan-tag--warn { background:rgba(217,119,6,.14); color:#b45309; }
+/* Detalle */
+.pd-body { max-height:56vh; overflow-y:auto; }
+.pd-cli { font-size:1rem; font-weight:800; }
+.pd-eq { font-size:.82rem; color:var(--t2,#666); margin-top:2px; }
+.pd-cifras { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px; }
+.pd-cifras div { text-align:center; padding:8px 4px; border:1.5px solid var(--border,#e3e1de); border-radius:11px; }
+.pd-cifras span { display:block; font-size:.66rem; text-transform:uppercase; letter-spacing:.07em; color:var(--t3,#999); }
+.pd-cifras b { font-size:.95rem; }
+.pd-falta { border-width:2px !important; border-color:var(--t1,#1a1a1a) !important; }
+.pd-meta { font-size:.78rem; color:var(--t2,#666); margin-bottom:10px; line-height:1.6; }
+.pd-pagos { display:flex; flex-direction:column; gap:3px; margin-bottom:6px; }
+.pd-pago { display:flex; justify-content:space-between; gap:8px; font-size:.78rem;
+           padding:5px 2px; border-bottom:1px dashed var(--border,#e3e1de); }
+.pd-nota { font-size:.8rem; padding:9px 11px; border-radius:11px; background:var(--bg1,#f1f0ee); margin-top:8px; }
+.pd-acciones { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.pd-acciones button { width:100%; }
+/* Buscador de stock del alta */
+.pf-stock-res { display:flex; flex-direction:column; gap:5px; margin-top:6px; }
+.pf-stock-item {
+  display:flex; justify-content:space-between; gap:10px; cursor:pointer;
+  padding:9px 11px; border-radius:10px; font-size:.82rem;
+  border:1.5px solid var(--border,#e3e1de); background:var(--card,#fff); color:var(--t1,#1a1a1a);
+}
+.pf-elegido { font-size:.8rem; margin:0; color:#047857; font-weight:700; }
+.pf-elegido button { background:none; border:0; text-decoration:underline; cursor:pointer;
+                     color:var(--t3,#999); font-size:.76rem; margin-left:6px; }

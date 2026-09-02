@@ -393,6 +393,259 @@ ${block('COPIA — Negocio')}
   _openPrint(html, `Venta ${p.marca} ${p.modelo}`);
 }
 
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  RESERVA DE EQUIPO y PLAN AHORRO                             ║
+// ║  ────────────────────────────────────────────────────────────║
+// ║  Los dos son "el cliente dejó plata a cuenta de un equipo",   ║
+// ║  así que comparten el CSS del comprobante de venta (_CSS_     ║
+// ║  VENTA_A5) y solo suman lo suyo: la barra de avance del plan  ║
+// ║  y la lista de pagos.                                        ║
+// ╚══════════════════════════════════════════════════════════════╝
+const _CSS_SENA = `
+.sbar{height:5.5mm;border:1px solid #000;margin:3px 0 2px;position:relative}
+.sbar-f{height:100%;background:#000}
+.sbar-t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+        font-size:8px;font-weight:800;mix-blend-mode:difference;color:#fff}
+.sgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:5px}
+.scaja{border:1.1px solid #000;padding:3px 6px;text-align:center}
+.scaja-l{font-size:6.6px;font-weight:800;text-transform:uppercase;letter-spacing:.09em}
+.scaja-v{font-size:12px;font-weight:800;margin-top:1px}
+.scaja--hl{border-width:2px}
+.spagos{width:100%;border-collapse:collapse;margin-bottom:5px}
+.spagos th{font-size:6.6px;text-transform:uppercase;letter-spacing:.09em;border-bottom:1px solid #000;padding:2px 5px;text-align:left}
+.spagos td{font-size:8.2px;border-bottom:.5px dotted #000;padding:2px 5px}
+.spagos .n{text-align:right;font-weight:700;white-space:nowrap}
+.spagos tr.hoy td{font-weight:800}
+.slim{border:1.3px solid #000;padding:3px 7px;margin-bottom:5px;font-size:8.4px}`;
+
+// Encabezado común de los dos comprobantes.
+function _senaHd(d, titulo, sub, nro, label) {
+  return `
+  <div class="vhd">
+    <div>
+      <div class="vshop">${d.businessName.toUpperCase()}</div>
+      <div class="vsub">${sub}</div>
+      ${_bizLinea() ? `<div class="vbiz">${_bizLinea()}</div>` : ''}
+    </div>
+    <div class="vhd-r">
+      <div class="vtit">${titulo}</div>
+      ${nro ? `<div class="vnro">N° ${_pr(nro)}</div>` : ''}
+      <div class="vcopia">${label}</div>
+    </div>
+  </div>`;
+}
+
+// Recuadro del cliente. Los campos vacíos no se imprimen.
+function _senaCliente(c) {
+  const filas = [
+    c.nombre ? ['Nombre', c.nombre] : null,
+    c.dni    ? ['DNI', c.dni]       : null,
+    c.tlf    ? ['Teléfono', c.tlf]  : null,
+  ].filter(Boolean);
+  if (!filas.length) return '';
+  return `<div class="vbox">
+    <div class="vbox-t">Cliente</div>
+    <div class="vgrid">${filas.map(([k, v]) => `<div class="vf"><span>${k}</span><b>${_pr(v)}</b></div>`).join('')}</div>
+  </div>`;
+}
+
+// Recuadro del equipo. Sirve tanto para uno del stock como para uno descrito
+// a mano (plan ahorro de un equipo que todavía no está).
+function _senaEquipo(e) {
+  const filas = [
+    e.almacenamiento ? ['Almacenamiento', e.almacenamiento] : null,
+    e.color ? ['Color', e.color] : null,
+    e.estado ? ['Condición', e.estado] : null,
+    e.bateria ? ['Batería', e.bateria + '%'] : null,
+  ].filter(Boolean);
+  const titulo = `${e.marca || ''} ${e.modelo || ''}`.trim();
+  return `<div class="vbox">
+    <div class="vbox-t">Equipo</div>
+    <div class="veq">${titulo || _pr(e.descripcion)}</div>
+    ${e.imei ? `<div class="vf"><span>IMEI</span><b class="vimei">${_pr(e.imei)}</b></div>` : ''}
+    ${filas.length ? `<div class="vgrid">${filas.map(([k, v]) => `<div class="vf"><span>${k}</span><b>${_pr(v)}</b></div>`).join('')}</div>` : ''}
+    ${titulo && e.descripcion ? `<div class="vf2"><span>Detalle:</span> ${_pr(e.descripcion)}</div>` : ''}
+    ${!e.imei ? `<div class="vf2"><span>Nota:</span> el IMEI se completa al momento de la entrega.</div>` : ''}
+  </div>`;
+}
+
+// Las tres cifras que importan, grandes: precio, entregado y saldo.
+function _senaCifras(precio, entregado, etiquetaEntregado) {
+  const saldo = Math.max(0, (Number(precio) || 0) - (Number(entregado) || 0));
+  return `<div class="sgrid">
+    <div class="scaja"><div class="scaja-l">Precio pactado</div><div class="scaja-v">${_prMoney(precio)}</div></div>
+    <div class="scaja"><div class="scaja-l">${etiquetaEntregado}</div><div class="scaja-v">${_prMoney(entregado)}</div></div>
+    <div class="scaja scaja--hl"><div class="scaja-l">Falta pagar</div><div class="scaja-v">${_prMoney(saldo)}</div></div>
+  </div>`;
+}
+
+function _senaFirmas(d, nombreCliente) {
+  return `
+  <div class="vfir">
+    <div class="vfir-c"><div class="vfir-sp"></div><div class="ln"></div>Firma del negocio</div>
+    <div class="vfir-c"><div class="vfir-sp"></div><div class="ln"></div>Firma y aclaración del cliente${
+      nombreCliente ? `<div class="vfir-n">${nombreCliente}</div>` : ''
+    }</div>
+    ${d.qrSvgWa ? `<div class="vqr">${d.qrSvgWa}<span>Escribinos</span></div>` : ''}
+  </div>`;
+}
+
+// ── RESERVA ───────────────────────────────────────────────────
+function _reservaBody(d, label) {
+  const r = d.r;
+  return `
+<div class="tk">
+  ${_senaHd(d, 'COMPROBANTE DE RESERVA', 'Venta de equipos · servicio técnico', r.nro, label)}
+
+  <div class="vmeta">
+    <span><b>Fecha:</b> ${d.fecha}</span>
+    ${r.vendedor ? `<span><b>Atendió:</b> ${_pr(r.vendedor)}</span>` : ''}
+  </div>
+
+  ${_senaCliente(r.cliente || {})}
+  ${_senaEquipo(r.equipo || {})}
+  ${_senaCifras(r.precio, r.sena, 'Seña entregada')}
+
+  <div class="slim">
+    <b>EQUIPO RESERVADO HASTA EL ${d.fechaLimite || '____ / ____ / ______'}.</b>
+    Hasta esa fecha el equipo queda separado y el precio no cambia.
+  </div>
+
+  <div class="vcond">
+    <div class="vbox-t">Condiciones de la reserva</div>
+    <div class="vcond-c">
+      <p><b>1. Qué es esta seña.</b> El importe entregado se imputa íntegramente al precio del equipo detallado, que queda separado y fuera de la venta al público hasta la fecha indicada.</p>
+      <p><b>2. Precio.</b> El precio pactado se mantiene sin variación hasta la fecha límite de la reserva, cualquiera sea la variación de precios en ese lapso.</p>
+      <p><b>3. Vencimiento.</b> Pasada la fecha límite sin que el cliente retire el equipo ni acuerde una prórroga, el equipo vuelve a estar disponible para la venta y el precio deja de estar congelado.</p>
+      <p><b>4. Si el cliente desiste.</b> El importe entregado no se devuelve en efectivo: queda acreditado a favor del cliente para aplicarlo a otra compra o servicio en el local, presentando este comprobante.</p>
+      <p><b>5. Entrega.</b> Se realiza contra la cancelación total del saldo y la firma del comprobante de venta, donde constan la garantía y el estado del equipo.</p>
+      <p><b>6. Conformidad.</b> La firma del presente implica la aceptación de estas condiciones.</p>
+    </div>
+  </div>
+
+  ${_senaFirmas(d, (r.cliente || {}).nombre)}
+  <div class="vpie">Guardá este comprobante: es lo que acredita la seña · ${d.businessName}</div>
+</div>`;
+}
+
+// datos: { nro, cliente:{nombre,dni,tlf}, equipo:{...}, precio, sena,
+//          fechaLimite (ISO o yyyy-mm-dd), vendedor }
+function printReserva(datos) {
+  const d = _senaDatos(datos);
+  d.r = datos;
+  d.fechaLimite = datos.fechaLimite ? _prDate(String(datos.fechaLimite).slice(0, 10)) : null;
+  _openPrint(`<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>Reserva — ${_pr((datos.equipo || {}).modelo)}</title>
+<style>${_CSS_VENTA_A5}${_CSS_SENA}</style></head><body>
+${_reservaBody(d, 'Original · cliente')}
+${_reservaBody(d, 'Copia · negocio')}
+${_autofitJs(192)}
+</body></html>`, 'Reserva');
+}
+
+// ── PLAN AHORRO ───────────────────────────────────────────────
+// Se imprime en CADA pago: el cliente se lleva el detalle de lo que lleva
+// puesto y lo que le falta. Es la libreta del plan.
+function _planBody(d, label) {
+  const p = d.p;
+  const pagos = Array.isArray(p.pagos) ? p.pagos : [];
+  const total = Number(p.precioPactado) || 0;
+  const acum  = Number(p.pagado) || 0;
+  const pct   = total > 0 ? Math.min(100, Math.round(acum * 100 / total)) : 0;
+  // Solo los últimos 8: con un plan largo la hoja no da, y lo que importa es
+  // el acumulado (que va arriba, en grande).
+  const ultimos = pagos.slice(-8);
+  const ocultos = pagos.length - ultimos.length;
+
+  return `
+<div class="tk">
+  ${_senaHd(d, 'PLAN AHORRO', 'Venta de equipos · servicio técnico', p.nro, label)}
+
+  <div class="vmeta">
+    <span><b>Fecha:</b> ${d.fecha}</span>
+    <span><b>Pago N°:</b> ${pagos.length}</span>
+    ${p.vendedor ? `<span><b>Atendió:</b> ${_pr(p.vendedor)}</span>` : ''}
+  </div>
+
+  ${_senaCliente(p.cliente || {})}
+  ${_senaEquipo(p.equipo || {})}
+
+  ${d.pagoHoy > 0 ? `<div class="slim"><b>ENTREGA DE HOY: ${_prMoney(d.pagoHoy)}</b>${
+    d.metodoHoy ? ` · ${_pr(d.metodoHoy)}` : ''}</div>` : ''}
+
+  ${_senaCifras(total, acum, 'Lleva entregado')}
+
+  <div class="sbar">
+    <div class="sbar-f" style="width:${pct}%"></div>
+    <div class="sbar-t">${pct}% del plan</div>
+  </div>
+
+  ${ultimos.length ? `
+  <table class="spagos">
+    <tr><th>Pago</th><th>Fecha</th><th>Forma</th><th class="n">Importe</th></tr>
+    ${ocultos > 0 ? `<tr><td colspan="4" style="font-size:7px">… ${ocultos} pago${ocultos === 1 ? '' : 's'} anterior${ocultos === 1 ? '' : 'es'} por ${_prMoney(acum - ultimos.reduce((s, x) => s + (Number(x.monto) || 0), 0))}</td></tr>` : ''}
+    ${ultimos.map((x, i) => `<tr class="${i === ultimos.length - 1 ? 'hoy' : ''}">
+      <td>${ocultos + i + 1}</td>
+      <td>${_prDate(String(x.fecha || '').slice(0, 10))}</td>
+      <td>${_pr(x.metodo)}</td>
+      <td class="n">${_prMoney(x.monto)}</td>
+    </tr>`).join('')}
+  </table>` : ''}
+
+  <div class="slim">
+    <b>PRECIO CONGELADO HASTA EL ${d.fechaLimite || '____ / ____ / ______'}.</b>
+    Completando el plan antes de esa fecha, el equipo se entrega al precio pactado arriba.
+  </div>
+
+  <div class="vcond">
+    <div class="vbox-t">Condiciones del plan</div>
+    <div class="vcond-c">
+      <p><b>1. Qué es este plan.</b> El cliente entrega importes a cuenta del equipo detallado. Cada entrega se registra en este comprobante y se acumula hasta cubrir el precio pactado.</p>
+      <p><b>2. Precio congelado.</b> El precio indicado se mantiene sin variación hasta la fecha límite, cualquiera sea la variación de precios en ese lapso. Completado el total dentro del plazo, el equipo se entrega a ese precio.</p>
+      <p><b>3. Si se pasa el plazo.</b> Vencida la fecha límite sin haber completado el total, lo entregado conserva su valor en pesos y se aplica al precio vigente del equipo al momento de la entrega.</p>
+      <p><b>4. Si el cliente desiste.</b> Los importes entregados no se devuelven en efectivo: quedan acreditados a su favor para aplicarlos a otra compra o servicio en el local, presentando este comprobante.</p>
+      <p><b>5. Disponibilidad.</b> Cuando el equipo está en stock, queda separado y fuera de la venta al público mientras el plan esté vigente. Si se trata de un equipo a pedido, se encarga al completarse el plan.</p>
+      <p><b>6. Entrega.</b> Se realiza contra la cancelación total y la firma del comprobante de venta, donde constan la garantía y el estado del equipo.</p>
+      <p><b>7. Conformidad.</b> La firma del presente implica la aceptación de estas condiciones.</p>
+    </div>
+  </div>
+
+  ${_senaFirmas(d, (p.cliente || {}).nombre)}
+  <div class="vpie">Traé este comprobante en cada pago · ${d.businessName}</div>
+</div>`;
+}
+
+// plan: el documento del plan (con `pagos` ya incluyendo el de hoy)
+// pagoHoy / metodoHoy: lo que se acaba de entregar (0 = solo reimprimir)
+function printPlanAhorro(plan, pagoHoy, metodoHoy) {
+  const d = _senaDatos(plan);
+  d.p = plan;
+  d.pagoHoy = Number(pagoHoy) || 0;
+  d.metodoHoy = metodoHoy || '';
+  d.fechaLimite = plan.fechaLimite ? _prDate(String(plan.fechaLimite).slice(0, 10)) : null;
+  _openPrint(`<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><title>Plan ahorro — ${_pr((plan.equipo || {}).modelo)}</title>
+<style>${_CSS_VENTA_A5}${_CSS_SENA}</style></head><body>
+${_planBody(d, 'Original · cliente')}
+${_planBody(d, 'Copia · negocio')}
+${_autofitJs(192)}
+</body></html>`, 'Plan ahorro');
+}
+
+// Datos comunes: nombre del negocio, fecha y QR de WhatsApp.
+function _senaDatos() {
+  const businessName = (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint';
+  const cfg = (typeof getConfig === 'function') ? getConfig() : null;
+  const tlfNeg = cfg?.telefonoNegocio || cfg?.tlfNegocio
+              || (typeof BIZ_DATA !== 'undefined' && BIZ_DATA ? BIZ_DATA.tel : '');
+  let qrSvgWa = '';
+  if (tlfNeg && typeof qrSvg === 'function') {
+    const link = `https://wa.me/${String(tlfNeg).replace(/\D/g, '')}`;
+    qrSvgWa = qrSvg(link, 25);
+  }
+  return { businessName, fecha: _today(), qrSvgWa };
+}
+
 const _CL_LABELS = {
   pantalla:'Pantalla', tactil:'Táctil', pixels:'Píxeles', cam_trasera:'Cám. trasera',
   cam_delantera:'Cám. frontal', botones:'Botones', altavoz:'Altavoz', microfono:'Micrófono',

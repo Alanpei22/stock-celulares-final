@@ -405,6 +405,8 @@ const EXENTAS = [
   'tieneGarantia',    // marca en la orden original
   'tokenSeguimiento', // lo escribe el propio upsert
   'sena: firebase',   // revertir seña al borrar un movimiento
+  'cobrado: false',   // revertir el cobro al borrar el movimiento: la página
+                      // pública muestra el estado del equipo, no si se pagó
   '[campo]: v',       // tpGuardarCampo (diagnóstico/motivo son internos)
   'arreglos: lista',  // tildar una reparación como hecha: el doc público no
                       // tiene los arreglos, solo paso/equipo/fechas

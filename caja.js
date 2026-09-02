@@ -8,7 +8,7 @@ const DENOMINACIONES = [20000, 10000, 2000, 1000, 500, 200, 100];
 const DENOMINACIONES_USD = [100, 50, 20, 10, 5, 1];
 
 const CATEGORIAS = {
-  ingreso: ['Venta equipo', 'Reparación', 'Venta producto', 'Hidrogel / Accesorio', 'Seña', 'Otro ingreso'],
+  ingreso: ['Venta equipo', 'Reparación', 'Venta producto', 'Hidrogel / Accesorio', 'Seña', 'Plan ahorro', 'Otro ingreso'],
   egreso:  ['Compra repuesto', 'Gasto fijo', 'Retiro dueño', 'Otro gasto']
 };
 const RETIRO_CAT = 'Retiro dueño';
@@ -17,7 +17,7 @@ const METODOS_PAGO = ['Efectivo', 'Transferencia', 'MercadoPago', 'Tarjeta débi
 
 const CAT_ICONS = {
   'Venta equipo': '📱', 'Reparación': '🔧', 'Venta producto': '🏷️', 'Hidrogel / Accesorio': '🛡️',
-  'Seña': '📝', 'Otro ingreso': '💰',
+  'Seña': '📝', 'Plan ahorro': '🐷', 'Otro ingreso': '💰',
   'Compra repuesto': '🛒', 'Gasto fijo': '📋', 'Retiro dueño': '🏧', 'Otro gasto': '💸'
 };
 
@@ -557,6 +557,8 @@ function listenMovimientos() {
       if (snap.docChanges().length === 0 && MOVIMIENTOS.length) return;
       MOVIMIENTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       MOVIMIENTOS.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      // Cambió algo del día: el historial guardado en memoria quedó viejo.
+      if (typeof _histInvalidar === 'function') _histInvalidar();
       renderMovimientos();
       renderStats();
     }, err => {
@@ -615,9 +617,9 @@ function renderStats() {
   const totalEg     = egMovs.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const totalGastos = gastos.reduce((s, m) => s + (Number(m.monto) || 0), 0);
 
-  const ingEfec = ingMovs.reduce((s, m) => s + _efecMonto(m), 0);
-  const egEfec  = egMovs.reduce((s, m) => s + _efecMonto(m), 0);
-  const efectivoEnCaja = apertura + ingEfec - egEfec;
+  // Una sola fuente para "cuánta plata hay en el cajón": la misma cuenta que
+  // usa el cierre. Antes estaba escrita dos veces y podían quedar distintas.
+  const efectivoEnCaja = _getCierreEsperado();
   const neto = totalIng - totalGastos; // retiros no afectan neto
 
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = fmt(val); };
@@ -640,12 +642,20 @@ function renderStats() {
   // Feature 6: comparativa "vs ayer" (usa _yesterdayNeto cargado por _loadYesterdayStats)
   _renderVsYesterday(neto);
 
-  // Desglose del día — usa _efecMonto para respetar el split
-  const reparac   = ingMovs.filter(m => m.categoria === 'Reparación').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-  const ventaEfec = ingMovs.filter(m => m.categoria !== 'Reparación').reduce((s, m) => s + _efecMonto(m), 0);
-  // Digital = no efectivo, excluyendo dólares (los dólares van a su propia caja)
-  const digital   = ingMovs.filter(m => m.metodoPago !== 'Dólares')
-                           .reduce((s, m) => s + ((Number(m.monto) || 0) - _efecMonto(m)), 0);
+  // Desglose del día — usa _efecMonto para respetar el split.
+  // Los tres primeros números tienen que PODER SUMARSE: efectivo de ventas +
+  // digital de ventas + reparaciones = todo lo que entró (sin los dólares,
+  // que tienen su propio renglón). Antes "Digital" incluía las reparaciones
+  // cobradas por transferencia y "Ef. ventas" no incluía las cobradas en
+  // efectivo: una reparación digital se contaba dos veces y una en efectivo
+  // no aparecía en ningún lado.
+  const esRep     = m => m.categoria === 'Reparación';
+  const ventas    = ingMovs.filter(m => !esRep(m));
+  const reparac   = ingMovs.filter(esRep).reduce((s, m) => s + (Number(m.monto) || 0), 0);
+  const ventaEfec = ventas.reduce((s, m) => s + _efecMonto(m), 0);
+  // Digital = lo que no fue efectivo, sin los dólares (van a su propia caja)
+  const digital   = ventas.filter(m => m.metodoPago !== 'Dólares')
+                          .reduce((s, m) => s + ((Number(m.monto) || 0) - _efecMonto(m)), 0);
   // Dólares en caja (en u$)
   const usdCaja = _usdEnCaja();
   const usdWrap = document.getElementById('desglose-usd-wrap');
@@ -1238,6 +1248,561 @@ function _metodoDesdeTexto(t) {
   if (s.includes('débit') || s.includes('debit') || s.includes('tarjeta')) return 'Tarjeta débito';
   if (s.includes('dólar') || s.includes('dolar') || s.includes('usd')) return 'Dólares';
   return 'Efectivo';
+}
+
+// ══════════════════════════════════════════
+//  PLANES DE AHORRO
+//  ─────────────────────────────────────────
+//  El cliente va dejando plata a cuenta de un equipo y al completar se lo
+//  lleva. Reglas del negocio (están escritas en el comprobante):
+//   · El precio queda CONGELADO hasta la fecha límite. Pasado el plazo, lo
+//     entregado conserva su valor en pesos y se aplica al precio del día.
+//   · Si abandona, lo entregado NO se devuelve en efectivo: queda como
+//     crédito para otra compra en el local.
+//   · El equipo puede ser uno del stock (queda reservado, reusando los
+//     campos `reserva*` que ya existían) o uno a pedido, descrito a mano.
+//
+//  CUPO: la colección `planes` se lee con un .get() puntual al abrir la
+//  sección, NUNCA con un listener. Son pocos documentos y se miran poco.
+//  Después de escribir se actualiza la copia local en memoria, sin releer.
+// ══════════════════════════════════════════
+let PLANES = [];
+let _planesLeidos = false;
+let _planSel      = null;   // id del plan abierto en el detalle
+let _planStockId  = null;   // equipo del stock elegido en el alta
+
+const _planPagado  = p => Number(p?.pagado) || 0;
+const _planPrecio  = p => Number(p?.precioPactado) || 0;
+const _planFalta   = p => Math.max(0, _planPrecio(p) - _planPagado(p));
+const _planPct     = p => (_planPrecio(p) > 0 ? Math.min(100, Math.round(_planPagado(p) * 100 / _planPrecio(p))) : 0);
+const _planCompleto = p => _planPrecio(p) > 0 && _planPagado(p) >= _planPrecio(p);
+const _planVencido = p => !!p?.fechaLimite && p.estado === 'activo' && p.fechaLimite < (typeof _todayAR === 'function' ? _todayAR() : '');
+
+async function _cargarPlanes(forzar) {
+  if (_planesLeidos && !forzar) return;
+  try {
+    const snap = await db.collection('planes').orderBy('createdAt', 'desc').limit(100).get();
+    PLANES = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    _planesLeidos = true;
+  } catch (e) {
+    console.error('cargar planes:', e);
+    toast('No se pudieron cargar los planes', 'error');
+  }
+}
+
+// ── Lista ─────────────────────────────────
+let _planFiltro = 'activo';
+
+async function openPlanesModal() {
+  document.getElementById('planes-overlay')?.classList.remove('hidden');
+  document.getElementById('planes-modal')?.classList.remove('hidden');
+  const cont = document.getElementById('planes-lista');
+  if (cont) cont.innerHTML = '<p class="planes-empty">Cargando…</p>';
+  await _cargarPlanes();
+  _renderPlanes();
+}
+
+function closePlanesModal() {
+  document.getElementById('planes-overlay')?.classList.add('hidden');
+  document.getElementById('planes-modal')?.classList.add('hidden');
+}
+
+function setPlanFiltro(f) { _planFiltro = f; _renderPlanes(); }
+
+function _renderPlanes() {
+  const cont = document.getElementById('planes-lista');
+  if (!cont) return;
+  const chips = document.getElementById('planes-chips');
+  if (chips) {
+    chips.innerHTML = [['activo', 'Activos'], ['entregado', 'Entregados'], ['cancelado', 'Cancelados'], ['todos', 'Todos']]
+      .map(([k, t]) => `<button type="button" class="planes-chip${_planFiltro === k ? ' planes-chip--on' : ''}" onclick="setPlanFiltro('${k}')">${t}</button>`)
+      .join('');
+  }
+  const lista = PLANES.filter(p => _planFiltro === 'todos' || (p.estado || 'activo') === _planFiltro);
+  if (!lista.length) {
+    cont.innerHTML = `<p class="planes-empty">No hay planes ${_planFiltro === 'todos' ? 'cargados' : 'en este estado'}.</p>`;
+    return;
+  }
+  cont.innerHTML = lista.map(p => {
+    const eq = `${p.equipo?.marca || ''} ${p.equipo?.modelo || ''}`.trim() || 'Equipo a definir';
+    const pct = _planPct(p);
+    return `<button type="button" class="plan-row" onclick="openPlanDetalle('${esc(p.id)}')">
+      <div class="plan-row-top">
+        <span class="plan-row-cli">N°${esc(String(p.nro || '?'))} · ${esc(p.cliente?.nombre || 'Sin nombre')}</span>
+        <span class="plan-row-monto">${fmt(_planPagado(p))} / ${fmt(_planPrecio(p))}</span>
+      </div>
+      <span class="plan-row-eq">📱 ${esc(eq)}</span>
+      <div class="plan-bar"><div class="plan-bar-f" style="width:${pct}%"></div></div>
+      <div class="plan-row-bot">
+        <span>${pct}% · falta ${fmt(_planFalta(p))}</span>
+        ${_planCompleto(p) && p.estado === 'activo' ? '<span class="plan-tag plan-tag--ok">✅ Completo</span>' : ''}
+        ${_planVencido(p) ? '<span class="plan-tag plan-tag--warn">⚠️ Plazo vencido</span>' : ''}
+        ${p.estado === 'entregado' ? '<span class="plan-tag">📦 Entregado</span>' : ''}
+        ${p.estado === 'cancelado' ? `<span class="plan-tag plan-tag--warn">Crédito ${fmt(p.creditoRestante || 0)}</span>` : ''}
+      </div>
+    </button>`;
+  }).join('');
+}
+
+// ── Alta ──────────────────────────────────
+function openPlanForm() {
+  _planStockId = null;
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : String(v); };
+  ['pf-cli-nombre', 'pf-cli-dni', 'pf-cli-tel', 'pf-marca', 'pf-modelo', 'pf-capacidad',
+   'pf-color', 'pf-desc', 'pf-precio', 'pf-cuota', 'pf-pago1', 'pf-buscar'].forEach(k => set(k, ''));
+  set('pf-plazo', 90);
+  set('pf-vendedor', localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '');
+  const reg = document.getElementById('pf-reg-caja'); if (reg) reg.checked = true;
+  const res = document.getElementById('pf-stock-res'); if (res) res.innerHTML = '';
+  document.getElementById('planform-overlay')?.classList.remove('hidden');
+  document.getElementById('planform-modal')?.classList.remove('hidden');
+}
+
+function closePlanForm() {
+  document.getElementById('planform-overlay')?.classList.add('hidden');
+  document.getElementById('planform-modal')?.classList.add('hidden');
+}
+
+// Buscador de equipos del stock para el alta. Elegir uno completa los campos
+// y deja el equipo enganchado (queda reservado al crear el plan).
+function _planBuscarStock() {
+  const cont = document.getElementById('pf-stock-res');
+  if (!cont) return;
+  const q = (document.getElementById('pf-buscar')?.value || '').trim().toLowerCase();
+  if (!q) { cont.innerHTML = ''; return; }
+  const items = (CAJA_STOCK || [])
+    .filter(p => !p.vendido && !p.reservado)
+    .filter(p => `${p.marca || ''} ${p.modelo || ''} ${p.almacenamiento || ''} ${p.imei || ''}`.toLowerCase().includes(q))
+    .slice(0, 6);
+  cont.innerHTML = items.length
+    ? items.map(p => `<button type="button" class="pf-stock-item" onclick="_planElegirStock('${esc(p.id)}')">
+        <span>📱 ${esc(p.marca)} ${esc(p.modelo)}${p.almacenamiento ? ' · ' + esc(p.almacenamiento) : ''}</span>
+        <b>${p.precio ? fmt(p.precio) : '—'}</b>
+      </button>`).join('')
+    : '<p class="planes-empty">Sin equipos disponibles para esa búsqueda. Podés describirlo a mano abajo.</p>';
+}
+
+function _planElegirStock(id) {
+  const p = (CAJA_STOCK || []).find(x => x.id === id);
+  if (!p) return;
+  _planStockId = id;
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : String(v); };
+  set('pf-marca', p.marca); set('pf-modelo', p.modelo);
+  set('pf-capacidad', p.almacenamiento); set('pf-color', p.color);
+  if (p.precio) set('pf-precio', p.precio);
+  set('pf-buscar', '');
+  const cont = document.getElementById('pf-stock-res');
+  if (cont) cont.innerHTML = `<p class="pf-elegido">✅ ${esc(p.marca)} ${esc(p.modelo)} — queda reservado al crear el plan
+    <button type="button" onclick="_planSoltarStock()">quitar</button></p>`;
+}
+
+function _planSoltarStock() {
+  _planStockId = null;
+  const cont = document.getElementById('pf-stock-res');
+  if (cont) cont.innerHTML = '';
+}
+
+// Número de plan correlativo, con el mismo mecanismo que el N° de orden de
+// las reparaciones: un contador en config, dentro de una transacción.
+async function _proximoNroPlan() {
+  const metaRef = db.collection('config').doc('planesMeta');
+  let nro = 1;
+  await db.runTransaction(async t => {
+    const meta = await t.get(metaRef);
+    nro = meta.exists ? (meta.data().nextPlanNum || 1) : 1;
+    t.set(metaRef, { nextPlanNum: nro + 1 }, { merge: true });
+  });
+  return nro;
+}
+
+function _planFechaLimite(dias) {
+  // Se parte del día de ACÁ (no de toISOString, que es UTC): después de las
+  // 21:00 el UTC ya está en mañana y el plazo salía un día largo.
+  const hoy = (typeof _todayAR === 'function') ? _todayAR() : new Date().toISOString().slice(0, 10);
+  const d = new Date(hoy + 'T12:00:00');
+  d.setDate(d.getDate() + (Number(dias) || 90));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+async function confirmPlan() {
+  const btn = document.getElementById('pf-confirm');
+  const v = k => (document.getElementById(k)?.value || '').trim();
+  const n = k => { const x = parseInt(String(v(k)).replace(/[^\d]/g, ''), 10); return isNaN(x) ? 0 : x; };
+
+  const nombre = v('pf-cli-nombre');
+  const precio = n('pf-precio');
+  const marca  = v('pf-marca'), modelo = v('pf-modelo');
+  if (!nombre)  { toast('Cargá el nombre del cliente', 'error'); return; }
+  if (!precio)  { toast('Cargá el precio pactado', 'error'); return; }
+  if (!marca && !modelo && !v('pf-desc')) { toast('Cargá el equipo (o describilo)', 'error'); return; }
+
+  if (btn) btn.disabled = true;
+  try {
+    const ahora   = new Date().toISOString();
+    const plazo   = n('pf-plazo') || 90;
+    const pago1   = n('pf-pago1');
+    const metodo  = v('pf-pago1-metodo') || 'Efectivo';
+    const regCaja = document.getElementById('pf-reg-caja')?.checked !== false;
+    const vendedor = v('pf-vendedor');
+    const nro = await _proximoNroPlan();
+
+    const equipo = { stockId: _planStockId || null };
+    if (marca) equipo.marca = marca;
+    if (modelo) equipo.modelo = modelo;
+    if (v('pf-capacidad')) equipo.almacenamiento = v('pf-capacidad');
+    if (v('pf-color')) equipo.color = v('pf-color');
+    if (v('pf-desc')) equipo.descripcion = v('pf-desc');
+    if (_planStockId) {
+      const s = (CAJA_STOCK || []).find(x => x.id === _planStockId);
+      if (s?.imei) equipo.imei = s.imei;
+      if (s?.estado) equipo.estado = s.estado;
+      if (s?.bateria) equipo.bateria = s.bateria;
+    }
+
+    const cliente = { nombre };
+    if (v('pf-cli-dni')) cliente.dni = v('pf-cli-dni');
+    if (v('pf-cli-tel')) cliente.tlf = v('pf-cli-tel');
+
+    const pagos = [];
+    if (pago1 > 0) pagos.push({ fecha: ahora, monto: pago1, metodo });
+
+    const plan = {
+      nro, cliente, equipo,
+      precioPactado: precio,
+      plazoDias: plazo,
+      fechaInicio: ahora,
+      fechaLimite: _planFechaLimite(plazo),
+      cuotaSugerida: n('pf-cuota') || null,
+      pagado: pago1,
+      pagos,
+      estado: 'activo',
+      vendedor: vendedor || null,
+      createdAt: ahora,
+      _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
+    };
+
+    const ref = await db.collection('planes').add(plan);
+    plan.id = ref.id;
+
+    // El equipo del stock queda reservado. Se reusan los campos `reserva*`
+    // que ya existían, así el detalle de Stock lo muestra como RESERVADO sin
+    // tocar nada de app.js.
+    if (_planStockId) {
+      try {
+        await db.collection('stock').doc(_planStockId).update({
+          reservado: true,
+          reservaCliente: nombre,
+          reservaTelefono: cliente.tlf || null,
+          reservaSena: pago1,
+          reservaFechaLimite: plan.fechaLimite,
+          reservaCreadaEn: ahora,
+          planId: ref.id,
+        });
+      } catch (e) { console.error('reservar equipo del plan:', e); toast('Plan creado, pero no pude reservar el equipo', 'error'); }
+    }
+
+    if (pago1 > 0 && regCaja) await _planMovCaja(plan, pago1, metodo, ahora);
+    if (cliente.tlf && typeof upsertCliente === 'function') {
+      upsertCliente({ tlf: cliente.tlf, nombre, dni: cliente.dni || '' }).catch(() => {});
+    }
+    _planLog(plan, `Plan ahorro N°${nro} abierto — ${nombre}${pago1 > 0 ? ' · ' + fmt(pago1) : ''}`);
+
+    PLANES.unshift(plan);
+    closePlanForm();
+    _renderPlanes();
+    toast(`✅ Plan N°${nro} creado`, 'success');
+    if (pago1 > 0) setTimeout(() => _planImprimir(plan, pago1, metodo), 250);
+  } catch (e) {
+    console.error('confirmPlan:', e);
+    toast(e?.code === 'resource-exhausted'
+      ? '⚠️ Cupo diario de Firebase agotado — el plan NO se guardó'
+      : 'Error al crear el plan', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ── Detalle y pagos ───────────────────────
+function openPlanDetalle(id) {
+  const p = PLANES.find(x => x.id === id);
+  if (!p) return;
+  _planSel = id;
+  const eq = `${p.equipo?.marca || ''} ${p.equipo?.modelo || ''}`.trim() || (p.equipo?.descripcion || 'Equipo a definir');
+  const pagos = Array.isArray(p.pagos) ? p.pagos : [];
+  const activo = (p.estado || 'activo') === 'activo';
+
+  document.getElementById('pd-tit').textContent = `🐷 Plan N°${p.nro || '?'}`;
+  document.getElementById('pd-body').innerHTML = `
+    <div class="pd-cli">${esc(p.cliente?.nombre || 'Sin nombre')}${p.cliente?.tlf ? ` · ${esc(p.cliente.tlf)}` : ''}</div>
+    <div class="pd-eq">📱 ${esc(eq)}${p.equipo?.stockId ? ' · del stock (reservado)' : ' · a pedido'}</div>
+    <div class="plan-bar plan-bar--big"><div class="plan-bar-f" style="width:${_planPct(p)}%"></div></div>
+    <div class="pd-cifras">
+      <div><span>Pactado</span><b>${fmt(_planPrecio(p))}</b></div>
+      <div><span>Entregado</span><b>${fmt(_planPagado(p))}</b></div>
+      <div class="pd-falta"><span>Falta</span><b>${fmt(_planFalta(p))}</b></div>
+    </div>
+    <div class="pd-meta">
+      Precio congelado hasta <b>${esc(p.fechaLimite || '—')}</b>${_planVencido(p) ? ' <span class="plan-tag plan-tag--warn">plazo vencido</span>' : ''}
+      ${p.cuotaSugerida ? ` · cuota sugerida ${fmt(p.cuotaSugerida)}` : ''}
+    </div>
+    ${pagos.length ? `<div class="pd-pagos">${pagos.map((x, i) => `
+      <div class="pd-pago"><span>${i + 1}. ${esc(String(x.fecha || '').slice(0, 10))}</span>
+      <span>${esc(x.metodo || '')}</span><b>${fmt(x.monto)}</b></div>`).join('')}</div>` : '<p class="planes-empty">Todavía no dejó ninguna entrega.</p>'}
+    ${p.estado === 'cancelado' ? `<div class="pd-nota">Plan cancelado. Crédito a favor del cliente: <b>${fmt(p.creditoRestante || 0)}</b> para otra compra en el local.</div>` : ''}
+    ${p.estado === 'entregado' ? `<div class="pd-nota">Equipo entregado el ${esc(String(p.entregadoEn || '').slice(0, 10))}.</div>` : ''}
+  `;
+  document.getElementById('pd-acciones').innerHTML = activo ? `
+    <button class="btn-primary" onclick="openPlanPago()">💵 Registrar entrega</button>
+    <button class="btn-secondary" onclick="_planImprimirSel()">🖨 Comprobante</button>
+    ${_planCompleto(p) ? `<button class="btn-primary" onclick="entregarPlan()">📦 Entregar el equipo</button>` : ''}
+    <button class="btn-secondary" onclick="cancelarPlan()">✕ Cancelar plan</button>
+  ` : `<button class="btn-secondary" onclick="_planImprimirSel()">🖨 Comprobante</button>`;
+
+  document.getElementById('plandet-overlay')?.classList.remove('hidden');
+  document.getElementById('plandet-modal')?.classList.remove('hidden');
+}
+
+function closePlanDetalle() {
+  document.getElementById('plandet-overlay')?.classList.add('hidden');
+  document.getElementById('plandet-modal')?.classList.add('hidden');
+  _planSel = null;
+}
+
+function _planImprimirSel() {
+  const p = PLANES.find(x => x.id === _planSel);
+  if (p) _planImprimir(p, 0, '');
+}
+
+function _planImprimir(plan, monto, metodo) {
+  if (typeof printPlanAhorro === 'function') printPlanAhorro(plan, monto, metodo);
+  else toast('No se pudo abrir el comprobante', 'error');
+}
+
+function openPlanPago() {
+  const p = PLANES.find(x => x.id === _planSel);
+  if (!p) return;
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : String(v); };
+  set('pp-monto', p.cuotaSugerida || '');
+  set('pp-metodo', 'Efectivo');
+  const reg = document.getElementById('pp-reg-caja'); if (reg) reg.checked = true;
+  document.getElementById('pp-info').textContent =
+    `N°${p.nro} · ${p.cliente?.nombre || ''} — falta ${fmt(_planFalta(p))}`;
+  document.getElementById('planpago-overlay')?.classList.remove('hidden');
+  document.getElementById('planpago-modal')?.classList.remove('hidden');
+}
+
+function closePlanPago() {
+  document.getElementById('planpago-overlay')?.classList.add('hidden');
+  document.getElementById('planpago-modal')?.classList.add('hidden');
+}
+
+// Movimiento de caja de una entrega del plan.
+// `cuando` es la MISMA marca de tiempo que se guarda en el pago del plan: es
+// lo que permite después borrar el movimiento y sacarle al plan ese pago
+// exacto y no otro del mismo importe.
+async function _planMovCaja(plan, monto, metodo, cuando) {
+  const eq = `${plan.equipo?.marca || ''} ${plan.equipo?.modelo || ''}`.trim();
+  await db.collection('caja_movimientos').add({
+    tipo: 'ingreso',
+    categoria: 'Plan ahorro',
+    descripcion: `Plan N°${plan.nro} — ${plan.cliente?.nombre || ''}${eq ? ' · ' + eq : ''}`,
+    monto,
+    metodoPago: metodo || 'Efectivo',
+    fecha: currentDate,
+    createdAt: cuando || new Date().toISOString(),
+    planId: plan.id,
+    esPlan: true,
+    clienteNombre: plan.cliente?.nombre || null,
+    clienteTel: plan.cliente?.tlf || null,
+    vendedor: plan.vendedor || null,
+    _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
+  });
+}
+
+// Le saca a un plan una entrega que se borró de la caja. Se lee el documento
+// para poder quitar el pago exacto del array: arrayRemove necesita el objeto
+// idéntico y `fecha` es la única marca que lo identifica.
+async function _planRevertirPago(planId, monto, createdAt) {
+  const ref = db.collection('planes').doc(planId);
+  const snap = await ref.get();
+  if (!snap.exists) return;
+  const d = snap.data();
+  const pagos = Array.isArray(d.pagos) ? d.pagos : [];
+  // El pago del plan y el movimiento de caja se graban con la misma marca de
+  // tiempo. Si no aparece, se cae al último del mismo importe.
+  let i = pagos.findIndex(p => p.fecha === createdAt && Number(p.monto) === monto);
+  if (i < 0) i = pagos.map(p => Number(p.monto)).lastIndexOf(monto);
+  const nuevos = i >= 0 ? pagos.filter((_, k) => k !== i) : pagos;
+  const pagado = Math.max(0, (Number(d.pagado) || 0) - monto);
+  await ref.update({ pagado, pagos: nuevos });
+
+  const local = PLANES.find(x => x.id === planId);
+  if (local) { local.pagado = pagado; local.pagos = nuevos; }
+  if (d.equipo?.stockId) {
+    db.collection('stock').doc(d.equipo.stockId).update({ reservaSena: pagado }).catch(() => {});
+  }
+  _renderPlanes();
+}
+
+// Vuelve a aplicar una entrega (el "deshacer" del borrado).
+async function _planAplicarPago(planId, monto, metodo, createdAt) {
+  const pago = { fecha: createdAt || new Date().toISOString(), monto, metodo: metodo || 'Efectivo' };
+  await db.collection('planes').doc(planId).update({
+    pagado: firebase.firestore.FieldValue.increment(monto),
+    pagos:  firebase.firestore.FieldValue.arrayUnion(pago),
+  });
+  const local = PLANES.find(x => x.id === planId);
+  if (local) { local.pagado = (Number(local.pagado) || 0) + monto; local.pagos = [...(local.pagos || []), pago]; }
+  _renderPlanes();
+}
+
+function _planLog(plan, desc) {
+  if (typeof _logActividadCaja === 'function') {
+    _logActividadCaja({ tipo: 'plan', desc, repairId: null, tecnico: plan.vendedor || null,
+                        extra: { planId: plan.id, nro: plan.nro } });
+  }
+}
+
+async function confirmPlanPago() {
+  const p = PLANES.find(x => x.id === _planSel);
+  if (!p) return;
+  const btn = document.getElementById('pp-confirm');
+  const monto = (() => { const x = parseInt(String(document.getElementById('pp-monto')?.value || '').replace(/[^\d]/g, ''), 10); return isNaN(x) ? 0 : x; })();
+  const metodo = document.getElementById('pp-metodo')?.value || 'Efectivo';
+  const regCaja = document.getElementById('pp-reg-caja')?.checked !== false;
+  if (monto <= 0) { toast('Cargá cuánto deja', 'error'); return; }
+
+  if (btn) btn.disabled = true;
+  try {
+    const ahora = new Date().toISOString();
+    const pago  = { fecha: ahora, monto, metodo };
+    // increment atómico: dos dispositivos cobrando a la vez no se pisan.
+    await db.collection('planes').doc(p.id).update({
+      pagado: firebase.firestore.FieldValue.increment(monto),
+      pagos:  firebase.firestore.FieldValue.arrayUnion(pago),
+      ultimoPago: ahora,
+    });
+    if (regCaja) await _planMovCaja(p, monto, metodo, ahora);
+
+    // Copia local al día, sin releer la colección (cupo).
+    p.pagado = _planPagado(p) + monto;
+    p.pagos  = [...(p.pagos || []), pago];
+    p.ultimoPago = ahora;
+    // La seña del equipo reservado acompaña al acumulado
+    if (p.equipo?.stockId) {
+      db.collection('stock').doc(p.equipo.stockId).update({ reservaSena: p.pagado }).catch(() => {});
+    }
+    _planLog(p, `Plan N°${p.nro} — entrega de ${fmt(monto)} (lleva ${fmt(p.pagado)} de ${fmt(_planPrecio(p))})`);
+    if (typeof tgNotify === 'function') {
+      tgNotify(`🐷 <b>Plan ahorro N°${p.nro} — ${tgMonto(monto)}</b>\n${esc(p.cliente?.nombre || '')}\nLleva ${tgMonto(p.pagado)} de ${tgMonto(_planPrecio(p))} · 🕐 ${tgHora()}`);
+    }
+
+    closePlanPago();
+    openPlanDetalle(p.id);
+    _renderPlanes();
+    toast(_planCompleto(p) ? '🎉 Plan completo — ya se puede entregar' : `✅ Entrega registrada — ${fmt(monto)}`, 'success');
+    setTimeout(() => _planImprimir(p, monto, metodo), 250);
+  } catch (e) {
+    console.error('confirmPlanPago:', e);
+    toast('Error al registrar la entrega', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ── Entrega final ─────────────────────────
+// OJO con la plata: cada entrega YA entró a la caja como ingreso. Acá no se
+// registra ningún ingreso nuevo, si no el equipo se contaría dos veces.
+async function entregarPlan() {
+  const p = PLANES.find(x => x.id === _planSel);
+  if (!p) return;
+  if (_planFalta(p) > 0) {
+    toast(`Todavía falta ${fmt(_planFalta(p))} — registrá la última entrega primero`, 'error');
+    return;
+  }
+  if (!confirm(`📦 ¿Entregar el equipo del plan N°${p.nro}?\n\n${p.cliente?.nombre || ''}\nYa pagó ${fmt(_planPagado(p))} en ${(p.pagos || []).length} entregas.\n\nNo entra plata nueva en la caja: ya se registró en cada entrega.`)) return;
+
+  try {
+    const ahora = new Date().toISOString();
+    await db.collection('planes').doc(p.id).update({ estado: 'entregado', entregadoEn: ahora });
+    p.estado = 'entregado'; p.entregadoEn = ahora;
+
+    if (p.equipo?.stockId) {
+      await db.collection('stock').doc(p.equipo.stockId).update({
+        vendido: true,
+        fecha_venta: ahora,
+        forma_pago: 'Plan ahorro',
+        vendedor: p.vendedor || null,
+        clienteNombre: p.cliente?.nombre || null,
+        clienteDni: p.cliente?.dni || null,
+        clienteTel: p.cliente?.tlf || null,
+        reservado: firebase.firestore.FieldValue.delete(),
+        reservaCliente: firebase.firestore.FieldValue.delete(),
+        reservaTelefono: firebase.firestore.FieldValue.delete(),
+        reservaSena: firebase.firestore.FieldValue.delete(),
+        reservaFechaLimite: firebase.firestore.FieldValue.delete(),
+      });
+    }
+    _planLog(p, `Plan N°${p.nro} completado y entregado — ${p.cliente?.nombre || ''}`);
+    closePlanDetalle();
+    _renderPlanes();
+    toast('📦 Equipo entregado', 'success');
+
+    // Comprobante de venta: el mismo A5 de siempre, con lo ya abonado.
+    if (typeof printVentaTicket === 'function') {
+      setTimeout(() => printVentaTicket(p.equipo?.stockId || null, {
+        ...(p.equipo || {}),
+        precio: _planPrecio(p),
+        forma_pago: 'Plan ahorro',
+        saldoAbonado: _planPagado(p),
+        vendedor: p.vendedor || '',
+        clienteNombre: p.cliente?.nombre || '',
+        clienteDni: p.cliente?.dni || '',
+        clienteTel: p.cliente?.tlf || '',
+        notas: `Plan ahorro N°${p.nro} — abonado en ${(p.pagos || []).length} entregas`,
+        fecha_venta: ahora,
+      }, 'A5'), 300);
+    }
+  } catch (e) {
+    console.error('entregarPlan:', e);
+    toast('Error al entregar', 'error');
+  }
+}
+
+// ── Cancelación ───────────────────────────
+// Lo entregado NO se devuelve en efectivo: queda como crédito a favor. Por eso
+// tampoco se toca la caja (la plata entró y se queda).
+async function cancelarPlan() {
+  const p = PLANES.find(x => x.id === _planSel);
+  if (!p) return;
+  const credito = _planPagado(p);
+  if (!confirm(`✕ ¿Cancelar el plan N°${p.nro}?\n\n${p.cliente?.nombre || ''}\n\nLos ${fmt(credito)} entregados quedan como CRÉDITO a favor del cliente para otra compra. No se devuelven en efectivo ni salen de la caja.${p.equipo?.stockId ? '\n\nEl equipo vuelve al stock disponible.' : ''}`)) return;
+
+  try {
+    const ahora = new Date().toISOString();
+    await db.collection('planes').doc(p.id).update({
+      estado: 'cancelado', canceladoEn: ahora, creditoRestante: credito,
+    });
+    p.estado = 'cancelado'; p.canceladoEn = ahora; p.creditoRestante = credito;
+
+    if (p.equipo?.stockId) {
+      await db.collection('stock').doc(p.equipo.stockId).update({
+        reservado: firebase.firestore.FieldValue.delete(),
+        reservaCliente: firebase.firestore.FieldValue.delete(),
+        reservaTelefono: firebase.firestore.FieldValue.delete(),
+        reservaSena: firebase.firestore.FieldValue.delete(),
+        reservaFechaLimite: firebase.firestore.FieldValue.delete(),
+        planId: firebase.firestore.FieldValue.delete(),
+      });
+    }
+    _planLog(p, `Plan N°${p.nro} cancelado — crédito ${fmt(credito)} a favor de ${p.cliente?.nombre || ''}`);
+    closePlanDetalle();
+    _renderPlanes();
+    toast(`Plan cancelado · crédito ${fmt(credito)}`, 'success');
+  } catch (e) {
+    console.error('cancelarPlan:', e);
+    toast('Error al cancelar', 'error');
+  }
 }
 
 // ══════════════════════════════════════════
@@ -3097,13 +3662,56 @@ function deleteMov() {
             sena: firebase.firestore.FieldValue.increment(-senaAmt)
           });
           senaReverted = senaAmt;
-        } catch {}
+        } catch (e) { console.error('revertir seña:', e); }
+      }
+
+      // Revertir la seña de una RESERVA de equipo. Si el movimiento se borra,
+      // esa plata no existe más: el equipo no puede seguir mostrando la seña,
+      // porque al venderlo se le descontaría del precio una plata que nunca
+      // quedó registrada.
+      let reservaReverted = 0;
+      if (movData.esSena && movData.senaTipo === 'venta' && movData.stockId && Number(movData.monto) > 0) {
+        try {
+          await db.collection('stock').doc(movData.stockId).update({
+            reservaSena: firebase.firestore.FieldValue.increment(-Number(movData.monto)),
+          });
+          reservaReverted = Number(movData.monto);
+        } catch (e) { console.error('revertir seña de reserva:', e); }
+      }
+
+      // Revertir el COBRO de una reparación. Si se borra el movimiento, la
+      // plata dejó de existir: la orden no puede seguir figurando como
+      // cobrada. El ESTADO no se toca a propósito — si el equipo se entregó,
+      // se entregó, y eso no se deshace borrando un movimiento de caja.
+      let cobroReverted = false;
+      if (movData.esCobro && movData.repairId) {
+        try {
+          await db.collection('repairs').doc(movData.repairId).update({
+            cobrado: false,
+            metodoCobro: firebase.firestore.FieldValue.delete(),
+            fechaCobro: firebase.firestore.FieldValue.delete(),
+          });
+          cobroReverted = true;
+        } catch (e) { console.error('revertir cobro:', e); }
+      }
+
+      // Revertir una entrega de PLAN AHORRO: se le descuenta al plan, si no
+      // el plan sigue diciendo que el cliente puso una plata que ya no está.
+      let planReverted = 0;
+      if (movData.esPlan && movData.planId && Number(movData.monto) > 0) {
+        try {
+          await _planRevertirPago(movData.planId, Number(movData.monto), movData.createdAt);
+          planReverted = Number(movData.monto);
+        } catch (e) { console.error('revertir pago de plan:', e); }
       }
 
       // Toast con undo (Feature 7)
       const parts = ['🗑 Eliminado'];
       if (stockReturned > 0) parts.push(`Stock +${stockReturned} u.`);
       if (senaReverted > 0)  parts.push(`Seña −${fmt(senaReverted).slice(1)}`);
+      if (reservaReverted > 0) parts.push(`Seña del equipo −${fmt(reservaReverted).slice(1)}`);
+      if (planReverted > 0)  parts.push(`Plan −${fmt(planReverted).slice(1)}`);
+      if (cobroReverted)     parts.push('Reparación sin cobrar');
       _showUndoToast({
         msg: parts.join(' · '),
         onUndo: async () => {
@@ -3121,6 +3729,21 @@ function deleteMov() {
               await db.collection('repairs').doc(movData.repairId).update({
                 sena: firebase.firestore.FieldValue.increment(senaReverted)
               });
+            }
+            if (cobroReverted) {
+              await db.collection('repairs').doc(movData.repairId).update({
+                cobrado: true,
+                metodoCobro: movData.metodoPago || 'Efectivo',
+                fechaCobro: movData.createdAt || new Date().toISOString(),
+              });
+            }
+            if (reservaReverted > 0) {
+              await db.collection('stock').doc(movData.stockId).update({
+                reservaSena: firebase.firestore.FieldValue.increment(reservaReverted),
+              });
+            }
+            if (planReverted > 0) {
+              await _planAplicarPago(movData.planId, planReverted, movData.metodoPago, movData.createdAt);
             }
             toast('↩️ Movimiento restaurado', 'success');
           } catch (undoErr) {
@@ -3563,7 +4186,11 @@ function _calcPeriodoStats(desdeISO) {
     else                       porVendedor[v].eg  += Number(m.monto) || 0;
     porVendedor[v].count++;
   });
-  return { totalIng, totalEg, efec, digital: totalIng - efec, neto: totalIng - totalEg, count: movs.length, porVendedor };
+  // Digital = lo que no entró en efectivo, SIN los dólares: no son ni una
+  // cosa ni la otra y quedaban sumados como digital en el cierre de turno.
+  const digital = ing.filter(m => m.metodoPago !== 'Dólares')
+                     .reduce((s, m) => s + ((Number(m.monto) || 0) - _efecMonto(m)), 0);
+  return { totalIng, totalEg, efec, digital, neto: totalIng - totalEg, count: movs.length, porVendedor };
 }
 
 function openCierreParcialModal() {

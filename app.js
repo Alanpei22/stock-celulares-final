@@ -1447,7 +1447,8 @@ function openDetail(id) {
                 <button class="btn-edit" onclick="printVentaTicket('${p.id}','','80mm')">🖨 Ticket 80mm</button>` : ''}
     ${!p.vendido && !p.reservado ? `<button class="btn-edit" onclick="closeDetail();openForm('${p.id}')">✏️ Editar</button>` : ''}
     ${!p.vendido && !p.reservado ? `<button class="btn-edit" onclick="openReservarModal('${p.id}')" style="background:#f59e0b;color:#fff">⏳ Reservar</button>` : ''}
-    ${p.reservado ? `<button class="btn-edit" onclick="cancelarReserva('${p.id}')" style="background:#fef3c7;color:#92400e">✕ Cancelar reserva</button>` : ''}
+    ${p.reservado ? `<button class="btn-edit" onclick="printReservaDe('${p.id}')">📄 Comprobante de reserva</button>
+                <button class="btn-edit" onclick="cancelarReserva('${p.id}')" style="background:#fef3c7;color:#92400e">✕ Cancelar reserva</button>` : ''}
     ${!p.vendido ? `<button class="btn-sell" onclick="markSold('${p.id}')">💰 Vendido</button>` : `<button class="btn-unsell" onclick="markUnsold('${p.id}')">↩️ Reactivar</button>`}
     <button class="btn-delete" onclick="deletePhone('${p.id}')">🗑️</button>
   `;
@@ -1729,13 +1730,22 @@ async function confirmSell() {
       fHasta.setMonth(fHasta.getMonth() + p.garantiaMeses);
       stockUpdate.garantiaHasta = fHasta.toISOString();
     }
+    // Un equipo vendido ya no está reservado. Se apaga la bandera pero se
+    // deja `reservaSena` y compañía: es el registro de que hubo seña.
+    if (p?.reservado) stockUpdate.reservado = false;
     batch.update(db.collection('stock').doc(id), stockUpdate);
 
     // ── Registrar en caja (si toggle activo y tiene precio) ──
+    // Si el equipo venía RESERVADO o de un PLAN AHORRO, esa plata ya entró a
+    // la caja el día que la dejó: acá se cobra solo la diferencia. Antes se
+    // registraba el precio completo y la seña quedaba contada dos veces.
     let movRefId = null;
-    if (regCaja && p?.precio > 0) {
+    const yaEntregado = Number(p?.reservaSena) || 0;
+    const aCobrar = Math.max(0, (Number(p?.precio) || 0) - yaEntregado);
+    if (regCaja && aCobrar > 0) {
       const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' ');
-      const desc  = `Venta: ${p.marca} ${p.modelo}${specs ? ' ' + specs : ''}`;
+      const desc  = `Venta: ${p.marca} ${p.modelo}${specs ? ' ' + specs : ''}`
+                  + (yaEntregado > 0 ? ` (saldo · ya había dejado $${yaEntregado.toLocaleString('es-AR')})` : '');
       const movRef = db.collection('caja_movimientos').doc();
       movRefId = movRef.id;
       // Snapshot del costo para reportar margen real
@@ -1743,7 +1753,7 @@ async function confirmSell() {
         tipo: 'ingreso',
         categoria: 'Venta',
         descripcion: desc,
-        monto: p.precio,
+        monto: aCobrar,
         metodoPago: formaPago,
         fecha: todayAR(),
         createdAt: ahora,
@@ -1751,12 +1761,16 @@ async function confirmSell() {
         vendedor: vendedor || null,
         _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
       };
-      // Costo + ganancia (solo si hay costo cargado)
+      // Costo + ganancia (solo si hay costo cargado).
+      // La ganancia es la de la venta ENTERA aunque el movimiento sea solo el
+      // saldo: la seña ya entró antes sin costo asociado, así que sumando los
+      // dos días la plata y el margen cierran.
       if (p.costo > 0) {
         movData.costoARSUnit = p.costo;
         movData.costoARSTotal = p.costo;
         movData.gananciaARS = p.precio - p.costo;
       }
+      if (yaEntregado > 0) movData.senaPrevia = yaEntregado;
       batch.set(movRef, movData);
     }
 
@@ -1858,6 +1872,18 @@ async function confirmReserva() {
 
   try {
     const ahora = new Date().toISOString();
+    // Número de reserva correlativo, igual que el N° de orden de las
+    // reparaciones: el cliente se lleva un papel que tiene que poder citar.
+    let reservaNro = null;
+    try {
+      const metaRef = db.collection('config').doc('reservasMeta');
+      await db.runTransaction(async t => {
+        const meta = await t.get(metaRef);
+        reservaNro = meta.exists ? (meta.data().nextReservaNum || 1) : 1;
+        t.set(metaRef, { nextReservaNum: reservaNro + 1 }, { merge: true });
+      });
+    } catch (e) { console.warn('nro de reserva:', e); }
+
     const batch = db.batch();
 
     // 1) Marcar equipo como reservado
@@ -1868,6 +1894,8 @@ async function confirmReserva() {
       reservaSena: sena,
       reservaFechaLimite: fechaLimite || null,
       reservaCreadaEn: ahora,
+      reservaNro,
+      reservaVendedor: localStorage.getItem('cajaVendedor') || null,
     };
     batch.update(db.collection('stock').doc(id), stockUpd);
 
@@ -1903,10 +1931,48 @@ async function confirmReserva() {
     closeReservarModal();
     closeDetail();
     toast('⏳ Equipo reservado para ' + cliente, 'success');
+    // El comprobante es lo que le queda al cliente para reclamar la seña
+    if (typeof printReserva === 'function') {
+      setTimeout(() => {
+        if (confirm('📄 ¿Imprimir el comprobante de reserva?\n\nSalen dos hojas A5: original para el cliente y copia para el negocio.')) {
+          printReserva({
+            nro: reservaNro,
+            cliente: { nombre: cliente, tlf },
+            equipo: { marca: p.marca, modelo: p.modelo, imei: p.imei,
+                      almacenamiento: p.almacenamiento, color: p.color,
+                      estado: p.estado, bateria: p.bateria },
+            precio: Number(p.precio) || 0,
+            sena, fechaLimite,
+            vendedor: stockUpd.reservaVendedor || '',
+          });
+        }
+      }, 300);
+    }
   } catch (e) {
     console.error('confirmReserva:', e);
     toast('Error al reservar', 'error');
   }
+}
+
+// Comprobante A5 de la reserva (original + copia). Se puede reimprimir
+// cuantas veces haga falta desde el detalle del equipo.
+function printReservaDe(id) {
+  const p = STOCK.find(x => x.id === id);
+  if (!p) return;
+  if (typeof printReserva !== 'function') { toast('No se pudo abrir el comprobante', 'error'); return; }
+  printReserva({
+    nro: p.reservaNro || null,
+    cliente: { nombre: p.reservaCliente || '', tlf: p.reservaTelefono || '', dni: p.reservaDni || '' },
+    equipo: {
+      marca: p.marca, modelo: p.modelo, imei: p.imei,
+      almacenamiento: p.almacenamiento, color: p.color,
+      estado: p.estado, bateria: p.bateria,
+    },
+    precio: Number(p.precio) || 0,
+    sena: Number(p.reservaSena) || 0,
+    fechaLimite: p.reservaFechaLimite || null,
+    vendedor: p.reservaVendedor || '',
+  });
 }
 
 async function cancelarReserva(id) {

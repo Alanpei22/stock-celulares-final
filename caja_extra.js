@@ -188,8 +188,24 @@ function _arOffset(days) {
   return d.toISOString().slice(0, 10);
 }
 
-async function loadHistorialData(tab) {
+// ── CUPO: el historial se paga caro ───────────────────────────
+// Cada pestaña hace un .get() sobre caja_movimientos y Firebase cobra por
+// DOCUMENTO leído, no por consulta. "Anual" son todos los movimientos del
+// año: con 50 por día son ~18.000 lecturas de las 50.000 gratis diarias, en
+// un solo toque. Antes cada vez que ibas y volvías de pestaña se pagaba de
+// nuevo. Ahora el resultado queda guardado unos minutos: mirar el historial
+// tres veces seguidas cuesta una sola consulta.
+const _HIST_CACHE_MS = 5 * 60 * 1000;
+const _histCache = {};   // tab → { t, html }
+
+async function loadHistorialData(tab, forzar) {
   const body = document.getElementById('caja-hist-body');
+
+  const cache = _histCache[tab];
+  if (!forzar && cache && (Date.now() - cache.t) < _HIST_CACHE_MS) {
+    body.innerHTML = cache.html;
+    return;
+  }
   body.innerHTML = '<p style="text-align:center;padding:20px;color:var(--t2)">Cargando...</p>';
 
   const today = _todayAR();
@@ -207,7 +223,7 @@ async function loadHistorialData(tab) {
         .where('fecha', '>=', _arOffset(-364))
         .where('fecha', '<=', today).get();
       const movs = snap.docs.map(d => d.data());
-      body.innerHTML = buildCajaAnualHTML(movs);
+      _histGuardar(tab, buildCajaAnualHTML(movs));
       return;
     }
     if (tab === 'stats') {
@@ -215,7 +231,7 @@ async function loadHistorialData(tab) {
         .where('fecha', '>=', _arOffset(-29))
         .where('fecha', '<=', today).get();
       const movs = snap.docs.map(d => d.data());
-      body.innerHTML = buildCajaStatsHTML(movs);
+      _histGuardar(tab, buildCajaStatsHTML(movs));
     } else {
       const snap = await db.collection('caja_movimientos')
         .where('fecha', '>=', desde).where('fecha', '<=', today).get();
@@ -239,11 +255,24 @@ async function loadHistorialData(tab) {
         prevMovs = prevSnap.docs.map(d => d.data());
       }
 
-      body.innerHTML = buildHistorialHTML(movs, arqueos, desde, today, prevMovs, tab);
+      _histGuardar(tab, buildHistorialHTML(movs, arqueos, desde, today, prevMovs, tab));
     }
   } catch (e) {
     body.innerHTML = '<p style="text-align:center;padding:20px;color:#ef4444">Error al cargar</p>';
   }
+}
+
+// Se llama desde caja.js cuando cambian los movimientos del día: lo guardado
+// dejó de ser cierto y la próxima vez se vuelve a consultar.
+function _histInvalidar() {
+  Object.keys(_histCache).forEach(k => delete _histCache[k]);
+}
+
+// Pinta y deja el resultado en el cache de la sesión.
+function _histGuardar(tab, html) {
+  _histCache[tab] = { t: Date.now(), html };
+  const body = document.getElementById('caja-hist-body');
+  if (body) body.innerHTML = html;
 }
 
 function buildHistorialHTML(movs, arqueos, desde, today, prevMovs, tab) {
