@@ -97,10 +97,14 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   iban al principio de la lista.
 - **Filtros propios adentro del cuadro**: buscador, marca, estado y precio
   desde/hasta. Arrancan con lo que tengas puesto en la pantalla de atrás y de
-  ahí mandan los de adentro. Lo TILDADO SE MANTIENE al cambiar el filtro: la
-  gracia es filtrar Samsung, elegir dos, pasar a Apple, elegir uno y mandar
-  los tres. El contador avisa cuántos elegidos quedaron fuera de la vista.
-  Todos/Ninguno trabajan sobre lo que se ve.
+  ahí mandan los de adentro.
+- **EL FILTRO MANDA**: al cambiarlo quedan elegidos EXACTAMENTE los que se
+  ven. Primero se hizo al reves (la seleccion se mantenia entre filtros, para
+  poder juntar dos marcas) y era una trampa reportada por el dueño: filtrabas
+  Motorola, veias tres tildados, y en el mensaje seguian yendo los quince de
+  antes. Para mandar solo los Motorola habia que sacar el filtro, tocar
+  Ninguno y volver a filtrar. Si querés sacar alguno, lo destildás dentro del
+  filtro. Todos/Ninguno trabajan sobre lo que se ve.
 - `batchExportWA` (modo selección múltiple) armaba su PROPIO formato, distinto
   al del botón: el mismo negocio mandaba dos mensajes con dos caras. Ahora
   abre este cuadro con lo seleccionado y usa el mismo texto.

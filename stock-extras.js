@@ -347,9 +347,14 @@ function armarListaWa(equipos) {
 
 // ── Modal ─────────────────────────────────
 // _listaBase = todos los equipos que se pueden ofrecer (ni vendidos ni
-// reservados). Los filtros de acá adentro achican esa base para MOSTRAR, pero
-// lo tildado se mantiene: podés filtrar Samsung, elegir dos, cambiar a Apple,
-// elegir uno más, y mandar los tres juntos.
+// reservados). _listaSel = los tildados.
+//
+// EL FILTRO MANDA: al cambiarlo, quedan elegidos exactamente los que se ven.
+// Antes la selección se mantenía entre filtros (para poder juntar dos marcas)
+// y era una trampa: filtrabas Motorola, veías tres tildados, y en el mensaje
+// seguían yendo los otros quince de antes. Para mandar solo los Motorola
+// había que acordarse de sacar el filtro, tocar Ninguno y volver a filtrar.
+// Ahora filtrás y ya está; si querés sacar alguno, lo destildás.
 let _listaBase = [];
 let _listaSel  = new Set();
 
@@ -432,14 +437,17 @@ function _listaMarcasSelect() {
   if (marcas.includes(previo)) sel.value = previo;
 }
 
-// Al mover un filtro solo cambia lo que se VE. Lo ya tildado se respeta.
-function listaFiltrar() { _listaRenderSel(); }
+// Al mover un filtro, quedan elegidos los que se ven y nada más.
+function listaFiltrar() {
+  _listaSel = new Set(_listaVisibles().map(p => p.id));
+  _listaRenderSel();
+}
 
 function listaLimpiarFiltros() {
   ['lwa-f-buscar', 'lwa-f-marca', 'lwa-f-estado', 'lwa-f-min', 'lwa-f-max'].forEach(k => {
     const el = document.getElementById(k); if (el) el.value = '';
   });
-  _listaRenderSel();
+  listaFiltrar();
 }
 
 // Dibuja la lista de tildes y regenera el texto.
@@ -469,12 +477,7 @@ function _listaCuenta() {
   const cuenta = document.getElementById('listawa-cuenta');
   if (!cuenta) return;
   const visibles = _listaVisibles();
-  // Si hay filtro puesto, puede haber elegidos que no estén a la vista: se
-  // dice, si no parece que se perdieron.
-  const fuera = _listaSel.size - visibles.filter(p => _listaSel.has(p.id)).length;
-  cuenta.textContent = `${_listaSel.size} elegido${_listaSel.size !== 1 ? 's' : ''}`
-    + ` · ${visibles.length} a la vista`
-    + (fuera > 0 ? ` (${fuera} fuera del filtro)` : '');
+  cuenta.textContent = `${_listaSel.size} de ${visibles.length} elegido${visibles.length !== 1 ? 's' : ''}`;
 }
 
 // Rearma el texto con TODO lo tildado, esté o no a la vista.
