@@ -450,7 +450,7 @@ function _listaRenderSel() {
     cont.innerHTML = visibles.length ? visibles.map(p => {
       const on = _listaSel.has(p.id);
       const specs = [p.almacenamiento, p.estado].filter(Boolean).join(' · ');
-      return `<label class="lwa-item${on ? ' lwa-item--on' : ''}">
+      return `<label class="lwa-item${on ? ' lwa-item--on' : ''}" data-id="${esc(p.id)}">
         <input type="checkbox" ${on ? 'checked' : ''} onchange="listaTogglePick('${esc(p.id)}')">
         <span class="lwa-item-txt">
           <span class="lwa-item-nom">${esc(p.marca || '')} ${esc(p.modelo || '')}</span>
@@ -460,29 +460,60 @@ function _listaRenderSel() {
       </label>`;
     }).join('') : '<p class="lwa-vacio">Ningún equipo con estos filtros.</p>';
   }
-  const cuenta = document.getElementById('listawa-cuenta');
-  if (cuenta) {
-    // Si hay filtro puesto, puede haber elegidos que no estén a la vista: se
-    // dice, si no parece que se perdieron.
-    const fuera = _listaSel.size - visibles.filter(p => _listaSel.has(p.id)).length;
-    cuenta.textContent = `${_listaSel.size} elegido${_listaSel.size !== 1 ? 's' : ''}`
-      + ` · ${visibles.length} a la vista`
-      + (fuera > 0 ? ` (${fuera} fuera del filtro)` : '');
-  }
+  _listaCuenta();
   _listaRegenerar();
+}
+
+// El renglón de arriba de la lista.
+function _listaCuenta() {
+  const cuenta = document.getElementById('listawa-cuenta');
+  if (!cuenta) return;
+  const visibles = _listaVisibles();
+  // Si hay filtro puesto, puede haber elegidos que no estén a la vista: se
+  // dice, si no parece que se perdieron.
+  const fuera = _listaSel.size - visibles.filter(p => _listaSel.has(p.id)).length;
+  cuenta.textContent = `${_listaSel.size} elegido${_listaSel.size !== 1 ? 's' : ''}`
+    + ` · ${visibles.length} a la vista`
+    + (fuera > 0 ? ` (${fuera} fuera del filtro)` : '');
 }
 
 // Rearma el texto con TODO lo tildado, esté o no a la vista.
 // Pisa lo que haya en el cuadro: el orden de uso es elegir primero y retocar
 // el texto al final.
+//
+// OJO CON ESTO: lo primero que se ve en el cuadro es el ENCABEZADO, que nunca
+// cambia. Al destildar un equipo la parte visible queda igual y parece que no
+// pasó nada (los equipos están más abajo). Por eso el rótulo dice cuántos
+// equipos y cuántos caracteres tiene, y el cuadro pega un destello: son las
+// dos únicas señales de que se rearmó.
 function _listaRegenerar() {
   const ta = document.getElementById('listawa-txt');
-  if (ta) ta.value = armarListaWa(_listaBase.filter(p => _listaSel.has(p.id)));
+  if (!ta) return;
+  const elegidos = _listaBase.filter(p => _listaSel.has(p.id));
+  ta.value = armarListaWa(elegidos);
+
+  const rot = document.getElementById('listawa-rotulo');
+  if (rot) {
+    rot.textContent = elegidos.length
+      ? `Mensaje · ${elegidos.length} equipo${elegidos.length !== 1 ? 's' : ''} · ${ta.value.length} caracteres`
+      : 'Mensaje · sin equipos elegidos';
+  }
+  // Destello: sacar la clase, forzar el reflow y volver a ponerla, si no dos
+  // cambios seguidos no se notan (el navegador no reinicia la animación).
+  ta.classList.remove('lwa-flash');
+  void ta.offsetWidth;
+  ta.classList.add('lwa-flash');
 }
 
 function listaTogglePick(id) {
   if (_listaSel.has(id)) _listaSel.delete(id); else _listaSel.add(id);
-  _listaRenderSel();
+  // Se toca SOLO esa fila. Rearmando la lista entera, el innerHTML nuevo
+  // manda el scroll al principio: si estabas abajo eligiendo el equipo 12,
+  // perdías el lugar en cada toque.
+  const fila = document.querySelector('.lwa-item[data-id="' + String(id).replace(/"/g, '') + '"]');
+  if (fila) fila.classList.toggle('lwa-item--on', _listaSel.has(id));
+  _listaCuenta();
+  _listaRegenerar();
 }
 
 // "Todos" y "Ninguno" trabajan sobre lo que está A LA VISTA: con un filtro

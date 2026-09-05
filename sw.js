@@ -1,4 +1,4 @@
-const CACHE = 'cel-v157';
+const CACHE = 'cel-v158';
 const SHELL = ['manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'mp-logo.png',
   // Banners de las notificaciones: cacheados para que el aviso salga completo
   // aunque el celu esté con mala señal cuando llega el push.

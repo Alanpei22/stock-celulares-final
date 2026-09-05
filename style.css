@@ -5977,3 +5977,12 @@ body.dark .rep-cliente-hint { background: rgba(16,185,129,.12); color: #34d399; 
  .lwa-filtros .pill { width: auto; flex: 1; min-width: 130px; }
  .lwa-precio { flex: 1 1 100%; }
 }
+
+/* Destello del mensaje al rearmarse: sin esto, destildar un equipo no se nota
+   porque lo que se ve arriba es el encabezado, que nunca cambia. */
+@keyframes lwaFlash {
+ 0%   { border-color: var(--wa, #25d366); background: rgba(37,211,102,.14); }
+ 100% { border-color: var(--border, #e3e1de); background: var(--input, #f1f0ee); }
+}
+.lwa-flash { animation: lwaFlash .55s ease-out; }
+@media (prefers-reduced-motion: reduce) { .lwa-flash { animation: none; } }

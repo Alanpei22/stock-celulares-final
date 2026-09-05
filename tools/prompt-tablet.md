@@ -108,6 +108,14 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   alcanza, muchas veces querés mandarle a un cliente ESTOS TRES y no toda la
   categoría. Arrancan todos tildados (sacar dos es más rápido que tildar
   quince) y hay atajos Todos / Ninguno. El mensaje se rearma al tildar.
+- **El cambio se tiene que NOTAR.** Lo primero que se ve en el cuadro es el
+  encabezado, que nunca cambia: al destildar un equipo la parte visible queda
+  igual y parece que no hizo nada (los equipos estan mas abajo). Por eso el
+  rotulo dice "Mensaje · N equipos · M caracteres" y el cuadro pega un
+  destello al rearmarse. Fue un bug reportado.
+- Tildar NO rearma la lista entera: con innerHTML nuevo el scroll saltaba al
+  principio y si estabas abajo eligiendo el equipo 12 perdias el lugar. Se
+  toca solo esa fila (por eso llevan data-id).
 - El texto es EDITABLE antes de mandarlo. Encabezado y pie se editan en
   Configuracion (`lista_header` / `lista_footer` en WA_TEMPLATES).
 - El boton grande es **Copiar**: el link `wa.me?text=` mete el texto en la URL

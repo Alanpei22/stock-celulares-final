@@ -16,7 +16,7 @@ const el = (id, extra = {}) => els[id] = Object.assign({
 }, extra);
 ['search','f-marca','f-estado','f-vendido','f-min','f-max','f-vendedor',
  'listawa-overlay','listawa-modal','listawa-txt','listawa-nota','listawa-sel','listawa-cuenta',
- 'lwa-f-buscar','lwa-f-marca','lwa-f-estado','lwa-f-min','lwa-f-max'].forEach(id => el(id));
+ 'lwa-f-buscar','lwa-f-marca','lwa-f-estado','lwa-f-min','lwa-f-max','listawa-rotulo'].forEach(id => el(id));
 els['f-vendido'].value = '0';   // "En stock", que es el valor por defecto
 
 let COPIADO = '', ABIERTO = '', CONFIRMA = true;
@@ -65,6 +65,7 @@ const STOCK = [
 ctx.__S = STOCK;
 run('STOCK = __S;');
 
+const seSrcActual = () => fs.readFileSync(DIR + 'stock-extras.js', 'utf8');
 const lista = () => { run('openListaWaModal()'); return els['listawa-txt'].value; };
 
 console.log('\n1) Nunca se ofrece algo que no se puede vender');
@@ -252,6 +253,37 @@ ok(get('_listaSel.size') === 5, '"Todos" vuelve a tildar todo');
 run("listaTogglePick('a')");
 lista();
 ok(get('_listaSel.size') === 5, 'al reabrir el cuadro vuelven todos tildados');
+
+console.log('\n8f) Se tiene que NOTAR que el mensaje cambió');
+// El bug reportado: destildás un equipo y "no se actualiza". Sí se
+// actualizaba, pero lo que se ve arriba del cuadro es el ENCABEZADO, que
+// nunca cambia: los equipos están más abajo, fuera de la vista. Sin una
+// señal, parece que el botón no hizo nada.
+lista();
+const rot0 = els['listawa-rotulo'].textContent;
+ok(/5 equipos/.test(rot0), 'el rótulo dice cuántos equipos van', rot0);
+ok(/caracteres/.test(rot0), 'y el largo del mensaje', rot0);
+run("listaTogglePick('a')");
+const rot1 = els['listawa-rotulo'].textContent;
+ok(/4 equipos/.test(rot1), 'al destildar uno, el rótulo baja', rot1);
+ok(rot0 !== rot1, 'o sea: cambia algo VISIBLE aunque el encabezado siga igual');
+run("listaTogglePick('b')");
+ok(/3 equipos/.test(els['listawa-rotulo'].textContent), 'y sigue bajando', els['listawa-rotulo'].textContent);
+run('listaPickTodos(false)');
+ok(/sin equipos elegidos/.test(els['listawa-rotulo'].textContent), 'sin nada elegido lo dice',
+   els['listawa-rotulo'].textContent);
+run('listaPickTodos(true)');
+ok(els['listawa-txt'].classList.contains('lwa-flash'), 'y el cuadro pega un destello al rearmarse');
+
+console.log('\n8g) Tildar no debe mandar el scroll de la lista al principio');
+// Rearmando el innerHTML entero, si estabas abajo eligiendo el equipo 12 el
+// scroll saltaba al inicio en cada toque.
+const tp = seSrcActual().slice(seSrcActual().indexOf('function listaTogglePick'),
+                              seSrcActual().indexOf('function listaPickTodos'));
+ok(!/_listaRenderSel\(\)/.test(tp), 'no rearma la lista entera', tp);
+ok(/_listaCuenta\(\)/.test(tp) && /_listaRegenerar\(\)/.test(tp), 'solo actualiza la cuenta y el mensaje');
+ok(/classList\.toggle\('lwa-item--on'/.test(tp), 'y prende/apaga solo esa fila');
+ok(/data-id="/.test(seSrcActual()), 'las filas llevan data-id para poder encontrarlas');
 
 console.log('\n8e) El modo selección múltiple usa el MISMO mensaje');
 // batchExportWA armaba su propio formato: el mismo negocio mandaba dos
