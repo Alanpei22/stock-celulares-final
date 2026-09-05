@@ -1392,6 +1392,21 @@
     <button class="tpent-x" onclick="closeListaWaModal()">✕</button>
   </div>
   <p class="fi-helper" id="listawa-nota"></p>
+  <div class="lwa-filtros">
+    <input id="lwa-f-buscar" class="pill" type="search" placeholder="🔍 Buscar modelo…" autocomplete="off" oninput="listaFiltrar()">
+    <select id="lwa-f-marca" class="pill" onchange="listaFiltrar()"><option value="">Todas las marcas</option></select>
+    <select id="lwa-f-estado" class="pill" onchange="listaFiltrar()">
+      <option value="">Todos los estados</option>
+      <option value="Nuevo">Nuevo</option>
+      <option value="Usado">Usado</option>
+      <option value="Reacondicionado">Reacondicionado</option>
+    </select>
+    <div class="lwa-precio">
+      <input id="lwa-f-min" class="pill" type="number" inputmode="numeric" placeholder="Desde $" oninput="listaFiltrar()">
+      <input id="lwa-f-max" class="pill" type="number" inputmode="numeric" placeholder="Hasta $" oninput="listaFiltrar()">
+      <button type="button" class="lwa-limpiar" onclick="listaLimpiarFiltros()" title="Limpiar filtros">✕</button>
+    </div>
+  </div>
   <div class="lwa-barra">
     <span id="listawa-cuenta"></span>
     <span class="lwa-barra-btns">

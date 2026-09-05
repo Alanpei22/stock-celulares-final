@@ -95,6 +95,15 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - Los precios cargados en dolares salen convertidos a pesos, y **se ordenan
   por el precio convertido**: ordenando por `precio` a secas valian 0 y se
   iban al principio de la lista.
+- **Filtros propios adentro del cuadro**: buscador, marca, estado y precio
+  desde/hasta. Arrancan con lo que tengas puesto en la pantalla de atrás y de
+  ahí mandan los de adentro. Lo TILDADO SE MANTIENE al cambiar el filtro: la
+  gracia es filtrar Samsung, elegir dos, pasar a Apple, elegir uno y mandar
+  los tres. El contador avisa cuántos elegidos quedaron fuera de la vista.
+  Todos/Ninguno trabajan sobre lo que se ve.
+- `batchExportWA` (modo selección múltiple) armaba su PROPIO formato, distinto
+  al del botón: el mismo negocio mandaba dos mensajes con dos caras. Ahora
+  abre este cuadro con lo seleccionado y usa el mismo texto.
 - Adentro del cuadro hay una **lista de tildes**: filtrar por marca/precio no
   alcanza, muchas veces querés mandarle a un cliente ESTOS TRES y no toda la
   categoría. Arrancan todos tildados (sacar dos es más rápido que tildar

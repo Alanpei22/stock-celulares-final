@@ -5960,3 +5960,20 @@ body.dark .rep-cliente-hint { background: rgba(16,185,129,.12); color: #34d399; 
 .lwa-item-nom { display: block; font-weight: 700; }
 .lwa-item-meta { display: block; font-size: .74rem; color: var(--text2, #5c5c5c); }
 .lwa-item-precio { white-space: nowrap; font-size: .82rem; }
+
+/* Filtros dentro del cuadro de la lista */
+.lwa-filtros { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; }
+.lwa-filtros .pill { width: 100%; }
+.lwa-precio { display: flex; gap: 6px; align-items: center; }
+.lwa-precio .pill { flex: 1; min-width: 0; text-align: center; }
+.lwa-limpiar {
+ flex-shrink: 0; width: 34px; height: 34px; border-radius: 9999px; cursor: pointer;
+ border: 1px solid var(--border, #e3e1de); background: var(--card, #fff);
+ color: var(--text3, #999); font-size: .85rem;
+}
+.lwa-vacio { text-align: center; font-size: .82rem; color: var(--text3, #999); padding: 16px 8px; margin: 0; }
+@media (min-width: 480px) {
+ .lwa-filtros { flex-direction: row; flex-wrap: wrap; }
+ .lwa-filtros .pill { width: auto; flex: 1; min-width: 130px; }
+ .lwa-precio { flex: 1 1 100%; }
+}

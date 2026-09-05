@@ -112,28 +112,15 @@ async function batchDescuento() {
   }
 }
 
+// Exportar los seleccionados del modo selección múltiple.
+// Antes armaba su PROPIO formato, distinto al del botón 📋 Lista: el mismo
+// negocio mandaba dos mensajes con dos caras según de dónde salieran. Ahora
+// los dos caminos abren el mismo cuadro y usan el mismo texto.
 function batchExportWA() {
   if (!_batchSelected.size) { toast('Seleccioná al menos uno', 'info'); return; }
   const items = Array.from(_batchSelected).map(id => STOCK.find(x => x.id === id)).filter(Boolean);
   if (!items.length) return;
-
-  const lines = items.map(p => {
-    const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' ');
-    const precio = p.precio ? '$' + p.precio.toLocaleString('es-AR') : 'Consultar';
-    let line = `📱 *${p.marca} ${p.modelo}*`;
-    if (specs) line += ` ${specs}`;
-    if (p.estado) line += ` (${p.estado})`;
-    if (p.bateria) line += ` 🔋${p.bateria}%`;
-    line += `\n💰 ${precio}`;
-    if (p.garantiaMeses > 0) line += ` · 🛡️ ${p.garantiaMeses}m garantía`;
-    return line;
-  }).join('\n\n');
-
-  const businessName = window._DAKI_NAME || 'TechPoint';
-  const fullMsg = `📲 *Equipos disponibles — ${businessName}*\n\n${lines}\n\n_Consultanos para más info_`;
-  const url = 'https://wa.me/?text=' + encodeURIComponent(fullMsg);
-  window.open(url, '_blank');
-  toast(`🟢 ${items.length} equipo(s) en WhatsApp`, 'success');
+  openListaWaModal(items);
 }
 
 // ── F6: Fotos múltiples (Firebase Storage) ──
@@ -359,27 +346,73 @@ function armarListaWa(equipos) {
 }
 
 // ── Modal ─────────────────────────────────
-// Los equipos que ofrece el cuadro (lo filtrado en pantalla, ya sin vendidos
-// ni reservados) y cuáles están tildados.
-let _listaDispo = [];
-let _listaSel = new Set();
+// _listaBase = todos los equipos que se pueden ofrecer (ni vendidos ni
+// reservados). Los filtros de acá adentro achican esa base para MOSTRAR, pero
+// lo tildado se mantiene: podés filtrar Samsung, elegir dos, cambiar a Apple,
+// elegir uno más, y mandar los tres juntos.
+let _listaBase = [];
+let _listaSel  = new Set();
 
-function openListaWaModal() {
+const _lwaV = id => (document.getElementById(id)?.value || '').trim();
+const _lwaN = id => { const n = parseInt(String(_lwaV(id)).replace(/[^\d]/g, ''), 10); return isNaN(n) ? 0 : n; };
+
+// Los que se ven ahora, según los filtros del cuadro.
+function _listaVisibles() {
+  const q      = _lwaV('lwa-f-buscar');
+  const marca  = _lwaV('lwa-f-marca');
+  const estado = _lwaV('lwa-f-estado');
+  const min    = _lwaN('lwa-f-min');
+  const max    = _lwaN('lwa-f-max');
+  return _listaBase.filter(p => {
+    if (marca && p.marca !== marca) return false;
+    if (estado && p.estado !== estado) return false;
+    const pr = _listaPrecioNum(p);   // el precio en pesos, el mismo que se muestra
+    if (min > 0 && pr < min) return false;
+    if (max > 0 && pr > max) return false;
+    if (q) {
+      const hay = `${p.marca || ''} ${p.modelo || ''} ${p.almacenamiento || ''}`;
+      return (typeof searchMatch === 'function')
+        ? searchMatch(hay, q)
+        : hay.toLowerCase().includes(q.toLowerCase());
+    }
+    return true;
+  });
+}
+
+// `preSel` = equipos ya elegidos desde afuera (modo selección múltiple).
+// Sin eso, la base es todo lo que se puede ofrecer.
+function openListaWaModal(preSel) {
   const modal = document.getElementById('listawa-modal');
   if (!modal) return;
-  const equipos = (typeof _stockFiltrado === 'function') ? _stockFiltrado() : [];
-  _listaDispo = equipos.filter(p => !p.vendido && !p.reservado);
-  // Arrancan todos tildados: lo más común es mandar lo que filtraste. Sacar
-  // dos es más rápido que tildar quince.
-  _listaSel = new Set(_listaDispo.map(p => p.id));
+  const todos = (Array.isArray(preSel) && preSel.length)
+    ? preSel
+    : (typeof STOCK !== 'undefined' ? STOCK : []);
+  _listaBase = todos.filter(p => !p.vendido && !p.reservado);
 
-  const ocultos = equipos.length - _listaDispo.length;
+  // Los filtros del cuadro arrancan con lo que tengas puesto en la pantalla
+  // de atrás, y de ahí en más mandan los de acá.
+  // Si venís de elegir equipos a mano, arrancan LIMPIOS: un filtro heredado
+  // podría esconder justo los que acabás de seleccionar.
+  const set = (k, v) => { const el = document.getElementById(k); if (el) el.value = v == null ? '' : String(v); };
+  const de = id => (preSel ? '' : (document.getElementById(id)?.value || ''));
+  set('lwa-f-buscar', de('search'));
+  set('lwa-f-marca',  de('f-marca'));
+  set('lwa-f-estado', de('f-estado'));
+  set('lwa-f-min',    de('f-min'));
+  set('lwa-f-max',    de('f-max'));
+  _listaMarcasSelect();
+
+  // Arrancan tildados los que se ven: lo más común es mandar eso. Sacar dos
+  // es más rápido que tildar quince.
+  _listaSel = new Set(_listaVisibles().map(p => p.id));
+
+  const ocultos = todos.length - _listaBase.length;
   const nota = document.getElementById('listawa-nota');
   if (nota) {
-    nota.textContent = _listaDispo.length
-      ? 'Destildá los que no querés mandar.'
-        + (ocultos > 0 ? ` (${ocultos} vendido/reservado no entra${ocultos !== 1 ? 'n' : ''})` : '')
-      : 'No hay equipos disponibles con los filtros de arriba.';
+    nota.textContent = _listaBase.length
+      ? 'Filtrá y destildá los que no querés mandar.'
+        + (ocultos > 0 ? ` (${ocultos} vendido/reservado queda afuera)` : '')
+      : 'No hay equipos disponibles para ofrecer.';
   }
   _listaRenderSel();
 
@@ -388,11 +421,33 @@ function openListaWaModal() {
   document.body.style.overflow = 'hidden';
 }
 
+// Carga el desplegable de marcas con las que hay de verdad para ofrecer.
+function _listaMarcasSelect() {
+  const sel = document.getElementById('lwa-f-marca');
+  if (!sel) return;
+  const previo = sel.value;
+  const marcas = [...new Set(_listaBase.map(p => p.marca).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  sel.innerHTML = '<option value="">Todas las marcas</option>'
+    + marcas.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+  if (marcas.includes(previo)) sel.value = previo;
+}
+
+// Al mover un filtro solo cambia lo que se VE. Lo ya tildado se respeta.
+function listaFiltrar() { _listaRenderSel(); }
+
+function listaLimpiarFiltros() {
+  ['lwa-f-buscar', 'lwa-f-marca', 'lwa-f-estado', 'lwa-f-min', 'lwa-f-max'].forEach(k => {
+    const el = document.getElementById(k); if (el) el.value = '';
+  });
+  _listaRenderSel();
+}
+
 // Dibuja la lista de tildes y regenera el texto.
 function _listaRenderSel() {
+  const visibles = _listaVisibles();
   const cont = document.getElementById('listawa-sel');
   if (cont) {
-    cont.innerHTML = _listaDispo.map(p => {
+    cont.innerHTML = visibles.length ? visibles.map(p => {
       const on = _listaSel.has(p.id);
       const specs = [p.almacenamiento, p.estado].filter(Boolean).join(' · ');
       return `<label class="lwa-item${on ? ' lwa-item--on' : ''}">
@@ -403,18 +458,26 @@ function _listaRenderSel() {
         </span>
         <b class="lwa-item-precio">${_listaPrecio(p)}</b>
       </label>`;
-    }).join('');
+    }).join('') : '<p class="lwa-vacio">Ningún equipo con estos filtros.</p>';
   }
   const cuenta = document.getElementById('listawa-cuenta');
-  if (cuenta) cuenta.textContent = `${_listaSel.size} de ${_listaDispo.length} elegidos`;
+  if (cuenta) {
+    // Si hay filtro puesto, puede haber elegidos que no estén a la vista: se
+    // dice, si no parece que se perdieron.
+    const fuera = _listaSel.size - visibles.filter(p => _listaSel.has(p.id)).length;
+    cuenta.textContent = `${_listaSel.size} elegido${_listaSel.size !== 1 ? 's' : ''}`
+      + ` · ${visibles.length} a la vista`
+      + (fuera > 0 ? ` (${fuera} fuera del filtro)` : '');
+  }
   _listaRegenerar();
 }
 
-// Rearma el texto con lo tildado. Pisa lo que haya en el cuadro: el orden de
-// uso es elegir primero y retocar el texto al final.
+// Rearma el texto con TODO lo tildado, esté o no a la vista.
+// Pisa lo que haya en el cuadro: el orden de uso es elegir primero y retocar
+// el texto al final.
 function _listaRegenerar() {
   const ta = document.getElementById('listawa-txt');
-  if (ta) ta.value = armarListaWa(_listaDispo.filter(p => _listaSel.has(p.id)));
+  if (ta) ta.value = armarListaWa(_listaBase.filter(p => _listaSel.has(p.id)));
 }
 
 function listaTogglePick(id) {
@@ -422,8 +485,12 @@ function listaTogglePick(id) {
   _listaRenderSel();
 }
 
+// "Todos" y "Ninguno" trabajan sobre lo que está A LA VISTA: con un filtro
+// puesto, es lo que uno espera que hagan.
 function listaPickTodos(v) {
-  _listaSel = v ? new Set(_listaDispo.map(p => p.id)) : new Set();
+  const visibles = _listaVisibles();
+  if (v) visibles.forEach(p => _listaSel.add(p.id));
+  else   visibles.forEach(p => _listaSel.delete(p.id));
   _listaRenderSel();
 }
 
