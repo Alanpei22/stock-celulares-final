@@ -25,6 +25,9 @@ const WA_TPL_DEFAULTS = {
   repair_listo:       'Hola {nombre}! 👋\nTu *{equipo}* (orden N°{nOrden}) ya está *listo para retirar* ✅\nAcordate de traer el comprobante. ¡Te esperamos!',
   repair_default:     'Hola {nombre}! 👋\nTe escribo de parte del taller por tu *{equipo}* (orden N°{nOrden}).',
   repair_presupuesto: 'Hola {nombre}! 👋\nTe paso el presupuesto de tu *{equipo}* (orden N°{nOrden}):\n\n🔧 Trabajo: {arreglo}\n💰 Presupuesto: *${monto}*\n\n¿Querés que lo hagamos? Cualquier consulta, avisame 😊',
+  // Encabezado y pie de la lista de equipos para WhatsApp (stock-extras.js)
+  lista_header:       '📱 *EQUIPOS DISPONIBLES* — {NEGOCIO}\n_Actualizado {FECHA}_',
+  lista_footer:       '📍 {DIRECCION}\n🕐 {HORARIO}\n_Consultanos por otros modelos_ 👋',
   stock:              '📱 *{marca} {modelo}*\n{specs}\n✅ Estado: {estado}\n💰 Precio: {precio}\n\n_Consultá disponibilidad_ 👋'
 };
 let WA_TEMPLATES = {};
@@ -1055,6 +1058,39 @@ async function ackFollowUp(id) {
 let renderTimer;
 function debounceRender() { clearTimeout(renderTimer); renderTimer = setTimeout(render, 60); }
 
+// Los equipos que quedan después de aplicar los filtros de arriba.
+// Está separado de render() porque la "lista para WhatsApp" tiene que mandar
+// EXACTAMENTE lo que ves en pantalla: con la cuenta escrita dos veces, un día
+// el filtro cambia en un lado y no en el otro, y le mandás al cliente equipos
+// que no estabas viendo.
+function _stockFiltrado() {
+  const el = id => document.getElementById(id);
+  const q       = (el('search')?.value || '').trim().toLowerCase();
+  const fMarca  = el('f-marca')?.value || '';
+  const fEstado = el('f-estado')?.value || '';
+  const fVend   = el('f-vendido')?.value ?? '0';
+  const fMin    = parseInt(el('f-min')?.value) || 0;
+  const fMax    = parseInt(el('f-max')?.value) || 0;
+  const fVendedor = el('f-vendedor')?.value || '';
+  const fUbi    = _pendingUbiFilter;
+
+  return STOCK.filter(p => {
+    if (fMarca && p.marca !== fMarca) return false;
+    if (fEstado && p.estado !== fEstado) return false;
+    if (fVend === '0' && p.vendido) return false;
+    if (fVend === '1' && !p.vendido) return false;
+    if (fMin > 0 && (p.precio || 0) < fMin) return false;
+    if (fMax > 0 && (p.precio || 0) > fMax) return false;
+    if (fVendedor && p.vendedor !== fVendedor) return false;
+    if (fUbi && p.ubicacion !== fUbi) return false;
+    if (q) {
+      const hay = `${p.marca || ''} ${p.modelo || ''} ${p.almacenamiento || ''} ${p.imei || ''} ${p.notas || ''}`;
+      return searchMatch(hay, q);
+    }
+    return true;
+  });
+}
+
 function render() {
   const q = (document.getElementById('search').value || '').trim().toLowerCase();
   const fMarca = document.getElementById('f-marca').value;
@@ -1086,21 +1122,7 @@ function render() {
   // Apply pending ubicacion filter (from stats bar click)
   const fUbi = _pendingUbiFilter;
 
-  const filtered = STOCK.filter(p => {
-    if (fMarca && p.marca !== fMarca) return false;
-    if (fEstado && p.estado !== fEstado) return false;
-    if (fVend === '0' && p.vendido) return false;
-    if (fVend === '1' && !p.vendido) return false;
-    if (fMin > 0 && (p.precio || 0) < fMin) return false;
-    if (fMax > 0 && (p.precio || 0) > fMax) return false;
-    if (fVendedor && p.vendedor !== fVendedor) return false;
-    if (fUbi && p.ubicacion !== fUbi) return false;
-    if (q) {
-      const hay = `${p.marca || ''} ${p.modelo || ''} ${p.almacenamiento || ''} ${p.imei || ''} ${p.notas || ''}`;
-      return searchMatch(hay, q);
-    }
-    return true;
-  });
+  const filtered = _stockFiltrado();
 
   // Sort: sold items by fecha_venta desc, others by fecha desc
   filtered.sort((a, b) => {
@@ -2638,6 +2660,8 @@ function openWaTplModal() {
   document.getElementById('wt-default').value   = WA_TEMPLATES.repair_default;
   document.getElementById('wt-presup').value    = WA_TEMPLATES.repair_presupuesto;
   document.getElementById('wt-stock').value     = WA_TEMPLATES.stock;
+  document.getElementById('wt-lista-h').value   = WA_TEMPLATES.lista_header;
+  document.getElementById('wt-lista-f').value   = WA_TEMPLATES.lista_footer;
   document.getElementById('wa-tpl-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   // close settings modal
@@ -2655,6 +2679,8 @@ function saveWaTemplates() {
   WA_TEMPLATES.repair_default   = document.getElementById('wt-default').value;
   WA_TEMPLATES.repair_presupuesto = document.getElementById('wt-presup').value;
   WA_TEMPLATES.stock            = document.getElementById('wt-stock').value;
+  WA_TEMPLATES.lista_header     = document.getElementById('wt-lista-h').value;
+  WA_TEMPLATES.lista_footer     = document.getElementById('wt-lista-f').value;
   localStorage.setItem(WA_TEMPLATES_KEY, JSON.stringify(WA_TEMPLATES));
   // Guardar en Firestore
   db.collection('config').doc('waTemplates').set(WA_TEMPLATES, { merge: true }).catch(() => {});
@@ -2673,6 +2699,8 @@ function resetWaTemplates() {
   document.getElementById('wt-default').value   = WA_TEMPLATES.repair_default;
   document.getElementById('wt-presup').value    = WA_TEMPLATES.repair_presupuesto;
   document.getElementById('wt-stock').value     = WA_TEMPLATES.stock;
+  document.getElementById('wt-lista-h').value   = WA_TEMPLATES.lista_header;
+  document.getElementById('wt-lista-f').value   = WA_TEMPLATES.lista_footer;
 }
 
 // ── Historial de accesos ──────────────────────────────────

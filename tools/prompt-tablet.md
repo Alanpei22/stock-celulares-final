@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 31 suites, ~1300 chequeos, 4 segundos.
+2. **`npm test` antes de cada push.** Son 32 suites, ~1340 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -75,6 +75,28 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - Bugs: las plantillas `fase_*` se guardaban pero **no volvian de Firestore**
   (el loader solo copiaba las 4 viejas), y "Restablecer" del modal viejo se
   las llevaba puestas. `repair_presupuesto` por fin se puede editar.
+
+**Lista de equipos para WhatsApp** (2026-09-05) — `tests/test-lista-equipos.js`
+- Boton **📋 Lista para WhatsApp** en los filtros de Stock. Arma el texto con
+  LO QUE ESTAS VIENDO: filtras arriba (marca, estado, precio, buscador) y el
+  boton convierte esa misma lista en un mensaje. No hay un segundo juego de
+  filtros a proposito.
+- `_stockFiltrado()` (app.js) es el filtro UNICO: lo usan `render()` y la
+  lista. Si estuviera escrito dos veces, un dia le mandas al cliente equipos
+  que no estabas viendo.
+- Agrupado por marca (alfabetico), adentro del mas barato al mas caro.
+  Linea: `• modelo · memoria · estado — precio`.
+- **En los iPhone va la salud de bateria** (es lo que siempre preguntan); en
+  el resto no, aunque el dato este cargado. Se detecta por marca O modelo.
+- **Nunca entra un equipo vendido ni reservado**, aunque el filtro de arriba
+  los muestre: ofrecer algo reservado es quedar mal con dos clientes.
+- Los precios cargados en dolares salen convertidos a pesos, y **se ordenan
+  por el precio convertido**: ordenando por `precio` a secas valian 0 y se
+  iban al principio de la lista.
+- El texto es EDITABLE antes de mandarlo. Encabezado y pie se editan en
+  Configuracion (`lista_header` / `lista_footer` en WA_TEMPLATES).
+- El boton grande es **Copiar**: el link `wa.me?text=` mete el texto en la URL
+  y con listas largas se corta. Arriba de 1800 caracteres avisa antes de abrir.
 
 **El buscador de ventas** (2026-09-01) — `tests/test-buscar-ventas.js`
 - Comparaba con `includes()` sobre el texto en minusculas, sin normalizar:

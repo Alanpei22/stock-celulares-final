@@ -107,6 +107,7 @@
           <option value="">Todos</option>
         </select>
         <select class="pill" id="f-vendedor"><option value="">Todos los vendedores</option></select>
+        <button class="pill pill--accion" onclick="openListaWaModal()">📋 Lista para WhatsApp</button>
       </div>
       <div class="price-filter">
         <span class="price-filter-lbl">💰 Precio:</span>
@@ -1355,6 +1356,14 @@
         <label class="fl">Presupuesto (botón 💬 de la ficha)</label>
         <textarea id="wt-presup" class="fi fi-area" rows="4"></textarea>
       </div>
+      <div class="fg fg--full">
+        <label class="fl">Lista de equipos · encabezado</label>
+        <textarea id="wt-lista-h" class="fi fi-area" rows="2"></textarea>
+      </div>
+      <div class="fg fg--full">
+        <label class="fl">Lista de equipos · pie</label>
+        <textarea id="wt-lista-f" class="fi fi-area" rows="3"></textarea>
+      </div>
       <div class="fg fg--full" style="margin-top:4px">
         <label class="fl">Stock (equipo en venta)</label>
         <textarea id="wt-stock" class="fi fi-area" rows="3"></textarea>
@@ -1365,6 +1374,21 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- MODAL: LISTA DE EQUIPOS PARA WHATSAPP
+     Arma el texto con lo que quedó filtrado en la pantalla de Stock. -->
+<div id="listawa-overlay" class="tpent-overlay hidden" onclick="closeListaWaModal()"></div>
+<div id="listawa-modal" class="tpent-modal listawa-modal hidden">
+  <div class="tpent-hd">
+    <span>📋 Lista para WhatsApp</span>
+    <button class="tpent-x" onclick="closeListaWaModal()">✕</button>
+  </div>
+  <p class="fi-helper" id="listawa-info"></p>
+  <textarea id="listawa-txt" class="fi fi-area listawa-txt" rows="14"></textarea>
+  <button class="tpent-btn tpent-btn--si" onclick="listaWaCopiar(this)">📋 Copiar la lista</button>
+  <button class="tpent-btn" onclick="listaWaEnviar()">🟢 Abrir WhatsApp</button>
+  <button class="tpent-volver" onclick="closeListaWaModal()">Cerrar</button>
 </div>
 
 <!-- MODAL: ¿LE AVISO AL CLIENTE? — sale al marcar una reparación como Listo.

@@ -5900,3 +5900,16 @@ body.dark .rep-cliente-hint { background: rgba(16,185,129,.12); color: #34d399; 
 .td-ico { font-size: 1.15rem; }
 .td-num { font-size: 1.6rem; font-weight: 900; line-height: 1; color: var(--text, #1a1a1a); letter-spacing: -.02em; }
 .td-lbl { font-size: .68rem; font-weight: 700; color: var(--t2, #666); text-align: center; line-height: 1.15; }
+
+/* Lista de equipos para WhatsApp */
+.pill--accion {
+ border-color: var(--wa, #25d366); color: var(--wa, #25d366);
+ font-weight: 700; cursor: pointer;
+}
+.pill--accion:active { background: var(--wa, #25d366); color: #fff; }
+.listawa-modal { max-width: 520px; }
+.listawa-txt {
+ width: 100%; margin: 8px 0 12px;
+ font-family: ui-monospace, 'Courier New', monospace;
+ font-size: .8rem; line-height: 1.5; resize: vertical;
+}

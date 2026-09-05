@@ -258,3 +258,152 @@ function buildPhotoGalleryHTML(p) {
   html += '</div>';
   return html;
 }
+
+// ══════════════════════════════════════════
+//  LISTA DE EQUIPOS PARA WHATSAPP
+//  ─────────────────────────────────────────
+//  Los clientes piden "mandame qué tenés". Esto arma el texto con LO QUE
+//  ESTÁS VIENDO: filtrás arriba como siempre (marca, estado, precio) y el
+//  botón convierte esa misma lista en un mensaje.
+//
+//  Decisiones tomadas con el dueño:
+//   · Agrupado por marca, una línea por equipo.
+//   · En los iPhone va la salud de batería: es lo primero que preguntan.
+//   · Solo equipos disponibles: nunca vendidos ni reservados. Ofrecer algo
+//     reservado y que te lo pidan es quedar mal con dos clientes a la vez.
+//   · Todo en pesos, aunque el equipo esté cargado en dólares.
+// ══════════════════════════════════════════
+
+// El precio en pesos, como NÚMERO. Si el equipo está cargado en dólares se
+// convierte con la cotización que la app ya tiene.
+// Se usa para mostrar Y para ordenar: ordenando por `precio` a secas, un
+// equipo en dólares vale 0 y se iba al principio de la lista aunque fuera el
+// más caro.
+function _listaPrecioNum(p) {
+  const ars = Number(p.precio) || 0;
+  if (ars > 0) return ars;
+  const usd = Number(p.precioUSD) || 0;
+  const dolar = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue
+              : (typeof getCurrentDolar === 'function' ? (getCurrentDolar() || 0) : 0);
+  if (usd > 0 && dolar > 0) return Math.round(usd * dolar);
+  return 0;
+}
+
+function _listaPrecio(p) {
+  const n = _listaPrecioNum(p);
+  if (n > 0) return '$' + n.toLocaleString('es-AR');
+  // Cargado en dólares pero sin cotización a mano: mejor el número real que
+  // un "consultar" que no dice nada.
+  const usd = Number(p.precioUSD) || 0;
+  return usd > 0 ? 'u$' + usd.toLocaleString('es-AR') : 'consultar';
+}
+
+// ¿Es un iPhone? Se mira marca y modelo porque en el stock aparece cargado de
+// las dos formas ("Apple" + "iPhone 11", o directamente marca "iPhone").
+function _esIphone(p) {
+  return /iphone|apple/i.test(`${p.marca || ''} ${p.modelo || ''}`);
+}
+
+// Una línea de equipo: modelo · memoria · estado — precio
+function _listaLinea(p) {
+  const partes = [p.modelo || 'Equipo'];
+  if (p.almacenamiento) partes.push(p.almacenamiento);
+  if (p.estado) partes.push(p.estado);
+  // La batería solo en los iPhone: es el dato que siempre preguntan.
+  if (_esIphone(p) && Number(p.bateria) > 0) partes.push('🔋' + p.bateria + '%');
+  return `• ${partes.join(' · ')} — ${_listaPrecio(p)}`;
+}
+
+const LISTA_HEADER_DEF = '📱 *EQUIPOS DISPONIBLES* — {NEGOCIO}\n_Actualizado {FECHA}_';
+const LISTA_FOOTER_DEF = '📍 {DIRECCION}\n🕐 {HORARIO}\n_Consultanos por otros modelos_ 👋';
+
+function _listaTpl(clave, porDefecto) {
+  const t = (typeof WA_TEMPLATES !== 'undefined' && WA_TEMPLATES) ? WA_TEMPLATES[clave] : null;
+  const bd = (typeof BIZ_DATA !== 'undefined' && BIZ_DATA) || {};
+  return (t || porDefecto)
+    .replace(/{NEGOCIO}/g, (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint')
+    // La fecha sale de todayAR() (yyyy-mm-dd) y se da vuelta a mano: con
+    // toLocaleDateString el mismo código imprime "5/9" o "05/09" según el
+    // dispositivo, y la lista se manda desde el celu y desde la compu.
+    .replace(/{FECHA}/g, (() => {
+      const h = (typeof todayAR === 'function') ? todayAR() : new Date().toISOString().slice(0, 10);
+      const [, m, d] = h.split('-');
+      return `${d}/${m}`;
+    })())
+    .replace(/{DIRECCION}/g, bd.dir || '')
+    .replace(/{HORARIO}/g, bd.extra || '')
+    .replace(/{TELEFONO}/g, bd.tel || '');
+}
+
+// Arma el texto completo. `equipos` ya viene filtrado.
+function armarListaWa(equipos) {
+  const dispo = (equipos || []).filter(p => !p.vendido && !p.reservado);
+  if (!dispo.length) return '';
+
+  // Agrupado por marca, las marcas alfabéticas y adentro por precio.
+  const porMarca = {};
+  dispo.forEach(p => {
+    const m = (p.marca || 'Otros').trim() || 'Otros';
+    (porMarca[m] = porMarca[m] || []).push(p);
+  });
+  const bloques = Object.keys(porMarca).sort((a, b) => a.localeCompare(b, 'es')).map(m => {
+    const lineas = porMarca[m]
+      .sort((a, b) => _listaPrecioNum(a) - _listaPrecioNum(b))
+      .map(_listaLinea).join('\n');
+    return `*${m.toUpperCase()}*\n${lineas}`;
+  });
+
+  return [_listaTpl('lista_header', LISTA_HEADER_DEF), bloques.join('\n\n'),
+          _listaTpl('lista_footer', LISTA_FOOTER_DEF)]
+    .filter(Boolean).join('\n\n');
+}
+
+// ── Modal ─────────────────────────────────
+function openListaWaModal() {
+  const modal = document.getElementById('listawa-modal');
+  if (!modal) return;
+  const equipos = (typeof _stockFiltrado === 'function') ? _stockFiltrado() : [];
+  const dispo = equipos.filter(p => !p.vendido && !p.reservado);
+  const texto = armarListaWa(equipos);
+
+  const ta = document.getElementById('listawa-txt');
+  if (ta) ta.value = texto;
+  const info = document.getElementById('listawa-info');
+  if (info) {
+    const ocultos = equipos.length - dispo.length;
+    info.textContent = dispo.length
+      ? `${dispo.length} equipo${dispo.length !== 1 ? 's' : ''} en la lista`
+        + (ocultos > 0 ? ` · ${ocultos} vendido/reservado no entra${ocultos !== 1 ? 'n' : ''}` : '')
+        + ' · podés editar el texto antes de mandarlo'
+      : 'No hay equipos disponibles con los filtros de arriba.';
+  }
+  document.getElementById('listawa-overlay')?.classList.remove('hidden');
+  modal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeListaWaModal() {
+  document.getElementById('listawa-overlay')?.classList.add('hidden');
+  document.getElementById('listawa-modal')?.classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+function listaWaCopiar(btn) {
+  const txt = document.getElementById('listawa-txt')?.value || '';
+  if (!txt) { toast('No hay nada para copiar', 'error'); return; }
+  navigator.clipboard.writeText(txt).then(() => {
+    if (btn) { const t = btn.textContent; btn.textContent = '✓ Copiado'; setTimeout(() => btn.textContent = t, 1600); }
+  }).catch(() => toast('No se pudo copiar', 'error'));
+}
+
+// OJO: el link wa.me mete el texto en la URL y con listas largas se corta.
+// Por eso el botón grande es Copiar y este avisa antes de romper el mensaje.
+const _LISTA_WA_MAX = 1800;
+
+function listaWaEnviar() {
+  const txt = document.getElementById('listawa-txt')?.value || '';
+  if (!txt) return;
+  if (txt.length > _LISTA_WA_MAX &&
+      !confirm(`La lista es larga (${txt.length} caracteres) y WhatsApp puede cortarla al abrirla por el link.\n\nConviene usar 📋 Copiar y pegarla en el chat.\n\n¿Abrir WhatsApp igual?`)) return;
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+}
