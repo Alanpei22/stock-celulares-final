@@ -5901,12 +5901,30 @@ body.dark .rep-cliente-hint { background: rgba(16,185,129,.12); color: #34d399; 
 .td-num { font-size: 1.6rem; font-weight: 900; line-height: 1; color: var(--text, #1a1a1a); letter-spacing: -.02em; }
 .td-lbl { font-size: .68rem; font-weight: 700; color: var(--t2, #666); text-align: center; line-height: 1.15; }
 
-/* Lista de equipos para WhatsApp */
-.pill--accion {
- border-color: var(--wa, #25d366); color: var(--wa, #25d366);
- font-weight: 700; cursor: pointer;
+/* Lista de equipos para WhatsApp — botón flotante abajo a la derecha.
+   Va por encima de la barra de abajo (que mide ~64px + el área segura del
+   iPhone) y por debajo de los modales. */
+.lista-fab {
+ position: fixed; right: 16px; z-index: 95;
+ bottom: calc(80px + env(safe-area-inset-bottom));
+ display: flex; align-items: center; gap: 7px;
+ min-height: 48px; padding: 0 18px;
+ border: 0; border-radius: 9999px;
+ background: var(--wa, #25d366); color: #fff;
+ font-size: .88rem; font-weight: 800; cursor: pointer;
+ box-shadow: 0 6px 20px rgba(37,211,102,.38);
+ transition: transform .12s;
 }
-.pill--accion:active { background: var(--wa, #25d366); color: #fff; }
+.lista-fab:active { transform: scale(.95); }
+.lista-fab.hidden { display: none; }
+.lista-fab-ico { font-size: 1.05rem; line-height: 1; }
+/* Solo en pantallas muy chicas queda el ícono suelto. El umbral es bajo a
+   propósito: el problema original era no encontrar el botón, así que en un
+   celular normal (360-430px) tiene que leerse la palabra. */
+@media (max-width: 330px) {
+ .lista-fab { padding: 0; width: 52px; height: 52px; justify-content: center; }
+ .lista-fab-txt { display: none; }
+}
 .listawa-modal { max-width: 520px; }
 .listawa-txt {
  width: 100%; margin: 8px 0 12px;

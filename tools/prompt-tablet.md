@@ -77,7 +77,9 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   las llevaba puestas. `repair_presupuesto` por fin se puede editar.
 
 **Lista de equipos para WhatsApp** (2026-09-05) — `tests/test-lista-equipos.js`
-- Boton **📋 Lista para WhatsApp** en los filtros de Stock. Arma el texto con
+- Boton flotante **📋 Lista** abajo a la derecha en la pantalla de Stock (no
+  entre los filtros: esa fila scrollea de costado y en el celular el boton
+  quedaba fuera de pantalla). Arma el texto con
   LO QUE ESTAS VIENDO: filtras arriba (marca, estado, precio, buscador) y el
   boton convierte esa misma lista en un mensaje. No hay un segundo juego de
   filtros a proposito.

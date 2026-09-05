@@ -107,7 +107,6 @@
           <option value="">Todos</option>
         </select>
         <select class="pill" id="f-vendedor"><option value="">Todos los vendedores</option></select>
-        <button class="pill pill--accion" onclick="openListaWaModal()">📋 Lista para WhatsApp</button>
       </div>
       <div class="price-filter">
         <span class="price-filter-lbl">💰 Precio:</span>
@@ -423,6 +422,14 @@
   </section>
 
   <!-- ── BOTTOM NAV ── -->
+  <!-- Botón flotante: arma la lista de equipos con lo que quedó filtrado.
+       Va acá y no entre los filtros porque esa fila scrollea de costado y en
+       el celular el botón quedaba fuera de pantalla. Solo se ve en Stock. -->
+  <button id="lista-fab" class="lista-fab" onclick="openListaWaModal()"
+          title="Armar la lista de equipos para mandar por WhatsApp">
+    <span class="lista-fab-ico">📋</span><span class="lista-fab-txt">Lista</span>
+  </button>
+
   <nav class="bottom-nav">
     <button class="nav-btn" id="nav-dash" onclick="switchSection('dash')">
       <span class="nav-ico-wrap">

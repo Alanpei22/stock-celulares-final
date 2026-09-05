@@ -156,6 +156,24 @@ ok(COPIADO === 'lista corta', 'si lo editás, se copia lo editado', COPIADO);
 run('listaWaEnviar()');
 ok(/wa\.me\/\?text=lista%20corta/.test(ABIERTO), 'y WhatsApp abre con ese texto', ABIERTO);
 
+console.log('\n9b) El botón flotante');
+// Estaba entre los filtros, pero esa fila scrollea de costado y en el celular
+// el botón quedaba fuera de pantalla.
+const idx = fs.readFileSync(DIR + 'index.html', 'utf8');
+ok(/id="lista-fab"[\s\S]{0,120}openListaWaModal\(\)/.test(idx), 'existe y abre la lista',
+   (idx.match(/<button id="lista-fab"[\s\S]{0,160}/) || [])[0]);
+ok(!/class="pill pill--accion"/.test(idx), 'ya no está metido entre los filtros que scrollean');
+ok(idx.indexOf('id="lista-fab"') < idx.indexOf('<nav class="bottom-nav"'),
+   'va antes de la barra de abajo, para quedar por encima');
+const css = fs.readFileSync(DIR + 'style.css', 'utf8');
+const fabCss = css.slice(css.indexOf('.lista-fab {'), css.indexOf('.lista-fab:active'));
+ok(/position: fixed/.test(fabCss) && /right: 16px/.test(fabCss), 'fijo abajo a la derecha', fabCss);
+ok(/env\(safe-area-inset-bottom\)/.test(fabCss), 'respeta el área segura del iPhone');
+// Solo se ve en Stock
+const swi = app.slice(app.indexOf('function switchSection'), app.indexOf('function switchSection') + 900);
+ok(/lista-fab/.test(swi) && /section !== 'stock'/.test(swi),
+   'se esconde fuera de la pantalla de Stock', swi.split('\n').filter(l => /lista-fab|stock/.test(l)));
+
 console.log('\n10) Con una lista larga avisa antes de que WhatsApp la corte');
 // El link wa.me mete el texto en la URL: con listas largas se trunca.
 els['listawa-txt'].value = 'x'.repeat(2500);

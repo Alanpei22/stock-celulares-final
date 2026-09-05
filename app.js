@@ -670,6 +670,9 @@ function switchSection(section) {
     if (btn) btn.classList.toggle('active', s === section);
   });
   if (typeof _syncSidebar === 'function') _syncSidebar(section);
+  // La lista de equipos solo tiene sentido mirando el stock
+  const fabLista = document.getElementById('lista-fab');
+  if (fabLista) fabLista.classList.toggle('hidden', section !== 'stock');
   if (section === 'dash') renderDashboard();
   // CUPO: los repuestos son una colección entera; se leen recién cuando se
   // entra a la sección, no en cada apertura de la app.
