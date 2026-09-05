@@ -15,7 +15,7 @@ const el = (id, extra = {}) => els[id] = Object.assign({
   querySelector: () => null, querySelectorAll: () => [], appendChild() {}, remove() {}, options: [],
 }, extra);
 ['search','f-marca','f-estado','f-vendido','f-min','f-max','f-vendedor',
- 'listawa-overlay','listawa-modal','listawa-txt','listawa-info'].forEach(id => el(id));
+ 'listawa-overlay','listawa-modal','listawa-txt','listawa-nota','listawa-sel','listawa-cuenta'].forEach(id => el(id));
 els['f-vendido'].value = '0';   // "En stock", que es el valor por defecto
 
 let COPIADO = '', ABIERTO = '', CONFIRMA = true;
@@ -71,7 +71,7 @@ let t = lista();
 ok(!/Moto G54/.test(t), 'un equipo VENDIDO no entra en la lista', t);
 ok(!/Redmi 12/.test(t), 'un equipo RESERVADO tampoco  ← ofrecerlo es quedar mal con dos clientes');
 ok(/Galaxy A54/.test(t) && /iPhone 11/.test(t), 'los disponibles sí');
-ok(/no entra/.test(els['listawa-info'].textContent), 'y avisa cuántos quedaron afuera', els['listawa-info'].textContent);
+ok(/no entra/.test(els['listawa-nota'].textContent), 'y avisa cuántos quedaron afuera', els['listawa-nota'].textContent);
 
 console.log('\n2) Agrupado por marca');
 ok(/\*APPLE\*/.test(t) && /\*SAMSUNG\*/.test(t), 'un título por marca', t);
@@ -142,7 +142,7 @@ console.log('\n8) Sin equipos, lo dice en vez de mandar una lista vacía');
 els['f-marca'].value = 'Nokia';
 t = lista();
 ok(t === '', 'no arma texto');
-ok(/No hay equipos disponibles/.test(els['listawa-info'].textContent), 'y avisa', els['listawa-info'].textContent);
+ok(/No hay equipos disponibles/.test(els['listawa-nota'].textContent), 'y avisa', els['listawa-nota'].textContent);
 els['f-marca'].value = '';
 
 console.log('\n9) Copiar y abrir WhatsApp');
@@ -155,6 +155,44 @@ run('listaWaCopiar(null)');
 ok(COPIADO === 'lista corta', 'si lo editás, se copia lo editado', COPIADO);
 run('listaWaEnviar()');
 ok(/wa\.me\/\?text=lista%20corta/.test(ABIERTO), 'y WhatsApp abre con ese texto', ABIERTO);
+
+console.log('\n8b) Elegir equipo por equipo, no solo filtrar');
+// Filtrar por marca/precio no alcanza: muchas veces querés mandarle a un
+// cliente estos tres y no toda la categoría.
+els['f-marca'].value = ''; els['f-estado'].value = '';
+els['f-min'].value = ''; els['f-max'].value = ''; els['search'].value = '';
+t = lista();
+ok(get('_listaSel.size') === 5, 'al abrir vienen todos tildados', get('_listaSel.size'));
+ok(/5 de 5 elegidos/.test(els['listawa-cuenta'].textContent), 'y lo dice', els['listawa-cuenta'].textContent);
+ok(/lwa-item/.test(els['listawa-sel'].innerHTML), 'dibuja la lista para tildar');
+ok(/Galaxy A54/.test(els['listawa-sel'].innerHTML), 'con el nombre de cada equipo');
+
+// Destildar uno lo saca del mensaje
+run("listaTogglePick('a')");   // Galaxy A54
+t = els['listawa-txt'].value;
+ok(!/Galaxy A54/.test(t), 'el destildado sale del mensaje', t);
+ok(/Galaxy S21/.test(t), 'y el resto queda');
+ok(/4 de 5 elegidos/.test(els['listawa-cuenta'].textContent), 'la cuenta acompaña');
+// Volver a tildarlo lo devuelve
+run("listaTogglePick('a')");
+ok(/Galaxy A54/.test(els['listawa-txt'].value), 'y si lo volvés a tildar, vuelve');
+
+// Elegir de a pocos: ninguno y después dos
+run('listaPickTodos(false)');
+ok(els['listawa-txt'].value === '', 'sin nada tildado no hay mensaje');
+ok(/0 de 5/.test(els['listawa-cuenta'].textContent), 'cuenta en cero');
+run("listaTogglePick('c'); listaTogglePick('d');");   // los dos iPhone
+t = els['listawa-txt'].value;
+ok(/iPhone 11/.test(t) && /iPhone 13/.test(t), 'quedan los dos elegidos', t);
+ok(!/Samsung/i.test(t) && !/iPhone 15/.test(t), 'y solo esos');
+ok(/\*APPLE\*/.test(t) && !/\*SAMSUNG\*/.test(t), 'la marca sin equipos elegidos ni aparece');
+run('listaPickTodos(true)');
+ok(get('_listaSel.size') === 5, '"Todos" vuelve a tildar todo');
+
+// Al reabrir arranca limpio otra vez
+run("listaTogglePick('a')");
+lista();
+ok(get('_listaSel.size') === 5, 'al reabrir el cuadro vuelven todos tildados');
 
 console.log('\n9b) El botón flotante');
 // Estaba entre los filtros, pero esa fila scrollea de costado y en el celular

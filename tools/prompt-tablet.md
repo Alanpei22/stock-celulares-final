@@ -95,6 +95,10 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - Los precios cargados en dolares salen convertidos a pesos, y **se ordenan
   por el precio convertido**: ordenando por `precio` a secas valian 0 y se
   iban al principio de la lista.
+- Adentro del cuadro hay una **lista de tildes**: filtrar por marca/precio no
+  alcanza, muchas veces querés mandarle a un cliente ESTOS TRES y no toda la
+  categoría. Arrancan todos tildados (sacar dos es más rápido que tildar
+  quince) y hay atajos Todos / Ninguno. El mensaje se rearma al tildar.
 - El texto es EDITABLE antes de mandarlo. Encabezado y pie se editan en
   Configuracion (`lista_header` / `lista_footer` en WA_TEMPLATES).
 - El boton grande es **Copiar**: el link `wa.me?text=` mete el texto en la URL

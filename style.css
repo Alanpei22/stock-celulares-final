@@ -5931,3 +5931,32 @@ body.dark .rep-cliente-hint { background: rgba(16,185,129,.12); color: #34d399; 
  font-family: ui-monospace, 'Courier New', monospace;
  font-size: .8rem; line-height: 1.5; resize: vertical;
 }
+
+/* Elegir qué equipos entran en la lista */
+.lwa-barra {
+ display: flex; align-items: center; justify-content: space-between; gap: 10px;
+ font-size: .78rem; font-weight: 700; color: var(--text2, #5c5c5c);
+ margin: 8px 0 6px;
+}
+.lwa-barra-btns { display: flex; gap: 6px; }
+.lwa-barra-btns button {
+ padding: 5px 12px; border-radius: 9999px; cursor: pointer;
+ border: 1px solid var(--border, #e3e1de); background: var(--card, #fff);
+ color: var(--text2, #5c5c5c); font-size: .74rem; font-weight: 700;
+}
+.lwa-sel {
+ display: flex; flex-direction: column; gap: 5px;
+ max-height: 34vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+ border: 1px solid var(--border, #e3e1de); border-radius: 12px; padding: 6px;
+}
+.lwa-item {
+ display: flex; align-items: center; gap: 10px; cursor: pointer;
+ padding: 8px 10px; border-radius: 9px; font-size: .82rem;
+ background: var(--bg1, #f1f0ee); opacity: .5;
+}
+.lwa-item--on { opacity: 1; background: rgba(37,211,102,.10); }
+.lwa-item input { width: 19px; height: 19px; flex-shrink: 0; cursor: pointer; }
+.lwa-item-txt { flex: 1; min-width: 0; }
+.lwa-item-nom { display: block; font-weight: 700; }
+.lwa-item-meta { display: block; font-size: .74rem; color: var(--text2, #5c5c5c); }
+.lwa-item-precio { white-space: nowrap; font-size: .82rem; }

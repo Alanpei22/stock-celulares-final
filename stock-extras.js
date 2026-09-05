@@ -359,27 +359,72 @@ function armarListaWa(equipos) {
 }
 
 // ── Modal ─────────────────────────────────
+// Los equipos que ofrece el cuadro (lo filtrado en pantalla, ya sin vendidos
+// ni reservados) y cuáles están tildados.
+let _listaDispo = [];
+let _listaSel = new Set();
+
 function openListaWaModal() {
   const modal = document.getElementById('listawa-modal');
   if (!modal) return;
   const equipos = (typeof _stockFiltrado === 'function') ? _stockFiltrado() : [];
-  const dispo = equipos.filter(p => !p.vendido && !p.reservado);
-  const texto = armarListaWa(equipos);
+  _listaDispo = equipos.filter(p => !p.vendido && !p.reservado);
+  // Arrancan todos tildados: lo más común es mandar lo que filtraste. Sacar
+  // dos es más rápido que tildar quince.
+  _listaSel = new Set(_listaDispo.map(p => p.id));
 
-  const ta = document.getElementById('listawa-txt');
-  if (ta) ta.value = texto;
-  const info = document.getElementById('listawa-info');
-  if (info) {
-    const ocultos = equipos.length - dispo.length;
-    info.textContent = dispo.length
-      ? `${dispo.length} equipo${dispo.length !== 1 ? 's' : ''} en la lista`
-        + (ocultos > 0 ? ` · ${ocultos} vendido/reservado no entra${ocultos !== 1 ? 'n' : ''}` : '')
-        + ' · podés editar el texto antes de mandarlo'
+  const ocultos = equipos.length - _listaDispo.length;
+  const nota = document.getElementById('listawa-nota');
+  if (nota) {
+    nota.textContent = _listaDispo.length
+      ? 'Destildá los que no querés mandar.'
+        + (ocultos > 0 ? ` (${ocultos} vendido/reservado no entra${ocultos !== 1 ? 'n' : ''})` : '')
       : 'No hay equipos disponibles con los filtros de arriba.';
   }
+  _listaRenderSel();
+
   document.getElementById('listawa-overlay')?.classList.remove('hidden');
   modal.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+}
+
+// Dibuja la lista de tildes y regenera el texto.
+function _listaRenderSel() {
+  const cont = document.getElementById('listawa-sel');
+  if (cont) {
+    cont.innerHTML = _listaDispo.map(p => {
+      const on = _listaSel.has(p.id);
+      const specs = [p.almacenamiento, p.estado].filter(Boolean).join(' · ');
+      return `<label class="lwa-item${on ? ' lwa-item--on' : ''}">
+        <input type="checkbox" ${on ? 'checked' : ''} onchange="listaTogglePick('${esc(p.id)}')">
+        <span class="lwa-item-txt">
+          <span class="lwa-item-nom">${esc(p.marca || '')} ${esc(p.modelo || '')}</span>
+          ${specs ? `<span class="lwa-item-meta">${esc(specs)}</span>` : ''}
+        </span>
+        <b class="lwa-item-precio">${_listaPrecio(p)}</b>
+      </label>`;
+    }).join('');
+  }
+  const cuenta = document.getElementById('listawa-cuenta');
+  if (cuenta) cuenta.textContent = `${_listaSel.size} de ${_listaDispo.length} elegidos`;
+  _listaRegenerar();
+}
+
+// Rearma el texto con lo tildado. Pisa lo que haya en el cuadro: el orden de
+// uso es elegir primero y retocar el texto al final.
+function _listaRegenerar() {
+  const ta = document.getElementById('listawa-txt');
+  if (ta) ta.value = armarListaWa(_listaDispo.filter(p => _listaSel.has(p.id)));
+}
+
+function listaTogglePick(id) {
+  if (_listaSel.has(id)) _listaSel.delete(id); else _listaSel.add(id);
+  _listaRenderSel();
+}
+
+function listaPickTodos(v) {
+  _listaSel = v ? new Set(_listaDispo.map(p => p.id)) : new Set();
+  _listaRenderSel();
 }
 
 function closeListaWaModal() {

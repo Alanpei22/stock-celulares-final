@@ -1391,8 +1391,17 @@
     <span>📋 Lista para WhatsApp</span>
     <button class="tpent-x" onclick="closeListaWaModal()">✕</button>
   </div>
-  <p class="fi-helper" id="listawa-info"></p>
-  <textarea id="listawa-txt" class="fi fi-area listawa-txt" rows="14"></textarea>
+  <p class="fi-helper" id="listawa-nota"></p>
+  <div class="lwa-barra">
+    <span id="listawa-cuenta"></span>
+    <span class="lwa-barra-btns">
+      <button type="button" onclick="listaPickTodos(true)">Todos</button>
+      <button type="button" onclick="listaPickTodos(false)">Ninguno</button>
+    </span>
+  </div>
+  <div class="lwa-sel" id="listawa-sel"></div>
+  <label class="fl" style="margin-top:10px;display:block">Mensaje</label>
+  <textarea id="listawa-txt" class="fi fi-area listawa-txt" rows="8"></textarea>
   <button class="tpent-btn tpent-btn--si" onclick="listaWaCopiar(this)">📋 Copiar la lista</button>
   <button class="tpent-btn" onclick="listaWaEnviar()">🟢 Abrir WhatsApp</button>
   <button class="tpent-volver" onclick="closeListaWaModal()">Cerrar</button>
