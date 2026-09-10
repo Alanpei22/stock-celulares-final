@@ -76,7 +76,7 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - Los placeholders de la app mostraban IMEI inventados que NO pasan el
   verificador. Cambiados por uno valido: la app no puede ensenar un ejemplo
   malo. Hay prueba que lo vigila.
--  /  /  /  / 
+- `imeiDigitos` / `imeiLuhnOk` / `imeiEstado` / `imeiWatch` / `imeiConfirmar`
   viven en utils.js (lo cargan las dos paginas).
 
 ## Lo que se hizo el 2026-08-20
