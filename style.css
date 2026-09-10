@@ -5986,3 +5986,12 @@ body.dark .rep-cliente-hint { background: rgba(16,185,129,.12); color: #34d399; 
 }
 .lwa-flash { animation: lwaFlash .55s ease-out; }
 @media (prefers-reduced-motion: reduce) { .lwa-flash { animation: none; } }
+
+/* ── Aviso en vivo del IMEI ── */
+.imei-hint {
+ display: block; margin-top: 4px; font-size: .74rem; font-weight: 600;
+ color: var(--text3, #999); min-height: 1em;
+}
+.imei-hint--mal { color: #dc2626; }
+.imei-hint--ok  { color: #059669; }
+.imei-mal { border-color: #dc2626 !important; }

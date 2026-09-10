@@ -1668,3 +1668,12 @@ body.dark .comprobante-item-imei { color:#eee; }
 /* Buscador de ventas: los chips van en dos filas (período y tipo) */
 .vsearch-chip-row { display:flex; flex-wrap:wrap; gap:6px; }
 .vsearch-chip-row + .vsearch-chip-row { margin-top:6px; }
+
+/* El aviso del IMEI también en el formulario de venta de la caja */
+.imei-hint {
+ display: block; margin-top: 4px; font-size: .74rem; font-weight: 600;
+ color: var(--t3, #999); min-height: 1em;
+}
+.imei-hint--mal { color: #dc2626; }
+.imei-hint--ok  { color: #059669; }
+.imei-mal { border-color: #dc2626 !important; }

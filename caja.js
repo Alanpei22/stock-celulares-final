@@ -127,6 +127,8 @@ function showApp() {
 function initApp() {
   initDarkMode();
   db = _fbInit();
+  // Aviso en vivo en los IMEI de la venta de equipo
+  if (typeof imeiWatch === 'function') { imeiWatch('ve-imei'); imeiWatch('ve-imei2'); }
   // Campanita de novedades. CUPO: listener acotado a 60 docs, ver avisos.js.
   if (typeof initAvisos === 'function') initAvisos();
   updateDateLabel();
@@ -1984,6 +1986,11 @@ async function confirmVentaEquipo() {
   const d = _veDatos();
   if (!d.precio) { toast('Cargá el precio de venta', 'error'); return; }
   if (!d.marca && !d.modelo) { toast('Cargá al menos la marca o el modelo', 'error'); return; }
+  // El IMEI queda impreso en el comprobante y es lo que identifica al equipo
+  if (typeof imeiConfirmar === 'function') {
+    if (!imeiConfirmar(d.imei, 'IMEI')) return;
+    if (!imeiConfirmar(d.imei2, 'IMEI 2')) return;
+  }
 
   const equipo  = `${d.marca || ''} ${d.modelo || ''}`.trim();
   const metodo  = _metodoDesdeTexto(d.forma_pago);

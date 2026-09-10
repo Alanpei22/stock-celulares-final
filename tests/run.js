@@ -43,6 +43,7 @@ const QUE_CUBRE = {
   'test-wa-plantillas.js':    'Mensajes de WhatsApp por fase y su editor en la ficha',
   'test-venta-caja.js':       'Vender un equipo desde la caja y su comprobante A5',
   'test-entrega.js':          '"¿Se lleva el equipo?": el cartel al cobrar y al pasar a Listo',
+  'test-imei.js':             'Validación de IMEI: 15 dígitos y verificador Luhn',
   'test-lista-equipos.js':    'Lista de equipos para WhatsApp desde el stock filtrado',
   'test-buscar-ventas.js':    'Buscador de ventas: acentos, monto, fecha y filtro por tipo',
   'test-buscar-orden.js':     'Buscar una reparación por número de orden al cobrar',

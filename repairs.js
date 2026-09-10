@@ -1417,6 +1417,9 @@ async function saveRepair() {
   if (!marca)   { toast('Ingresá la marca', 'error'); return; }
   if (!modelo)  { toast('Ingresá el modelo', 'error'); return; }
   if (!arreglos.length) { toast('Agregá al menos una reparación', 'error'); return; }
+  // Un IMEI mal cargado se arrastra a la boleta, a la garantía y al día que
+  // haya que consultarlo en la blacklist
+  if (typeof imeiConfirmar === 'function' && !imeiConfirmar(imei, 'IMEI')) return;
 
   const btn = document.getElementById('rep-form-save');
   btn.disabled = true;

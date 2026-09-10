@@ -314,3 +314,77 @@ function tgHora() {
 function tgMonto(n) {
   return '$' + Math.round(Number(n) || 0).toLocaleString('es-AR');
 }
+
+// ══════════════════════════════════════════════════════════
+//  IMEI — validación
+// ══════════════════════════════════════════════════════════
+// Un IMEI son 15 dígitos y el último es un verificador Luhn (el mismo
+// algoritmo de las tarjetas). Con eso se agarra el 90% de los errores de
+// tipeo: un dígito cambiado o dos dados vuelta rompen el verificador.
+//
+// NO bloquea. El cliente está parado en el mostrador y a veces lo que hay que
+// cargar es lo que dice la caja, aunque no cierre. Lo que hace es avisar
+// mientras escribís (en rojo, al lado del campo) y volver a preguntar antes
+// de guardar. Casi siempre el error se corrige antes de llegar a guardar.
+
+function imeiDigitos(v) { return String(v ?? '').replace(/\D/g, ''); }
+
+// Verificador Luhn sobre los 15 dígitos (los 14 primeros + el de control).
+function imeiLuhnOk(d) {
+  if (!/^\d{15}$/.test(d)) return false;
+  let suma = 0;
+  for (let i = 0; i < 15; i++) {
+    let n = +d[i];
+    // Se duplican las posiciones pares empezando por la segunda (índice 1)
+    if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; }
+    suma += n;
+  }
+  return suma % 10 === 0;
+}
+
+// Estado del campo: sirve para el cartelito y para el aviso al guardar.
+function imeiEstado(v) {
+  const d = imeiDigitos(v);
+  if (!d) return { vacio: true, ok: true, digitos: 0, msg: '' };
+  if (d.length < 15) return { vacio: false, ok: false, digitos: d.length,
+                              msg: `${d.length}/15 dígitos` };
+  if (d.length > 15) return { vacio: false, ok: false, digitos: d.length,
+                              msg: `${d.length} dígitos: un IMEI tiene 15` };
+  if (!imeiLuhnOk(d)) return { vacio: false, ok: false, digitos: 15,
+                               msg: '15 dígitos pero el número no cierra — revisá *#06#' };
+  return { vacio: false, ok: true, digitos: 15, msg: '✓ IMEI válido' };
+}
+
+// Engancha el aviso en vivo a un campo. Crea el cartelito solo, así no hay
+// que tocar el HTML de cada formulario.
+function imeiWatch(inputId) {
+  const inp = document.getElementById(inputId);
+  if (!inp || inp._imeiWatch) return;
+  inp._imeiWatch = true;
+  let hint = document.getElementById(inputId + '-hint');
+  if (!hint) {
+    hint = document.createElement('span');
+    hint.id = inputId + '-hint';
+    hint.className = 'imei-hint';
+    inp.insertAdjacentElement('afterend', hint);
+  }
+  const pintar = () => {
+    const e = imeiEstado(inp.value);
+    hint.textContent = e.msg;
+    hint.classList.toggle('imei-hint--mal', !e.vacio && !e.ok);
+    hint.classList.toggle('imei-hint--ok', !e.vacio && e.ok);
+    inp.classList.toggle('imei-mal', !e.vacio && !e.ok);
+  };
+  inp.addEventListener('input', pintar);
+  inp.addEventListener('blur', pintar);
+  pintar();
+}
+
+// Antes de guardar: si hay algo cargado y no cierra, preguntar una vez.
+// Devuelve true si se puede seguir.
+function imeiConfirmar(valor, etiqueta) {
+  const e = imeiEstado(valor);
+  if (e.ok) return true;
+  return confirm(`⚠️ El ${etiqueta || 'IMEI'} no parece válido:\n${e.msg}\n\n`
+    + 'Marcá *#06# en el equipo para verlo.\n\n¿Guardar igual?');
+}

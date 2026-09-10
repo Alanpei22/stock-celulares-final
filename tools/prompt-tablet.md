@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 32 suites, ~1340 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 33 suites, ~1390 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -61,7 +61,25 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   exigen el ID token de Firebase de una cuenta de la allowlist
 
 
-## Lo ultimo que se hizo (2026-08-20)
+## Lo ultimo que se hizo (2026-09-10)
+
+**Validacion de IMEI** — tests/test-imei.js
+- 15 digitos + verificador **Luhn** (el mismo de las tarjetas). Agarra el error
+  de tipeo mas comun: cambiar un digito lo detecta SIEMPRE, y dar vuelta dos
+  casi siempre.
+- Aviso EN VIVO al lado del campo mientras escribis: "7/15 digitos", "15
+  digitos pero el numero no cierra — revisa *#06#", o el tilde verde.
+- **NO bloquea**: el cliente esta parado en el mostrador y a veces hay que
+  cargar lo que dice la caja. Al guardar vuelve a preguntar una vez.
+- Enganchado en los 4 campos: alta de stock, ingreso de reparacion, y los dos
+  IMEI de la venta desde la caja.
+- Los placeholders de la app mostraban IMEI inventados que NO pasan el
+  verificador. Cambiados por uno valido: la app no puede ensenar un ejemplo
+  malo. Hay prueba que lo vigila.
+-  /  /  /  / 
+  viven en utils.js (lo cargan las dos paginas).
+
+## Lo que se hizo el 2026-08-20
 
 **Mensajes de WhatsApp**
 - Los avisos de las 11 fases se **editan desde la ficha** de la reparacion

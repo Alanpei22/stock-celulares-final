@@ -439,6 +439,10 @@ function initApp() {
   // Campanita de novedades. CUPO: listener acotado a 60 docs, ver avisos.js.
   if (typeof initAvisos === 'function') initAvisos();
   window._DAKI_NAME = 'TechPoint';
+  // Aviso en vivo en los campos de IMEI (alta de stock e ingreso de equipo).
+  // Los modales ya están en el HTML aunque estén ocultos, así que alcanza con
+  // engancharlos una vez.
+  if (typeof imeiWatch === 'function') { imeiWatch('fi-imei'); imeiWatch('rep-fi-imei'); }
   loadConfig();
   loadWaTemplates();
   fetchDolarBlue();
@@ -1339,6 +1343,8 @@ async function savePhone() {
 
   if (!marca) { toast('Ingresá la marca', 'error'); return; }
   if (!modelo) { toast('Ingresá el modelo', 'error'); return; }
+  // Un IMEI mal cargado se arrastra a la garantía y al comprobante
+  if (typeof imeiConfirmar === 'function' && !imeiConfirmar(imei, 'IMEI')) return;
   if (!estado) { toast('Seleccioná el estado', 'error'); return; }
   if (!precio || precio <= 0) { toast('Ingresá un precio válido', 'error'); return; }
   if (imei && !/^\d{15}$/.test(imei)) { toast('El IMEI debe tener 15 dígitos', 'error'); return; }
