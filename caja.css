@@ -1677,3 +1677,22 @@ body.dark .comprobante-item-imei { color:#eee; }
 .imei-hint--mal { color: #dc2626; }
 .imei-hint--ok  { color: #059669; }
 .imei-mal { border-color: #dc2626 !important; }
+
+/* ── Barra del dólar ── */
+.dolar-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin: 0 12px 8px; padding: 8px 14px;
+  border: 1px solid var(--border, #e3e1de); border-radius: 12px;
+  background: var(--card, #fff); cursor: pointer;
+  font-size: .78rem; -webkit-tap-highlight-color: transparent;
+}
+.dolar-bar:active { background: var(--bg1, #f1f0ee); }
+.dolar-bar--cargando { opacity: .55; }
+.dolar-bar-tag { font-weight: 800; color: var(--t2, #5c5c5c); letter-spacing: .01em; }
+.dolar-par { display: flex; align-items: baseline; gap: 5px; }
+.dolar-par i { font-style: normal; color: var(--t3, #999); font-size: .72rem; }
+.dolar-par b { font-weight: 800; color: var(--t1, #1a1a1a); font-variant-numeric: tabular-nums; }
+.dolar-usa { margin-left: auto; color: var(--t3, #999); font-size: .72rem; font-weight: 600; }
+.dolar-usa:empty { display: none; }
+.dolar-bar--manual .dolar-par { display: none; }
+.dolar-bar--manual .dolar-usa { margin-left: 0; color: var(--t2, #5c5c5c); font-weight: 700; }

@@ -63,6 +63,16 @@
     </div>
   </header>
 
+  <!-- Barra del dólar. Compra y venta son para cantarle el precio al cliente;
+       "la app usa" es el número con el que se convierten las ventas en USD.
+       Tocar la barra la actualiza. -->
+  <div class="dolar-bar" id="dolar-bar" onclick="refrescarDolarBar()" title="Tocá para actualizar la cotización">
+    <span class="dolar-bar-tag">💵 Blue</span>
+    <span class="dolar-par"><i>Compra</i><b id="dolar-compra">—</b></span>
+    <span class="dolar-par"><i>Venta</i><b id="dolar-venta">—</b></span>
+    <span class="dolar-usa" id="dolar-usa"></span>
+  </div>
+
   <!-- Notificaciones in-app (banners) -->
   <div id="notif-banners" class="notif-banners hidden"></div>
 

@@ -142,7 +142,14 @@ function initApp() {
   // números del día. Ahora arrancan la primera vez que se toca el buscador
   // (ver _asegurarDatosVenta), o al abrir el modal de cobro.
   _initMovDescAutocomplete();      // ← input handler de descripción
-  ensureDolar(db);                 // ← cotización para calcular costo en pesos
+  // Cotización: primero la que usa la app para las cuentas, después la barra
+  // (que necesita saber ese número para poder aclararlo si difiere).
+  // Envuelto en Promise.resolve: si ensureDolar no está o no devuelve promesa,
+  // la caja tiene que abrir igual. Sin esto, un cambio en utils.js dejaba la
+  // pantalla en blanco.
+  Promise.resolve(typeof ensureDolar === 'function' ? ensureDolar(db) : null)
+    .then(() => { if (typeof pintarDolarBar === 'function') pintarDolarBar(); })
+    .catch(e => console.error('cotización:', e));
   // El inventario (colección productos completa) arranca al entrar a la
   // pestaña Accesorios — ver switchCajaTab en caja.html.
   if (typeof initInventario === 'function') initInventario({ soloUI: true });
@@ -1311,6 +1318,53 @@ function _metodoDesdeTexto(t) {
   if (s.includes('débit') || s.includes('debit') || s.includes('tarjeta')) return 'Tarjeta débito';
   if (s.includes('dólar') || s.includes('dolar') || s.includes('usd')) return 'Dólares';
   return 'Efectivo';
+}
+
+// ══════════════════════════════════════════
+//  BARRA DEL DÓLAR
+//  ─────────────────────────────────────────
+//  Compra y venta salen de la API pública (no gasta cupo de Firebase).
+//  "La app usa" es getCurrentDolar(): la venta con el recargo del local, o el
+//  valor cargado a mano en Configuración. Se muestra aparte porque si no, el
+//  dueño ve "venta 1.545" y la app convirtiendo a 1.555 y no entiende nada.
+// ══════════════════════════════════════════
+async function pintarDolarBar(forzar) {
+  const bar = document.getElementById('dolar-bar');
+  if (!bar || typeof dolarDetalle !== 'function') return;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const d = await dolarDetalle(forzar);
+  const usa = (typeof getCurrentDolar === 'function') ? (getCurrentDolar() || 0) : 0;
+
+  if (d && d.manual) {
+    // Cargado a mano: las cifras de la API no se usan, así que no se muestran
+    bar.classList.add('dolar-bar--manual');
+    set('dolar-compra', '—');
+    set('dolar-venta', '—');
+    set('dolar-usa', usa ? `a mano · $${usa.toLocaleString('es-AR')}` : 'a mano');
+    return;
+  }
+  bar.classList.remove('dolar-bar--manual');
+  if (!d) {
+    set('dolar-compra', '—'); set('dolar-venta', '—');
+    set('dolar-usa', 'sin conexión');
+    return;
+  }
+  set('dolar-compra', d.compra ? '$' + d.compra.toLocaleString('es-AR') : '—');
+  set('dolar-venta',  d.venta  ? '$' + d.venta.toLocaleString('es-AR')  : '—');
+  // Solo se aclara si es distinto de la venta, para no repetir el mismo número
+  set('dolar-usa', (usa && usa !== d.venta) ? `la app usa $${usa.toLocaleString('es-AR')}` : '');
+}
+
+async function refrescarDolarBar() {
+  const bar = document.getElementById('dolar-bar');
+  bar?.classList.add('dolar-bar--cargando');
+  await pintarDolarBar(true);
+  bar?.classList.remove('dolar-bar--cargando');
+  const d = await dolarDetalle();
+  if (d && !d.manual) {
+    const h = (typeof dolarHora === 'function') ? dolarHora(d.at) : '';
+    toast(h ? `💵 Cotización actualizada · ${h}` : '💵 Cotización actualizada', 'success');
+  }
 }
 
 // ══════════════════════════════════════════

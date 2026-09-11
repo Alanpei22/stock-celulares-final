@@ -388,3 +388,49 @@ function imeiConfirmar(valor, etiqueta) {
   return confirm(`⚠️ El ${etiqueta || 'IMEI'} no parece válido:\n${e.msg}\n\n`
     + 'Marcá *#06# en el equipo para verlo.\n\n¿Guardar igual?');
 }
+
+// ══════════════════════════════════════════════════════════
+//  COTIZACIÓN DEL BLUE — para MOSTRAR
+// ══════════════════════════════════════════════════════════
+// Trae compra y venta por separado, que es lo que se le canta a un cliente
+// que paga en dólares.
+//
+// OJO: esto NO es el número con el que la app hace las cuentas. Para convertir
+// se usa getCurrentDolar() (la venta con el recargo del local, o el valor
+// cargado a mano). Son dos cosas distintas a propósito y la barra muestra las
+// dos, si no el dueño ve "venta 1.545" y la app convirtiendo a otro número y
+// no entiende por qué.
+//
+// No toca el cupo de Firebase: es una API pública, no Firestore. Se cachea
+// 10 minutos para no llamarla en cada pantalla.
+const _DOLAR_TTL_MS = 10 * 60 * 1000;
+let _dolarDet = null;
+
+async function dolarDetalle(forzar) {
+  const manual = parseInt(localStorage.getItem('dolarManual')) || 0;
+  if (manual > 0) {
+    return { manual: true, compra: null, venta: null, usa: manual, at: null };
+  }
+  if (!forzar && _dolarDet && (Date.now() - _dolarDet.t) < _DOLAR_TTL_MS) return _dolarDet;
+  try {
+    const r = await fetch('https://dolarapi.com/v1/dolares/blue');
+    const d = await r.json();
+    const compra = Math.round(Number(d.compra) || 0);
+    const venta  = Math.round(Number(d.venta) || 0);
+    if (!venta && !compra) return _dolarDet;
+    _dolarDet = { manual: false, compra, venta, at: d.fechaActualizacion || null, t: Date.now() };
+    return _dolarDet;
+  } catch {
+    return _dolarDet;   // si se cayó la API, lo último que sabíamos
+  }
+}
+
+// Hora de la última actualización, en formato de acá.
+function dolarHora(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit',
+    });
+  } catch { return ''; }
+}

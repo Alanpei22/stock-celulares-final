@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 33 suites, ~1390 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 34 suites, ~1420 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -62,6 +62,21 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 
 ## Lo ultimo que se hizo (2026-09-10)
+
+**Barra del dolar en la caja** — tests/test-dolar-bar.js
+- Arriba de los numeros del dia: Blue, compra y venta por separado (que es lo
+  que le cantas al cliente que paga en dolares). Tocarla la actualiza y avisa
+  con la hora de la cotizacion.
+- **Compra/venta NO es el numero con el que la app convierte.** Para las
+  cuentas se usa getCurrentDolar() (la venta con el recargo del local, o el
+  valor cargado a mano). Si difieren, la barra lo aclara: "la app usa $1.555".
+  Sin eso el dueno ve venta 1.545 y la app convirtiendo a otro numero.
+- Si la cotizacion esta cargada a mano en Configuracion, la barra esconde
+  compra/venta y dice "a mano": mostrar las de la API seria mentir.
+- Cache de 10 minutos. **No gasta cupo**: es dolarapi.com, no Firestore. Hay
+  prueba que lo vigila.
+- test-cupo.js agarro de paso que si ensureDolar no devolvia promesa, la caja
+  no abria. Ahora va envuelto en Promise.resolve con catch.
 
 **Validacion de IMEI** — tests/test-imei.js
 - 15 digitos + verificador **Luhn** (el mismo de las tarjetas). Agarra el error
