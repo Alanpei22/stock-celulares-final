@@ -49,6 +49,7 @@ const QUE_CUBRE = {
   'test-buscar-ventas.js':    'Buscador de ventas: acentos, monto, fecha y filtro por tipo',
   'test-buscar-orden.js':     'Buscar una reparación por número de orden al cobrar',
   'test-caja-auditoria.js':   'Auditoría de la caja: desglose del día y borrado de movimientos',
+  'test-reparaciones-estados.js': 'Reparaciones: card = ficha, cobro del saldo, garantía y equipos viejos abiertos',
   'test-planes.js':           'Planes de ahorro, reservas y que la seña no se cuente dos veces',
 };
 

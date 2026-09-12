@@ -393,7 +393,9 @@ function tpWaTexto(r, override) {
     .replace(/{GARANTIA}/g, gar)
     .replace(/{PLAZO}/g, r.fechaEstimada || 'a confirmar')
     .replace(/{DIAGNOSTICO}/g, r.diagnostico || '—')
-    .replace(/{MOTIVO}/g, r.motivo || r.diagnostico || '—')
+    // Cerrado desde la card no hay motivo escrito, pero sí la categoría.
+    .replace(/{MOTIVO}/g, r.motivo || r.diagnostico
+      || (typeof novaMotivoLabel === 'function' && novaMotivoLabel(r.motivoCierre)) || '—')
     .replace(/{NEGOCIO}/g, biz)
     .replace(/{DIRECCION}/g, dir)
     .replace(/{HORARIO}/g, hor)
@@ -670,8 +672,12 @@ async function _tpBackupPrevio() {
 
 // Acomoda la fase cuando el estado cambió por afuera del tablero (chip rápido
 // de la lista, cobro desde la caja, etc). Devuelve el parche a escribir.
-function _tpSyncFase(r, nuevoEstado, ahoraISO) {
-  const destino = TP_ESTADO_FASE[nuevoEstado] || 'reparacion';
+// faseDestino: para cuando el estado solo no alcanza ("no va" puede ser
+// "sin reparación" o "rechazado").
+function _tpSyncFase(r, nuevoEstado, ahoraISO, faseDestino) {
+  const destino = (faseDestino && TP_FASES[faseDestino] && TP_FASES[faseDestino].estado === nuevoEstado)
+    ? faseDestino
+    : (TP_ESTADO_FASE[nuevoEstado] || 'reparacion');
   if (tpFaseDe(r) === destino) return {};
   const hist = tpHistorial(r).map(x => ({ f: x.f, t: x.t }));
   hist.push({ f: destino, t: ahoraISO || new Date().toISOString() });
@@ -761,6 +767,9 @@ async function tpDeshacer(id) {
   if (!confirm(`↩️ Volver a "${TP_FASES[anterior].nombre}"?`)) return;
   try {
     const upd = { fase: anterior, faseHist: hist, estado: estadoAnterior };
+    // Deshacer una entrega le saca la fecha: si no, la ficha seguía diciendo
+    // "Entregado" de un equipo que está de vuelta en el local.
+    if (r.estado === 'entregado' && estadoAnterior !== 'entregado' && r.fechaEntrega) upd.fechaEntrega = null;
     // El historial de estados también retrocede si el estado cambia
     if (estadoAnterior !== r.estado && Array.isArray(r.estadoHistorial) && r.estadoHistorial.length > 1) {
       upd.estadoHistorial = r.estadoHistorial.slice(0, -1);

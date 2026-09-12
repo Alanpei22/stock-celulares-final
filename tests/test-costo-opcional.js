@@ -104,8 +104,12 @@ run('entregarSinCargarCosto()');
   const src = leer('repairs.js');
   ok(/function _faltaCargarCosto/.test(src),
      'sigue existiendo la detección de "falta el costo"');
-  ok((src.match(/openCostoRequeridoModal\(/g) || []).length >= 3,
-     'el modal se sigue abriendo desde los dos lugares de entrega');
+  // La card y la ficha entregan por el mismo camino (changeRepairStatus), así
+  // que el modal se abre desde un solo lugar y vale para los dos.
+  ok((src.match(/openCostoRequeridoModal\(/g) || []).length >= 2,
+     'el modal se sigue abriendo al entregar');
+  ok(/async function quickStatusChange[\s\S]{0,200}return changeRepairStatus\(/.test(src),
+     'y la card entrega por el mismo camino que la ficha');
   ok(/function confirmCostoRequerido/.test(src),
      'cargar el costo de verdad sigue funcionando igual');
   // El costo se puede cargar después: el campo de la ficha tiene que seguir ahí.

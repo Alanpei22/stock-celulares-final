@@ -250,8 +250,12 @@ const cajaSrc = fs.readFileSync(DIR + 'caja.js', 'utf8');
 const repSrc  = fs.readFileSync(DIR + 'repairs.js', 'utf8');
 ok(!/confirm\([^)]*se llev/i.test(cajaSrc), 'caja.js');
 ok(!/confirm\([^)]*se llev/i.test(repSrc), 'repairs.js');
-ok((repSrc.match(/tpEntregaModal\(/g) || []).length === 2,
-   'los dos lugares de repairs.js usan el modal', (repSrc.match(/tpEntregaModal\(/g) || []).length);
+// La card y la ficha pasan por changeRepairStatus: un solo lugar pregunta,
+// y vale para los dos (antes eran dos copias de la misma lógica).
+ok((repSrc.match(/tpEntregaModal\(/g) || []).length === 1,
+   'repairs.js pregunta desde un solo lugar', (repSrc.match(/tpEntregaModal\(/g) || []).length);
+ok(/async function quickStatusChange[\s\S]{0,200}return changeRepairStatus\(/.test(repSrc),
+   'y la card usa ese mismo camino');
 ['index.html', 'caja.html'].forEach(f => {
   const h = fs.readFileSync(DIR + f, 'utf8');
   ok(/id="tpent-modal"/.test(h) && /tpEntregaSi\(\)/.test(h), `${f} tiene el modal`);

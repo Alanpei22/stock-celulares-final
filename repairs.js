@@ -23,12 +23,15 @@ let pendingGarantiaRef = null;
 let repRenderTimer;
 let _repairsListener   = null; // referencia al unsubscribe de onSnapshot
 let _repairsLoaded     = false; // true tras el primer snapshot
+let _repVentana = [], _repAbiertas = [], _repAbiertasListener = null; // las dos consultas que arman REPAIRS
 let _repEscHandler     = null; // LOW-12: stored reference so it can be removed
 
 // Expone cleanup para que auth.js pueda cancelar el listener en logout
 window._repairsCleanup = function() {
   if (_repairsListener) { _repairsListener(); _repairsListener = null; }
-  if (_repEscHandler)   { document.removeEventListener('keydown', _repEscHandler); _repEscHandler = null; } // LOW-12
+  if (_repAbiertasListener) { _repAbiertasListener(); _repAbiertasListener = null; }
+  _repVentana = []; _repAbiertas = [];
+  if (_repEscHandler)  { document.removeEventListener('keydown', _repEscHandler); _repEscHandler = null; } // LOW-12
   _repairsLoaded = false;
   REPAIRS = [];
 };
@@ -77,6 +80,20 @@ function listenRepairs() {
   cutoff.setDate(cutoff.getDate() - REPAIRS_DIAS_VENTANA);
   const cutoffISO = cutoff.toISOString();
 
+  const _pintar = () => {
+    // Las dos consultas se pisan (un equipo abierto de hace 10 días viene en
+    // las dos): se unen por id.
+    const porId = new Map();
+    _repVentana.forEach(r => porId.set(r.id, r));
+    _repAbiertas.forEach(r => porId.set(r.id, r));
+    REPAIRS = [...porId.values()];
+    REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
+    _cacheRepairs();
+    renderRepairs();
+    if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
+    else if (typeof renderDashFollowUps === 'function') renderDashFollowUps();
+  };
+
   _repairsListener = db.collection('repairs')
     .where('fechaIngreso', '>=', cutoffISO)
     // includeMetadataChanges: para saber si quedan cambios sin subir (indicador
@@ -85,16 +102,25 @@ function listenRepairs() {
       if (typeof syncReport === 'function') syncReport('reparaciones', snap.metadata.hasPendingWrites);
       if (_repairsLoaded && snap.docChanges().length === 0) return;
       _repairsLoaded = true;
-      REPAIRS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
-      _cacheRepairs();
-      renderRepairs();
-      if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
-      else if (typeof renderDashFollowUps === 'function') renderDashFollowUps();
+      _repVentana = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      _pintar();
     }, err => {
       console.error('Repairs:', err);
       toast('Error cargando reparaciones', 'error');
     });
+
+  // Los que SIGUEN EN EL LOCAL aunque hayan entrado hace más de 60 días
+  // (esperando un repuesto que no llega, abandonados, listos sin retirar).
+  // Antes desaparecían de la lista al cumplir los 60 días: el equipo estaba
+  // en el cajón y la app no lo mostraba. Son pocos (solo los abiertos), así
+  // que el costo de cupo es chico.
+  if (_repAbiertasListener) { _repAbiertasListener(); _repAbiertasListener = null; }
+  _repAbiertasListener = db.collection('repairs')
+    .where('estado', 'in', ['reparando', 'listo'])
+    .onSnapshot(snap => {
+      _repAbiertas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      _pintar();
+    }, err => console.error('Repairs abiertas:', err));
 }
 
 // Carga histórico completo (solo cuando se pide explícitamente, ej: estadísticas anuales).
@@ -215,6 +241,23 @@ function filterRepsByStatus(status) {
 }
 
 // ── Render ────────────────────────────────
+// Garantía vigente de un equipo entregado: { quedan } en días, o null si no
+// tiene, no se entregó todavía o ya venció.
+function _garantiaRestante(r, ahora = new Date()) {
+  if (!r || r.estado !== 'entregado' || !(r.diasGarantia > 0) || !r.fechaEntrega) return null;
+  const pasaron = Math.floor((ahora - new Date(r.fechaEntrega)) / 86400000);
+  if (!isFinite(pasaron)) return null;
+  const quedan = r.diasGarantia - pasaron;
+  return quedan > 0 ? { quedan } : null;
+}
+
+// Día calendario en Argentina ('YYYY-MM-DD') de una fecha ISO o Date.
+function _diaAR(d) {
+  const t = new Date(d);
+  if (isNaN(t)) return '';
+  return t.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+}
+
 function renderRepairs() {
   const q       = (document.getElementById('rep-search').value || '').trim().toLowerCase();
   const fEstado = document.getElementById('rep-f-estado').value;
@@ -234,10 +277,13 @@ function renderRepairs() {
   selM.value = prev;
 
   // Date filter refs
+  // "Hoy" y "este mes" se comparan con el día ARGENTINO de ingreso. Antes se
+  // comparaba contra la fecha UTC: un equipo que entró a las 22 h aparecía
+  // en "Hoy" recién al día siguiente.
   const now      = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = _diaAR(now);
   const weekAgo  = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
-  const monthStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const monthStr = todayStr.slice(0, 7);
 
   const _tpOn = typeof tpVencido === 'function';
   let filtered = REPAIRS.filter(r => {
@@ -265,11 +311,11 @@ function renderRepairs() {
       if (!searchMatch([r.nOrden, r.marca, r.modelo, r.arreglo, r.nombre, r.tlf, r.dni], q)) return false;
     }
     if (fFecha === 'hoy') {
-      if (!r.fechaIngreso || !r.fechaIngreso.startsWith(todayStr)) return false;
+      if (!r.fechaIngreso || _diaAR(r.fechaIngreso) !== todayStr) return false;
     } else if (fFecha === 'semana') {
       if (!r.fechaIngreso || new Date(r.fechaIngreso) < weekAgo) return false;
     } else if (fFecha === 'mes') {
-      if (!r.fechaIngreso || !r.fechaIngreso.startsWith(monthStr)) return false;
+      if (!r.fechaIngreso || !_diaAR(r.fechaIngreso).startsWith(monthStr)) return false;
     }
     return true;
   });
@@ -279,7 +325,16 @@ function renderRepairs() {
   if (fSort === 'antiguo') {
     filtered.sort((a, b) => (a.fechaIngreso || '').localeCompare(b.fechaIngreso || ''));
   } else if (fSort === 'estado') {
-    filtered.sort((a, b) => (STATE_ORDER[a.estado] ?? 9) - (STATE_ORDER[b.estado] ?? 9));
+    // Por fase, en el orden del recorrido (ingresado → … → entregado). Antes
+    // ordenaba por los 4 estados viejos y "presupuestado", "esperando
+    // repuesto" y "en reparación" quedaban mezclados como si fueran lo mismo.
+    const ord = r => {
+      if (!_tpOn) return STATE_ORDER[r.estado] ?? 9;
+      const f = tpFaseDe(r);
+      const i = TP_PIPE.indexOf(f);
+      return i >= 0 ? i : (f === 'abandonado' ? 6.5 : 9);
+    };
+    filtered.sort((a, b) => ord(a) - ord(b) || (b.nOrden || 0) - (a.nOrden || 0));
   } else if (fSort === 'monto') {
     filtered.sort((a, b) => (b.monto || 0) - (a.monto || 0));
   } else if (fSort === 'reciente') {
@@ -344,7 +399,10 @@ function renderRepairs() {
     const taCls  = isDemorado ? 'card-time-ago card-time-demorado' : 'card-time-ago';
 
     // Saldo pendiente
-    const saldoVal = (r.monto && r.sena && r.monto > r.sena && r.estado !== 'entregado')
+    // Si ya se cobró (desde la caja o desde acá) no hay saldo, aunque la seña
+    // siga anotada: antes una orden cobrada seguía mostrando "Saldo $X".
+    const saldoVal = (r.monto && r.sena && r.monto > r.sena && r.estado !== 'entregado'
+                      && !r.cobrado && !_esNoVa(r.estado))
       ? r.monto - r.sena : null;
     const saldoHTML = saldoVal
       ? `<span class="card-saldo-badge">💰 Saldo $${saldoVal.toLocaleString('es-AR')}</span>`
@@ -355,18 +413,16 @@ function renderRepairs() {
       ? `<div class="card-nota" onclick="event.stopPropagation();openNotaModal('${r.id}')">📝 ${esc(r.notaRapida)}</div>`
       : '';
 
-    // Días en taller / garantía
+    // Garantía: corre desde que se ENTREGÓ, no desde que entró. Antes se
+    // contaba desde el ingreso y salía hasta en equipos que seguían en el
+    // banco ("Día 5/90d garantía" de algo que todavía no se arregló), y un
+    // equipo que tardó un mes en el taller ya aparecía con garantía gastada.
+    // El "Día N en taller" se fue: era el mismo número que el ⏱ de al lado.
     let diasBadgeHTML = '';
-    if (r.fechaIngreso) {
-      const diasEnTaller = Math.floor((now - new Date(r.fechaIngreso)) / 86400000);
-      if (r.diasGarantia > 0) {
-        const pct = diasEnTaller / r.diasGarantia;
-        const diasCls = pct >= 1 ? 'rep-dias-venc' : pct >= 0.7 ? 'rep-dias-warn' : 'rep-dias-ok';
-        const label = pct >= 1 ? `⚠️ Gtía vencida (${diasEnTaller}d)` : `📅 Día ${diasEnTaller}/${r.diasGarantia}d garantía`;
-        diasBadgeHTML = `<span class="rep-dias-badge ${diasCls}">${label}</span>`;
-      } else {
-        diasBadgeHTML = `<span class="rep-dias-badge rep-dias-neutral">📅 Día ${diasEnTaller} en taller</span>`;
-      }
+    const _gar = _garantiaRestante(r, now);
+    if (_gar) {
+      const diasCls = _gar.quedan <= 7 ? 'rep-dias-warn' : 'rep-dias-ok';
+      diasBadgeHTML = `<span class="rep-dias-badge ${diasCls}">🛡️ Garantía: ${_gar.quedan === 1 ? 'queda 1 día' : `quedan ${_gar.quedan} días`}</span>`;
     }
 
     // Checklist fallas
@@ -931,12 +987,16 @@ const _EST_CFG = {
   cancelado: { ico: '✖',  label: 'No va',     cls: 'chip-cancelado' },
 };
 // A qué estados se puede saltar desde cada uno
+// El estado que se guarda es 'no va'. Antes la tabla solo tenía 'cancelado'
+// (el nombre viejo), así que las cards de "No va" quedaban SIN botones: ni
+// reabrir ni marcar devuelto, había que entrar a la ficha.
 const _EST_MAP = {
   reparando: ['listo', 'cancelado'],
   listo:     ['entregado', 'reparando', 'cancelado'],
   entregado: ['reparando'],
-  cancelado: ['entregado', 'reparando'],  // "no va" → se puede entregar o reabrir
-  'no van':  ['entregado', 'reparando'],  // datos legacy
+  'no va':   ['reparando'],               // se devuelve con "Devuelto", o se reabre
+  cancelado: ['reparando'],               // datos legacy
+  'no van':  ['reparando'],               // datos legacy
 };
 // El paso natural: el que hacés sin pensar. Va como acción principal.
 const _EST_SIGUIENTE = { reparando: 'listo', listo: 'entregado' };
@@ -951,6 +1011,11 @@ function _cardAccionesHtml(r) {
   if (sig) {
     const c = _EST_CFG[sig];
     pri.push(chip(c.cls, 'card-chip--pri', `quickStatusChange(event,'${r.id}','${sig}')`, c.ico, c.label));
+  }
+  // "No va" sin devolver: lo que queda por hacer es dárselo al cliente.
+  if (_esNoVa(r.estado) && r.devuelto !== true && typeof tpMarcarDevuelto === 'function') {
+    pri.push(chip('chip-entregado', 'card-chip--pri',
+      `event.stopPropagation();tpMarcarDevuelto('${r.id}')`, '↩️', 'Devuelto'));
   }
   if (r.monto > 0 && !r.cobrado && (r.estado === 'listo' || r.estado === 'entregado')) {
     pri.push(chip('chip-cobrar', 'card-chip--pri',
@@ -1689,7 +1754,11 @@ function openRepairDetail(id) {
       <span class="det-label">Seña</span>
       <span class="det-val" style="color:var(--grn2);font-weight:700">$ ${r.sena.toLocaleString('es-AR')}</span>
     </div>` : ''}
-    ${saldo !== null ? `<div class="det-row">
+    ${r.cobrado ? `<div class="det-row">
+      <span class="det-label">Cobro</span>
+      <span class="det-val" style="color:var(--grn2);font-weight:700">✅ Cobrado${r.metodoCobro ? ' · ' + esc(r.metodoCobro) : ''}</span>
+    </div>` : ''}
+    ${saldo !== null && !r.cobrado ? `<div class="det-row">
       <span class="det-label">Saldo</span>
       <span class="det-val" style="color:${saldo < 0 ? 'var(--grn2)' : 'var(--warn)'};font-weight:700">$ ${saldo.toLocaleString('es-AR')}${saldo < 0 ? ' <em style="font-weight:normal;font-size:.85em">(crédito)</em>' : ''}</span>
     </div>` : ''} <!-- MED-15 -->
@@ -1859,7 +1928,7 @@ function _tpAvisarTrasEntrega(id) {
 // faseExtra: {fase, faseHist} cuando el cambio viene del tablero de fases
 // (tp-fases.js). Se escribe junto con el estado para que no queden desfasados
 // si el usuario cancela alguno de los diálogos del camino.
-async function changeRepairStatus(id, newStatus, faseExtra = {}) {
+async function changeRepairStatus(id, newStatus, faseExtra = {}, opts = {}) {
   const r = REPAIRS.find(x => x.id === id);
   if (!r) return;
 
@@ -1875,7 +1944,7 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}) {
         ...faseExtra,
         motivoCierre: desdeTablero,
         ...(faseExtra.devuelto ? {} : { devuelto: false }),
-      });
+      }, opts);
       return;
     }
     const res = await openNoVaModal(r);
@@ -1884,7 +1953,7 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}) {
       ...faseExtra,
       motivoCierre: res.motivoCierre,
       ...(res.devuelto ? { devuelto: true, fechaEntrega: new Date().toISOString() } : { devuelto: false }),
-    });
+    }, opts);
     return;
   }
 
@@ -1902,7 +1971,7 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}) {
         ? { fase: 'entregado', faseHist: [...(faseExtra.faseHist || []).slice(0, -1), { f: 'entregado', t: new Date().toISOString() }] }
         : {};
       if (res.avisar) _tpAvisarTrasEntrega(id);
-      return changeRepairStatus(id, 'entregado', fx);
+      return changeRepairStatus(id, 'entregado', fx, opts);
     }
   }
 
@@ -1919,7 +1988,7 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}) {
   // Al marcar como "listo", preguntar qué repuesto se usó
   if (newStatus === 'listo') {
     openRepUsoModal(async (repuestoId) => {
-      await _doChangeRepairStatus(id, newStatus, r, faseExtra);
+      await _doChangeRepairStatus(id, newStatus, r, faseExtra, opts);
       if (repuestoId && typeof REPUESTOS !== 'undefined') {
         const rep = REPUESTOS.find(x => x.id === repuestoId);
         if (rep) {
@@ -1950,7 +2019,7 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}) {
     return;
   }
 
-  await _doChangeRepairStatus(id, newStatus, r, faseExtra);
+  await _doChangeRepairStatus(id, newStatus, r, faseExtra, opts);
 }
 
 // 📨 Aviso Telegram de cambios de estado relevantes (listo / entregado / no va)
@@ -1966,15 +2035,28 @@ function _tgEstadoRepair(newStatus, r, update = {}) {
   }
 }
 
-async function _doChangeRepairStatus(id, newStatus, r, extra = {}) {
+async function _doChangeRepairStatus(id, newStatus, r, extra = {}, opts = {}) {
   const ahora = new Date().toISOString();
   const update = { estado: newStatus, ...extra };
   if (newStatus === 'entregado') update.fechaEntrega = ahora;
+  // Reabrir un equipo entregado (o devuelto) le saca la fecha de entrega.
+  // Si no, la ficha seguía diciendo "Entregado: 12/09" de algo que volvió al
+  // banco, y la estadística de días en taller medía hasta esa fecha vieja.
+  const saleDeCerrado = (r.estado === 'entregado' || _esNoVa(r.estado))
+                        && newStatus !== 'entregado' && !_esNoVa(newStatus);
+  if (saleDeCerrado && r.fechaEntrega) update.fechaEntrega = null;
   const prevHistory = Array.isArray(r.estadoHistorial) ? r.estadoHistorial : [];
   update.estadoHistorial = [...prevHistory, { estado: newStatus, fecha: ahora }];
   // Si el cambio NO vino del tablero de fases, la fase se acomoda sola al
   // nuevo estado para que no quede mostrando una fase que ya no corresponde.
-  if (!update.fase && typeof _tpSyncFase === 'function') Object.assign(update, _tpSyncFase(r, newStatus, ahora));
+  // "No va" tiene dos fases: si el motivo es que rechazó el presupuesto, la
+  // fase es "rechazado", no "sin reparación". Antes siempre caía en "sin
+  // reparación" y el aviso al cliente le decía que su equipo "no tiene
+  // arreglo viable" a alguien que solo no quiso pagar el precio.
+  if (!update.fase && typeof _tpSyncFase === 'function') {
+    const destino = (newStatus === 'no va' && update.motivoCierre === 'presupuesto') ? 'rechazado' : undefined;
+    Object.assign(update, _tpSyncFase(r, newStatus, ahora, destino));
+  }
 
   try {
     await db.collection('repairs').doc(id).update(update);
@@ -1996,12 +2078,18 @@ async function _doChangeRepairStatus(id, newStatus, r, extra = {}) {
       extra: { estadoAnterior: r.estado, estadoNuevo: newStatus, nOrden: r.nOrden }
     });
 
-    closeRepairDetail();
-    if (newStatus !== 'entregado') {
-      setTimeout(() => openRepairDetail(id), 120);
+    // Desde la card de la lista no se abre la ficha: estabas en la lista.
+    if (!opts.desdeCard) {
+      closeRepairDetail();
+      if (newStatus !== 'entregado') setTimeout(() => openRepairDetail(id), 120);
     }
-    if (newStatus === 'entregado' && r.monto && r.monto > 0) {
-      setTimeout(() => openCobroModal(r), 400);
+    // Entregado sin cobrar → cobro. Si ya estaba cobrado (desde la caja) no se
+    // vuelve a ofrecer: antes se abría igual y era un toque para cobrar dos veces.
+    if (newStatus === 'entregado' && r.monto > 0 && !r.cobrado) {
+      setTimeout(() => openCobroModal(REPAIRS.find(x => x.id === id) || r), 400);
+    }
+    if (newStatus === 'entregado' && typeof triggerWaNotify === 'function') {
+      triggerWaNotify('entregado', r);
     }
     // ── Aviso automático al cliente cuando pasa a "Listo" ──
     if (newStatus === 'listo' && r.tlf) {
@@ -2111,18 +2199,31 @@ function _syncWaListoPref() {
 // ── Registrar cobro en caja ─────────────────────────────
 let _cobroRepair = null;
 
+// Lo que falta cobrar de una reparación: el total menos la seña que ya
+// entró a la caja.
+function _saldoACobrar(r) {
+  return Math.max(0, (Number(r?.monto) || 0) - (Number(r?.sena) || 0));
+}
+
 function openCobroModal(r) {
+  // Siempre la versión más nueva: la seña o el cobro pueden haber entrado
+  // desde la caja (otro dispositivo) después de dibujar la card.
+  r = REPAIRS.find(x => x.id === r?.id) || r;
+  if (!r) return;
+  if (r.cobrado) { toast('Esta reparación ya está cobrada', 'success'); return; }
   _cobroRepair = r;
   const monto = Number(r.monto) || 0;
   const sena  = Number(r.sena)  || 0;
-  document.getElementById('cobro-monto-label').textContent = '$ ' + monto.toLocaleString('es-AR');
+  // El número grande es lo que se cobra AHORA. Antes decía el total aunque
+  // hubiera seña, y se registraba el total: la seña entraba dos veces a la caja.
+  document.getElementById('cobro-monto-label').textContent = '$ ' + _saldoACobrar(r).toLocaleString('es-AR');
   document.getElementById('cobro-desc-label').textContent  = `N°${r.nOrden || '?'} — ${r.marca} ${r.modelo}`;
   // Mostrar seña si existe
   const senaEl = document.getElementById('cobro-sena-info');
   if (senaEl) {
     if (sena > 0) {
       const saldo = monto - sena;
-      senaEl.innerHTML = `Seña cobrada: <b>$${sena.toLocaleString('es-AR')}</b> &nbsp;·&nbsp; Saldo pendiente: <b>$${saldo.toLocaleString('es-AR')}</b>`;
+      senaEl.innerHTML = `Total $${monto.toLocaleString('es-AR')} &nbsp;·&nbsp; Seña ya cobrada: <b>$${sena.toLocaleString('es-AR')}</b> &nbsp;·&nbsp; Se cobra el saldo: <b>$${Math.max(0, saldo).toLocaleString('es-AR')}</b>`;
       senaEl.style.display = '';
     } else {
       senaEl.style.display = 'none';
@@ -2149,27 +2250,34 @@ function selectCobroMetodo(metodo) {
 async function confirmarCobro() {
   if (!_cobroRepair) return;
   const metodo = document.querySelector('.cobro-metodo-btn.cobro-m-active')?.dataset.m || 'Efectivo';
-  const r = _cobroRepair;
+  // Se relee al confirmar: si mientras el cartel estaba abierto se cobró
+  // desde la caja, no se registra de nuevo.
+  const r = REPAIRS.find(x => x.id === _cobroRepair.id) || _cobroRepair;
   closeCobroModal();
+  if (r.cobrado) { toast('Ya estaba cobrada: no se registró de nuevo', 'error'); return; }
   try {
     const batch  = db.batch();
     const hoy    = _todayAR();         // ← zona horaria Argentina
     const ahora  = new Date().toISOString();
-    const monto  = Number(r.monto)  || 0;
+    // Se cobra el SALDO: la seña ya entró a la caja cuando se cobró.
+    const monto  = _saldoACobrar(r);
     const costo  = Number(r.costo)  || 0;
 
     // ── Ingreso: cobro al cliente ──────────────────────────
-    const ingRef = db.collection('caja_movimientos').doc();
-    batch.set(ingRef, {
-      tipo: 'ingreso',
-      categoria: 'Reparación',
-      descripcion: `N°${r.nOrden} ${r.marca} ${r.modelo} — ${r.arreglo || ''}`.trim(),
-      monto,
-      metodoPago: metodo,
-      fecha: hoy,
-      createdAt: ahora,
-      repairId: r.id
-    });
+    // Con la seña cubriendo todo no hay nada que ingresar: solo se marca cobrada.
+    if (monto > 0) {
+      const ingRef = db.collection('caja_movimientos').doc();
+      batch.set(ingRef, {
+        tipo: 'ingreso',
+        categoria: 'Reparación',
+        descripcion: `N°${r.nOrden} ${r.marca} ${r.modelo} — ${r.arreglo || ''}`.trim(),
+        monto,
+        metodoPago: metodo,
+        fecha: hoy,
+        createdAt: ahora,
+        repairId: r.id
+      });
+    }
 
     // ── Egreso: costo del repuesto (si tiene costo cargado) ─
     if (costo > 0) {
@@ -3756,109 +3864,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// Chip rápido de la card. Va por el MISMO camino que la ficha.
+// Antes eran dos copias de la lógica que se habían separado: marcar "Listo"
+// desde la card no ofrecía avisarle al cliente, "Entregado" no abría el cobro
+// y no quedaba en el registro de actividad. La única diferencia que tiene
+// sentido es que desde la lista no se abre la ficha después.
 async function quickStatusChange(e, id, newStatus) {
-  e.stopPropagation();
-
-  const rep = REPAIRS.find(x => x.id === id);
-  if (!rep) return;
-
-  // ── "No va" → por qué, y si ya fue devuelto ──
-  if (newStatus === 'no va' || newStatus === 'cancelado') {
-    const res = await openNoVaModal(rep);
-    if (!res) return;   // canceló
-    await _doStatusChange(id, 'no va', {
-      motivoCierre: res.motivoCierre,
-      ...(res.devuelto ? { devuelto: true, fechaEntrega: new Date().toISOString() } : { devuelto: false }),
-    });
-    return;
-  }
-
-  // ── "Listo" → preguntar si el cliente ya se lo llevó ──
-  if (newStatus === 'listo') {
-    const res = (typeof tpEntregaModal === 'function')
-      ? await tpEntregaModal(rep, { contexto: 'estado' })
-      : { entregado: false, avisar: false };
-    if (!res) return;   // volvió atrás: la orden queda como estaba
-    if (res.entregado) {
-      if (res.avisar) _tpAvisarTrasEntrega(id);
-      return quickStatusChange(e, id, 'entregado');
-    }
-  }
-
-  // ── Al pasar a "entregado", recordar cargar el costo si falta ──
-  // No es obligatorio: el modal trae "Entregar sin cargar el costo".
-  if (newStatus === 'entregado' && _faltaCargarCosto(rep)) {
-    const ok = await openCostoRequeridoModal(rep);
-    if (!ok) return; // canceló la entrega
-    const r2 = REPAIRS.find(x => x.id === id);
-    if (r2) Object.assign(rep, r2);
-  }
-
-  // Al marcar como "listo", preguntar qué repuesto se usó
-  if (newStatus === 'listo') {
-    openRepUsoModal(async (repuestoId) => {
-      await _doStatusChange(id, newStatus);
-      if (repuestoId && typeof REPUESTOS !== 'undefined') {
-        const rep = REPUESTOS.find(x => x.id === repuestoId);
-        if (rep) {
-          const nueva = Math.max(0, (rep.cantidad || 0) - 1);
-          // Snapshot del costo al momento de uso (USD × dólar, fallback a precioCompra legacy)
-          const dolar    = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue
-                         : (typeof getCurrentDolar === 'function' ? (getCurrentDolar() || 0) : 0);
-          const costoUSD = Number(rep.precioCostoUSD) || 0;
-          const costoARS = costoUSD > 0 && dolar > 0
-            ? Math.round(costoUSD * dolar)
-            : (Number(rep.precioCompra) || 0);
-          const repairUpdate = {
-            costoRepuesto: costoARS,
-            repuestoId: rep.id,
-            repuestoNombre: rep.nombre || '',
-            costoRepuestoUSD: costoUSD,
-            dolarSnapshot: dolar
-          };
-          Promise.all([
-            db.collection('repuestos').doc(repuestoId).update({ cantidad: nueva }),
-            db.collection('repairs').doc(id).update(repairUpdate)
-          ])
-            .then(() => toast(`🔩 −1 ${rep.nombre}`, 'success'))
-            .catch(() => toast('Error al descontar repuesto', 'error'));
-        }
-      }
-    });
-    return;
-  }
-
-  await _doStatusChange(id, newStatus);
+  if (e && e.stopPropagation) e.stopPropagation();
+  return changeRepairStatus(id, newStatus, {}, { desdeCard: true });
 }
 
+// Se mantiene por compatibilidad (lo usan las pruebas y quizás algún onclick
+// viejo): escribe el estado directo, sin los carteles del camino.
 async function _doStatusChange(id, newStatus, extra = {}) {
-  const ahora = new Date().toISOString();
-  const update = { estado: newStatus, ...extra };
-  if (newStatus === 'entregado') update.fechaEntrega = ahora;
-  const rPrev = REPAIRS.find(x => x.id === id);
-  // BUG-FIX: los chips rápidos cambiaban el estado sin dejar historial ni
-  // actualizar el seguimiento público del QR (el detalle sí lo hacía).
-  if (rPrev) {
-    const prevHistory = Array.isArray(rPrev.estadoHistorial) ? rPrev.estadoHistorial : [];
-    update.estadoHistorial = [...prevHistory, { estado: newStatus, fecha: ahora }];
-    if (typeof _tpSyncFase === 'function') Object.assign(update, _tpSyncFase(rPrev, newStatus, ahora));
-  }
-  try {
-    await db.collection('repairs').doc(id).update(update);
-    toast('→ ' + (REPAIR_STATES[newStatus]?.label || newStatus), 'success');
-    if (rPrev && typeof upsertSeguimientoPublico === 'function') {
-      upsertSeguimientoPublico({ ...rPrev, ...update });
-    }
-    if (rPrev && typeof pushCambioEquipo === 'function') pushCambioEquipo(rPrev, update.fase, newStatus);
-    _tgEstadoRepair(newStatus, REPAIRS.find(x => x.id === id), update);
-    // WA auto-notify on entregado
-    if (newStatus === 'entregado') {
-      const r = REPAIRS.find(x => x.id === id);
-      if (r) triggerWaNotify('entregado', r);
-    }
-  } catch (err) {
-    toast('Error al actualizar', 'error');
-  }
+  const r = REPAIRS.find(x => x.id === id);
+  if (!r) return;
+  return _doChangeRepairStatus(id, newStatus, r, extra, { desdeCard: true });
 }
 
 // ── Modal: Repuesto Usado ────────────────────

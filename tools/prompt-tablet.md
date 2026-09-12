@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 34 suites, ~1420 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 35 suites, ~1500 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -61,7 +61,38 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   exigen el ID token de Firebase de una cuenta de la allowlist
 
 
-## Lo ultimo que se hizo (2026-09-10)
+## Lo ultimo que se hizo (2026-09-12)
+
+**Revision de reparaciones (estados y card)** — tests/test-reparaciones-estados.js
+- **La card y la ficha cambiaban el estado por dos caminos copiados** que se
+  habian separado (quickStatusChange/_doStatusChange vs changeRepairStatus).
+  Desde la card: Listo no ofrecia avisar al cliente, Entregado no abria el
+  cobro. Ahora quickStatusChange delega en changeRepairStatus con
+  `{ desdeCard: true }` (lo unico distinto: no reabre la ficha).
+  `_doStatusChange` queda como envoltorio.
+- **Cobrar desde reparaciones registraba el TOTAL aunque hubiera sena** → la
+  sena entraba dos veces a la caja. Ahora cobra el saldo (`_saldoACobrar`), no
+  ingresa $0 si la sena cubre todo, y relee la reparacion al confirmar: si ya
+  se cobro desde la caja, no registra de nuevo. Entregar algo ya cobrado no
+  abre el cobro.
+- "No va" con motivo "rechazo el presupuesto" caia en fase `irreparable` y el
+  aviso le decia al cliente "no tiene arreglo viable". Ahora va a `rechazado`
+  (`_tpSyncFase` acepta fase destino). {MOTIVO} sin texto usa la categoria.
+- Las cards en `no va` no tenian botones (la tabla solo conocia 'cancelado').
+  Ahora: Devuelto (si falta) y reabrir.
+- Garantia en la card se contaba desde el INGRESO y salia en equipos en el
+  banco. Ahora desde fechaEntrega, solo entregados y vigente. Se fue el "Dia N
+  en taller" (repetia el ⏱). Saldo no se muestra si esta cobrado.
+- Reabrir/deshacer un entregado pone `fechaEntrega: null`.
+- **Equipos abiertos con mas de 60 dias desaparecian de la lista** (repuesto que
+  no llega, abandonados). Segundo listener SOLO de `estado in [reparando,listo]`,
+  unido por id con la ventana de 60 dias. Cuesta ~1 lectura por equipo abierto.
+- Filtro Hoy/Mes con fecha argentina (`_diaAR`), antes UTC. Orden "por estado"
+  sigue las fases. Sacada la opcion "Para entregar" (= "Listo").
+- test-costo-opcional y test-entrega contaban que la logica estuviera copiada
+  en dos lugares; ahora verifican que la card use el mismo camino.
+
+## Lo que se hizo el 2026-09-10
 
 **Barra del dolar en la caja** — tests/test-dolar-bar.js
 - Arriba de los numeros del dia: Blue, compra y venta por separado (que es lo
