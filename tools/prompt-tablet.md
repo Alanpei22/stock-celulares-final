@@ -63,6 +63,23 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 ## Lo ultimo que se hizo (2026-09-12)
 
+**Alcance de la lista de reparaciones: ultimos 30 dias / todo** — test-reparaciones-estados.js (10-13)
+- Primer filtro de la lista (`#rep-alcance`). Se guarda por dispositivo
+  (localStorage `repAlcance`). Lista, contadores de arriba y marcas usan el
+  alcance (`_enAlcance`). En 30 dias cuenta SOLO la fecha de ingreso.
+- Al pie de la lista, en 30 dias: "N mas viejos ocultos" + boton Ver todo.
+- **Cupo**: la ventana en vivo sigue en 60 dias (la usan las estadisticas del
+  mes vs mes anterior). "Todo" hace UN `.get()` del historial al abrir la app
+  (loadAllRepairsHistory, compartido con estadisticas), nunca listener a la
+  coleccion. Si falla, vuelve a 30.
+- Se saco el listener de "abiertos" del commit anterior: en 30 dias el usuario
+  pidio literalmente 30 dias, y en Todo el historial ya los trae.
+- Lo viejo no recibe snapshot: `_repPatchLocal(id, data)` despues de cada
+  escritura en repairs.js (estado, cobro, edicion, nota, borrar, garantia,
+  arreglos, costo). tp-fases ya muta el objeto y repinta. Cambios a equipos
+  viejos hechos desde OTRO dispositivo se ven al reabrir la app.
+- El cache de localStorage guarda solo la ventana (el historial no entra).
+
 **Revision de reparaciones (estados y card)** — tests/test-reparaciones-estados.js
 - **La card y la ficha cambiaban el estado por dos caminos copiados** que se
   habian separado (quickStatusChange/_doStatusChange vs changeRepairStatus).

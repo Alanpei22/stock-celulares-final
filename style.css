@@ -5995,3 +5995,17 @@ body.dark .rep-cliente-hint { background: rgba(16,185,129,.12); color: #34d399; 
 .imei-hint--mal { color: #dc2626; }
 .imei-hint--ok  { color: #059669; }
 .imei-mal { border-color: #dc2626 !important; }
+
+/* ── Alcance de la lista de reparaciones (30 días / todo) ── */
+.pill--alcance { font-weight: 700; color: var(--text); }
+.rep-alcance-pie {
+  margin: 14px 4px 24px; padding: 12px 14px;
+  border: 1px dashed var(--border); border-radius: 12px;
+  color: var(--text3); font-size: 12px; line-height: 1.5; text-align: center;
+}
+.rep-alcance-pie b { color: var(--text2); }
+.rep-alcance-btn {
+  display: block; margin: 8px auto 0; padding: 7px 14px; min-height: 34px;
+  border: 1px solid var(--border); border-radius: 9999px;
+  background: var(--card); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer;
+}

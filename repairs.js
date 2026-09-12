@@ -23,14 +23,13 @@ let pendingGarantiaRef = null;
 let repRenderTimer;
 let _repairsListener   = null; // referencia al unsubscribe de onSnapshot
 let _repairsLoaded     = false; // true tras el primer snapshot
-let _repVentana = [], _repAbiertas = [], _repAbiertasListener = null; // las dos consultas que arman REPAIRS
+let _repVentana = [], _repHistorial = [];   // REPAIRS = ventana en vivo + (si elegiste "Todo") el historial
 let _repEscHandler     = null; // LOW-12: stored reference so it can be removed
 
 // Expone cleanup para que auth.js pueda cancelar el listener en logout
 window._repairsCleanup = function() {
   if (_repairsListener) { _repairsListener(); _repairsListener = null; }
-  if (_repAbiertasListener) { _repAbiertasListener(); _repAbiertasListener = null; }
-  _repVentana = []; _repAbiertas = [];
+  _repVentana = []; _repHistorial = [];
   if (_repEscHandler)  { document.removeEventListener('keydown', _repEscHandler); _repEscHandler = null; } // LOW-12
   _repairsLoaded = false;
   REPAIRS = [];
@@ -47,7 +46,9 @@ const _REP_CACHE_KEY = 'repairsCache';
 // Guarda una copia liviana (sin fotos base64) en localStorage para pintar al instante
 function _cacheRepairs() {
   try {
-    const liviano = REPAIRS.map(({ foto, patronImg, ...r }) => r);
+    // Solo la ventana: el historial completo puede no entrar en localStorage.
+    const base = _repVentana.length ? _repVentana : REPAIRS;
+    const liviano = base.map(({ foto, patronImg, ...r }) => r);
     localStorage.setItem(_REP_CACHE_KEY, JSON.stringify(liviano));
   } catch { /* quota / modo privado: seguimos sin cache */ }
 }
@@ -67,32 +68,105 @@ function _hydrateRepairsFromCache() {
   } catch { /* cache corrupto: se ignora, llega Firestore igual */ }
 }
 
+// ── Alcance de la lista: últimos 30 días o todo el historial ──
+// Se elige en la lista (primer filtro) y queda guardado EN ESTE DISPOSITIVO:
+// la tablet del mostrador puede quedar en 30 días y el celu del dueño en todo.
+//
+// CUPO: "30 días" no lee nada extra. "Todo" lee UNA vez cada reparación de la
+// base al abrir la app (con .get(), no con un listener a la colección entera).
+// Lo que entra nuevo o cambia en los últimos días sigue llegando en vivo por el
+// listener de la ventana; lo viejo que se toca desde este dispositivo se
+// actualiza a mano (_repPatchLocal).
+const REP_ALCANCE_DIAS = 30;
+const _REP_ALCANCE_KEY = 'repAlcance';
+
+function repAlcance() {
+  try { return localStorage.getItem(_REP_ALCANCE_KEY) === 'todo' ? 'todo' : '30'; }
+  catch { return '30'; }
+}
+
+// ¿Entra en lo que se muestra? En "30 días" cuenta SOLO la fecha de ingreso:
+// un equipo que entró hace 3 meses y sigue sin retirar se ve en "Todo".
+function _enAlcance(r, ahora = Date.now()) {
+  if (repAlcance() === 'todo') return true;
+  if (!r.fechaIngreso) return false;
+  return ahora - new Date(r.fechaIngreso).getTime() <= REP_ALCANCE_DIAS * 86400000;
+}
+
+async function setRepAlcance(valor) {
+  const v = valor === 'todo' ? 'todo' : '30';
+  try { localStorage.setItem(_REP_ALCANCE_KEY, v); } catch {}
+  const sel = document.getElementById('rep-alcance');
+  if (sel) sel.value = v;
+  if (v === 'todo') {
+    const ok = await _cargarHistorialRep();
+    if (!ok) {   // sin internet o error: vuelve a 30 días en vez de mostrar a medias
+      try { localStorage.setItem(_REP_ALCANCE_KEY, '30'); } catch {}
+      if (sel) sel.value = '30';
+      renderRepairs();
+    } else {
+      toast(`🗂️ ${REPAIRS.length.toLocaleString('es-AR')} reparaciones · se leen cada vez que abrís la app en este dispositivo`, 'info');
+    }
+  } else {
+    _repHistorial = [];
+    _repPintar();
+  }
+}
+
+async function _cargarHistorialRep() {
+  const listEl = document.getElementById('rep-list');
+  try {
+    if (listEl) listEl.innerHTML = '<div class="list-loading"><span class="list-loading__spinner"></span>Cargando historial…</div>';
+    _repHistorial = await loadAllRepairsHistory();
+    _repPintar();
+    return true;
+  } catch (e) {
+    console.error('historial reparaciones:', e);
+    toast('No se pudo cargar el historial completo', 'error');
+    _repHistorial = [];
+    _repPintar();
+    return false;
+  }
+}
+
+// Arma REPAIRS. Lo de la ventana en vivo pisa a la copia del historial (es más
+// nuevo): se unen por id.
+function _repPintar() {
+  const porId = new Map();
+  _repHistorial.forEach(r => porId.set(r.id, r));
+  _repVentana.forEach(r => porId.set(r.id, r));
+  REPAIRS = [...porId.values()];
+  REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
+  _cacheRepairs();
+  renderRepairs();
+  if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
+  else if (typeof renderDashFollowUps === 'function') renderDashFollowUps();
+}
+
+// Una reparación vieja (fuera de la ventana en vivo) no recibe el snapshot de
+// Firestore cuando se modifica: se actualiza la copia local a mano. Sin esto,
+// en "Todo" marcabas entregado un equipo de hace 4 meses y la card seguía
+// diciendo "Listo" hasta reabrir la app.
+function _repPatchLocal(id, data) {
+  if (_repVentana.some(x => x.id === id)) return;   // ya llega por el listener
+  const i = _repHistorial.findIndex(x => x.id === id);
+  if (i < 0) return;
+  if (data === null) _repHistorial.splice(i, 1);   // borrada
+  else Object.assign(_repHistorial[i], data);
+  _repPintar();
+}
+
 function listenRepairs() {
   // Evitar listeners duplicados
   if (_repairsListener) { _repairsListener(); _repairsListener = null; }
 
   // CUPO: cada apertura de la app vuelve a leer TODAS las reparaciones de la
   // ventana, y eso se cobra por documento. 60 días cubre el día a día del
-  // taller (un equipo que entró hace más de 2 meses ya se entregó o está
-  // abandonado). Las más viejas se buscan con el histórico on-demand
-  // (loadAllRepairsHistory), que ya se usa para las estadísticas.
+  // taller y las estadísticas del mes contra el mes anterior. Lo que se
+  // muestra en la lista lo decide el alcance (30 días / todo).
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - REPAIRS_DIAS_VENTANA);
   const cutoffISO = cutoff.toISOString();
-
-  const _pintar = () => {
-    // Las dos consultas se pisan (un equipo abierto de hace 10 días viene en
-    // las dos): se unen por id.
-    const porId = new Map();
-    _repVentana.forEach(r => porId.set(r.id, r));
-    _repAbiertas.forEach(r => porId.set(r.id, r));
-    REPAIRS = [...porId.values()];
-    REPAIRS.sort((a, b) => (b.fechaIngreso || '').localeCompare(a.fechaIngreso || ''));
-    _cacheRepairs();
-    renderRepairs();
-    if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
-    else if (typeof renderDashFollowUps === 'function') renderDashFollowUps();
-  };
 
   _repairsListener = db.collection('repairs')
     .where('fechaIngreso', '>=', cutoffISO)
@@ -103,24 +177,13 @@ function listenRepairs() {
       if (_repairsLoaded && snap.docChanges().length === 0) return;
       _repairsLoaded = true;
       _repVentana = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      _pintar();
+      _repPintar();
     }, err => {
       console.error('Repairs:', err);
       toast('Error cargando reparaciones', 'error');
     });
 
-  // Los que SIGUEN EN EL LOCAL aunque hayan entrado hace más de 60 días
-  // (esperando un repuesto que no llega, abandonados, listos sin retirar).
-  // Antes desaparecían de la lista al cumplir los 60 días: el equipo estaba
-  // en el cajón y la app no lo mostraba. Son pocos (solo los abiertos), así
-  // que el costo de cupo es chico.
-  if (_repAbiertasListener) { _repAbiertasListener(); _repAbiertasListener = null; }
-  _repAbiertasListener = db.collection('repairs')
-    .where('estado', 'in', ['reparando', 'listo'])
-    .onSnapshot(snap => {
-      _repAbiertas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      _pintar();
-    }, err => console.error('Repairs abiertas:', err));
+  if (repAlcance() === 'todo') _cargarHistorialRep();
 }
 
 // Carga histórico completo (solo cuando se pide explícitamente, ej: estadísticas anuales).
@@ -143,6 +206,11 @@ function initRepairs() {
     repRenderTimer = setTimeout(renderRepairs, 60);
   });
   document.getElementById('rep-f-estado').addEventListener('change', renderRepairs);
+  const alcSel = document.getElementById('rep-alcance');
+  if (alcSel) {
+    alcSel.value = repAlcance();
+    alcSel.addEventListener('change', () => setRepAlcance(alcSel.value));
+  }
   document.getElementById('rep-f-marca').addEventListener('change', renderRepairs);
   document.getElementById('rep-f-fecha').addEventListener('change', renderRepairs);
   document.getElementById('rep-sort').addEventListener('change', renderRepairs);
@@ -266,7 +334,7 @@ function renderRepairs() {
   const fSort   = document.getElementById('rep-sort').value;
 
   // Actualizar filtro de marcas
-  const marcas = [...new Set(REPAIRS.map(r => r.marca).filter(Boolean))].sort();
+  const marcas = [...new Set(REPAIRS.filter(r => _enAlcance(r)).map(r => r.marca).filter(Boolean))].sort();
   const selM = document.getElementById('rep-f-marca');
   const prev = selM.value;
   while (selM.options.length > 1) selM.remove(1);
@@ -286,7 +354,10 @@ function renderRepairs() {
   const monthStr = todayStr.slice(0, 7);
 
   const _tpOn = typeof tpVencido === 'function';
-  let filtered = REPAIRS.filter(r => {
+  // Lo que cuenta la lista y los números de arriba: el alcance elegido.
+  const _ahoraTs = now.getTime();
+  const BASE = REPAIRS.filter(r => _enAlcance(r, _ahoraTs));
+  let filtered = BASE.filter(r => {
     if (fEstado === 'demorado') {
       // Demorado = se pasó del SLA de su fase (TP_SLA en tp-fases.js)
       if (_tpOn) { if (!tpVencido(r)) return false; }
@@ -345,15 +416,15 @@ function renderRepairs() {
   }
 
   // Stats bar: demorados = pasados del SLA de su fase
-  const demorados = REPAIRS.filter(r => _tpOn ? tpVencido(r) : (
+  const demorados = BASE.filter(r => _tpOn ? tpVencido(r) : (
     r.estado === 'reparando' && r.fechaIngreso && (now - new Date(r.fechaIngreso)) / 86400000 > 3
   )).length;
 
-  document.getElementById('rs-reparando').textContent = REPAIRS.filter(r => r.estado === 'reparando').length;
-  document.getElementById('rs-listo').textContent     = REPAIRS.filter(r => r.estado === 'listo').length;
+  document.getElementById('rs-reparando').textContent = BASE.filter(r => r.estado === 'reparando').length;
+  document.getElementById('rs-listo').textContent     = BASE.filter(r => r.estado === 'listo').length;
   document.getElementById('rs-demorados').textContent = demorados;
   const devolverEl = document.getElementById('rs-devolver');
-  if (devolverEl) devolverEl.textContent = REPAIRS.filter(r => _esNoVa(r.estado) && r.devuelto !== true).length;
+  if (devolverEl) devolverEl.textContent = BASE.filter(r => _esNoVa(r.estado) && r.devuelto !== true).length;
 
   updateNavBadge();
 
@@ -366,8 +437,8 @@ function renderRepairs() {
       emptyEl.style.display = 'none';
       listEl.innerHTML = '<div class="list-loading"><span class="list-loading__spinner"></span>Cargando reparaciones…</div>';
     } else {
-      listEl.innerHTML = '';
-      emptyEl.style.display = '';
+      listEl.innerHTML = _repAlcancePie(true);
+      emptyEl.style.display = listEl.innerHTML ? 'none' : '';
     }
     return;
   }
@@ -466,7 +537,19 @@ function renderRepairs() {
         ${notaHTML}
         ${acciones}
       </div>`;
-  }).join('');
+  }).join('') + _repAlcancePie(false);
+}
+
+// Renglón al pie de la lista: qué se está mirando y cómo ver el resto.
+// Sobre todo sirve cuando buscás una orden vieja y no aparece.
+function _repAlcancePie(vacio) {
+  if (repAlcance() === 'todo') return '';
+  const fuera = REPAIRS.length - REPAIRS.filter(r => _enAlcance(r)).length;
+  return `<div class="rep-alcance-pie">
+    ${vacio ? '<b>No hay nada acá en los últimos 30 días.</b><br>' : ''}
+    Mostrando equipos ingresados en los últimos ${REP_ALCANCE_DIAS} días${fuera > 0 ? ` · ${fuera} más viejos ocultos` : ''}.
+    <button type="button" class="rep-alcance-btn" onclick="setRepAlcance('todo')">🗂️ Ver todo el historial</button>
+  </div>`;
 }
 
 // ── Checklist helpers ─────────────────────
@@ -1127,6 +1210,7 @@ async function toggleArregloHecho(repairId, i, hecho) {
   r.arreglos = lista;          // snapshot local, para que la ficha se refresque ya
   try {
     await db.collection('repairs').doc(repairId).update({ arreglos: lista });
+    _repPatchLocal(repairId, { arreglos: lista });
     const hechas = lista.filter(a => a.hecho).length;
     if (hechas === lista.length) toast('✅ Todas las reparaciones hechas', 'success');
   } catch (e) {
@@ -1502,6 +1586,7 @@ async function saveRepair() {
       };
       if (foto) updateData.foto = foto;
       await db.collection('repairs').doc(editingRepairId).set(_stripUndefined(updateData));
+      _repPatchLocal(editingRepairId, _stripUndefined(updateData));
       // Seguimiento público (QR): si cambió el modelo, el IMEI o la fecha
       // estimada, el cliente tiene que verlo al escanear.
       if (typeof upsertSeguimientoPublico === 'function') {
@@ -2060,6 +2145,7 @@ async function _doChangeRepairStatus(id, newStatus, r, extra = {}, opts = {}) {
 
   try {
     await db.collection('repairs').doc(id).update(update);
+    _repPatchLocal(id, update);
     // Seguimiento público (QR): reflejar el nuevo estado
     if (typeof upsertSeguimientoPublico === 'function') {
       upsertSeguimientoPublico({ ...r, ...update });
@@ -2303,6 +2389,7 @@ async function confirmarCobro() {
     });
 
     await batch.commit();
+    _repPatchLocal(r.id, { cobrado: true, metodoCobro: metodo, fechaCobro: ahora });
     toast('💰 Cobro registrado en caja', 'success');
   } catch(e) {
     console.error('confirmarCobro:', e);
@@ -2625,6 +2712,7 @@ async function deleteRepair(id) {
   if (!confirm(`¿Eliminar N°${r.nOrden} — ${r.nombre || (r.marca + ' ' + r.modelo)}?`)) return;
   try {
     await db.collection('repairs').doc(id).delete();
+    _repPatchLocal(id, null);
     closeRepairDetail();
     toast('Reparación eliminada', 'info');
   } catch (e) {
@@ -2705,6 +2793,7 @@ async function saveGarantia() {
     if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(docGarantia);
 
     await db.collection('repairs').doc(originalId).update({ tieneGarantia: true });
+    _repPatchLocal(originalId, { tieneGarantia: true });
 
     closeGarantiaModal();
     closeRepairDetail();
@@ -3987,6 +4076,7 @@ async function saveNota() {
   const val = document.getElementById('nota-input').value.trim();
   try {
     await db.collection('repairs').doc(_notaCurrentId).update({ notaRapida: val || null });
+    _repPatchLocal(_notaCurrentId, { notaRapida: val || null });
     toast(val ? '📝 Nota guardada' : '🗑 Nota eliminada', 'success');
     closeNotaModal();
   } catch { toast('Error al guardar nota', 'error'); }
@@ -4560,6 +4650,7 @@ async function confirmCostoRequerido() {
 
   try {
     await db.collection('repairs').doc(r.id).update(update);
+    _repPatchLocal(r.id, update);
     // Actualizar snapshot local
     Object.assign(r, update);
     closeCostoRequeridoModal(true);
