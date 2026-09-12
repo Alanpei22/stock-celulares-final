@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 35 suites, ~1500 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 36 suites, ~1530 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -62,6 +62,20 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 
 ## Lo ultimo que se hizo (2026-09-12)
+
+**Demorados: una sola cuenta** — tests/test-demorados.js
+- Habia 5 definiciones (lista por SLA de fase; inicio, estadisticas y resumen
+  por "+3 dias reparando"; demoradas de estadisticas metia listos).
+  Ahora `tpDemorado(r)` en tp-fases.js = estado 'reparando' + vencido el SLA
+  de su fase. `_repDemorado` en repairs.js es el respaldo. Todo usa eso.
+- `TP_SLA.ingresado` 4 h → 72 h (la card salta Ingresado → Listo, asi que casi
+  todo vivia en Ingresado y a las 4 h salia demorado). `aprobado` 4 → 24 h.
+- `tpVencido` (reloj rojo) ya no marca "no va" devueltos. Listo vencido
+  dice "sin retirar" y no suma en Demorados.
+- `tpDesde`: si la ultima fase anotada no es la actual, usa el ultimo cambio
+  de estado; con una sola fase, cuenta desde fechaIngreso si es anterior.
+- Estadisticas: "Demoradas" filtraba por Reparando; el boton WA llamaba a
+  sendWA() que no existe (ahora repairWhatsApp).
 
 **Alcance de la lista de reparaciones: ultimos 30 dias / todo** — test-reparaciones-estados.js (10-13)
 - Primer filtro de la lista (`#rep-alcance`). Se guarda por dispositivo

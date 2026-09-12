@@ -150,13 +150,13 @@ console.log('\n4) SLA por fase');
 setRepairs([
   { id:'c1', estado:'reparando', fase:'repuesto', faseHist:[{f:'repuesto',t:hAgo(100)}] },  // sla 120 → ok
   { id:'c2', estado:'reparando', fase:'repuesto', faseHist:[{f:'repuesto',t:hAgo(130)}] },  // sla 120 → vencido
-  { id:'c3', estado:'reparando', fase:'ingresado', faseHist:[{f:'ingresado',t:hAgo(5)}] },  // sla 4 → vencido
+  { id:'c3', estado:'reparando', fase:'ingresado', faseHist:[{f:'ingresado',t:hAgo(80)}] }, // sla 72 → vencido
   { id:'c4', estado:'entregado', fase:'entregado', faseHist:[{f:'entregado',t:hAgo(900)}] },// sla null
   { id:'c5', estado:'listo', fase:'abandonado', faseHist:[{f:'abandonado',t:hAgo(900)}] },  // sla null
 ]);
 ok(get('tpVencido(REPAIRS[0])') === false, '100 h esperando repuesto: todavía no', null);
 ok(get('tpVencido(REPAIRS[1])') === true,  '130 h esperando repuesto: demorado', null);
-ok(get('tpVencido(REPAIRS[2])') === true,  '5 h ingresado sin tocar: demorado', null);
+ok(get('tpVencido(REPAIRS[2])') === true,  '80 h ingresado sin tocar: demorado (el plazo era 4 h y todo salía demorado)', null);
 ok(get('tpVencido(REPAIRS[3])') === false, 'entregado nunca se demora', null);
 ok(get('tpVencido(REPAIRS[4])') === false, 'abandonado no molesta más', null);
 

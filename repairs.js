@@ -309,6 +309,14 @@ function filterRepsByStatus(status) {
 }
 
 // ── Render ────────────────────────────────
+// Demorado con respaldo por si tp-fases.js no cargó (la regla vieja: más de
+// 3 días reparando). La definición de verdad es tpDemorado.
+function _repDemorado(r) {
+  if (typeof tpDemorado === 'function') return tpDemorado(r);
+  return !!r && r.estado === 'reparando' && !!r.fechaIngreso
+    && (Date.now() - new Date(r.fechaIngreso)) / 86400000 > 3;
+}
+
 // Garantía vigente de un equipo entregado: { quedan } en días, o null si no
 // tiene, no se entregó todavía o ya venció.
 function _garantiaRestante(r, ahora = new Date()) {
@@ -359,8 +367,8 @@ function renderRepairs() {
   const BASE = REPAIRS.filter(r => _enAlcance(r, _ahoraTs));
   let filtered = BASE.filter(r => {
     if (fEstado === 'demorado') {
-      // Demorado = se pasó del SLA de su fase (TP_SLA en tp-fases.js)
-      if (_tpOn) { if (!tpVencido(r)) return false; }
+      // Demorado: una sola definición para toda la app (tpDemorado en tp-fases.js)
+      if (_tpOn) { if (!tpDemorado(r)) return false; }
       else {
         if (r.estado !== 'reparando' || !r.fechaIngreso) return false;
         if ((now - new Date(r.fechaIngreso)) / 86400000 <= 3) return false;
@@ -416,7 +424,7 @@ function renderRepairs() {
   }
 
   // Stats bar: demorados = pasados del SLA de su fase
-  const demorados = BASE.filter(r => _tpOn ? tpVencido(r) : (
+  const demorados = BASE.filter(r => _tpOn ? tpDemorado(r) : (
     r.estado === 'reparando' && r.fechaIngreso && (now - new Date(r.fechaIngreso)) / 86400000 > 3
   )).length;
 
@@ -456,9 +464,12 @@ function renderRepairs() {
       ? `<span class="owner-only ganancia-chip ${ganancia >= 0 ? 'ganancia-pos' : 'ganancia-neg'}">📈 $${ganancia.toLocaleString('es-AR')}</span>`
       : '';
 
-    // Demorado = se pasó del SLA de SU fase (ver TP_SLA en tp-fases.js)
-    const isDemorado = typeof tpVencido === 'function' ? tpVencido(r)
+    // Demorado (borde rojo, cuenta arriba) vs vencido (reloj rojo): un Listo
+    // que no retiran lleva el reloj rojo pero no es una demora del taller.
+    const isDemorado = typeof tpDemorado === 'function' ? tpDemorado(r)
       : (r.estado === 'reparando' && r.fechaIngreso && (now - new Date(r.fechaIngreso)) / 86400000 > 3);
+    const isVencido = typeof tpVencido === 'function' ? tpVencido(r) : isDemorado;
+    const vencTxt = !isVencido ? '' : (r.estado === 'listo' ? ' · sin retirar ⚠️' : ' ⚠️');
 
     // Card class — sanitizar estado para evitar espacios en el nombre de clase CSS
     const estadoSlug = (r.estado || '').replace(/\s+/g, '-').toLowerCase();
@@ -516,7 +527,7 @@ function renderRepairs() {
             ${typeof tpChipHtml === 'function' ? tpChipHtml(r) : `<span class="badge ${st.cls}">${st.label}</span>`}
             ${r.esGarantia ? '<span class="badge bg-warn" style="margin-top:3px">Garantía</span>' : ''}
             ${typeof tpDesde === 'function'
-              ? `<span class="tp-dias ${isDemorado ? 'rojo' : ''}">${tpTxtTiempo(tpDesde(r))} acá${isDemorado ? ' ⚠️' : ''}</span>`
+              ? `<span class="tp-dias ${isVencido ? 'rojo' : ''}">${tpTxtTiempo(tpDesde(r))} acá${vencTxt}</span>`
               : (isDemorado ? '<span class="badge" style="margin-top:3px;background:#fee2e2;color:#dc2626;font-size:.6rem">⚠️ Demorado</span>' : '')}
             ${/* El ícono de WhatsApp se fue de acá: ahora es el chip "Avisar",
                   con el resto de las acciones. Tenerlo en dos lugares de la
@@ -1752,7 +1763,7 @@ function openRepairDetail(id) {
       <span class="det-label">Fase</span>
       <div class="tp-fase-head">
         ${tpChipHtml(r)}
-        <span class="tp-dias ${tpVencido(r) ? 'rojo' : ''}">${tpTxtTiempo(tpDesde(r))} en esta fase${tpVencido(r) ? ' ⚠️ demorado' : ''}</span>
+        <span class="tp-dias ${tpVencido(r) ? 'rojo' : ''}">${tpTxtTiempo(tpDesde(r))} en esta fase${tpDemorado(r) ? ' ⚠️ demorado' : (tpVencido(r) ? ' ⚠️ sin retirar' : '')}</span>
         ${_esNoVa(r.estado) ? `<span class="tp-dias">${r.devuelto ? '· devuelto' : '· para devolver'}</span>` : ''}
       </div>
       ${tpStepsHtml(r)}
@@ -3266,11 +3277,7 @@ function buildRepairStatsHTML(tab) {
   // ── ESTADO ACTUAL DEL TALLER (no afectado por período) ──
   const reparandoNow = REPAIRS.filter(r => r.estado === 'reparando').length;
   const listoNow     = REPAIRS.filter(r => r.estado === 'listo').length;
-  const demoradosNow = REPAIRS.filter(r => {
-    if (r.estado !== 'reparando') return false;
-    const t = r.fechaIngreso ? (Date.now() - new Date(r.fechaIngreso)) / 86400000 : 0;
-    return t > 3;
-  }).length;
+  const demoradosNow = REPAIRS.filter(_repDemorado).length;
 
   const estadoHtml = `
     <h4 class="rstats-section-title">Estado actual del taller</h4>
@@ -3285,7 +3292,7 @@ function buildRepairStatsHTML(tab) {
       </button>
       <button class="rstats-status-card${demoradosNow > 0 ? ' rstats-status-card--warn' : ''}" onclick="closeRepairStats();_filterRepairsByEstado('demoradas')">
         <div class="rstats-status-num">${demoradosNow}</div>
-        <div class="rstats-status-lbl">⚠️ Demoradas +3d</div>
+        <div class="rstats-status-lbl">⚠️ Demoradas</div>
       </button>
     </div>
   `;
@@ -3416,14 +3423,10 @@ function buildRepairStatsHTML(tab) {
   ` : '';
 
   // ── DEMORADAS ACCIONABLES ──
-  const demoradasList = REPAIRS.filter(r => {
-    if (r.estado !== 'reparando' && r.estado !== 'listo') return false;
-    if (!r.fechaIngreso) return false;
-    const dias = (Date.now() - new Date(r.fechaIngreso)) / 86400000;
-    return dias > 3;
-  }).map(r => ({
+  const demoradasList = REPAIRS.filter(_repDemorado).map(r => ({
     ...r,
-    diasIng: Math.round((Date.now() - new Date(r.fechaIngreso)) / 86400000),
+    diasIng: r.fechaIngreso ? Math.round((Date.now() - new Date(r.fechaIngreso)) / 86400000) : 0,
+    faseTxt: typeof tpFaseInfo === 'function' ? tpFaseInfo(r).nombre : 'Reparando',
   })).sort((a, b) => b.diasIng - a.diasIng).slice(0, 8);
 
   const demoradasHtml = demoradasList.length > 0 ? `
@@ -3433,7 +3436,7 @@ function buildRepairStatsHTML(tab) {
         <div class="rstats-demorada">
           <div class="rstats-demorada-info">
             <div class="rstats-demorada-name">N°${r.nOrden || '?'} · ${esc(r.marca || '')} ${esc(r.modelo || '')}</div>
-            <div class="rstats-demorada-meta">${esc(r.nombre || '—')} · ${r.diasIng} días · ${esc(r.estado === 'listo' ? '✅ Lista' : '🔧 Reparando')}</div>
+            <div class="rstats-demorada-meta">${esc(r.nombre || '—')} · ${r.diasIng} días en el taller · ${esc(r.faseTxt)}</div>
           </div>
           ${r.tlf ? `<button class="rstats-demorada-wa" onclick="closeRepairStats();sendWAToCustomer('${esc(r.id)}')">🟢</button>` : ''}
         </div>
@@ -3496,20 +3499,22 @@ function _filterRepairsByEstado(estado) {
   if (typeof switchSection === 'function') switchSection('repairs');
   const sel = document.getElementById('rep-f-estado');
   if (sel) {
-    sel.value = estado === 'demoradas' ? 'reparando' : estado;
+    // "Demoradas" filtraba por "Reparando": tocabas 3 y la lista mostraba 20.
+    sel.value = estado === 'demoradas' ? 'demorado' : estado;
     if (typeof renderRepairs === 'function') renderRepairs();
   }
 }
 
+// El botón verde de las demoradas en estadísticas. Llamaba a sendWA(), que no
+// existe en ningún lado: el botón no hacía nada.
 function sendWAToCustomer(repairId) {
-  if (typeof sendWA === 'function') sendWA(repairId);
+  if (typeof repairWhatsApp === 'function') repairWhatsApp(repairId);
 }
 
 function buildStatsMonthHTML_LEGACY(now, thisMonth) {
   const reparando = REPAIRS.filter(r => r.estado === 'reparando').length;
   const listo     = REPAIRS.filter(r => r.estado === 'listo').length;
-  const demorados = REPAIRS.filter(r => r.estado === 'reparando' && r.fechaIngreso &&
-    (now - new Date(r.fechaIngreso)) / 86400000 > 3).length;
+  const demorados = REPAIRS.filter(_repDemorado).length;
 
   const mesReps    = REPAIRS.filter(r => r.fechaIngreso && r.fechaIngreso.startsWith(thisMonth));
   const mesTotal   = mesReps.length;

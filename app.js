@@ -881,8 +881,9 @@ function _renderKPIs() {
   const rpts = typeof REPUESTOS !== 'undefined' ? REPUESTOS : [];
   const hoyISO = _dAR(new Date());
   const now = Date.now();
-  const demoradas = reps.filter(r => r.estado === 'reparando' && r.fechaIngreso &&
-    (now - new Date(r.fechaIngreso).getTime()) / 86400000 > 3).length;
+  // Misma cuenta que la lista de reparaciones (tpDemorado en tp-fases.js)
+  const demoradas = reps.filter(r => typeof _repDemorado === 'function' ? _repDemorado(r)
+    : (r.estado === 'reparando' && r.fechaIngreso && (now - new Date(r.fechaIngreso).getTime()) / 86400000 > 3)).length;
   const listas    = reps.filter(r => r.estado === 'listo').length;
   const record    = reps.filter(r => r.seguimientoFecha && r.seguimientoFecha <= hoyISO && !r.seguimientoAck).length;
   const bajoStock = rpts.filter(r => r.stockMin > 0 && (r.cantidad || 0) <= r.stockMin).length;

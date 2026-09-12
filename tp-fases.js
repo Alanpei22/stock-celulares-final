@@ -26,10 +26,13 @@
 //  null = esa fase no vence nunca (no muestra alerta).
 // ══════════════════════════════════════════════════════════════
 const TP_SLA = {
-  ingresado:     4,     // 4 h  → si entró y nadie lo miró, avisá
+  // Antes 4 h. Pero la card lleva de "Ingresado" directo a "Listo" sin pasar
+  // por las fases del medio, así que casi todo lo que está en el taller vive
+  // en "Ingresado": a las 4 horas TODO salía demorado. 3 días, como siempre.
+  ingresado:     72,
   diagnostico:   48,    // 2 días para diagnosticar
   presupuestado: 72,    // 3 días esperando respuesta del cliente
-  aprobado:      4,     // aprobado y sin empezar: que no se duerma
+  aprobado:      24,    // aprobado y sin empezar: que no se duerma (antes 4 h)
   repuesto:      120,   // 5 días esperando que llegue el repuesto
   reparacion:    72,    // 3 días en el banco
   listo:         168,   // 7 días avisado y sin retirar
@@ -196,7 +199,22 @@ function tpHistorial(r) {
 // Desde cuándo está en la fase actual.
 function tpDesde(r) {
   const h = tpHistorial(r);
-  return (h.length ? h[h.length - 1].t : null) || r.fechaIngreso || new Date().toISOString();
+  const ult = h.length ? h[h.length - 1] : null;
+  let t = (ult && ult.t) || r.fechaIngreso || new Date().toISOString();
+  // Si el estado cambió por un camino que no anotó la fase (versión vieja de
+  // la app, otro dispositivo), la última entrada es de OTRA fase y el reloj
+  // arrancaba de ahí: un equipo recién pasado a Listo salía con los días que
+  // estuvo en el banco. Se toma el último cambio de estado, que sí se anotó.
+  if (ult && ult.f !== tpFaseDe(r) && Array.isArray(r.estadoHistorial)) {
+    const cambio = r.estadoHistorial
+      .filter(x => x && x.estado === r.estado && x.fecha)
+      .map(x => x.fecha).sort().pop();
+    if (cambio && cambio > t) t = cambio;
+  }
+  // Primera fase: si la orden se cargó con fecha de ingreso anterior (el
+  // selector de día permite cargar lo que entró ayer), cuenta desde el ingreso.
+  if (h.length <= 1 && r.fechaIngreso && r.fechaIngreso < t) t = r.fechaIngreso;
+  return t;
 }
 
 function tpHoras(iso) {
@@ -205,12 +223,34 @@ function tpHoras(iso) {
   return (Date.now() - t) / 3600000;
 }
 
-// ¿Se pasó del SLA de su fase?
+// ¿Se pasó del SLA de su fase? (el reloj rojo de la card y la ficha)
 function tpVencido(r) {
+  if (!r) return false;
   const f = tpFaseDe(r);
   const sla = TP_SLA[f];
   if (sla == null) return false;
+  // Un "no va" que ya se devolvió está cerrado: no hay nada que hacer.
+  // Antes quedaba vencido para siempre y sumaba en Demorados.
+  if ((f === 'irreparable' || f === 'rechazado') && r.devuelto === true) return false;
   return tpHoras(tpDesde(r)) > sla;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DEMORADO — UNA sola definición para toda la app
+//  ─────────────────────────────────────────────────────────────
+//  Equipo que sigue EN EL TALLER SIN TERMINAR y se pasó del plazo de su fase.
+//
+//  Antes había cinco cuentas distintas: la lista usaba el plazo de la fase
+//  (y metía listos sin retirar y "no va" ya devueltos), el panel de inicio y
+//  las estadísticas contaban "más de 3 días desde el ingreso", y la lista de
+//  demoradas de las estadísticas sumaba también los listos. Cada pantalla
+//  daba un número distinto.
+//
+//  Un Listo sin retirar NO es demorado (la demora es del cliente): tiene su
+//  reloj rojo en la card ("sin retirar") y su aviso aparte.
+// ══════════════════════════════════════════════════════════════
+function tpDemorado(r) {
+  return !!r && r.estado === 'reparando' && tpVencido(r);
 }
 
 // "3 h" / "2 d" / "45 min"
