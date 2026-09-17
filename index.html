@@ -808,6 +808,19 @@
     <div class="modal-body">
 
       <div class="settings-section">
+        <h4 class="settings-title">📊 Cupo de Firebase</h4>
+        <p class="fi-helper" style="margin-bottom:8px">
+          Lecturas de HOY contadas en <b>este dispositivo</b>. El plan gratis corta en 50.000 por día
+          entre todos los aparatos. Sirve para ver qué es lo que más lee.
+        </p>
+        <div id="cupo-panel" class="cupo-panel"></div>
+        <div class="settings-row">
+          <button class="btn-secondary" onclick="renderCupoPanel()">🔄 Actualizar</button>
+          <button class="btn-secondary" onclick="cupoReset()">Empezar de cero</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <h4 class="settings-title">🏪 Imagen del Negocio</h4>
         <div class="biz-preview" id="biz-preview">
           <span class="biz-no-img">Sin imagen cargada</span>

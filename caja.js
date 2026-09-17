@@ -125,6 +125,8 @@ function showApp() {
 }
 
 function initApp() {
+  // Una apertura = un ciclo de lecturas (contador en utils.js)
+  if (typeof cupoApertura === 'function') cupoApertura();
   initDarkMode();
   db = _fbInit();
   // Aviso en vivo en los IMEI de la venta de equipo
@@ -560,7 +562,9 @@ function listenMovimientos() {
 
   try {
     // includeMetadataChanges: alimenta el indicador de sincronización.
+    let _primerMov = true;
     movListener = query.onSnapshot({ includeMetadataChanges: true }, snap => {
+      if (typeof cupoSnap === 'function') { cupoSnap('caja_movimientos', snap, _primerMov); _primerMov = false; }
       if (typeof syncReport === 'function') syncReport('caja', snap.metadata.hasPendingWrites);
       // Aviso solo de metadata (subió lo que estaba pendiente): no re-dibujar
       if (snap.docChanges().length === 0 && MOVIMIENTOS.length) return;

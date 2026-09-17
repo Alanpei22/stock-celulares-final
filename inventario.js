@@ -72,7 +72,9 @@ function initInventario(opts = {}) {
 // ── Listener Firestore ──────────────────────────────────────
 function _listenProductos() {
   if (_invListener) return;
+  let _primerInv = true;
   _invListener = db.collection('productos').orderBy('nombre').onSnapshot(snap => {
+    if (typeof cupoSnap === 'function') { cupoSnap('productos', snap, _primerInv); _primerInv = false; }
     PRODUCTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     PRODUCTOS_MAP.clear();
     PRODUCTOS.forEach(p => { if (p.codigo) PRODUCTOS_MAP.set(String(p.codigo), p); });

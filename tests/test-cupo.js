@@ -127,5 +127,60 @@ ok(/openPedidosModal[\s\S]{0,300}listenPedidos\(\)/.test(pedSrc),
    'se lee al abrir el modal de pedidos');
 ok(/if \(_repuestosListener\) return;/.test(repuSrc), 'el listener de repuestos no se recrea (antes se cancelaba y releía todo)');
 
+console.log('\n7) El corte de la ventana de reparaciones es estable');
+// Antes el corte llevaba la hora y los milisegundos del momento de abrir. Para
+// Firestore eso es una consulta DISTINTA cada vez: no puede reusar lo que ya
+// tiene guardado y vuelve a leer (y cobrar) toda la ventana en cada apertura.
+ok(/cutoff\.toISOString\(\)\.slice\(0, 10\) \+ 'T00:00:00/.test(repSrc),
+   'va redondeado a la medianoche, así la consulta es la misma todo el día');
+ok(/_HIST_TTL_MS/.test(repSrc) && /localStorage\.setItem\(_HIST_KEY/.test(repSrc),
+   'y el historial completo queda guardado unas horas en el dispositivo');
+
+console.log('\n8) Contador de lecturas (para saber qué las gasta)');
+{
+  const u = fs.readFileSync(DIR + 'utils.js', 'utf8');
+  const desde = u.indexOf('const _CUPO_KEY');
+  const hasta = u.indexOf('// ── Debounce');
+  ok(desde > 0 && hasta > desde, 'el contador está en utils.js (lo cargan las dos páginas)');
+  const cc = {
+    console,
+    localStorage: { _d: {}, getItem(k) { return this._d[k] ?? null; },
+                    setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } },
+  };
+  cc.globalThis = cc;
+  vm.createContext(cc);
+  vm.runInContext('var todayAR = () => "2026-09-17";' + u.slice(desde, hasta), cc, { filename: 'utils.js' });
+  const G = e => vm.runInContext(e, cc);
+
+  G('cupoContar("stock", 120); cupoContar("repairs", 40); cupoContar("stock", 5);');
+  const d = G('cupoLeer()');
+  ok(d.cols.stock === 125 && d.cols.repairs === 40, 'suma por colección', d.cols);
+  ok(G('cupoTotal()') === 165, 'y el total', G('cupoTotal()'));
+
+  // Un listener manda TODOS los documentos la primera vez y solo los cambios
+  // después: contar siempre el total multiplicaría la cuenta por diez.
+  G('cupoContar("x", 0)');
+  const snapPrimero = { size: 300, docChanges: () => [1, 2, 3] };
+  cc.__S = snapPrimero;
+  G('cupoSnap("productos", __S, true)');
+  ok(G('cupoLeer()').cols.productos === 300, 'primer snapshot: todos', G('cupoLeer()').cols.productos);
+  G('cupoSnap("productos", __S, false)');
+  ok(G('cupoLeer()').cols.productos === 303, 'los siguientes: solo lo que cambió', G('cupoLeer()').cols.productos);
+
+  // Al cambiar el día, la cuenta arranca de cero
+  vm.runInContext('todayAR = () => "2026-09-18";', cc);
+  ok(G('cupoTotal()') === 0, 'la cuenta es por día', G('cupoTotal()'));
+}
+
+console.log('\n9) Y está enganchado donde más se lee');
+const appSrc2 = fs.readFileSync(DIR + 'app.js', 'utf8');
+const cajaSrc2 = fs.readFileSync(DIR + 'caja.js', 'utf8');
+ok(/cupoSnap\('stock'/.test(appSrc2), 'stock');
+ok(/cupoSnap\('repairs'/.test(repSrc), 'reparaciones');
+ok(/cupoSnap\('caja_movimientos'/.test(cajaSrc2), 'movimientos de caja');
+ok(/cupoContar\('repairs \(historial completo\)'/.test(repSrc), 'y el historial completo, que es el más caro');
+ok(/cupoApertura/.test(appSrc2) && /cupoApertura/.test(cajaSrc2), 'las dos páginas cuentan la apertura');
+ok(/id="cupo-panel"/.test(fs.readFileSync(DIR + 'index.html', 'utf8')), 'se ve en Configuración');
+
 console.log(fails ? `\n${fails} FALLARON` : '\nTodo OK');
 process.exit(fails ? 1 : 0);

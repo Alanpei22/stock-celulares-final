@@ -167,7 +167,9 @@ function listenRepuestos() {
   if (_repuestosListener) return;
   if (typeof db === 'undefined' || !db) return;
 
+  let _primerRepu = true;
   _repuestosListener = db.collection('repuestos').onSnapshot(snap => {
+    if (typeof cupoSnap === 'function') { cupoSnap('repuestos', snap, _primerRepu); _primerRepu = false; }
     REPUESTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     REPUESTOS.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
     _lowStockDismissed = false; // reaparece en cada cambio de inventario

@@ -63,6 +63,24 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 ## Lo ultimo que se hizo (2026-09-17)
 
+**Cupo de Firebase: medir y bajar lecturas** — test-cupo.js (7, 8, 9)
+- **Contador propio** en utils.js: `cupoContar(col, n)`, `cupoSnap(col, snap,
+  primero)`, `cupoApertura()`, `cupoLeer()`, `cupoTotal()`. Guarda por dia y por
+  DISPOSITIVO en localStorage. Se ve en Configuracion → "Cupo de Firebase"
+  (`renderCupoPanel`). Enganchado en stock, repairs, caja_movimientos,
+  productos, repuestos y el historial completo.
+  OJO: un listener manda todo la 1a vez y despues solo cambios → por eso
+  `cupoSnap` recibe `primero`.
+- **El corte de la ventana de reparaciones ahora va a medianoche.** Antes
+  llevaba hora y milisegundos: para Firestore era otra consulta cada vez, no
+  podia reusar lo cacheado y **releia toda la ventana en cada apertura**.
+- **"Todo el historial" se guarda 6 h en el dispositivo** (`_HIST_TTL_MS`,
+  localStorage `repairsHistCache`, sin fotos). Antes cada apertura leia la
+  coleccion entera.
+- Lo mas caro que queda: el listener de `stock` (colección entera, sin filtro,
+  pero consulta estable) y el historial completo. Medir con el panel antes de
+  tocar otra cosa.
+
 **BUG: el escaner abria la camara y no leia NADA** (tests/test-escaner-lectura.js)
 - Culpa del hint `TRY_HARDER` de ZXing. Suena a que ayuda; en esta version deja
   de leer. Medido en navegador de verdad sobre un <video> con un EAN-13 real:

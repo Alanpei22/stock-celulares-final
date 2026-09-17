@@ -277,14 +277,24 @@ console.log('\n12) Reabrir la app en "todo" vuelve a traer el historial; volver 
 W.gets = [];
 run('_repHistorial = []; _fullHistoryCache = null; _repairsLoaded = false; listenRepairs()');
 await new Promise(r => setImmediate(r));
-ok(W.gets.includes('repairs'), 'al abrir en "todo" lo carga solo', W.gets);
+// CUPO: el historial es lo más caro que lee la app (la colección entera), así
+// que queda guardado unas horas en el dispositivo. Abrir la app cinco veces en
+// una tarde costaba cinco veces la base entera.
+ok(W.gets.length === 0, 'al reabrir, usa lo guardado en vez de releer la base', W.gets);
+ok(get('REPAIRS').length === 3, 'y la lista sale igual de completa', get('REPAIRS').length);
+ctx.localStorage.removeItem('repairsHistCache');
+W.gets = [];
+run('_repHistorial = []; _fullHistoryCache = null; _repairsLoaded = false; listenRepairs()');
+await new Promise(r => setImmediate(r));
+ok(W.gets.includes('repairs'), 'vencido el guardado, sí lo vuelve a leer', W.gets);
 await get(`setRepAlcance('30')`);
 ok(get('_repHistorial').length === 0, 'en 30 días se suelta el historial');
 ok(JSON.stringify(listaIds()) === '[40]', 'y la lista vuelve a 30 días', listaIds());
 
 console.log('\n13) Sin internet no queda a medias');
 HIST_FALLA = true;
-run('_fullHistoryCache = null'); const _ce = console.error; console.error = () => {};
+run('_fullHistoryCache = null');
+ctx.localStorage.removeItem('repairsHistCache'); const _ce = console.error; console.error = () => {};
 await get(`setRepAlcance('todo')`);
 ok(get('repAlcance()') === '30', 'si no pudo traer el historial, vuelve a 30 días');
 HIST_FALLA = false; console.error = _ce;

@@ -71,7 +71,10 @@ function listenStock() {
   // Cancelar listener previo (evita duplicados en re-login)
   if (_stockListener) { _stockListener(); _stockListener = null; }
 
+  let _primerStock = true;
   _stockListener = db.collection('stock').onSnapshot(snapshot => {
+    if (typeof cupoSnap === 'function') cupoSnap('stock', snapshot, _primerStock);
+    _primerStock = false;
     _stockLoaded = true;
     STOCK = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     STOCK.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
@@ -432,6 +435,8 @@ function saveBizImage() {
 
 // ── Init ──────────────────────────────────────────────────
 function initApp() {
+  // Una apertura = un ciclo de lecturas (contador en utils.js)
+  if (typeof cupoApertura === 'function') cupoApertura();
   if (appInited) return;
   appInited = true;
   initDarkMode();
@@ -2368,7 +2373,36 @@ function _saveBizDataForm() {
   _bizDataTimer = setTimeout(saveBizData, 600); // no escribir en Firestore en cada tecla
 }
 
+// Cuánto se leyó hoy en este dispositivo, por colección. La idea no es la
+// contabilidad exacta (esa está en la consola de Firebase) sino saber a dónde
+// apuntar cuando el cupo se llena.
+function renderCupoPanel() {
+  const el = document.getElementById('cupo-panel');
+  if (!el || typeof cupoLeer !== 'function') return;
+  const d = cupoLeer();
+  const total = cupoTotal(d);
+  const filas = Object.entries(d.cols).sort((a, b) => b[1] - a[1]);
+  if (!filas.length) { el.innerHTML = '<p class="settings-empty">Todavía no se leyó nada hoy en este dispositivo.</p>'; return; }
+  const prom = d.aperturas ? Math.round(total / d.aperturas) : total;
+  el.innerHTML = filas.map(([col, n]) => `
+      <div class="cupo-row">
+        <span class="cupo-col">${esc(col)}</span>
+        <span class="cupo-num">${n.toLocaleString('es-AR')}</span>
+        <span class="cupo-barra"><i style="width:${Math.max(2, Math.round(n / total * 100))}%"></i></span>
+      </div>`).join('') +
+    `<div class="cupo-total">
+       <b>${total.toLocaleString('es-AR')}</b> lecturas hoy · ${d.aperturas || 1} aperturas ·
+       <b>${prom.toLocaleString('es-AR')}</b> por apertura
+     </div>`;
+}
+
+function cupoReset() {
+  try { localStorage.removeItem('cupoLecturas'); } catch {}
+  renderCupoPanel();
+}
+
 function openSettings() {
+  renderCupoPanel();
   renderSettingsSellers();
   renderSettingsPayments();
   renderSettingsPrices();

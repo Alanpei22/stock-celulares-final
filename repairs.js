@@ -164,9 +164,14 @@ function listenRepairs() {
   // ventana, y eso se cobra por documento. 60 días cubre el día a día del
   // taller y las estadísticas del mes contra el mes anterior. Lo que se
   // muestra en la lista lo decide el alcance (30 días / todo).
+  // El corte va redondeado a la MEDIANOCHE. Antes llevaba la hora y los
+  // milisegundos del momento de abrir: para Firestore era una consulta
+  // DISTINTA cada vez, así que no podía reusar lo que ya tenía guardado y
+  // volvía a leer todas las reparaciones de la ventana en cada apertura.
+  // Con el corte fijo por día, las aperturas siguientes solo traen los cambios.
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - REPAIRS_DIAS_VENTANA);
-  const cutoffISO = cutoff.toISOString();
+  const cutoffISO = cutoff.toISOString().slice(0, 10) + 'T00:00:00.000Z';
 
   _repairsListener = db.collection('repairs')
     .where('fechaIngreso', '>=', cutoffISO)
@@ -174,6 +179,7 @@ function listenRepairs() {
     // de sincronización). Los avisos que son SOLO de metadata no re-dibujan.
     .onSnapshot({ includeMetadataChanges: true }, snap => {
       if (typeof syncReport === 'function') syncReport('reparaciones', snap.metadata.hasPendingWrites);
+      if (typeof cupoSnap === 'function') cupoSnap('repairs', snap, !_repairsLoaded);
       if (_repairsLoaded && snap.docChanges().length === 0) return;
       _repairsLoaded = true;
       _repVentana = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -189,10 +195,38 @@ function listenRepairs() {
 // Carga histórico completo (solo cuando se pide explícitamente, ej: estadísticas anuales).
 // Se cachea en memoria por sesión para no re-leer toda la historia cada vez.
 let _fullHistoryCache = null;
-async function loadAllRepairsHistory() {
+// CUPO: esto lee la colección ENTERA. Es lo más caro que hace la app, así que
+// además de cachearlo en memoria se guarda en el dispositivo por unas horas:
+// abrir la app cinco veces en una tarde con "Todo el historial" puesto costaba
+// cinco veces la base entera.
+const _HIST_TTL_MS = 6 * 60 * 60 * 1000;   // 6 horas
+const _HIST_KEY = 'repairsHistCache';
+
+function _histDesdeDisco() {
+  try {
+    const raw = localStorage.getItem(_HIST_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d || !Array.isArray(d.lista) || !d.t) return null;
+    if (Date.now() - d.t > _HIST_TTL_MS) return null;
+    return d.lista;
+  } catch { return null; }
+}
+
+async function loadAllRepairsHistory(forzar) {
   if (_fullHistoryCache) return _fullHistoryCache;
+  if (!forzar) {
+    const guardado = _histDesdeDisco();
+    if (guardado) { _fullHistoryCache = guardado; return _fullHistoryCache; }
+  }
   const snap = await db.collection('repairs').orderBy('fechaIngreso', 'desc').get();
+  if (typeof cupoContar === 'function') cupoContar('repairs (historial completo)', snap.size);
   _fullHistoryCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  try {
+    // Sin fotos: el historial entero con base64 no entra en localStorage
+    const liviano = _fullHistoryCache.map(({ foto, patronImg, ...x }) => x);
+    localStorage.setItem(_HIST_KEY, JSON.stringify({ t: Date.now(), lista: liviano }));
+  } catch { /* no entra: seguimos solo con el cache en memoria */ }
   return _fullHistoryCache;
 }
 

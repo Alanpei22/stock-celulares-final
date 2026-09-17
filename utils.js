@@ -60,6 +60,58 @@ function todayAR() {
   }).slice(0, 10);
 }
 
+// ══════════════════════════════════════════════════════════════
+//  CONTADOR DE LECTURAS DE FIREBASE
+//  ─────────────────────────────────────────────────────────────
+//  El plan gratis corta en 50.000 lecturas por día y cada documento leído
+//  cuenta una. Cuando se llena, la app deja de traer datos y no hay forma de
+//  saber QUÉ lo gastó: la consola de Firebase muestra el total, no el detalle.
+//
+//  Esto lleva la cuenta por colección, por día y POR DISPOSITIVO (es
+//  localStorage). Sirve para saber a dónde apuntar, no para facturar: los
+//  números de verdad están en la consola de Firebase.
+// ══════════════════════════════════════════════════════════════
+const _CUPO_KEY = 'cupoLecturas';
+
+function cupoLeer() {
+  try {
+    const d = JSON.parse(localStorage.getItem(_CUPO_KEY) || '{}');
+    if (d.dia !== todayAR()) return { dia: todayAR(), cols: {}, aperturas: 0 };
+    return { dia: d.dia, cols: d.cols || {}, aperturas: d.aperturas || 0 };
+  } catch { return { dia: todayAR(), cols: {}, aperturas: 0 }; }
+}
+
+function cupoContar(coleccion, n) {
+  if (!n || n < 0) return;
+  try {
+    const d = cupoLeer();
+    d.cols[coleccion] = (d.cols[coleccion] || 0) + n;
+    localStorage.setItem(_CUPO_KEY, JSON.stringify(d));
+  } catch { /* modo privado: sin contador, la app sigue igual */ }
+}
+
+// Una apertura de la app = un ciclo de lecturas. Sirve para el promedio.
+function cupoApertura() {
+  try {
+    const d = cupoLeer();
+    d.aperturas = (d.aperturas || 0) + 1;
+    localStorage.setItem(_CUPO_KEY, JSON.stringify(d));
+  } catch {}
+}
+
+// Un snapshot de listener: la PRIMERA vez llegan todos los documentos; después,
+// solo los que cambiaron. Contar siempre docs.length multiplicaría por diez.
+function cupoSnap(coleccion, snap, primero) {
+  if (!snap) return;
+  const n = primero ? (snap.size ?? (snap.docs || []).length)
+                    : (typeof snap.docChanges === 'function' ? snap.docChanges().length : 0);
+  cupoContar(coleccion, n);
+}
+
+function cupoTotal(d) {
+  return Object.values((d || cupoLeer()).cols).reduce((s, n) => s + n, 0);
+}
+
 // ── Debounce ───────────────────────────────────────────────
 function debounce(fn, ms = 300) {
   let t;
