@@ -52,6 +52,7 @@ const QUE_CUBRE = {
   'test-reparaciones-estados.js': 'Reparaciones: card = ficha, cobro del saldo, garantía y equipos viejos abiertos',
   'test-demorados.js':       'Demorados: una sola cuenta en lista, card, inicio y estadísticas',
   'test-escaner-lectura.js': 'Que el lector LEA un código de barras de verdad (ZXing real)',
+  'test-etiquetas.js':       'Etiquetas de equipos: hoja A4 con precio y QR del IMEI',
   'test-lote.js':            'Ingreso por lote: escanear varios, borrador y guardado en bloque',
   'test-modelo-imei.js':     'Qué equipo es, a partir del IMEI (historial propio + tabla TAC)',
   'test-imei-camara.js':     'Leer el IMEI con la cámara sin cargar el código equivocado',

@@ -324,6 +324,11 @@ async function loteGuardar() {
     await batch.commit();
 
     const n = docs.length;
+    // Los equipos van al cajón: sin etiqueta hay que buscar el precio en la app
+    if (typeof printEtiquetas === 'function' &&
+        confirm(`✅ ${n} equipos cargados.\n\n¿Imprimo las etiquetas con precio y QR?`)) {
+      printEtiquetas(docs);
+    }
     _lote = _loteVacio();
     _loteBorrarBorrador();
     _loteRender();

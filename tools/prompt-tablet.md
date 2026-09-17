@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 43 suites, ~1745 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 44 suites, ~1770 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -62,6 +62,15 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 
 ## Lo ultimo que se hizo (2026-09-17)
+
+**Etiquetas de equipos** — print.js `printEtiquetas(lista)` + test-etiquetas.js
+- Hoja A4, 3 columnas x 34 mm (63x34 = medida de las hojas autoadhesivas
+  comunes), con linea de corte punteada por si se imprime en papel normal.
+- Llevan: marca+modelo (2 lineas), specs, estado, PRECIO grande (en USD si se
+  compro en dolares), ultimos 6 del IMEI y **QR con el IMEI completo** (se
+  escanea con la misma app).
+- Se ofrecen al terminar un lote y hay boton "🏷️ Etiqueta" en la ficha del
+  equipo (`etiquetaDe`), solo en los no vendidos.
 
 **Ingreso por lote** — lote.js + tests/test-lote.js
 - Stock → menu ⋮ → "📦 Ingreso por lote". Escaneas los IMEI uno atras del otro

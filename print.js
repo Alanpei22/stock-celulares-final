@@ -54,6 +54,72 @@ function _openPrint(html, title) {
   w.addEventListener('load', () => { w.focus(); setTimeout(() => w.print(), 350); });
 }
 
+// ══════════════════════════════════════════════════════════════
+//  ETIQUETAS DE EQUIPOS
+//  ─────────────────────────────────────────────────────────────
+//  Después de cargar un lote, los equipos quedan en el cajón sin nada pegado:
+//  para saber el precio hay que buscarlos en la app uno por uno.
+//
+//  Sale en hoja A4, 3 columnas × 8 filas (24 etiquetas de 63×34 mm, la medida
+//  de las hojas autoadhesivas comunes). Si no tenés hojas de etiquetas, se
+//  imprime en papel normal y se corta: las líneas de corte están marcadas.
+//
+//  El QR lleva el IMEI: escaneándolo con la app encontrás el equipo.
+// ══════════════════════════════════════════════════════════════
+// Escapar acá y no en bluetooth-print.js: este archivo no depende de ese
+function _escEtq(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function _etiquetaHtml(p) {
+  const marca = String(p.marca || '').trim();
+  const modelo = String(p.modelo || '').trim();
+  const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : '',
+                 p.bateria ? '🔋 ' + p.bateria + '%' : ''].filter(Boolean).join(' · ');
+  const precio = Number(p.precio) || 0;
+  const usd = (p.moneda === 'usd' && p.precioUSD) ? p.precioUSD : 0;
+  const imei = String(p.imei || '').trim();
+  const qr = (imei && typeof qrSvg === 'function') ? qrSvg(imei, 16, 2) : '';
+  return `<div class="etq">
+    <div class="etq-txt">
+      <div class="etq-eq">${_escEtq(marca)} ${_escEtq(modelo)}</div>
+      ${specs ? `<div class="etq-specs">${_escEtq(specs)}</div>` : ''}
+      <div class="etq-estado">${_escEtq(p.estado || '')}</div>
+      <div class="etq-precio">${usd ? 'u$' + usd.toLocaleString('es-AR') : '$' + precio.toLocaleString('es-AR')}</div>
+      ${imei ? `<div class="etq-imei">IMEI …${_escEtq(imei.slice(-6))}</div>` : ''}
+    </div>
+    ${qr ? `<div class="etq-qr">${qr}</div>` : ''}
+  </div>`;
+}
+
+// lista = equipos (los del lote recién cargado, o uno solo desde la ficha)
+function printEtiquetas(lista) {
+  const equipos = (Array.isArray(lista) ? lista : [lista]).filter(Boolean);
+  if (!equipos.length) { if (typeof toast === 'function') toast('No hay equipos para etiquetar', 'error'); return; }
+  const biz = (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint';
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<title>Etiquetas — ${_escEtq(biz)}</title><style>
+@page{size:A4 portrait;margin:8mm}
+*{box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;background:#fff}
+.hoja{display:grid;grid-template-columns:repeat(3,63mm);grid-auto-rows:34mm;gap:0}
+.etq{border:.3mm dashed #bbb;padding:2.4mm 2.8mm;display:flex;gap:1.5mm;align-items:center;overflow:hidden}
+.etq-txt{flex:1;min-width:0}
+.etq-eq{font-size:10pt;font-weight:800;line-height:1.12;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.etq-specs{font-size:7pt;color:#333;margin-top:.5mm}
+.etq-estado{font-size:6.5pt;text-transform:uppercase;letter-spacing:.06em;color:#555}
+.etq-precio{font-size:14pt;font-weight:800;margin-top:1mm;line-height:1}
+.etq-imei{font-size:6pt;color:#666;margin-top:.6mm}
+.etq-qr{width:16mm;flex-shrink:0}
+.etq-qr svg{width:16mm;height:16mm;display:block}
+@media print{.etq{border-color:#ddd}}
+</style></head><body>
+<div class="hoja">${equipos.map(_etiquetaHtml).join('')}</div>
+</body></html>`;
+  _openPrint(html, 'Etiquetas');
+}
+
 // ── Punto de entrada — Ticket de ingreso ─────────────────────
 // El comprobante de RECEPCIÓN se imprime siempre en A5: es el único formato
 // que quedó (se sacaron A4, 80mm y BT del menú). El parámetro se mantiene por

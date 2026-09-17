@@ -1403,6 +1403,14 @@ function openForm(id) {
   setTimeout(() => document.getElementById('fi-marca').focus(), 300);
 }
 
+// Reimprimir la etiqueta de un equipo (la del lote sale sola al cargarlo)
+function etiquetaDe(id) {
+  const p = STOCK.find(x => x.id === id);
+  if (!p) return;
+  if (typeof printEtiquetas !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
+  printEtiquetas([p]);
+}
+
 function closeForm() {
   document.getElementById('form-modal').classList.add('hidden');
   document.body.style.overflow = '';
@@ -1567,6 +1575,7 @@ function openDetail(id) {
     <button class="btn-copy" onclick="copyInfo('${p.id}')">📋 Copiar</button>
     ${p.vendido ? `<button class="btn-edit" onclick="printVentaTicket('${p.id}','','A5')">📄 Comprobante A5</button>
                 <button class="btn-edit" onclick="printVentaTicket('${p.id}','','80mm')">🖨 Ticket 80mm</button>` : ''}
+    ${!p.vendido ? `<button class="btn-edit" onclick="etiquetaDe('${p.id}')">🏷️ Etiqueta</button>` : ''}
     ${!p.vendido && !p.reservado ? `<button class="btn-edit" onclick="closeDetail();openForm('${p.id}')">✏️ Editar</button>` : ''}
     ${!p.vendido && !p.reservado ? `<button class="btn-edit" onclick="openReservarModal('${p.id}')" style="background:#f59e0b;color:#fff">⏳ Reservar</button>` : ''}
     ${p.reservado ? `<button class="btn-edit" onclick="printReservaDe('${p.id}')">📄 Comprobante de reserva</button>
