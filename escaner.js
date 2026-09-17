@@ -322,7 +322,7 @@ function cerrarEscaner() {
 
 // Escanea dentro de un campo de IMEI. Solo acepta un número que cierre por
 // Luhn: si apuntás al código de barras del producto, sigue buscando.
-function escanearImei(inputId) {
+function escanearImei(inputId, campos) {
   const inp = document.getElementById(inputId);
   if (!inp) return Promise.resolve(false);
   return abrirEscaner(imei => {
@@ -331,6 +331,8 @@ function escanearImei(inputId) {
     try { inp.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
     try { inp.focus(); } catch {}
     toast('📷 IMEI ' + imei, 'success');
+    // Y de paso, qué equipo es
+    _autocompletarPorImei(imei, campos || _CAMPOS_EQUIPO[inputId]);
   }, {
     titulo: 'Escaneá el IMEI de la etiqueta',
     // Sigue leyendo hasta encontrar uno válido: las cajas tienen varios
@@ -340,6 +342,108 @@ function escanearImei(inputId) {
     noSirve: 'Ese no es el IMEI (puede ser la serie o el código del producto). Probá con el otro.',
   });
 }
+
+// ══════════════════════════════════════════════════════════════
+//  QUÉ EQUIPO ES, A PARTIR DEL IMEI
+//  ─────────────────────────────────────────────────────────────
+//  Los primeros 8 dígitos del IMEI (el TAC) identifican el modelo: son iguales
+//  en todas las unidades del mismo equipo. Con eso se completa marca y modelo
+//  al escanear, en vez de tipearlos.
+//
+//  Dos fuentes, en este orden:
+//   1. TU historial. Si ese TAC ya lo cargaste, se usa TU forma de escribirlo
+//      ("A54" y no "GALAXY A54 5G"), que es la que después buscás.
+//   2. `vendor/tac.json`: 109.000 códigos de las marcas que se venden acá,
+//      sacados de una base pública. Se baja una sola vez por dispositivo
+//      (~440 KB comprimido) y recién cuando hace falta.
+//
+//  Lo que el IMEI NO dice: capacidad, color ni estado. Eso se sigue cargando.
+// ══════════════════════════════════════════════════════════════
+let _tacTabla = null;
+let _tacCarga = null;
+
+function tacDe(imei) {
+  const d = (typeof imeiDigitos === 'function') ? imeiDigitos(imei) : String(imei || '').replace(/\D/g, '');
+  return d.length >= 8 ? d.slice(0, 8) : '';
+}
+
+// Lo que ya cargaste vos, que manda sobre la tabla.
+function _modeloEnHistorial(tac) {
+  const listas = [
+    (typeof STOCK !== 'undefined' && Array.isArray(STOCK)) ? STOCK : [],
+    (typeof REPAIRS !== 'undefined' && Array.isArray(REPAIRS)) ? REPAIRS : [],
+  ];
+  for (const lista of listas) {
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const p = lista[i];
+      if (!p || !p.imei || !p.marca) continue;
+      if (tacDe(p.imei) !== tac) continue;
+      return { marca: p.marca, modelo: p.modelo || '', fuente: 'historial' };
+    }
+  }
+  return null;
+}
+
+async function _tacCargarTabla() {
+  if (_tacTabla) return _tacTabla;
+  if (_tacCarga) return _tacCarga;
+  _tacCarga = (async () => {
+    try {
+      const r = await fetch('vendor/tac.json');
+      const j = await r.json();
+      // Formato compacto: modelos aparte, para que el archivo pese la mitad
+      if (j && Array.isArray(j.m) && j.t) _tacTabla = j;
+    } catch (e) {
+      console.error('tabla de modelos:', e);
+    } finally {
+      _tacCarga = null;
+    }
+    return _tacTabla;
+  })();
+  return _tacCarga;
+}
+
+// { marca, modelo, fuente } o null. No baja nada si el IMEI no sirve.
+async function modeloPorImei(imei) {
+  const tac = tacDe(imei);
+  if (!tac) return null;
+  const propio = _modeloEnHistorial(tac);
+  if (propio) return propio;
+  const tabla = await _tacCargarTabla();
+  if (!tabla) return null;
+  const i = tabla.t[tac];
+  if (i == null) return null;
+  const partes = String(tabla.m[i] || '').split('|');
+  if (!partes[0]) return null;
+  return { marca: partes[0], modelo: partes[1] || '', fuente: 'tabla' };
+}
+
+// Completa marca y modelo DESPUÉS de escanear, sin pisar lo que ya escribiste.
+async function _autocompletarPorImei(imei, campos) {
+  if (!campos) return;
+  const m = await modeloPorImei(imei);
+  if (!m) return;
+  const puesto = [];
+  const poner = (id, val) => {
+    const el = id && document.getElementById(id);
+    if (!el || !val || el.value.trim()) return;   // no pisar lo cargado
+    el.value = val;
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
+    try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch {}
+    puesto.push(val);
+  };
+  poner(campos.marca, m.marca);
+  poner(campos.modelo, m.modelo);
+  if (puesto.length) {
+    toast(`📱 ${puesto.join(' ')} — ${m.fuente === 'historial' ? 'como lo cargaste antes' : 'según el IMEI'}. Corregí si no coincide.`, 'success');
+  }
+}
+
+// Qué campos de marca/modelo acompañan a cada campo de IMEI.
+const _CAMPOS_EQUIPO = {
+  'fi-imei':     { marca: 'fi-marca',     modelo: 'fi-modelo' },      // alta de stock
+  'rep-fi-imei': { marca: 'rep-fi-marca', modelo: 'rep-fi-modelo' },  // ingreso de reparación
+};
 
 // Pone el botón de cámara al lado de un campo de IMEI, sin tocar el HTML de
 // cada formulario (son cuatro: stock, reparación y los dos de la venta).

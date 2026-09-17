@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 41 suites, ~1680 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 42 suites, ~1710 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -62,6 +62,20 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 
 ## Lo ultimo que se hizo (2026-09-17)
+
+**Escanear el IMEI y saber QUE equipo es** — tests/test-modelo-imei.js
+- Los primeros 8 digitos del IMEI (TAC) identifican el modelo. Al escanear se
+  completan marca y modelo, SIN pisar lo que ya este escrito.
+- Dos fuentes, en orden: (1) el historial propio (STOCK/REPAIRS), asi respeta
+  como escribis vos los modelos; (2) `vendor/tac.json`.
+- `vendor/tac.json`: 109.655 TAC / 8.721 modelos, sacado de la base publica
+  MoazEb/tac-database (255k filas) recortado a las marcas que se venden aca.
+  Formato compacto {m:[modelos], t:{tac:indice}}: 1,8 MB crudo, ~440 KB
+  comprimido. Se baja UNA vez por dispositivo y solo cuando hace falta; el sw
+  ahora cachea .json.
+- Lo que el IMEI NO dice: capacidad, color ni estado. Eso se sigue cargando.
+- Para actualizar la tabla: bajar tac_full.csv del repo, filtrar marcas y
+  regenerar el formato compacto (ver el commit).
 
 **IMEI con la camara** — tests/test-imei-camara.js
 - Boton 📷 al lado de los CUATRO campos de IMEI: alta de stock (`fi-imei`),

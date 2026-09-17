@@ -1,4 +1,4 @@
-const CACHE = 'cel-v172';
+const CACHE = 'cel-v173';
 const SHELL = ['manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'mp-logo.png',
   // Banners de las notificaciones: cacheados para que el aviso salga completo
   // aunque el celu esté con mala señal cuando llega el push.
@@ -32,7 +32,9 @@ self.addEventListener('fetch', e => {
   }
 
   // JS y CSS: stale-while-revalidate — sirve del caché al instante, actualiza en fondo
-  if (['js', 'css'].includes(ext)) {
+  // json entra acá por la tabla de modelos (vendor/tac.json): se baja una vez
+  // y queda cacheada como el resto.
+  if (['js', 'css', 'json'].includes(ext)) {
     e.respondWith(
       caches.open(CACHE).then(cache =>
         cache.match(e.request).then(cached => {
