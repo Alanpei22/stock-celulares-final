@@ -175,7 +175,14 @@ console.log('\n8) Contador de lecturas (para saber qué las gasta)');
 console.log('\n9) Y está enganchado donde más se lee');
 const appSrc2 = fs.readFileSync(DIR + 'app.js', 'utf8');
 const cajaSrc2 = fs.readFileSync(DIR + 'caja.js', 'utf8');
-ok(/cupoSnap\('stock'/.test(appSrc2), 'stock');
+ok(/cupoSnap\('stock \(en el local\)'/.test(appSrc2), 'stock en el local');
+ok(/cupoContar\('stock \(vendidos\)'/.test(appSrc2), 'y los vendidos por separado');
+// Lo más caro que tenía la app: engancharse a la colección entera en cada
+// apertura, con todos los celulares vendidos hace años adentro.
+ok(/collection\('stock'\)\.where\('vendido', '==', false\)\.onSnapshot/.test(appSrc2),
+   'el listener en vivo trae SOLO lo que está en el local');
+ok(/collection\('stock'\)\.where\('vendido', '==', true\)\.get\(\)/.test(appSrc2),
+   'y los vendidos se piden cuando hacen falta, no de arranque');
 ok(/cupoSnap\('repairs'/.test(repSrc), 'reparaciones');
 ok(/cupoSnap\('caja_movimientos'/.test(cajaSrc2), 'movimientos de caja');
 ok(/cupoContar\('repairs \(historial completo\)'/.test(repSrc), 'y el historial completo, que es el más caro');

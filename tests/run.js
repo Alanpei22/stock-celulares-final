@@ -54,6 +54,7 @@ const QUE_CUBRE = {
   'test-escaner-lectura.js': 'Que el lector LEA un código de barras de verdad (ZXing real)',
   'test-escaner.js':         'Leer códigos de barras con la cámara y cargar al inventario',
   'test-sin-cupo.js':        'Ingresar un equipo aunque Firebase no conteste (cupo agotado)',
+  'test-stock-vendidos.js':  'Stock en dos partes: lo del local en vivo, lo vendido on-demand',
   'test-planes.js':           'Planes de ahorro, reservas y que la seña no se cuente dos veces',
 };
 

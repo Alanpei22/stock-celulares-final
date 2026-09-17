@@ -67,20 +67,95 @@ function _hydrateStockFromCache() {
   } catch { /* cache corrupto: se ignora */ }
 }
 
+// ══════════════════════════════════════════════════════════════
+//  CUPO: el stock se lee en DOS partes
+//  ─────────────────────────────────────────────────────────────
+//  Antes la app se enganchaba a la colección `stock` ENTERA en cada apertura:
+//  cada celular vendido hace dos años se volvía a leer (y a cobrar) cada vez,
+//  en cada aparato. Era la lectura más cara de la app y la que agotaba el cupo
+//  diario.
+//
+//  Ahora:
+//   · Lo que está EN EL LOCAL (no vendido) va en vivo: es lo que se usa todo
+//     el día y son pocos equipos.
+//   · Lo VENDIDO se trae solo cuando hace falta (filtro "Vendidos"/"Todos",
+//     estadísticas, exportar, backup) y queda guardado unas horas.
+// ══════════════════════════════════════════════════════════════
+let _stockVendidos = [];            // los vendidos, cuando se pidieron
+let _vendidosCargados = false;
+let _vendidosCargando = null;
+const _VEND_KEY = 'stockVendidosCache';
+const _VEND_TTL_MS = 6 * 60 * 60 * 1000;
+
+function _stockPintar() {
+  STOCK = [..._stockEnLocal, ..._stockVendidos];
+  STOCK.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  _cacheStock();
+  render();
+  if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
+}
+
+// ¿Están los vendidos a mano? Lo usan la lista y las estadísticas para saber
+// si tienen que pedirlos.
+function vendidosListos() { return _vendidosCargados; }
+
+async function cargarVendidos(forzar) {
+  if (_vendidosCargados && !forzar) return _stockVendidos;
+  if (_vendidosCargando) return _vendidosCargando;
+
+  if (!forzar) {
+    try {
+      const guardado = JSON.parse(localStorage.getItem(_VEND_KEY) || 'null');
+      if (guardado && Array.isArray(guardado.lista) && Date.now() - guardado.t < _VEND_TTL_MS) {
+        _stockVendidos = guardado.lista;
+        _vendidosCargados = true;
+        _stockPintar();
+        return _stockVendidos;
+      }
+    } catch {}
+  }
+
+  _vendidosCargando = (async () => {
+    try {
+      const snap = await db.collection('stock').where('vendido', '==', true).get();
+      if (typeof cupoContar === 'function') cupoContar('stock (vendidos)', snap.size);
+      _stockVendidos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      _vendidosCargados = true;
+      try {
+        // Sin fotos: no entran en localStorage
+        const liviano = _stockVendidos.map(({ fotos, foto, ...x }) => x);
+        localStorage.setItem(_VEND_KEY, JSON.stringify({ t: Date.now(), lista: liviano }));
+      } catch {}
+      _stockPintar();
+    } catch (e) {
+      console.error('vendidos:', e);
+      toast(e?.code === 'resource-exhausted'
+        ? 'Cupo de Firebase agotado: los vendidos se ven después de las 4 AM'
+        : 'No se pudieron traer los equipos vendidos', 'error');
+    } finally {
+      _vendidosCargando = null;
+    }
+    return _stockVendidos;
+  })();
+  return _vendidosCargando;
+}
+
+let _stockEnLocal = [];
+
 function listenStock() {
   // Cancelar listener previo (evita duplicados en re-login)
   if (_stockListener) { _stockListener(); _stockListener = null; }
 
   let _primerStock = true;
-  _stockListener = db.collection('stock').onSnapshot(snapshot => {
-    if (typeof cupoSnap === 'function') cupoSnap('stock', snapshot, _primerStock);
+  _stockListener = db.collection('stock').where('vendido', '==', false).onSnapshot(snapshot => {
+    if (typeof cupoSnap === 'function') cupoSnap('stock (en el local)', snapshot, _primerStock);
     _primerStock = false;
     _stockLoaded = true;
-    STOCK = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    STOCK.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
-    _cacheStock();
-    render();
-    if (typeof _refreshDashIfVisible === 'function') _refreshDashIfVisible();
+    _stockEnLocal = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Un equipo que se acaba de vender sale de esta consulta: si estaba en la
+    // lista de vendidos cargada, se actualiza; si no, aparece al recargarlos.
+    _stockVendidos = _stockVendidos.filter(v => !_stockEnLocal.some(p => p.id === v.id));
+    _stockPintar();
     // Backup automático una vez por sesión, 3s después de cargar datos
     if (!_autoBackupDone) { _autoBackupDone = true; setTimeout(autoBackup, 3000); }
   }, err => {
@@ -118,6 +193,10 @@ async function autoBackup() {
   const today = new Date().toISOString().slice(0, 10);
   if (localStorage.getItem('lastAutoBackup') === today) return;
   try {
+    // El backup tiene que llevar TODO, no solo lo que está en el local: si no,
+    // la copia del día se guardaría sin los equipos vendidos.
+    if (!vendidosListos()) await cargarVendidos();
+    if (!vendidosListos()) return;   // no se pudieron traer: mejor no guardar media copia
     // BUG-FIX: backup completo (snapshot puro del documento)
     const backupData = {
       fecha: new Date().toISOString(),
@@ -1082,6 +1161,9 @@ function _stockFiltrado() {
   const fMarca  = el('f-marca')?.value || '';
   const fEstado = el('f-estado')?.value || '';
   const fVend   = el('f-vendido')?.value ?? '0';
+  // Mirar vendidos = traerlos (una vez cada 6 h). Con el filtro en "En stock",
+  // que es como se usa todo el día, no se lee nada de más.
+  if (fVend !== '0' && !vendidosListos() && typeof cargarVendidos === 'function') cargarVendidos();
   const fMin    = parseInt(el('f-min')?.value) || 0;
   const fMax    = parseInt(el('f-max')?.value) || 0;
   const fVendedor = el('f-vendedor')?.value || '';
@@ -1148,7 +1230,9 @@ function render() {
   const inStock = STOCK.filter(p => !p.vendido);
   const sold = STOCK.filter(p => p.vendido);
   document.getElementById('s-stock').textContent      = inStock.length;
-  document.getElementById('s-sold').textContent       = sold.length;
+  // Los vendidos no están cargados hasta que se piden (cupo): mejor un guion
+  // que un cero, que se leería como "no vendiste nada".
+  document.getElementById('s-sold').textContent       = vendidosListos() ? sold.length : '–';
   document.getElementById('s-exhibicion').textContent = inStock.filter(p => p.ubicacion === 'Exhibición').length;
   document.getElementById('s-deposito').textContent   = inStock.filter(p => p.ubicacion === 'Depósito').length;
 
@@ -2046,7 +2130,9 @@ async function cancelarReserva(id) {
 }
 
 // ── Modal Estadísticas ────────────────────────────────────
-function openStats() {
+async function openStats() {
+  // Las estadísticas son de ventas: sin los vendidos no dicen nada.
+  if (!vendidosListos()) { toast('Trayendo las ventas…', 'info'); await cargarVendidos(); }
   currentTab = 'ventas';
   document.getElementById('tab-ventas').classList.add('active');
   document.getElementById('tab-entradas').classList.remove('active');
@@ -2305,7 +2391,8 @@ async function _doDownloadBackup() {
   toast(`✅ Backup descargado — ${totalDocs} registros · ${mb} MB`, 'success');
 }
 
-function exportCSV() {
+async function exportCSV() {
+  if (!vendidosListos()) { toast('Trayendo las ventas…', 'info'); await cargarVendidos(); }
   const headers = ['Marca','Modelo','Estado','Precio','Almacenamiento','RAM','IMEI','Notas','Fecha Ingreso','Vendido','Fecha Venta','Vendedor','Forma de Pago'];
   const rows = STOCK.map(p => [
     p.marca, p.modelo, p.estado, p.precio || 0,

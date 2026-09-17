@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 39 suites, ~1620 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 40 suites, ~1650 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -62,6 +62,17 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 
 ## Lo ultimo que se hizo (2026-09-17)
+
+**El stock se lee en DOS partes** — tests/test-stock-vendidos.js
+- Era la lectura mas cara: listener a la coleccion `stock` ENTERA en cada
+  apertura, con todos los vendidos de años anteriores, en cada aparato.
+- Ahora: listener en vivo con `where('vendido','==',false)` + los vendidos
+  on-demand (`cargarVendidos()`, cache 6 h en localStorage `stockVendidosCache`).
+  Se piden al filtrar "Vendidos"/"Todos", en estadisticas, exportar y backup.
+- `vendidosListos()` dice si estan. El contador de vendidos muestra "–" hasta
+  cargarlos (un 0 se leeria como "no vendiste nada").
+- `autoBackup` NO guarda si no pudo traerlos: media copia es peor que ninguna.
+- Con el uso normal del dia (filtro "En stock") **no se lee nada de mas**.
 
 **Se agoto el cupo y la app no dejaba ingresar equipos** — tests/test-sin-cupo.js
 - El cupo de Firebase se renueva a **medianoche de California = 4 AM de aca**.
