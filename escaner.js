@@ -30,6 +30,7 @@ let _escUltimo = { cod: '', t: 0 };
 let _escOpts = {};
 let _escTrack = null;      // pista de video (para la linterna)
 let _escLector = null;     // el motor en uso (nativo o de respaldo)
+let _escAyudaTimer = null; // aviso de "no lo estoy leyendo"
 
 // ¿El navegador trae el lector propio? (no pide permiso de cámara)
 async function _escNativo() {
@@ -78,19 +79,24 @@ function _escLectorZxing() {
     hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [
       F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.CODABAR, F.QR_CODE,
     ]);
-    // Sin esto no lee un código apenas torcido, que es como se escanea de verdad
-    hints.set(Z.DecodeHintType.TRY_HARDER, true);
+    // OJO: NADA de TRY_HARDER. Suena a que ayuda, pero en esta versión de ZXing
+    // deja de leer del todo: medido contra un EAN-13 de verdad, 0 de 6 con el
+    // hint puesto y 6 de 6 sin él. Fue el motivo de que no leyera nada.
   } catch { hints = null; }
   const reader = new Z.BrowserMultiFormatReader(hints, 200);
+  // DOS intentos por cuadro: esta versión de ZXing falla uno sí y uno no sobre
+  // la MISMA imagen (medido: 10 de 20 con un intento, 20 de 20 con dos). Cada
+  // intento cuesta ~17 ms, así que sale gratis.
   return {
     async detect(video) {
-      try {
-        const r = reader.decode(video);
-        const txt = r && (typeof r.getText === 'function' ? r.getText() : r.text);
-        return txt ? [{ rawValue: txt }] : [];
-      } catch {
-        return [];        // cuadro sin código: no es un error
+      for (let i = 0; i < 2; i++) {
+        try {
+          const r = reader.decode(video);
+          const txt = r && (typeof r.getText === 'function' ? r.getText() : r.text);
+          if (txt) return [{ rawValue: txt }];
+        } catch { /* cuadro sin código: no es un error */ }
       }
+      return [];
     },
     stop() { try { reader.reset(); } catch {} },
   };
@@ -170,12 +176,18 @@ async function abrirEscaner(cb, opts = {}) {
   try { await video.play(); } catch { /* algunos navegadores ya lo arrancan solos */ }
 
   _escTrack = _escStream.getVideoTracks()[0] || null;
+  _escEnfoqueContinuo();
   _escMostrarLinterna();
 
   _escLector = nativo ? new BarcodeDetector({ formats: ESCANER_FORMATOS }) : _escLectorZxing();
   _escEstado('Buscando el código…');
+  // Si a los 8 segundos no leyó nada, el problema suele ser distancia o luz.
+  // Sin este aviso te quedás mirando la pantalla sin saber qué está pasando.
+  _escAyudaTimer = setTimeout(() => {
+    if (_escStream && !_escUltimo.cod) _escEstado('No lo estoy leyendo. Alejá el celu unos 15 cm, buscá más luz y que el código entre entero en el recuadro.');
+  }, 8000);
   // El de respaldo tarda más por cuadro: se le da aire para no trabar la pantalla.
-  _escTimer = setInterval(() => _escBuscar(_escLector, video), nativo ? 220 : 400);
+  _escTimer = setInterval(() => _escBuscar(_escLector, video), nativo ? 220 : 300);
   return true;
 }
 
@@ -195,6 +207,7 @@ async function _escBuscar(detector, video) {
   const ahora = Date.now();
   if (raw === _escUltimo.cod && ahora - _escUltimo.t < _ESC_REPETIR_MS) return;
   _escUltimo = { cod: raw, t: ahora };
+  if (_escAyudaTimer) { clearTimeout(_escAyudaTimer); _escAyudaTimer = null; }
 
   _escAvisar(raw);
   const cb = _escCb;
@@ -224,6 +237,18 @@ function _escAvisar(cod) {
 function _escEstado(txt) {
   const el = document.getElementById('esc-estado');
   if (el) el.textContent = txt;
+}
+
+// Enfoque continuo: un código de barras chico, a 10 cm, sale borroso si la
+// cámara se queda con el enfoque fijo. No todas lo soportan; si no, no pasa nada.
+function _escEnfoqueContinuo() {
+  if (!_escTrack || !_escTrack.applyConstraints) return;
+  try {
+    const cap = _escTrack.getCapabilities ? _escTrack.getCapabilities() : {};
+    if (cap.focusMode && cap.focusMode.includes && cap.focusMode.includes('continuous')) {
+      _escTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+    }
+  } catch { /* la cámara no deja tocar el enfoque: seguimos igual */ }
 }
 
 // ── Linterna ────────────────────────────────────────────────
@@ -257,6 +282,7 @@ async function escanerLuz() {
 // calienta y la luz de la cámara queda prendida.
 function cerrarEscaner() {
   if (_escTimer) { clearInterval(_escTimer); _escTimer = null; }
+  if (_escAyudaTimer) { clearTimeout(_escAyudaTimer); _escAyudaTimer = null; }
   if (_escStream) {
     try { _escStream.getTracks().forEach(t => t.stop()); } catch {}
     _escStream = null;

@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 37 suites, ~1570 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 38 suites, ~1590 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -62,6 +62,18 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 
 ## Lo ultimo que se hizo (2026-09-17)
+
+**BUG: el escaner abria la camara y no leia NADA** (tests/test-escaner-lectura.js)
+- Culpa del hint `TRY_HARDER` de ZXing. Suena a que ayuda; en esta version deja
+  de leer. Medido en navegador de verdad sobre un <video> con un EAN-13 real:
+  **0 de 6 con el hint, 20 de 20 sin el**. NO lo vuelvas a poner.
+- Ademas ZXing falla **uno si y uno no** sobre la MISMA imagen: el envoltorio
+  intenta 2 veces por cuadro (10/20 con un intento, 20/20 con dos). ~17 ms c/u.
+- La prueba nueva dibuja un EAN-13 a mano (tabla de codificacion) y lo pasa por
+  la ZXing REAL de vendor/. Las otras pruebas usan una libreria de mentira y por
+  eso no agarraban esto.
+- Se sumo enfoque continuo (focusMode) y un aviso a los 8 s: "no lo estoy
+  leyendo, alejá el celu, mas luz".
 
 **Leer codigos de barras con la camara** — escaner.js + tests/test-escaner.js
 - `escaner.js`: modulo aparte, pensado para reusar (IMEI, cobro). API:
