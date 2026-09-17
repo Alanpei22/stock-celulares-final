@@ -410,6 +410,8 @@ const EXENTAS = [
   '[campo]: v',       // tpGuardarCampo (diagnóstico/motivo son internos)
   'arreglos: lista',  // tildar una reparación como hecha: el doc público no
                       // tiene los arreglos, solo paso/equipo/fechas
+  '_pendBorrar',      // reintento de un ingreso que no se pudo subir: el QR ya
+                      // se publicó cuando se cargó el equipo, es el mismo doc
 ];
 const sospechosas = [];
 for (const archivo of ['repairs.js', 'caja.js', 'tp-fases.js', 'seguimiento.js']) {

@@ -230,6 +230,91 @@ async function loadAllRepairsHistory(forzar) {
   return _fullHistoryCache;
 }
 
+// ══════════════════════════════════════════════════════════════
+//  INGRESAR UN EQUIPO CUANDO FIREBASE NO CONTESTA
+//  ─────────────────────────────────────────────────────────────
+//  Pasó de verdad: se agotó el cupo diario (se renueva a las 4 AM de acá) y la
+//  app no dejaba ingresar equipos. Con un cliente en el mostrador, eso no es
+//  una opción.
+//
+//  Ahora el ingreso NUNCA se frena:
+//   · El número de orden sale de la base; si no se puede leer, se calcula con
+//     lo que hay en el celu y queda marcado como provisorio.
+//   · La reparación se guarda igual: Firestore la deja en su cola local y la
+//     sube sola cuando puede. Además queda una copia acá por si esa cola se
+//     pierde (navegador que limpia datos, sesión cerrada).
+// ══════════════════════════════════════════════════════════════
+const _PEND_KEY = 'repsPendientes';
+
+function _pendLeer() {
+  try { return JSON.parse(localStorage.getItem(_PEND_KEY) || '[]'); } catch { return []; }
+}
+
+function _pendGuardar(doc) {
+  try {
+    const lista = _pendLeer().filter(d => d.id !== doc.id);
+    lista.push(doc);
+    localStorage.setItem(_PEND_KEY, JSON.stringify(lista));
+  } catch { /* si no entra (fotos), queda la cola de Firestore */ }
+}
+
+function _pendBorrar(id) {
+  try {
+    const lista = _pendLeer().filter(d => d.id !== id);
+    if (lista.length) localStorage.setItem(_PEND_KEY, JSON.stringify(lista));
+    else localStorage.removeItem(_PEND_KEY);
+  } catch {}
+}
+
+// Escribe la reparación SIN hacer esperar al mostrador: si tarda o falla, la
+// copia local queda y se reintenta al abrir la app.
+function _guardarRepairSinBloquear(doc) {
+  _pendGuardar(doc);
+  db.collection('repairs').doc(doc.id).set(_stripUndefined(doc))
+    .then(() => _pendBorrar(doc.id))
+    .catch(e => console.error('ingreso pendiente de subir:', e));
+}
+
+// Al abrir la app: subir lo que haya quedado colgado de una sesión anterior.
+async function _pendReintentar() {
+  const lista = _pendLeer();
+  if (!lista.length) return;
+  let subidas = 0;
+  for (const doc of lista) {
+    if (REPAIRS.some(r => r.id === doc.id)) { _pendBorrar(doc.id); continue; }
+    try {
+      await db.collection('repairs').doc(doc.id).set(_stripUndefined(doc));
+      _pendBorrar(doc.id);
+      subidas++;
+    } catch (e) {
+      console.error('reintento de ingreso:', e);
+      return;   // sigue sin poder: se reintenta la próxima vez
+    }
+  }
+  if (subidas) toast(`✅ ${subidas} ingreso${subidas > 1 ? 's' : ''} que había${subidas > 1 ? 'n' : ''} quedado pendiente${subidas > 1 ? 's' : ''} se subi${subidas > 1 ? 'eron' : 'ó'}`, 'success');
+}
+
+// Número de orden. Sale del contador de la base; si no se puede leer (sin cupo,
+// sin internet), se usa el siguiente al más alto que tenga este dispositivo y
+// queda marcado como provisorio para revisarlo después.
+async function _numeroDeOrden(ordenInputVal) {
+  const metaRef = db.collection('config').doc('repairsMeta');
+  try {
+    let nOrden;
+    await db.runTransaction(async t => {
+      const meta = await t.get(metaRef);
+      const next = meta.exists ? (meta.data().nextOrderNum || 7100) : 7100;
+      nOrden = ordenInputVal > 0 ? ordenInputVal : next;
+      if (nOrden >= next) t.set(metaRef, { nextOrderNum: nOrden + 1 }, { merge: true });
+    });
+    return { nOrden, provisorio: false };
+  } catch (e) {
+    console.error('contador de órdenes:', e);
+    const maxLocal = REPAIRS.reduce((m, r) => Math.max(m, Number(r.nOrden) || 0), 7099);
+    return { nOrden: ordenInputVal > 0 ? ordenInputVal : maxLocal + 1, provisorio: true };
+  }
+}
+
 // ── Init ──────────────────────────────────
 function initRepairs() {
   document.getElementById('rep-add-btn').addEventListener('click', () => openRepairForm());
@@ -311,6 +396,7 @@ function initRepairs() {
   loadWaNotifyNumber();
   _hydrateRepairsFromCache(); // pinta la lista al instante desde el cache local
   listenRepairs();
+  _pendReintentar();          // ingresos que quedaron sin subir
 
   // Cerrar modales con ESC (repairs) — LOW-12: store reference to allow removal
   if (_repEscHandler) document.removeEventListener('keydown', _repEscHandler);
@@ -1653,27 +1739,25 @@ async function saveRepair() {
       // Usar nOrden ingresado por el usuario (o auto si está vacío)
       const ordenInputVal = parseInt(document.getElementById('rep-fi-orden').value) || 0;
 
-      // CRIT-06: verificar que el número manual no esté ya en uso
+      // CRIT-06: verificar que el número manual no esté ya en uso.
+      // Si la consulta falla (sin cupo, sin internet) NO se frena el ingreso:
+      // se revisa contra lo que hay en el celu y listo.
       if (ordenInputVal > 0) {
-        const dupSnap = await db.collection('repairs').where('nOrden', '==', ordenInputVal).limit(1).get();
-        if (!dupSnap.empty) {
+        let repetido = REPAIRS.some(r => Number(r.nOrden) === ordenInputVal);
+        if (!repetido) {
+          try {
+            const dupSnap = await db.collection('repairs').where('nOrden', '==', ordenInputVal).limit(1).get();
+            repetido = !dupSnap.empty;
+          } catch (e) { console.error('chequeo de N° repetido:', e); }
+        }
+        if (repetido) {
           toast(`⚠️ Ya existe una reparación con el N°${ordenInputVal}`, 'error');
           btn.disabled = false;
           return;
         }
       }
 
-      const metaRef = db.collection('config').doc('repairsMeta');
-      let nOrden;
-      await db.runTransaction(async t => {
-        const meta  = await t.get(metaRef);
-        const next  = meta.exists ? (meta.data().nextOrderNum || 7100) : 7100;
-        nOrden = ordenInputVal > 0 ? ordenInputVal : next;
-        // Advance counter only if the entered value >= current next
-        if (nOrden >= next) {
-          t.set(metaRef, { nextOrderNum: nOrden + 1 }, { merge: true });
-        }
-      });
+      const { nOrden, provisorio } = await _numeroDeOrden(ordenInputVal);
 
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const ahora = _repIngresoISO(); // fecha de ingreso elegida con las flechas (hoy por defecto)
@@ -1694,11 +1778,18 @@ async function saveRepair() {
         seguimientoNota: seguimientoNota || null,
         seguimientoAck: false
       };
+      // Número dado por el celu porque la base no contestó: queda marcado para
+      // poder revisarlo cuando vuelva a andar.
+      if (provisorio) newDoc.numeroProvisorio = true;
       if (foto) newDoc.foto = foto;
       // Tag con device para que el cross-device listener no nos notifique a nosotros mismos
       if (typeof getDeviceId === 'function') newDoc._sourceDevice = getDeviceId();
-      await db.collection('repairs').doc(id).set(_stripUndefined(newDoc));
-      toast('Reparación N°' + nOrden + ' registrada', 'success');
+      // Sin await: el mostrador no espera a Firebase. Si no se puede subir
+      // ahora, queda en cola (la de Firestore y la nuestra) y sube sola.
+      _guardarRepairSinBloquear(newDoc);
+      toast(provisorio
+        ? `Reparación N°${nOrden} guardada en el celu — se sube cuando Firebase vuelva (el N° puede cambiar)`
+        : 'Reparación N°' + nOrden + ' registrada', 'success');
       logActivity({
         tipo: 'ingreso',
         desc: `Nuevo ingreso: ${marca} ${modelo} N°${nOrden} — ${arreglo}`,
@@ -1751,7 +1842,7 @@ async function saveRepair() {
     let msg = 'Error al guardar';
     if (e?.code === 'permission-denied') msg = 'Sin permisos para guardar (revisá tu login)';
     else if (e?.code === 'unavailable')   msg = 'Sin conexión a Firestore';
-    else if (e?.code === 'resource-exhausted') msg = '⚠️ Cupo diario de Firebase agotado — se renueva a las 4 AM (hora AR). La reparación NO se guardó.';
+    else if (e?.code === 'resource-exhausted') msg = '⚠️ Cupo diario de Firebase agotado (se renueva a las 4 AM). El ingreso queda guardado en el celu y sube solo.';
     else if (e?.code === 'invalid-argument') msg = 'Datos inválidos: ' + (e.message || '');
     else if (e?.message) msg = 'Error: ' + e.message;
     toast(msg, 'error');
