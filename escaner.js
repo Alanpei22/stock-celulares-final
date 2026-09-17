@@ -1,16 +1,18 @@
 // ══════════════════════════════════════════════════════════════
 //  escaner.js — Leer códigos de barras con la cámara del celu
 // ══════════════════════════════════════════════════════════════
-//  Usa BarcodeDetector, que viene ADENTRO del navegador (Chrome en Android):
-//  cero librerías que bajar, cero peso extra, y anda sin internet una vez que
-//  la app está cacheada.
+//  DOS MOTORES, y el liviano primero:
 //
-//  Dónde NO anda: Safari de iPhone y Firefox no lo traen. En vez de romperse,
-//  el cartel dice que se use el lector de mano o que se escriba el código.
-//  (Si algún día hace falta iPhone: ahí sí hay que sumar una librería de ~200 KB
-//  y este archivo es el único lugar donde se toca.)
+//   1. BarcodeDetector, que viene ADENTRO del navegador (Chrome en Android).
+//      Cero peso, y anda sin internet apenas la app quedó cacheada.
+//   2. Si el navegador no lo trae — Safari de iPhone, Chrome de escritorio en
+//      Windows, Firefox — recién ahí se baja `vendor/zxing.min.js` (336 KB).
+//      Se baja UNA vez por dispositivo y queda en el caché de la app.
 //
-//  No lee ni escribe NADA en Firebase: todo pasa en el celu.
+//  Así el celular con Android, que es donde más se escanea, no paga los 336 KB
+//  que solo necesitan la PC y el iPhone.
+//
+//  No lee ni escribe NADA en Firebase: todo pasa en el aparato.
 // ══════════════════════════════════════════════════════════════
 'use strict';
 
@@ -27,9 +29,10 @@ let _escCb = null;         // a quién le avisamos el código
 let _escUltimo = { cod: '', t: 0 };
 let _escOpts = {};
 let _escTrack = null;      // pista de video (para la linterna)
+let _escLector = null;     // el motor en uso (nativo o de respaldo)
 
-// ¿El navegador puede leer códigos? (no pide permiso de cámara)
-async function escanerDisponible() {
+// ¿El navegador trae el lector propio? (no pide permiso de cámara)
+async function _escNativo() {
   if (typeof BarcodeDetector === 'undefined') return false;
   try {
     const soporta = await BarcodeDetector.getSupportedFormats();
@@ -39,16 +42,65 @@ async function escanerDisponible() {
   }
 }
 
-// Qué decirle al que toca el botón en un equipo que no puede leer códigos.
-// Importa el detalle: en Android la solución es abrir la app en Chrome, en
-// iPhone y en la PC no hay solución por ahora.
+// ¿Se puede escanear en este aparato? Con cámara y https, sí: si falta el
+// lector propio del navegador, se usa el de respaldo.
+async function escanerDisponible() {
+  if (await _escNativo()) return true;
+  const hayCam = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  return hayCam && (typeof window === 'undefined' || window.isSecureContext !== false);
+}
+
+// ── Motor de respaldo (PC, iPhone, Firefox) ──────────────────
+// Se baja recién cuando hace falta.
+let _escZxingCarga = null;
+
+function _escCargarZxing() {
+  if (typeof ZXing !== 'undefined') return Promise.resolve(true);
+  if (_escZxingCarga) return _escZxingCarga;
+  _escZxingCarga = new Promise(res => {
+    const sc = document.createElement('script');
+    sc.src = 'vendor/zxing.min.js';
+    sc.onload = () => res(typeof ZXing !== 'undefined');
+    sc.onerror = () => { _escZxingCarga = null; res(false); };
+    document.head.appendChild(sc);
+  });
+  return _escZxingCarga;
+}
+
+// Envoltorio con la MISMA forma que BarcodeDetector: detect(video) → [{rawValue}].
+// Así el resto del archivo no sabe cuál de los dos motores está usando.
+function _escLectorZxing() {
+  const Z = ZXing;
+  let hints = null;
+  try {
+    hints = new Map();
+    const F = Z.BarcodeFormat;
+    hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [
+      F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.CODE_39, F.ITF, F.CODABAR, F.QR_CODE,
+    ]);
+    // Sin esto no lee un código apenas torcido, que es como se escanea de verdad
+    hints.set(Z.DecodeHintType.TRY_HARDER, true);
+  } catch { hints = null; }
+  const reader = new Z.BrowserMultiFormatReader(hints, 200);
+  return {
+    async detect(video) {
+      try {
+        const r = reader.decode(video);
+        const txt = r && (typeof r.getText === 'function' ? r.getText() : r.text);
+        return txt ? [{ rawValue: txt }] : [];
+      } catch {
+        return [];        // cuadro sin código: no es un error
+      }
+    },
+    stop() { try { reader.reset(); } catch {} },
+  };
+}
+
+// Ya no hay aparatos sin lector: lo que puede faltar es la cámara o el https.
 function _escSinSoporte() {
-  const ua = (navigator.userAgent || '');
-  if (/iPhone|iPad|iPod/i.test(ua))
-    return 'El navegador del iPhone todavía no lee códigos con la cámara. Usá el lector de mano o escribí el código.';
-  if (/Android/i.test(ua))
-    return 'Este navegador no lee códigos. Abrí la app en Chrome desde el celular y probá de nuevo.';
-  return 'Leer con la cámara anda en el celular (Chrome de Android), no en la computadora. Acá usá el lector de mano o escribí el código.';
+  if (typeof window !== 'undefined' && window.isSecureContext === false)
+    return 'La cámara solo funciona con https. Entrá a la app por su dirección web, no por el archivo.';
+  return 'Este dispositivo no tiene cámara disponible. Usá el lector de mano o escribí el código.';
 }
 
 // Por qué no se puede, en castellano y con la salida a mano.
@@ -74,13 +126,20 @@ async function abrirEscaner(cb, opts = {}) {
   const video = document.getElementById('esc-video');
   if (!modal || !video) { toast('Falta el lector en esta pantalla', 'error'); return false; }
 
-  if (!(await escanerDisponible())) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     toast(_escSinSoporte(), 'error');
     return false;
   }
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    toast(_escMotivo({}), 'error');
-    return false;
+
+  // Motor: el del navegador si está; si no, el de respaldo (se baja una vez).
+  const nativo = await _escNativo();
+  if (!nativo) {
+    _escEstado('Preparando el lector…');
+    toast('Preparando el lector por primera vez…', 'info');
+    if (!(await _escCargarZxing())) {
+      toast('No se pudo preparar el lector. Probá con internet una primera vez.', 'error');
+      return false;
+    }
   }
 
   _escCb = cb;
@@ -113,8 +172,10 @@ async function abrirEscaner(cb, opts = {}) {
   _escTrack = _escStream.getVideoTracks()[0] || null;
   _escMostrarLinterna();
 
-  const detector = new BarcodeDetector({ formats: ESCANER_FORMATOS });
-  _escTimer = setInterval(() => _escBuscar(detector, video), 220);
+  _escLector = nativo ? new BarcodeDetector({ formats: ESCANER_FORMATOS }) : _escLectorZxing();
+  _escEstado('Buscando el código…');
+  // El de respaldo tarda más por cuadro: se le da aire para no trabar la pantalla.
+  _escTimer = setInterval(() => _escBuscar(_escLector, video), nativo ? 220 : 400);
   return true;
 }
 
@@ -200,6 +261,8 @@ function cerrarEscaner() {
     try { _escStream.getTracks().forEach(t => t.stop()); } catch {}
     _escStream = null;
   }
+  if (_escLector && typeof _escLector.stop === 'function') _escLector.stop();
+  _escLector = null;
   _escTrack = null;
   const video = document.getElementById('esc-video');
   if (video) { try { video.pause(); } catch {} video.srcObject = null; }

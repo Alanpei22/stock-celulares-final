@@ -67,10 +67,14 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - `escaner.js`: modulo aparte, pensado para reusar (IMEI, cobro). API:
   `escanerDisponible()`, `abrirEscaner(cb, {titulo, continuo})`, `cerrarEscaner()`,
   `escanerLuz()`. El modal (`#esc-modal`) vive en caja.html.
-- Usa **BarcodeDetector del navegador**: cero librerias, cero peso, anda sin
-  internet. NO lo traen Safari de iPhone ni Firefox: ahi el boton no aparece y
-  queda el lector de mano (input keyboard-wedge de siempre). Si alguna vez hace
-  falta iPhone, la libreria se suma SOLO en este archivo.
+- **Dos motores, el liviano primero**: BarcodeDetector del navegador (Chrome de
+  Android: cero peso) y, si no esta (iPhone, Chrome de escritorio en Windows,
+  Firefox), se baja `vendor/zxing.min.js` (336 KB) UNA vez por dispositivo y
+  queda en el cache de la app. En Android NO se baja nunca.
+- El envoltorio de ZXing tiene la misma forma que BarcodeDetector
+  (`detect(video) -> [{rawValue}]`), asi el resto del archivo no sabe cual usa.
+  La prueba 7d lo corre contra la libreria REAL de vendor/: si una version nueva
+  cambia constructor/decode/reset, falla ahi.
 - El boton se ve SIEMPRE. Al principio se escondia si el navegador no sabia
   leer codigos y era peor: no aparecia y no se sabia por que. Ahora al tocarlo
   dice el motivo segun el aparato (Android → abri Chrome; iPhone/PC → lector de

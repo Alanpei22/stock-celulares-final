@@ -32,6 +32,22 @@ function nuevoTrack(conLinterna) {
 let LEIDOS = [];        // lo que "ve" la cámara en cada vuelta
 const TOASTS = [];
 let TICK = null;        // el loop de detección, para hacerlo correr a mano
+const SCRIPTS = [];     // los <script> que la app pidió bajar
+let CARGA_FALLA = false;
+let ZXING_RESET = 0;
+// La librería de respaldo, con la misma forma que usa escaner.js
+const ZXING_FALSO = {
+  BarcodeFormat: { EAN_13: 1, EAN_8: 2, UPC_A: 3, UPC_E: 4, CODE_128: 5, CODE_39: 6, ITF: 7, CODABAR: 8, QR_CODE: 9 },
+  DecodeHintType: { POSSIBLE_FORMATS: 2, TRY_HARDER: 3 },
+  BrowserMultiFormatReader: class {
+    constructor(hints) { this.hints = hints; }
+    decode() {
+      if (!LEIDOS.length) throw new Error('NotFoundException');
+      return { getText: () => LEIDOS[0] };
+    }
+    reset() { ZXING_RESET++; }
+  },
+};
 let VISIBILITY = null;  // handler de visibilitychange
 
 const ctx = {
@@ -45,6 +61,9 @@ const ctx = {
     addEventListener: (ev, fn) => { if (ev === 'visibilitychange') VISIBILITY = fn; },
     body: { style: {} },
     querySelector: () => null, querySelectorAll: () => [],
+    // El lector de respaldo se baja con un <script>: acá se simula.
+    createElement: () => { const sc = { src: '', onload: null, onerror: null }; SCRIPTS.push(sc); return sc; },
+    head: { appendChild: sc => setImmediate(() => (CARGA_FALLA ? sc.onerror && sc.onerror() : (ctx.ZXing = ZXING_FALSO, sc.onload && sc.onload()))) },
   },
   navigator: {
     vibrate: () => true,
@@ -147,27 +166,78 @@ await get('escanerLuz()');
 ok(TRACKS[TRACKS.length - 1].torch === false, 'y la apaga');
 run('cerrarEscaner()');
 
-console.log('\n7) Navegador que no sabe leer códigos');
-// Safari de iPhone y Firefox no traen BarcodeDetector.
-ok(await get('escanerDisponible()') === true, 'con soporte: disponible');
+console.log('\n7) Navegador sin lector propio: se baja el de respaldo');
+// Safari de iPhone, Chrome de escritorio en Windows y Firefox no traen
+// BarcodeDetector. Antes ahí no se podía escanear; ahora se usa ZXing.
+ok(await get('escanerDisponible()') === true, 'con lector propio: disponible');
 run('BarcodeDetector = undefined');
-ok(await get('escanerDisponible()') === false, 'sin soporte: no disponible');
+ok(await get('_escNativo()') === false, 'sin lector propio del navegador');
+ok(await get('escanerDisponible()') === true, 'pero igual se puede escanear (hay cámara)');
+
+SCRIPTS.length = 0;
+const CODB = [];
+ctx.COD = CODB;
+LEIDOS = [];
+abrio = await get(`abrirEscaner(c => COD.push(c))`);
+ok(abrio === true, 'abre igual');
+ok(SCRIPTS.length === 1 && /vendor\/zxing\.min\.js$/.test(SCRIPTS[0].src),
+   'bajó el lector de respaldo desde la app, no de internet', SCRIPTS.map(x => x.src));
+LEIDOS = ['7790895000997'];
+await TICK();
+ok(CODB[0] === '7790895000997', 'y lee el código igual que el nativo', CODB);
+ok(!abierta(), 'la cámara también se apaga');
+ok(ZXING_RESET > 0, 'y el lector de respaldo se frena (si no, sigue procesando cuadros)');
+
+console.log('\n7b) Se baja una sola vez, y solo donde hace falta');
+SCRIPTS.length = 0;
+await get(`abrirEscaner(() => {})`);
+ok(SCRIPTS.length === 0, 'la segunda vez ya está cargado: no se vuelve a bajar', SCRIPTS.length);
+run('cerrarEscaner()');
+run('BarcodeDetector = __BD; ZXing = undefined; _escZxingCarga = null;');
+SCRIPTS.length = 0;
+await get(`abrirEscaner(() => {})`);
+ok(SCRIPTS.length === 0,
+   'con lector propio (Android) NO se bajan los 336 KB', SCRIPTS.map(x => x.src));
+run('cerrarEscaner()');
+
+console.log('\n7c) Si no se puede bajar, lo dice');
+run('BarcodeDetector = undefined; ZXing = undefined; _escZxingCarga = null;');
+CARGA_FALLA = true;
 TOASTS.length = 0;
-const pedidosAntes = CAMARA.pedidos.length;
 abrio = await get(`abrirEscaner(() => {})`);
-ok(abrio === false && CAMARA.pedidos.length === pedidosAntes,
-   'no pide la cámara para después fallar', CAMARA.pedidos.length);
-ok(TOASTS.some(t => /lector de mano|escrib/i.test(t[1])), 'y ofrece la salida a mano', TOASTS);
-// El motivo cambia segun el aparato: en Android la salida es abrir Chrome.
-ctx.navigator.userAgent = 'Mozilla/5.0 (Linux; Android 14; SM-A546E) AppleWebKit/537.36';
-TOASTS.length = 0;
-await get(`abrirEscaner(() => {})`);
-ok(TOASTS.some(t => /Chrome/.test(t[1])), 'en Android dice que abra Chrome', TOASTS);
-ctx.navigator.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)';
-TOASTS.length = 0;
-await get(`abrirEscaner(() => {})`);
-ok(TOASTS.some(t => /iPhone/.test(t[1])), 'en iPhone lo dice y ofrece el lector de mano', TOASTS);
-ctx.navigator.userAgent = 'node';
+ok(abrio === false, 'no abre a medias');
+ok(TOASTS.some(t => /internet/i.test(t[1])), 'y explica que la primera vez necesita internet', TOASTS);
+ok(!abierta(), 'sin dejar la cámara prendida');
+CARGA_FALLA = false;
+run('BarcodeDetector = __BD; ZXing = undefined; _escZxingCarga = null;');
+
+console.log('\n7d) El envoltorio contra la ZXing DE VERDAD');
+// Las pruebas de arriba usan una librería de mentira. Esto carga la real de
+// vendor/ y llama al envoltorio igual que lo hace la app: si una versión nueva
+// de ZXing cambia el constructor, el decode o el reset, se cae acá.
+{
+  const px = new Uint8ClampedArray(640 * 480 * 4).fill(255);   // imagen en blanco
+  const lienzo = { width: 640, height: 480, style: {},
+    getContext: () => ({ drawImage() {}, getImageData: () => ({ data: px, width: 640, height: 480 }) }) };
+  const c2 = { console, setTimeout, clearTimeout, Math, Date, Map, Set,
+    Uint8ClampedArray, Uint8Array, Int32Array, Float32Array,
+    document: { createElement: t => (t === 'canvas' ? lienzo : { style: {} }), body: { appendChild() {} } },
+    navigator: { userAgent: 'node' } };
+  c2.self = c2; c2.globalThis = c2; c2.window = c2;
+  vm.createContext(c2);
+  vm.runInContext(fs.readFileSync(DIR + 'vendor/zxing.min.js', 'utf8'), c2, { filename: 'zxing.min.js' });
+  const fuente = fs.readFileSync(DIR + 'escaner.js', 'utf8');
+  const desde = fuente.indexOf('function _escLectorZxing()');
+  const hasta = fuente.indexOf('\n}\n', desde) + 3;
+  vm.runInContext(fuente.slice(desde, hasta), c2, { filename: 'envoltorio' });
+  const lector = vm.runInContext('_escLectorZxing()', c2);
+  ok(lector && typeof lector.detect === 'function', 'el envoltorio se arma con la librería real');
+  const salida = await lector.detect({ videoWidth: 640, videoHeight: 480, width: 640, height: 480, style: {} });
+  ok(Array.isArray(salida) && salida.length === 0,
+     'una imagen sin código devuelve lista vacía, no una excepción', salida);
+  lector.stop();
+  ok(true, 'y stop() no explota');
+}
 
 console.log('\n8) El código va al inventario');
 const INV = [];
@@ -224,6 +294,11 @@ ok(html.indexOf('escaner.js') < html.indexOf('inventario.js'), 'escaner.js se ca
 ok(/playsinline/.test(html) && /playsinline/.test(src), 'video en línea (sin esto iPhone lo abre a pantalla completa)');
 ok(!/collection\(|firebase/.test(src), 'no toca Firebase: leer un código no gasta cupo');
 ok(!/cdn|unpkg|jsdelivr|https:\/\//.test(src.replace(/\/\/.*/g, '')), 'y no baja ninguna librería de internet');
+// El lector de respaldo vive en el repo: no se pide a un CDN (que puede caerse
+// o bloquearse) y queda en el caché de la app.
+const zx = fs.statSync(DIR + 'vendor/zxing.min.js');
+ok(zx.size > 200000 && zx.size < 600000, 'vendor/zxing.min.js está en la app', zx.size);
+ok(!/zxing/.test(html), 'y NO se carga de arranque: solo cuando el navegador no tiene lector propio');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
