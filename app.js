@@ -527,6 +527,7 @@ function initApp() {
   // Los modales ya están en el HTML aunque estén ocultos, así que alcanza con
   // engancharlos una vez.
   if (typeof imeiWatch === 'function') { imeiWatch('fi-imei'); imeiWatch('rep-fi-imei'); }
+  if (typeof imeiBotonCam === 'function') { imeiBotonCam('fi-imei'); imeiBotonCam('rep-fi-imei'); }
   loadConfig();
   loadWaTemplates();
   fetchDolarBlue();

@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 40 suites, ~1650 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 41 suites, ~1680 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -62,6 +62,20 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 
 ## Lo ultimo que se hizo (2026-09-17)
+
+**IMEI con la camara** — tests/test-imei-camara.js
+- Boton 📷 al lado de los CUATRO campos de IMEI: alta de stock (`fi-imei`),
+  ingreso de reparacion (`rep-fi-imei`) y los dos de la venta (`ve-imei`,
+  `ve-imei2`). El boton lo pone `imeiBotonCam(id)` por JS, no hay que tocar el
+  HTML de cada formulario.
+- `imeiDesdeCodigo(raw)` en utils.js: saca el IMEI de lo que diga la etiqueta
+  (rotulos, espacios) y **solo acepta si cierra por Luhn**. Si la etiqueta trae
+  14 digitos sin verificador, lo calcula (`imeiVerificador`).
+- Por que importa: la caja tiene varios codigos pegados (IMEI1, IMEI2, serie y
+  el EAN del producto). Sin el filtro, el lector cargaba el codigo del carton
+  como IMEI. Ahora avisa "ese no es el IMEI" y sigue buscando.
+- `abrirEscaner` acepta `opts.validar` y `opts.noSirve` para esto.
+- index.html ahora tambien carga escaner.js y tiene el modal del lector.
 
 **El stock se lee en DOS partes** — tests/test-stock-vendidos.js
 - Era la lectura mas cara: listener a la coleccion `stock` ENTERA en cada

@@ -394,6 +394,40 @@ function imeiLuhnOk(d) {
   return suma % 10 === 0;
 }
 
+// Dígito verificador (Luhn) de los primeros 14. Sirve para las etiquetas que
+// traen el IMEI sin el verificador.
+function imeiVerificador(d14) {
+  if (!/^\d{14}$/.test(d14)) return '';
+  let suma = 0;
+  for (let i = 0; i < 14; i++) {
+    let n = +d14[i];
+    if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; }
+    suma += n;
+  }
+  return String((10 - (suma % 10)) % 10);
+}
+
+// El IMEI que hay adentro de un código escaneado, o null.
+// La etiqueta de la caja no viene limpia: puede decir "IMEI1:35693803564380 9",
+// traer el IMEI pegado al número de serie, o ser el código de barras del
+// producto (un EAN que no tiene nada que ver). Por eso no se toma cualquier
+// número: tiene que cerrar por Luhn.
+function imeiDesdeCodigo(raw) {
+  const d = imeiDigitos(raw);
+  if (d.length < 14) return null;
+  // Una ventana de 15 dígitos que cierre
+  for (let i = 0; i + 15 <= d.length; i++) {
+    const cand = d.slice(i, i + 15);
+    if (imeiLuhnOk(cand)) return cand;
+  }
+  // Etiquetas que traen los 14 sin el verificador
+  if (d.length === 14) {
+    const completo = d + imeiVerificador(d);
+    if (imeiLuhnOk(completo)) return completo;
+  }
+  return null;
+}
+
 // Estado del campo: sirve para el cartelito y para el aviso al guardar.
 function imeiEstado(v) {
   const d = imeiDigitos(v);

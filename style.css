@@ -6059,3 +6059,12 @@ body.dark .rep-cliente-hint { background: rgba(16,185,129,.12); color: #34d399; 
   background: rgba(255,255,255,.12); color: #fff;
   font-size: 13px; font-weight: 700; cursor: pointer;
 }
+
+/* ── Botón de cámara al lado del IMEI ── */
+.imei-cam-btn {
+  margin-left: 8px; padding: 7px 12px; min-height: 38px; min-width: 44px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--card); font-size: 16px; cursor: pointer; vertical-align: middle;
+}
+.imei-cam-btn:active { background: var(--accent-soft); }
+.fi--con-cam { width: calc(100% - 58px); display: inline-block; vertical-align: middle; }

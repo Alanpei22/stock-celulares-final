@@ -131,6 +131,7 @@ function initApp() {
   db = _fbInit();
   // Aviso en vivo en los IMEI de la venta de equipo
   if (typeof imeiWatch === 'function') { imeiWatch('ve-imei'); imeiWatch('ve-imei2'); }
+  if (typeof imeiBotonCam === 'function') { imeiBotonCam('ve-imei'); imeiBotonCam('ve-imei2'); }
   // Campanita de novedades. CUPO: listener acotado a 60 docs, ver avisos.js.
   if (typeof initAvisos === 'function') initAvisos();
   updateDateLabel();

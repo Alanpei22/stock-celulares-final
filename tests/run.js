@@ -52,6 +52,7 @@ const QUE_CUBRE = {
   'test-reparaciones-estados.js': 'Reparaciones: card = ficha, cobro del saldo, garantía y equipos viejos abiertos',
   'test-demorados.js':       'Demorados: una sola cuenta en lista, card, inicio y estadísticas',
   'test-escaner-lectura.js': 'Que el lector LEA un código de barras de verdad (ZXing real)',
+  'test-imei-camara.js':     'Leer el IMEI con la cámara sin cargar el código equivocado',
   'test-escaner.js':         'Leer códigos de barras con la cámara y cargar al inventario',
   'test-sin-cupo.js':        'Ingresar un equipo aunque Firebase no conteste (cupo agotado)',
   'test-stock-vendidos.js':  'Stock en dos partes: lo del local en vivo, lo vendido on-demand',

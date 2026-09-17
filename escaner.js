@@ -204,15 +204,26 @@ async function _escBuscar(detector, video) {
   const raw = codigos && codigos.length ? String(codigos[0].rawValue || '').trim() : '';
   if (!raw) return;
 
+  // Filtro del que pidió el escaneo: para un IMEI, el código de barras del
+  // producto no sirve. Se sigue buscando en vez de cargar cualquier número.
+  let valor = raw;
+  if (typeof _escOpts.validar === 'function') {
+    valor = _escOpts.validar(raw);
+    if (!valor) {
+      _escEstado(_escOpts.noSirve || 'Ese código no sirve acá. Buscá el otro de la etiqueta.');
+      return;
+    }
+  }
+
   const ahora = Date.now();
   if (raw === _escUltimo.cod && ahora - _escUltimo.t < _ESC_REPETIR_MS) return;
   _escUltimo = { cod: raw, t: ahora };
   if (_escAyudaTimer) { clearTimeout(_escAyudaTimer); _escAyudaTimer = null; }
 
-  _escAvisar(raw);
+  _escAvisar(valor);
   const cb = _escCb;
   if (!_escOpts.continuo) cerrarEscaner();
-  if (typeof cb === 'function') cb(raw);
+  if (typeof cb === 'function') cb(valor);
 }
 
 // Que se note que leyó, sin mirar la pantalla.
@@ -299,6 +310,51 @@ function cerrarEscaner() {
   if (btn) { btn.classList.add('hidden'); btn.dataset.on = ''; btn.textContent = '🔦 Luz'; }
   _escCb = null;
   _escOpts = {};
+}
+
+// ══════════════════════════════════════════════════════════════
+//  IMEI CON LA CÁMARA
+//  ─────────────────────────────────────────────────────────────
+//  El IMEI está impreso en la caja del equipo y atrás del celular, en código
+//  de barras. Tipearlo a mano son 15 dígitos y un error de tipeo se arrastra a
+//  la boleta, a la garantía y al día que haya que consultarlo.
+// ══════════════════════════════════════════════════════════════
+
+// Escanea dentro de un campo de IMEI. Solo acepta un número que cierre por
+// Luhn: si apuntás al código de barras del producto, sigue buscando.
+function escanearImei(inputId) {
+  const inp = document.getElementById(inputId);
+  if (!inp) return Promise.resolve(false);
+  return abrirEscaner(imei => {
+    inp.value = imei;
+    // 'input' para que el cartelito de validación se vuelva a pintar
+    try { inp.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
+    try { inp.focus(); } catch {}
+    toast('📷 IMEI ' + imei, 'success');
+  }, {
+    titulo: 'Escaneá el IMEI de la etiqueta',
+    // Sigue leyendo hasta encontrar uno válido: las cajas tienen varios
+    // códigos juntos (IMEI, serie, EAN del producto).
+    continuo: false,
+    validar: raw => (typeof imeiDesdeCodigo === 'function' ? imeiDesdeCodigo(raw) : null),
+    noSirve: 'Ese no es el IMEI (puede ser la serie o el código del producto). Probá con el otro.',
+  });
+}
+
+// Pone el botón de cámara al lado de un campo de IMEI, sin tocar el HTML de
+// cada formulario (son cuatro: stock, reparación y los dos de la venta).
+function imeiBotonCam(inputId) {
+  const inp = document.getElementById(inputId);
+  if (!inp || document.getElementById(inputId + '-cam')) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = inputId + '-cam';
+  btn.className = 'imei-cam-btn';
+  btn.textContent = '📷';
+  btn.title = 'Escanear el IMEI con la cámara';
+  btn.onclick = () => escanearImei(inputId);
+  inp.insertAdjacentElement('afterend', btn);
+  inp.classList.add('fi--con-cam');
 }
 
 // Si la app pasa a segundo plano (atendés a alguien, suena el teléfono), la

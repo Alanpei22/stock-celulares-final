@@ -2184,6 +2184,7 @@
 </div>
 
 <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script defer src="escaner.js"></script>
 <script defer src="qr.js"></script>
 <script defer src="sync-status.js"></script>
 <script defer src="tp-fases.js"></script>
@@ -2545,5 +2546,21 @@
   <div class="sheet-title" id="sheet-title"></div>
   <div class="sheet-items" id="sheet-items"></div>
 </div>
+
+<!-- ── Lector de códigos con la cámara (escaner.js) ── -->
+<div id="esc-modal" class="esc-modal hidden">
+  <video id="esc-video" class="esc-video" muted playsinline></video>
+  <div class="esc-marco"><span class="esc-linea"></span></div>
+  <div class="esc-top">
+    <span id="esc-titulo" class="esc-titulo">Escaneá el código de barras</span>
+    <button type="button" class="esc-cerrar" onclick="cerrarEscaner()" title="Cerrar">✕</button>
+  </div>
+  <div class="esc-bottom">
+    <span id="esc-estado" class="esc-estado"></span>
+    <button type="button" id="esc-luz" class="esc-btn hidden" onclick="escanerLuz()">🔦 Luz</button>
+    <button type="button" class="esc-btn" onclick="cerrarEscaner()">Cancelar</button>
+  </div>
+</div>
+
 </body>
 </html>
