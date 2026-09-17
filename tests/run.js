@@ -51,6 +51,7 @@ const QUE_CUBRE = {
   'test-caja-auditoria.js':   'Auditoría de la caja: desglose del día y borrado de movimientos',
   'test-reparaciones-estados.js': 'Reparaciones: card = ficha, cobro del saldo, garantía y equipos viejos abiertos',
   'test-demorados.js':       'Demorados: una sola cuenta en lista, card, inicio y estadísticas',
+  'test-escaner.js':         'Leer códigos de barras con la cámara y cargar al inventario',
   'test-planes.js':           'Planes de ahorro, reservas y que la seña no se cuente dos veces',
 };
 

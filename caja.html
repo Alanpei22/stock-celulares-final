@@ -204,9 +204,10 @@
         </div>
       </div>
       <div class="inv-scan-wrap">
-        <span class="inv-scan-ico">📷</span>
+        <button type="button" class="inv-scan-cam" id="inv-scan-cam" onclick="escanearInvCam()"
+                title="Leer el código con la cámara">📷 Escanear</button>
         <input id="inv-scan-input" class="inv-scan-input" type="text"
-          placeholder="Escaneá un código de barras…"
+          placeholder="…o usá el lector de mano"
           inputmode="none" autocomplete="off" autocorrect="off" spellcheck="false">
       </div>
       <div class="search-wrap">
@@ -1002,6 +1003,7 @@
 <script src="print.js"></script>
 <script src="caja_extra.js"></script>
 <script src="clientes.js"></script>
+<script src="escaner.js"></script>
 <script src="inventario.js"></script>
 <script src="finanzas-report.js"></script>
 <script src="modulos_catalog.js"></script>
@@ -1583,6 +1585,21 @@ function switchCajaTab(tab) {
 
 <!-- ═══════════ BOTTOM SHEET (menú deslizante) ═══════════ -->
 <div id="sheet-overlay" class="sheet-overlay hidden" onclick="closeSheet()"></div>
+
+<!-- ── Lector de códigos con la cámara (escaner.js) ── -->
+<div id="esc-modal" class="esc-modal hidden">
+  <video id="esc-video" class="esc-video" muted playsinline></video>
+  <div class="esc-marco"><span class="esc-linea"></span></div>
+  <div class="esc-top">
+    <span id="esc-titulo" class="esc-titulo">Escaneá el código de barras</span>
+    <button type="button" class="esc-cerrar" onclick="cerrarEscaner()" title="Cerrar">✕</button>
+  </div>
+  <div class="esc-bottom">
+    <span id="esc-estado" class="esc-estado"></span>
+    <button type="button" id="esc-luz" class="esc-btn hidden" onclick="escanerLuz()">🔦 Luz</button>
+    <button type="button" class="esc-btn" onclick="cerrarEscaner()">Cancelar</button>
+  </div>
+</div>
 <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true">
   <div class="sheet-handle" onclick="closeSheet()"></div>
   <div class="sheet-title" id="sheet-title"></div>

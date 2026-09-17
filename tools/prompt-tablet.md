@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 36 suites, ~1530 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 37 suites, ~1570 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -61,7 +61,23 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   exigen el ID token de Firebase de una cuenta de la allowlist
 
 
-## Lo ultimo que se hizo (2026-09-12)
+## Lo ultimo que se hizo (2026-09-17)
+
+**Leer codigos de barras con la camara** — escaner.js + tests/test-escaner.js
+- `escaner.js`: modulo aparte, pensado para reusar (IMEI, cobro). API:
+  `escanerDisponible()`, `abrirEscaner(cb, {titulo, continuo})`, `cerrarEscaner()`,
+  `escanerLuz()`. El modal (`#esc-modal`) vive en caja.html.
+- Usa **BarcodeDetector del navegador**: cero librerias, cero peso, anda sin
+  internet. NO lo traen Safari de iPhone ni Firefox: ahi el boton no aparece y
+  queda el lector de mano (input keyboard-wedge de siempre). Si alguna vez hace
+  falta iPhone, la libreria se suma SOLO en este archivo.
+- Inventario: boton "📷 Escanear" al lado del buscador → `escanearInvCam()` →
+  `_handleInvScan` (el mismo camino del lector de mano): codigo conocido abre el
+  producto, codigo nuevo abre el alta con el codigo puesto.
+- Lo que mas se cuida en la prueba: que la camara SIEMPRE se apague (cerrar,
+  leer, o mandar la app a segundo plano). Un stream abierto calienta el celu.
+- Antirrebote de 2,5 s por codigo (el detector dispara varias veces por segundo).
+- Linterna solo si la camara la soporta. No toca Firebase: no gasta cupo.
 
 **Demorados: una sola cuenta** — tests/test-demorados.js
 - Habia 5 definiciones (lista por SLA de fase; inicio, estadisticas y resumen

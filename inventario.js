@@ -24,6 +24,7 @@ const INV_CATEGORIAS = [
 function initInventario(opts = {}) {
   if (!opts.soloUI) _listenProductos();
   _initInvScanInput();
+  _invCamBtn();
 
   document.getElementById('inv-add-btn').addEventListener('click', () => openProductoForm());
   // Búsqueda con debounce para evitar lag con muchos productos
@@ -298,6 +299,22 @@ function _initInvScanInput() {
       if (!active || active === document.body || (!active.tagName.match(/^(INPUT|TEXTAREA|BUTTON|SELECT|A)$/i) && !active.closest('#inv-form-modal'))) inp.focus(); // MED-09
     }, 150);
   });
+}
+
+// Leer el código con la CÁMARA del celu. El lector de mano sigue andando
+// igual: son dos caminos al mismo _handleInvScan.
+async function escanearInvCam() {
+  if (typeof abrirEscaner !== 'function') { toast('El lector no está disponible acá', 'error'); return; }
+  await abrirEscaner(cod => _handleInvScan(cod), { titulo: 'Escaneá el código del producto' });
+}
+
+// Muestra el botón de cámara solo si el navegador puede leer códigos: un botón
+// que abre un cartel de error no sirve para nada.
+async function _invCamBtn() {
+  const btn = document.getElementById('inv-scan-cam');
+  if (!btn) return;
+  const ok = typeof escanerDisponible === 'function' && await escanerDisponible();
+  btn.classList.toggle('hidden', !ok);
 }
 
 function focusInvScan() {
