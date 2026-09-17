@@ -6094,3 +6094,12 @@ body.dark .rep-cliente-hint { background: rgba(16,185,129,.12); color: #34d399; 
 @media (max-width: 640px) {
   .lote-fila-campos { grid-template-columns: 1fr 1fr; }
 }
+
+.lote-moneda-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.lote-moneda-lbl { font-size: 12px; color: var(--text3); }
+.lote-moneda { padding: 6px 12px; min-height: 32px; border: 1px solid var(--border); border-radius: 9999px;
+               background: var(--card); color: var(--text2); font-size: 12px; font-weight: 700; cursor: pointer; }
+.lote-moneda--on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.lote-cot { font-size: 12px; color: var(--text3); }
+.lote-aviso { font-size: 12px; color: var(--text3); margin: 0 0 8px; }
+.lote-in--costo { background: var(--accent-soft); }

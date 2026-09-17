@@ -16,7 +16,8 @@ const mk = id => els[id] = { id, value: '', textContent: '', innerHTML: '', disa
                toggle(c, f) { f ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); } },
   focus() {}, addEventListener() {} };
 ['lote-modal', 'lote-filas', 'lote-totales', 'lote-guardar', 'lote-estado', 'lote-ubicacion',
- 'lote-garantia', 'lote-proveedor'].forEach(mk);
+ 'lote-garantia', 'lote-proveedor', 'lote-moneda-ars', 'lote-moneda-usd', 'lote-cotizacion',
+ 'lote-aviso-costo'].forEach(mk);
 
 const TOASTS = [];
 const COMMITS = [];
@@ -36,6 +37,7 @@ const ctx = {
   imeiDesdeCodigo: raw => (/^\d{15}$/.test(String(raw)) ? String(raw) : null),
   modeloPorImei: async imei => (imei.startsWith('35693803') ? { marca: 'Samsung', modelo: 'GALAXY A54', fuente: 'tabla' } : null),
   getDeviceId: () => 'celu',
+  OWNER_MODE: true, dolarBlue: 1500,
   STOCK: [{ id: 'yaesta', imei: '111111111111111', marca: 'Motorola', modelo: 'G54', vendido: false }],
 };
 ctx.globalThis = ctx; ctx.self = ctx;
@@ -131,6 +133,40 @@ ok(els['lote-guardar'].disabled === false, 'el botón vuelve a quedar habilitado
 FALLA_COMMIT = false;
 await get('loteGuardar()');
 ok(COMMITS.length === 2, 'al reintentar, entra', COMMITS.length);
+
+console.log('\n8) Lote en dólares');
+// Las compras grandes se pagan en dólares y convertir equipo por equipo a mano
+// es donde se cuelan los errores.
+run('OWNER_MODE = true; dolarBlue = 1500;');
+run('_lote = null; abrirLote(); loteAgregarManual();');
+run('loteSetCampo(0,"marca","Apple"); loteSetCampo(0,"modelo","iPhone 13"); loteSetCampo(0,"precio","500"); loteSetCampo(0,"costo","400");');
+run('loteMoneda("usd")');
+ok(get('_lote.comun.moneda') === 'usd', 'se puede cargar el lote en dólares');
+COMMITS.length = 0;
+await get('loteGuardar()');
+const d = COMMITS[0][0];
+ok(d.precioUSD === 500 && d.precio === 750000, 'guarda el precio en dólares Y convertido', [d.precioUSD, d.precio]);
+ok(d.costoUSD === 400 && d.costo === 600000, 'lo mismo con el costo', [d.costoUSD, d.costo]);
+ok(d.dolarSnapshot === 1500, 'con la cotización usada: después se sabe a cuánto se compró', d.dolarSnapshot);
+ok(d.moneda === 'usd', 'y marcado como comprado en dólares');
+
+console.log('\n9) Sin cotización no inventa el cambio');
+run('dolarBlue = 0; _lote = null; abrirLote(); loteAgregarManual();');
+run('loteSetCampo(0,"marca","X"); loteSetCampo(0,"modelo","Y"); loteSetCampo(0,"precio","100"); _lote.comun.moneda = "usd";');
+TOASTS.length = 0;
+COMMITS.length = 0;
+await get('loteGuardar()');
+ok(COMMITS.length === 0, 'no guarda', COMMITS.length);
+ok(TOASTS.some(t => /cotización/i.test(t[1])), 'y avisa por qué', TOASTS);
+run('dolarBlue = 1500; loteDescartar();');
+
+console.log('\n10) Los costos son del dueño');
+run('OWNER_MODE = false; _lote = null; abrirLote(); loteAgregarManual();');
+ok(!/Costo/.test(els['lote-filas'].innerHTML), 'sin modo dueño no se ve la columna de costo');
+ok(!els['lote-aviso-costo'].classList.contains('hidden'), 'y se explica por qué (no queda un hueco sin motivo)');
+run('OWNER_MODE = true; _loteRender();');
+ok(/Costo/.test(els['lote-filas'].innerHTML), 'en modo dueño sí');
+run('loteDescartar();');
 
 console.log('\n8) Está enganchado en la app');
 const idx = fs.readFileSync(DIR + 'index.html', 'utf8');

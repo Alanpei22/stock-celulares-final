@@ -2592,6 +2592,14 @@
         </div>
       </div>
 
+      <div class="lote-moneda-row">
+        <span class="lote-moneda-lbl">Precios y costos en</span>
+        <button type="button" id="lote-moneda-ars" class="lote-moneda lote-moneda--on" onclick="loteMoneda('ars')">ARS $</button>
+        <button type="button" id="lote-moneda-usd" class="lote-moneda" onclick="loteMoneda('usd')">USD u$</button>
+        <span id="lote-cotizacion" class="lote-cot"></span>
+      </div>
+      <p id="lote-aviso-costo" class="lote-aviso hidden">🔒 Los costos se cargan en <b>Modo dueño</b> (menú ⋮).</p>
+
       <div class="lote-copiar">
         <button type="button" class="btn-link" onclick="loteAplicarATodas('precio')">Copiar el 1er precio a todos</button>
         <button type="button" class="btn-link owner-only" onclick="loteAplicarATodas('costo')">Copiar el 1er costo a todos</button>

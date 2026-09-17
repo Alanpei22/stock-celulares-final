@@ -74,6 +74,10 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   escenario posible: hay prueba para eso.
 - No entra dos veces el mismo IMEI ni uno que ya este en STOCK (validacion
   local, sin lecturas de Firebase).
+- **Costos y moneda**: columna de costo por equipo (solo en modo dueno, con
+  aviso de por que no se ve) y botones ARS/USD para todo el lote. En USD se
+  guardan `precioUSD`, `costoUSD`, el convertido y `dolarSnapshot` con la
+  cotizacion usada. Sin cotizacion no guarda: no inventa el cambio.
 
 **Escanear el IMEI y saber QUE equipo es** — tests/test-modelo-imei.js
 - Los primeros 8 digitos del IMEI (TAC) identifican el modelo. Al escanear se

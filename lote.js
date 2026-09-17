@@ -24,9 +24,27 @@ let _lote = null;   // { comun: {...}, filas: [...] }
 
 function _loteVacio() {
   return {
-    comun: { estado: 'Nuevo', ubicacion: '', garantiaMeses: 0, proveedor: '' },
+    // moneda: en qué se cargan precio y costo de TODO el lote. Las compras
+    // grandes se pagan en dólares, y tipear la conversión equipo por equipo es
+    // donde se cuelan los errores.
+    comun: { estado: 'Nuevo', ubicacion: '', garantiaMeses: 0, proveedor: '', moneda: 'ars' },
     filas: [],
   };
+}
+
+// La cotización con la que se convierte. Es la misma que usa el resto de la app.
+function _loteDolar() {
+  if (typeof getCurrentDolar === 'function') { const d = getCurrentDolar(); if (d > 0) return d; }
+  if (typeof dolarBlue === 'number' && dolarBlue > 0) return dolarBlue;
+  return 0;
+}
+
+function _loteEsUSD() { return (_lote && _lote.comun.moneda) === 'usd'; }
+
+// ¿Se pueden ver y cargar los costos? Es la misma regla que en el resto: los
+// costos son del dueño, no de quien atiende el mostrador.
+function _loteVeCostos() {
+  return typeof OWNER_MODE === 'undefined' ? true : !!OWNER_MODE;
 }
 
 function _loteGuardarBorrador() {
@@ -132,6 +150,16 @@ function loteSetCampo(i, campo, valor) {
 function loteSetComun(campo, valor) {
   _lote.comun[campo] = valor;
   _loteGuardarBorrador();
+  if (campo === 'moneda') _loteRender();   // cambian los rótulos y los totales
+}
+
+// Cambiar entre pesos y dólares para todo el lote.
+function loteMoneda(m) {
+  if (m === 'usd' && !_loteDolar()) {
+    toast('No tengo la cotización del dólar todavía', 'error');
+    return;
+  }
+  loteSetComun('moneda', m === 'usd' ? 'usd' : 'ars');
 }
 
 // Copiar el precio (o el costo) de la primera fila a todas las vacías: en un
@@ -156,6 +184,24 @@ function _loteRender() {
   document.getElementById('lote-garantia').value = _lote.comun.garantiaMeses || 0;
   document.getElementById('lote-proveedor').value = _lote.comun.proveedor || '';
 
+  const usd = _loteEsUSD();
+  const cot = _loteDolar();
+  const btnArs = document.getElementById('lote-moneda-ars');
+  const btnUsd = document.getElementById('lote-moneda-usd');
+  if (btnArs && btnUsd) {
+    btnArs.classList.toggle('lote-moneda--on', !usd);
+    btnUsd.classList.toggle('lote-moneda--on', usd);
+  }
+  const cotEl = document.getElementById('lote-cotizacion');
+  if (cotEl) {
+    cotEl.textContent = usd
+      ? (cot ? `Se convierte a $${cot.toLocaleString('es-AR')} por dólar` : 'Sin cotización')
+      : '';
+  }
+  // Los costos son del dueño: si no está en modo dueño, que sepa por qué no los ve
+  const avisoC = document.getElementById('lote-aviso-costo');
+  if (avisoC) avisoC.classList.toggle('hidden', _loteVeCostos());
+
   if (!_lote.filas.length) {
     cont.innerHTML = `<p class="lote-vacio">Todavía no hay equipos.<br>
       Tocá <b>📷 Escanear equipos</b> y pasá uno atrás del otro: la cámara no se cierra hasta que termines.</p>`;
@@ -163,6 +209,7 @@ function _loteRender() {
     return;
   }
 
+  const usdF = _loteEsUSD();
   cont.innerHTML = _lote.filas.map((f, i) => `
     <div class="lote-fila">
       <div class="lote-fila-top">
@@ -179,10 +226,10 @@ function _loteRender() {
                oninput="loteSetCampo(${i},'almacenamiento',this.value)">
         <input class="fi lote-in lote-in--chico" type="number" inputmode="numeric" placeholder="🔋%" value="${esc(f.bateria || '')}"
                oninput="loteSetCampo(${i},'bateria',this.value)">
-        <input class="fi lote-in" type="number" inputmode="numeric" placeholder="Precio $" value="${esc(f.precio || '')}"
+        <input class="fi lote-in" type="number" inputmode="numeric" placeholder="${usdF ? 'Precio u$' : 'Precio $'}" value="${esc(f.precio || '')}"
                oninput="loteSetCampo(${i},'precio',this.value)">
-        <input class="fi lote-in owner-only" type="number" inputmode="numeric" placeholder="Costo $" value="${esc(f.costo || '')}"
-               oninput="loteSetCampo(${i},'costo',this.value)">
+        ${_loteVeCostos() ? `<input class="fi lote-in lote-in--costo" type="number" inputmode="numeric" placeholder="${usdF ? 'Costo u$' : 'Costo $'}" value="${esc(f.costo || '')}"
+               oninput="loteSetCampo(${i},'costo',this.value)">` : ''}
       </div>
     </div>`).join('');
   _loteTotales();
@@ -195,9 +242,15 @@ function _loteTotales() {
   const sinPrecio = _lote.filas.filter(f => !(Number(f.precio) > 0)).length;
   const total = _lote.filas.reduce((s, f) => s + (Number(f.precio) || 0), 0);
   const costo = _lote.filas.reduce((s, f) => s + (Number(f.costo) || 0), 0);
+  const usd = _loteEsUSD();
+  const cot = _loteDolar();
+  const plata = v => usd
+    ? `u$${Number(v).toLocaleString('es-AR')}${cot ? ` <small>(${fmt(Math.round(v * cot))})</small>` : ''}`
+    : fmt(v);
   el.innerHTML = n
-    ? `<b>${n}</b> equipo${n > 1 ? 's' : ''} · venta ${fmt(total)}` +
-      (costo > 0 ? ` · costo ${fmt(costo)} · <span class="lote-gan">ganancia ${fmt(total - costo)}</span>` : '') +
+    ? `<b>${n}</b> equipo${n > 1 ? 's' : ''} · venta ${plata(total)}` +
+      (costo > 0 && _loteVeCostos()
+        ? ` · costo ${plata(costo)} · <span class="lote-gan">ganancia ${plata(total - costo)}</span>` : '') +
       (sinPrecio ? ` · <span class="lote-falta">${sinPrecio} sin precio</span>` : '')
     : '';
   const btn = document.getElementById('lote-guardar');
@@ -227,6 +280,9 @@ async function loteGuardar() {
   if (btn) btn.disabled = true;
   const ahora = new Date().toISOString();
   const comun = _lote.comun;
+  const usd = _loteEsUSD();
+  const cot = _loteDolar();
+  if (usd && !cot) { toast('Sin cotización no puedo convertir el lote', 'error'); if (btn) btn.disabled = false; return; }
 
   try {
     const batch = db.batch();
@@ -247,7 +303,18 @@ async function loteGuardar() {
         vendido: false,
         _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
       };
-      if (Number(f.costo) > 0) doc.costo = Number(f.costo);
+      // En dólares se guardan LAS DOS: el número que cargaste y el convertido,
+      // con la cotización usada. Sin eso, mañana no se sabe a cuánto se compró.
+      if (usd) {
+        doc.precioUSD = Number(f.precio) || 0;
+        doc.precio = Math.round((Number(f.precio) || 0) * cot);
+        doc.moneda = 'usd';
+        doc.dolarSnapshot = cot;
+        if (Number(f.costo) > 0) {
+          doc.costoUSD = Number(f.costo);
+          doc.costo = Math.round(Number(f.costo) * cot);
+        }
+      } else if (Number(f.costo) > 0) doc.costo = Number(f.costo);
       if (Number(f.bateria) > 0) doc.bateria = Number(f.bateria);
       if (Number(comun.garantiaMeses) > 0) doc.garantiaMeses = Number(comun.garantiaMeses);
       batch.set(db.collection('stock').doc(id), doc);
