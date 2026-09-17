@@ -77,6 +77,7 @@
                 <span class="lock-icon">🔒</span> Modo dueño
               </button>
               <div class="hdr-drop-sep"></div>
+              <button class="hdr-drop-item" onclick="abrirLote();closeHdrMenu()">📦 Ingreso por lote</button>
               <button class="hdr-drop-item" id="stats-btn">📊 Estadísticas</button>
               <button class="hdr-drop-item" id="settings-btn">⚙️ Configuración</button>
               <button class="hdr-drop-item" id="export-btn">💾 Exportar stock</button>
@@ -2185,6 +2186,7 @@
 
 <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script defer src="escaner.js"></script>
+<script defer src="lote.js"></script>
 <script defer src="qr.js"></script>
 <script defer src="sync-status.js"></script>
 <script defer src="tp-fases.js"></script>
@@ -2545,6 +2547,64 @@
   <div class="sheet-handle" onclick="closeSheet()"></div>
   <div class="sheet-title" id="sheet-title"></div>
   <div class="sheet-items" id="sheet-items"></div>
+</div>
+
+
+<!-- ── Ingreso por lote (lote.js) ── -->
+<div id="lote-modal" class="modal-overlay hidden">
+  <div class="modal-card lote-card">
+    <div class="modal-header">
+      <h3>📦 Ingreso por lote</h3>
+      <button class="modal-close" onclick="cerrarLote()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="lote-acciones">
+        <button type="button" class="btn-primary lote-scan" onclick="loteEscanear()">📷 Escanear equipos</button>
+        <button type="button" class="btn-secondary" onclick="loteAgregarManual()">＋ A mano</button>
+      </div>
+
+      <div class="lote-comunes">
+        <div class="fg">
+          <label class="fl">Estado (todos)</label>
+          <select id="lote-estado" class="fi" onchange="loteSetComun('estado', this.value)">
+            <option value="Nuevo">Nuevo</option>
+            <option value="Usado">Usado</option>
+            <option value="Reacondicionado">Reacondicionado</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">Ubicación</label>
+          <select id="lote-ubicacion" class="fi" onchange="loteSetComun('ubicacion', this.value)">
+            <option value="">—</option>
+            <option value="Exhibición">Exhibición</option>
+            <option value="Depósito">Depósito</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">Garantía (meses)</label>
+          <input id="lote-garantia" class="fi" type="number" inputmode="numeric" min="0" value="0"
+                 oninput="loteSetComun('garantiaMeses', this.value)">
+        </div>
+        <div class="fg">
+          <label class="fl">Proveedor / remito</label>
+          <input id="lote-proveedor" class="fi" type="text" placeholder="Opcional"
+                 oninput="loteSetComun('proveedor', this.value)">
+        </div>
+      </div>
+
+      <div class="lote-copiar">
+        <button type="button" class="btn-link" onclick="loteAplicarATodas('precio')">Copiar el 1er precio a todos</button>
+        <button type="button" class="btn-link owner-only" onclick="loteAplicarATodas('costo')">Copiar el 1er costo a todos</button>
+      </div>
+
+      <div id="lote-filas" class="lote-filas"></div>
+      <div id="lote-totales" class="lote-totales"></div>
+    </div>
+    <div class="modal-footer lote-footer">
+      <button type="button" class="btn-secondary" onclick="loteDescartar()">Descartar lote</button>
+      <button type="button" class="btn-primary" id="lote-guardar" onclick="loteGuardar()">💾 Guardar</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── Lector de códigos con la cámara (escaner.js) ── -->

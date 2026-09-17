@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 42 suites, ~1710 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 43 suites, ~1745 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -62,6 +62,18 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 
 ## Lo ultimo que se hizo (2026-09-17)
+
+**Ingreso por lote** — lote.js + tests/test-lote.js
+- Stock → menu ⋮ → "📦 Ingreso por lote". Escaneas los IMEI uno atras del otro
+  (`abrirEscaner` en modo `continuo`), cada equipo entra con marca y modelo por
+  TAC, completas precio y se guardan TODOS con un `batch.commit()`.
+- Campos comunes al lote: estado, ubicacion, garantia, proveedor (va a `notas`
+  como "Lote: X"). Botones para copiar el 1er precio/costo a los que falten.
+- **El borrador se guarda en localStorage (`loteBorrador`) en cada cambio** y si
+  el commit falla NO se borra. Escanear 15 equipos y perderlos es el peor
+  escenario posible: hay prueba para eso.
+- No entra dos veces el mismo IMEI ni uno que ya este en STOCK (validacion
+  local, sin lecturas de Firebase).
 
 **Escanear el IMEI y saber QUE equipo es** — tests/test-modelo-imei.js
 - Los primeros 8 digitos del IMEI (TAC) identifican el modelo. Al escanear se

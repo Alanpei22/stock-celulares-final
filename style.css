@@ -6068,3 +6068,29 @@ body.dark .rep-cliente-hint { background: rgba(16,185,129,.12); color: #34d399; 
 }
 .imei-cam-btn:active { background: var(--accent-soft); }
 .fi--con-cam { width: calc(100% - 58px); display: inline-block; vertical-align: middle; }
+
+
+/* ── Ingreso por lote ── */
+.lote-card { max-width: 820px; width: 96%; }
+.lote-acciones { display: flex; gap: 10px; margin-bottom: 12px; }
+.lote-scan { flex: 1; min-height: 46px; font-size: 15px; }
+.lote-comunes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.lote-copiar { display: flex; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
+.lote-filas { display: flex; flex-direction: column; gap: 10px; max-height: 46vh; overflow-y: auto; }
+.lote-vacio { padding: 26px 14px; text-align: center; color: var(--text3); font-size: 13px; line-height: 1.6; }
+.lote-fila { border: 1px solid var(--border); border-radius: 12px; padding: 10px; background: var(--card); }
+.lote-fila-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.lote-n { width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; background: var(--accent); color: #fff;
+          font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.lote-imei { flex: 1; font-size: 12px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.lote-del { width: 30px; height: 30px; border: none; border-radius: 50%; background: transparent;
+            color: var(--text3); font-size: 15px; cursor: pointer; }
+.lote-fila-campos { display: grid; grid-template-columns: 1.2fr 1.4fr .7fr .7fr 1fr 1fr; gap: 6px; }
+.lote-in { min-height: 38px; font-size: 13px; }
+.lote-totales { margin-top: 12px; font-size: 13px; color: var(--text2); }
+.lote-gan { color: var(--grn2, #10b981); font-weight: 700; }
+.lote-falta { color: var(--warn, #f59e0b); font-weight: 700; }
+.lote-footer { display: flex; gap: 10px; justify-content: space-between; }
+@media (max-width: 640px) {
+  .lote-fila-campos { grid-template-columns: 1fr 1fr; }
+}
