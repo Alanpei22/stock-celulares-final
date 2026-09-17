@@ -308,13 +308,13 @@ async function escanearInvCam() {
   await abrirEscaner(cod => _handleInvScan(cod), { titulo: 'Escaneá el código del producto' });
 }
 
-// Muestra el botón de cámara solo si el navegador puede leer códigos: un botón
-// que abre un cartel de error no sirve para nada.
+// El botón se ve SIEMPRE. Antes se escondía cuando el navegador no sabía leer
+// códigos, y el resultado era peor: no aparecía y no había forma de saber por
+// qué. Ahora está, y si el navegador no puede, al tocarlo te dice el motivo.
 async function _invCamBtn() {
   const btn = document.getElementById('inv-scan-cam');
   if (!btn) return;
-  const ok = typeof escanerDisponible === 'function' && await escanerDisponible();
-  btn.classList.toggle('hidden', !ok);
+  btn.classList.remove('hidden');
 }
 
 function focusInvScan() {

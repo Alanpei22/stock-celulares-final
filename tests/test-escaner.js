@@ -158,6 +158,16 @@ abrio = await get(`abrirEscaner(() => {})`);
 ok(abrio === false && CAMARA.pedidos.length === pedidosAntes,
    'no pide la cámara para después fallar', CAMARA.pedidos.length);
 ok(TOASTS.some(t => /lector de mano|escrib/i.test(t[1])), 'y ofrece la salida a mano', TOASTS);
+// El motivo cambia segun el aparato: en Android la salida es abrir Chrome.
+ctx.navigator.userAgent = 'Mozilla/5.0 (Linux; Android 14; SM-A546E) AppleWebKit/537.36';
+TOASTS.length = 0;
+await get(`abrirEscaner(() => {})`);
+ok(TOASTS.some(t => /Chrome/.test(t[1])), 'en Android dice que abra Chrome', TOASTS);
+ctx.navigator.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)';
+TOASTS.length = 0;
+await get(`abrirEscaner(() => {})`);
+ok(TOASTS.some(t => /iPhone/.test(t[1])), 'en iPhone lo dice y ofrece el lector de mano', TOASTS);
+ctx.navigator.userAgent = 'node';
 
 console.log('\n8) El código va al inventario');
 const INV = [];
@@ -192,14 +202,17 @@ await pEsc2;
 ok(INV[0] && INV[0][0] === null && INV[0][1] === '7799999999999',
    'código nuevo: abre el alta con el código ya puesto', INV[0]);
 
-console.log('\n9) El botón de cámara solo sale si el navegador puede');
+console.log('\n9) El botón de cámara se ve siempre');
+// Antes se escondía cuando el navegador no podía leer códigos, y el resultado
+// era peor: no aparecía y no había forma de saber por qué.
 els['inv-scan-cam'].classList.add('hidden');
 await get('_invCamBtn()');
 ok(!els['inv-scan-cam'].classList.contains('hidden'), 'con soporte, aparece');
 run('BarcodeDetector = undefined');
+els['inv-scan-cam'].classList.add('hidden');
 await get('_invCamBtn()');
-ok(els['inv-scan-cam'].classList.contains('hidden'),
-   'sin soporte se esconde: un botón que solo abre un cartel de error no sirve');
+ok(!els['inv-scan-cam'].classList.contains('hidden'),
+   'y sin soporte también: el motivo aparece al tocarlo');
 run('BarcodeDetector = __BD');
 
 console.log('\n10) Puesto en la caja, y sin gastar cupo');

@@ -39,6 +39,18 @@ async function escanerDisponible() {
   }
 }
 
+// Qué decirle al que toca el botón en un equipo que no puede leer códigos.
+// Importa el detalle: en Android la solución es abrir la app en Chrome, en
+// iPhone y en la PC no hay solución por ahora.
+function _escSinSoporte() {
+  const ua = (navigator.userAgent || '');
+  if (/iPhone|iPad|iPod/i.test(ua))
+    return 'El navegador del iPhone todavía no lee códigos con la cámara. Usá el lector de mano o escribí el código.';
+  if (/Android/i.test(ua))
+    return 'Este navegador no lee códigos. Abrí la app en Chrome desde el celular y probá de nuevo.';
+  return 'Leer con la cámara anda en el celular (Chrome de Android), no en la computadora. Acá usá el lector de mano o escribí el código.';
+}
+
 // Por qué no se puede, en castellano y con la salida a mano.
 function _escMotivo(e) {
   const n = (e && e.name) || '';
@@ -63,7 +75,7 @@ async function abrirEscaner(cb, opts = {}) {
   if (!modal || !video) { toast('Falta el lector en esta pantalla', 'error'); return false; }
 
   if (!(await escanerDisponible())) {
-    toast('Este navegador no lee códigos con la cámara. Usá el lector de mano o escribí el código.', 'error');
+    toast(_escSinSoporte(), 'error');
     return false;
   }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {

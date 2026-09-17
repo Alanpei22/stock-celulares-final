@@ -71,6 +71,10 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   internet. NO lo traen Safari de iPhone ni Firefox: ahi el boton no aparece y
   queda el lector de mano (input keyboard-wedge de siempre). Si alguna vez hace
   falta iPhone, la libreria se suma SOLO en este archivo.
+- El boton se ve SIEMPRE. Al principio se escondia si el navegador no sabia
+  leer codigos y era peor: no aparecia y no se sabia por que. Ahora al tocarlo
+  dice el motivo segun el aparato (Android → abri Chrome; iPhone/PC → lector de
+  mano). BarcodeDetector NO esta en Chrome de escritorio en Windows.
 - Inventario: boton "📷 Escanear" al lado del buscador → `escanearInvCam()` →
   `_handleInvScan` (el mismo camino del lector de mano): codigo conocido abre el
   producto, codigo nuevo abre el alta con el codigo puesto.
