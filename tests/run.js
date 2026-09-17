@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 
 const QUE_CUBRE = {
+  'test-mov-form.js':        'Formulario de la caja: categoría obligatoria y sin pasos numerados',
   'test-carrito.js':          'Caja: cobrar reparación y productos juntos, montos separados',
   'test-fases.js':            'Tablero de fases, SLA, avisos push y seguimiento del QR',
   'test-cupo.js':             'Cupo de Firebase: qué colecciones lee la app al abrirse',

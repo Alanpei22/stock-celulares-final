@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 44 suites, ~1770 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 45 suites, ~1800 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -62,6 +62,19 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 
 ## Lo ultimo que se hizo (2026-09-17)
+
+**Formulario de movimientos de la caja** — tests/test-mov-form.js
+- **La categoria ya NO se elige sola.** `setMovTipo` hacia `selectCat(cats[0])`:
+  toda venta rapida quedaba "Venta equipo" y todo gasto "Compra repuesto" si no
+  te acordabas de tocar el chip. Ensuciaba el desglose del dia y las stats.
+- Sin categoria el boton de abajo queda bloqueado y dice que falta
+  (`_actualizarBotonCobrar`).
+- Cuando se deduce sola (productos, reparacion) los chips se esconden pero
+  aparece el renglon `#mov-cat-auto` con la categoria que quedo.
+- Se fueron los pasos numerados 1/2/3. Orden nuevo: **monto primero**, despues
+  que fue, categoria y metodo. Con carrito el monto NO desaparece: queda en
+  modo lectura con "Sale de los productos cargados" (antes saltaba la pantalla).
+- Rotulos segun tipo: "Rubro del gasto", "Con que se pago", placeholder propio.
 
 **Etiquetas de equipos** — print.js `printEtiquetas(lista)` + test-etiquetas.js
 - Hoja A4, 3 columnas x 34 mm (63x34 = medida de las hojas autoadhesivas

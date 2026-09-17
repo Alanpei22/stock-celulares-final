@@ -2169,11 +2169,13 @@ function addQuickAmt(amt) {
 
 // ── Cobro didáctico: textos de los pasos según venta/gasto ──
 function _updateMovStepUI(tipo) {
-  const s1  = document.getElementById('mov-step1-lbl');
-  const s3  = document.getElementById('mov-step3-lbl');
   const esGasto = tipo === 'egreso';
-  if (s1)  s1.textContent  = esGasto ? '¿Qué gasto?'      : '¿Qué vendés?';
-  if (s3)  s3.textContent  = esGasto ? '¿Cómo pagaste?'   : '¿Cómo paga?';
+  const desc = document.getElementById('mov-fi-desc');
+  if (desc) desc.placeholder = esGasto ? 'En qué se gastó *' : 'Buscá producto / repuesto o escribí qué fue *';
+  const catL = document.getElementById('mov-cat-lbl');
+  if (catL) catL.textContent = esGasto ? 'Rubro del gasto' : 'Categoría';
+  const metL = document.getElementById('mov-metodo-lbl');
+  if (metL) metL.textContent = esGasto ? 'Con qué se pagó' : 'Método de pago';
   // El texto del botón lo maneja _actualizarBotonCobrar (dice el monto)
   _updateMovResumen();
 }
@@ -2218,13 +2220,22 @@ function _updateMovResumen() {
     }
   }
 
-  // Con productos cargados el monto sale de la lista: el teclado grande y los
-  // montos rápidos solo estorban (y descuadran el total contra las líneas).
-  const stepMonto = document.getElementById('mov-step-monto');
-  if (stepMonto) stepMonto.classList.toggle('hidden', hayCarrito);
+  // Con productos cargados el monto lo manda la lista. Antes el bloque entero
+  // desaparecía y la pantalla saltaba; ahora se queda, en modo lectura, con el
+  // total a la vista y sin los botones de montos rápidos.
+  const montoInput = document.getElementById('mov-fi-monto');
+  const quick = document.getElementById('mov-quick-amounts');
+  const hint = document.getElementById('mov-monto-hint');
+  if (montoInput) {
+    montoInput.readOnly = hayCarrito;
+    montoInput.classList.toggle('mov-monto-big--calc', hayCarrito);
+  }
+  if (quick) quick.classList.toggle('hidden', hayCarrito);
+  if (hint) hint.classList.toggle('hidden', !hayCarrito);
   // La categoría se deduce sola cuando hay productos
   const catWrap = document.getElementById('mov-cat-wrap');
   if (catWrap) catWrap.classList.toggle('hidden', hayCarrito && tipo === 'ingreso');
+  _pintarCatAuto();
 
   _actualizarBotonCobrar(monto, tipo);
 }
@@ -2233,11 +2244,17 @@ function _updateMovResumen() {
 function _actualizarBotonCobrar(monto, tipo) {
   const btn = document.getElementById('mov-save-btn');
   if (!btn) return;
-  const falta = _cart.length > 0 && _cartSinPrecio();
+  const sinPrecio = _cart.length > 0 && _cartSinPrecio();
+  // Sin categoría no se guarda: es el dato que rompe el desglose del día si
+  // sale mal, y es el que más fácil se pasa por alto.
+  const sinCat = !(document.getElementById('mov-hidden-cat')?.value || '');
+  const falta = sinPrecio || sinCat;
   btn.disabled = falta;
   btn.classList.toggle('btn-bloqueado', falta);
-  if (falta) {
+  if (sinPrecio) {
     btn.textContent = '⚠️ Falta un precio';
+  } else if (sinCat) {
+    btn.textContent = tipo === 'egreso' ? '⚠️ Elegí el rubro del gasto' : '⚠️ Elegí la categoría';
   } else if (tipo === 'egreso') {
     btn.textContent = '✅ Confirmar gasto';
   } else {
@@ -2404,8 +2421,10 @@ function setMovTipo(tipo) {
   if (btnIng) btnIng.classList.toggle('tipo-active', tipo === 'ingreso');
   if (btnEg)  btnEg.classList.toggle('tipo-active',  tipo === 'egreso');
   renderCatBtns(tipo);
-  const cats = CATEGORIAS[tipo] || [];
-  selectCat(cats[0] || '');
+  // NADA de elegir la primera categoría sola. Antes toda venta rápida quedaba
+  // como "Venta equipo" y todo gasto como "Compra repuesto" si no te acordabas
+  // de tocar el chip: el desglose del día y las estadísticas quedaban mintiendo.
+  selectCat('');
   // Captura de cliente solo tiene sentido en ventas (ingreso)
   const cliSec = document.getElementById('mov-cliente-section');
   if (cliSec) cliSec.style.display = (tipo === 'ingreso') ? '' : 'none';
@@ -2434,6 +2453,21 @@ function selectCat(cat) {
   });
   const hidden = document.getElementById('mov-hidden-cat');
   if (hidden) hidden.value = cat;
+  _pintarCatAuto();
+  if (typeof _updateMovResumen === 'function') _updateMovResumen();
+}
+
+// Cuando la categoría se deduce sola (productos, reparación) el bloque de
+// chips se esconde. Sin este renglón el movimiento quedaba categorizado sin
+// que se viera cómo.
+function _pintarCatAuto() {
+  const el = document.getElementById('mov-cat-auto');
+  if (!el) return;
+  const cat = document.getElementById('mov-hidden-cat')?.value || '';
+  const wrap = document.getElementById('mov-cat-wrap');
+  const escondido = wrap && wrap.classList.contains('hidden');
+  el.classList.toggle('hidden', !(escondido && cat));
+  if (escondido && cat) el.innerHTML = `Categoría: <b>${(CAT_ICONS[cat] || '')} ${esc(cat)}</b>`;
 }
 
 function selectMetodo(metodo) {

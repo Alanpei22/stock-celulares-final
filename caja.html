@@ -449,59 +449,54 @@
     <button class="mov-close-btn" onclick="closeMovForm()">✕</button>
   </div>
 
-  <!-- Cuerpo con scroll: el total y el botón de cobrar quedan fijos abajo -->
+  <!-- Cuerpo con scroll: el total y el botón de cobrar quedan fijos abajo.
+       Orden: primero el MONTO (es lo único que se carga siempre), después qué
+       fue, la categoría y cómo se pagó. Nada de pasos numerados: eran tres
+       títulos ocupando pantalla en un teléfono. -->
   <div class="mov-body" id="mov-body">
 
-  <!-- ░░ PASO 1 — Qué ░░ -->
-  <div class="mov-step">
-    <div class="mov-step-hdr">
-      <span class="mov-step-num">1</span>
-      <span class="mov-step-lbl" id="mov-step1-lbl">¿Qué vendés?</span>
-    </div>
-    <div class="fg">
-      <div class="mov-desc-wrap">
-        <input id="mov-fi-desc" class="fi" type="text" placeholder="Buscá producto / repuesto o escribí libre... *" autocomplete="off">
-        <div id="mov-desc-suggest" class="mov-desc-suggest hidden"></div>
-      </div>
-      <!-- Item seleccionado (cantidad + stock) -->
-      <div id="mov-sale-item-info" class="mov-sale-item-info hidden"></div>
-    </div>
-    <!-- Categorías — se ocultan cuando hay productos cargados (se deduce sola) -->
-    <div class="fg" style="margin-top:.6rem" id="mov-cat-wrap">
-      <label class="fl">Categoría</label>
-      <div id="mov-categorias" class="chip-group"></div>
-    </div>
-    <input type="hidden" id="mov-hidden-cat">
-  </div>
-
-  <!-- ░░ PASO 2 — Cuánto ░░ (solo cuando NO hay carrito: el total lo manda la lista) -->
-  <div class="mov-step" id="mov-step-monto">
-    <div class="mov-step-hdr">
-      <span class="mov-step-num">2</span>
-      <span class="mov-step-lbl">¿Cuánto?</span>
-    </div>
+  <!-- ── Monto ── -->
+  <div class="mov-bloque" id="mov-step-monto">
     <div class="mov-monto-area">
       <span class="mov-monto-prefix">$</span>
       <input id="mov-fi-monto" class="mov-monto-big" type="number" placeholder="0" min="0" inputmode="numeric">
     </div>
-    <div class="quick-amounts">
+    <div class="quick-amounts" id="mov-quick-amounts">
       <button class="quick-amt" onclick="addQuickAmt(5000)">+5k</button>
       <button class="quick-amt" onclick="addQuickAmt(10000)">+10k</button>
       <button class="quick-amt" onclick="addQuickAmt(20000)">+20k</button>
       <button class="quick-amt" onclick="addQuickAmt(50000)">+50k</button>
       <button class="quick-amt" onclick="addQuickAmt(100000)">+100k</button>
     </div>
+    <p class="mov-monto-hint hidden" id="mov-monto-hint">Sale de los productos cargados</p>
   </div>
 
-  <!-- ░░ PASO 3 — Cómo paga ░░ -->
-  <div class="mov-step">
-    <div class="mov-step-hdr">
-      <span class="mov-step-num">3</span>
-      <span class="mov-step-lbl" id="mov-step3-lbl">¿Cómo paga?</span>
+  <!-- ── Qué fue ── -->
+  <div class="mov-bloque">
+    <div class="fg">
+      <div class="mov-desc-wrap">
+        <input id="mov-fi-desc" class="fi" type="text" placeholder="Buscá producto / repuesto o escribí qué fue *" autocomplete="off">
+        <div id="mov-desc-suggest" class="mov-desc-suggest hidden"></div>
+      </div>
+      <!-- Item seleccionado (cantidad + stock) -->
+      <div id="mov-sale-item-info" class="mov-sale-item-info hidden"></div>
     </div>
-  <div class="fg">
+  </div>
+
+  <!-- ── Categoría ── -->
+  <div class="mov-bloque" id="mov-cat-wrap">
+    <label class="fl" id="mov-cat-lbl">Categoría</label>
+    <div id="mov-categorias" class="chip-group"></div>
+  </div>
+  <!-- Cuando se deduce sola (productos, reparación) se muestra acá, para que
+       no quede un movimiento categorizado por arte de magia -->
+  <p class="mov-cat-auto hidden" id="mov-cat-auto"></p>
+  <input type="hidden" id="mov-hidden-cat">
+
+  <!-- ── Cómo se paga ── -->
+  <div class="mov-bloque">
     <div class="metodo-hdr-row">
-      <label class="fl">Método de pago</label>
+      <label class="fl" id="mov-metodo-lbl">Método de pago</label>
       <button class="btn-split-toggle" id="btn-split-toggle" onclick="toggleSplit()">＋ Dividir</button>
     </div>
     <div class="chip-group metodos-group">
@@ -514,11 +509,10 @@
       <button class="metodo-btn metodo-otro" data-m="Dólares" onclick="selectMetodo('Dólares')">💲 Dólares</button>
       <button class="metodo-btn metodo-mas" id="btn-metodos-mas" onclick="toggleMetodosOtros()">＋ Otros</button>
     </div>
-    <!-- Split section -->
+
+    <!-- Split -->
     <div id="split-section" class="split-section hidden">
-      <div class="split-sep">
-        <span>2do método</span>
-      </div>
+      <div class="split-sep"><span>2do método</span></div>
       <div class="chip-group metodos-group2">
         <button class="metodo-btn2" data-m2="Efectivo" onclick="selectMetodo2('Efectivo')">💵 Efectivo</button>
         <button class="metodo-btn2" data-m2="Transferencia" onclick="selectMetodo2('Transferencia')">🏦 Transferencia</button>
@@ -537,6 +531,7 @@
     </div>
     <input type="hidden" id="mov-hidden-metodo">
     <input type="hidden" id="mov-hidden-metodo2">
+
     <!-- Vuelto (solo efectivo) -->
     <div id="vuelto-section" class="vuelto-section hidden">
       <div class="vuelto-row">
@@ -551,6 +546,7 @@
         <span id="vuelto-val" class="vuelto-val">$0</span>
       </div>
     </div>
+
     <!-- Dólares (solo método Dólares) -->
     <div id="mov-dolares-section" class="dolares-section hidden">
       <div class="dolares-row">
@@ -572,7 +568,6 @@
         </div>
       </div>
     </div>
-  </div>
   </div>
 
   <!-- Cliente (opcional) — alimenta el CRM desde ventas -->
