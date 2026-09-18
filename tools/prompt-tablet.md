@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 45 suites, ~1800 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 46 suites, ~1820 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -62,6 +62,20 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 
 
 ## Lo ultimo que se hizo (2026-09-17)
+
+**Modo oscuro: UNA sola paleta** — tests/test-modo-oscuro.js
+- Habia **tres** bloques `body.dark` con variables, de tres epocas: gris casi
+  negro (#0A0A0B/#161618), azul marino (#0f172a/#1e293b) y otro. Ganaba el
+  ultimo del archivo, asi que la pantalla mezclaba las tres.
+- Ahora hay UNO solo (grafito neutro, `--bg #111316` / `--card #1a1d21`), con
+  el dorado del local como unico color fuerte. La prueba falla si aparece otro.
+- Los textos chicos (hora, categoria, fechas) daban **2,6:1** de contraste:
+  ilegibles. Ahora 5,3:1. La prueba **mide el contraste** (formula WCAG), no
+  mira a ojo.
+- Chips de categoria y metodo: eran blancos (un cartel de luz en la mano).
+  Ahora fantasma con borde y el elegido en dorado. Los inputs dejaron de verse
+  claros sobre el fondo oscuro.
+- 194 declaraciones de reglas `.dark` reescritas al mapa nuevo.
 
 **Formulario de movimientos de la caja** — tests/test-mov-form.js
 - **La categoria ya NO se elige sola.** `setMovTipo` hacia `selectCat(cats[0])`:
