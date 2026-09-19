@@ -6140,3 +6140,13 @@ body.dark .fi::placeholder,
 body.dark input::placeholder,
 body.dark textarea::placeholder { color: #6b7280; }
 body.dark .mov-footer { background: #15181c; border-color: #2a2e34; }
+
+/* ── Escanear para cobrar ── */
+.mov-desc-row { display: flex; gap: 8px; align-items: center; }
+.mov-desc-row .fi { flex: 1; min-width: 0; }
+.mov-scan-btn {
+  flex-shrink: 0; width: 46px; min-height: 44px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--card); font-size: 18px; cursor: pointer;
+}
+.mov-scan-btn:active { background: var(--accent-soft); }

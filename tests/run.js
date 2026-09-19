@@ -17,6 +17,7 @@ const path = require('path');
 
 const QUE_CUBRE = {
   'test-modo-oscuro.js':     'Modo oscuro: una sola paleta y contraste medido de los textos',
+  'test-cobro-escaneo.js':   'Cobrar escaneando: accesorio, repuesto, equipo o boleta',
   'test-mov-form.js':        'Formulario de la caja: categoría obligatoria y sin pasos numerados',
   'test-carrito.js':          'Caja: cobrar reparación y productos juntos, montos separados',
   'test-fases.js':            'Tablero de fases, SLA, avisos push y seguimiento del QR',

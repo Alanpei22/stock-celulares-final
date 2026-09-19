@@ -475,7 +475,11 @@
   <div class="mov-bloque">
     <div class="fg">
       <div class="mov-desc-wrap">
-        <input id="mov-fi-desc" class="fi" type="text" placeholder="Buscá producto / repuesto o escribí qué fue *" autocomplete="off">
+        <div class="mov-desc-row">
+          <input id="mov-fi-desc" class="fi" type="text" placeholder="Buscá producto / repuesto o escribí qué fue *" autocomplete="off">
+          <button type="button" class="mov-scan-btn" id="mov-scan-btn" onclick="movEscanear()"
+                  title="Escanear producto, equipo o boleta">📷</button>
+        </div>
         <div id="mov-desc-suggest" class="mov-desc-suggest hidden"></div>
       </div>
       <!-- Item seleccionado (cantidad + stock) -->

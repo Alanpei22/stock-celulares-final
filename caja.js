@@ -2985,6 +2985,98 @@ function _hideMovSuggestions() {
   if (drop) drop.classList.add('hidden');
 }
 
+// ══════════════════════════════════════════════════════════════
+//  COBRAR ESCANEANDO
+//  ─────────────────────────────────────────────────────────────
+//  Una venta tenía cuatro pasos: buscar el producto tipeando, elegir la
+//  categoría, poner el monto y el método. Escaneando, los tres primeros salen
+//  solos: queda tocar Cobrar.
+//
+//  Lee cuatro cosas distintas, que es lo que hay arriba del mostrador:
+//   · el código de barras de un accesorio (inventario)
+//   · el de un repuesto
+//   · el IMEI de un equipo del stock
+//   · el QR de una boleta de reparación (o su número de orden)
+// ══════════════════════════════════════════════════════════════
+function movEscanear() {
+  if (typeof abrirEscaner !== 'function') { toast('El lector no está disponible acá', 'error'); return; }
+  abrirEscaner(cod => _movDesdeCodigo(cod), {
+    titulo: 'Escaneá el producto, el equipo o la boleta',
+    continuo: true,   // varios productos seguidos sin volver a abrir la cámara
+  });
+}
+
+// Lo que se escaneó, convertido en algo que la caja entiende.
+function _movDesdeCodigo(cod) {
+  const txt = String(cod || '').trim();
+  if (!txt) return;
+  const digitos = txt.replace(/\D/g, '');
+
+  // 1) Accesorio del inventario, por su código de barras
+  const prod = (typeof PRODUCTOS !== 'undefined' ? PRODUCTOS : [])
+    .find(p => p.activo !== false && String(p.codigo || '').trim() === txt);
+  if (prod) {
+    _addToCart({
+      source: 'producto', id: prod.id, nombre: prod.nombre || '(sin nombre)',
+      extra: [prod.categoria, prod.codigo].filter(Boolean).join(' · '),
+      stock: Number(prod.stock) || 0, precio: Number(prod.precioVenta) || 0,
+      costoUSD: 0, costoARS: Number(prod.precioCosto) || 0, icon: '📦',
+    });
+    return;
+  }
+
+  // 2) Repuesto
+  const repu = (typeof CAJA_REPUESTOS !== 'undefined' ? CAJA_REPUESTOS : [])
+    .find(r => String(r.codigo || '').trim() === txt);
+  if (repu) {
+    const dolar = (typeof getCurrentDolar === 'function' ? getCurrentDolar() : 0) || 0;
+    const costoUSD = Number(repu.precioCostoUSD) || 0;
+    _addToCart({
+      source: 'repuesto', id: repu.id,
+      nombre: [repu.nombre || repu.tipo || 'Repuesto', repu.marca, repu.modelo].filter(Boolean).join(' '),
+      extra: '', stock: Number(repu.cantidad) || 0,
+      precio: Number(repu.precioVenta) || 0, sinPrecio: !(Number(repu.precioVenta) > 0),
+      costoUSD, costoARS: costoUSD > 0 && dolar > 0 ? Math.round(costoUSD * dolar) : (Number(repu.precioCompra) || 0),
+      icon: '🔧',
+    });
+    return;
+  }
+
+  // 3) Equipo del stock, por el IMEI de la etiqueta o de la caja
+  if (digitos.length >= 14) {
+    const eq = (typeof CAJA_STOCK !== 'undefined' ? CAJA_STOCK : [])
+      .find(p => !p.vendido && String(p.imei || '').replace(/\D/g, '') === digitos);
+    if (eq) {
+      _addToCart({
+        source: 'equipo', id: eq.id,
+        nombre: `${eq.marca || ''} ${eq.modelo || ''}`.trim() || 'Equipo',
+        extra: [eq.almacenamiento, eq.estado].filter(Boolean).join(' · '),
+        stock: 1, precio: Number(eq.precio) || 0,
+        costoUSD: 0, costoARS: Number(eq.costo) || 0, icon: '📱',
+      });
+      return;
+    }
+  }
+
+  // 4) Boleta de una reparación: el QR lleva el token de seguimiento, y el
+  //    número de orden está impreso como número suelto.
+  const reps = (typeof CAJA_REPAIRS !== 'undefined' ? CAJA_REPAIRS : []);
+  const token = (txt.match(/[?&]t=([A-Za-z0-9_-]+)/) || [])[1];
+  let rep = token ? reps.find(r => r.tokenSeguimiento === token) : null;
+  if (!rep && digitos && digitos.length <= 7) rep = reps.find(r => String(r.nOrden || '') === digitos);
+  if (rep) {
+    if (rep.cobrado && rep.estado === 'entregado') {
+      toast(`N°${rep.nOrden} ya está cobrada y entregada`, 'error');
+      return;
+    }
+    if (typeof cerrarEscaner === 'function') cerrarEscaner();   // abre un cartel: la cámara estorba
+    _openRepairLinkModal(rep);
+    return;
+  }
+
+  toast('Ese código no está en el inventario ni en el stock', 'error');
+}
+
 function _selectMovSuggestion(idx) {
   const drop = document.getElementById('mov-desc-suggest');
   const r = drop?._results?.[idx];
@@ -3406,7 +3498,9 @@ async function saveMov() {
   const splitAmt = _splitActive ? (parseFloat(document.getElementById('mov-split-amt')?.value) || 0) : 0;
 
   const montoOk = monto > 0;
-  const descOk  = descripcion.length > 0;
+  // La descripción se puede deducir: con categoría elegida, escribir "Venta
+  // producto" a mano era un paso al pedo en cada venta.
+  const descOk  = descripcion.length > 0 || categoria.length > 0;
   const catOk   = categoria.length > 0;
   const metOk   = metodoPago.length > 0;
   const splitOk = !_splitActive || (metodo2.length > 0 && splitAmt > 0 && splitAmt <= monto);
@@ -3457,8 +3551,10 @@ async function saveMov() {
   }
 
   const tipo = document.getElementById('mov-btn-ingreso').classList.contains('tipo-active') ? 'ingreso' : 'egreso';
+  // Sin texto propio, el movimiento se llama como su categoría
+  const descFinal = descripcion || categoria;
 
-  const data = { tipo, categoria, descripcion, monto, metodoPago, fecha: currentDate };
+  const data = { tipo, categoria, descripcion: descFinal, monto, metodoPago, fecha: currentDate };
   if (_splitActive && metodo2 && splitAmt > 0) {
     data.metodoPago2 = metodo2;
     data.monto2 = splitAmt;

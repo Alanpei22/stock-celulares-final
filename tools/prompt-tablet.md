@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 46 suites, ~1820 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 47 suites, ~1860 chequeos, 5 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -61,7 +61,23 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   exigen el ID token de Firebase de una cuenta de la allowlist
 
 
-## Lo ultimo que se hizo (2026-09-17)
+## Lo ultimo que se hizo (2026-09-19)
+
+**Cobrar escaneando** — `movEscanear()` / `_movDesdeCodigo()` en caja.js
+- Boton 📷 al lado del buscador del formulario de movimientos. Modo continuo:
+  varios productos seguidos sin reabrir la camara.
+- Reconoce CUATRO cosas: codigo de barras de accesorio (PRODUCTOS.codigo),
+  de repuesto (CAJA_REPUESTOS.codigo), **IMEI** de un equipo del stock (tambien
+  el QR de la etiqueta que imprime la app) y la **boleta de reparacion** (token
+  `?t=` del QR de seguimiento, o el N° de orden suelto).
+- Cada uno entra por `_addToCart`, asi que precio, categoria, descripcion y
+  monto salen solos: queda tocar Cobrar.
+- No deja cobrar dos veces un equipo vendido ni una orden ya cobrada+entregada.
+- La **descripcion dejo de ser obligatoria** si hay categoria (se guarda con el
+  nombre de la categoria): escribir "Venta producto" a mano en cada venta era
+  un paso al pedo.
+
+## Lo que se hizo el 2026-09-17
 
 **Modo oscuro: UNA sola paleta** — tests/test-modo-oscuro.js
 - Habia **tres** bloques `body.dark` con variables, de tres epocas: gris casi
