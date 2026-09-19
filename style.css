@@ -6150,3 +6150,19 @@ body.dark .mov-footer { background: #15181c; border-color: #2a2e34; }
   background: var(--card); font-size: 18px; cursor: pointer;
 }
 .mov-scan-btn:active { background: var(--accent-soft); }
+
+/*  ════════════════════════════════════════════════════════════
+    ROLES — qué ve un empleado
+    ────────────────────────────────────────────────────────────
+    Cada empleado entra con su cuenta desde su celular. Puede trabajar
+    (reparaciones, equipos, ventas, gastos, inventario) pero no ve la plata
+    del día: efectivo en caja, neto, apertura, desglose, reporte, cierre y
+    dashboard quedan afuera.
+
+    Todo lo que es del dueño se marca con `.solo-dueno` en el HTML. Ojo con
+    la dirección: por defecto se VE (así, para el dueño, nada cambia) y se
+    esconde solo cuando el body tiene `rol-empleado`. Es al revés de
+    `.owner-only`, que arranca escondido y aparece con el PIN.
+    Quién es quién: roles.js. Lo que de verdad frena: firestore.rules.
+    ════════════════════════════════════════════════════════════  */
+body.rol-empleado .solo-dueno { display: none !important; }

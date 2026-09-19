@@ -190,6 +190,10 @@ function _updateDarkIcon() {
 
 // ── Backup Automático ──────────────────────────────────────
 async function autoBackup() {
+  // El backup es del dueño: leer los vendidos y escribir la copia son cosas que
+  // las reglas le niegan a una cuenta de empleado. Además evita que el celular
+  // del empleado se coma las lecturas del cupo para nada.
+  if (typeof tpEsEmpleado === 'function' && tpEsEmpleado()) return;
   const today = new Date().toISOString().slice(0, 10);
   if (localStorage.getItem('lastAutoBackup') === today) return;
   try {
@@ -223,6 +227,13 @@ async function autoBackup() {
 }
 
 // ── Modo Dueño ──────────────────────────────────────────────
+// Ojo, son dos cosas distintas que se parecen:
+//   · el ROL (roles.js) viene con la cuenta: un empleado nunca es dueño.
+//   · el MODO DUEÑO es el PIN, para destapar costos y ganancias en TU
+//     propio celular cuando hay un cliente al lado.
+// `hide:` en los menús espera true cuando hay que esconder.
+function _soloDueno() { return typeof tpEsEmpleado === 'function' && tpEsEmpleado(); }
+
 let OWNER_MODE = false;
 let _ownerPinBuf = '';
 let _ownerLockTimer = null;
@@ -230,6 +241,7 @@ let _ownerPinCallback = null; // función a ejecutar tras PIN correcto
 
 // Verificar PIN sin entrar a modo dueño — para acciones puntuales
 function requireOwnerPin(onSuccess, mensaje) {
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El modo dueño')) return;
   _ownerPinCallback = onSuccess;
   _ownerPinBuf = '';
   _updateOwnerDots();
@@ -242,10 +254,13 @@ function requireOwnerPin(onSuccess, mensaje) {
 }
 
 function toggleOwnerLock() {
-  if (OWNER_MODE) { lockOwnerMode(); } else { openOwnerPinModal(); }
+  if (OWNER_MODE) { lockOwnerMode(); return; }
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El modo dueño')) return;
+  openOwnerPinModal();
 }
 
 async function openOwnerPinModal() {
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El modo dueño')) return;
   _ownerPinBuf = '';
   _updateOwnerDots();
   document.getElementById('owner-pin-error').textContent = '';
@@ -377,6 +392,8 @@ function lockOwnerMode() {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.remove('app-hidden');
+  // Quién entró decide qué se ve. Antes de pintar nada. (roles.js)
+  if (typeof aplicarRol === 'function') aplicarRol();
   // Habilita la sidebar de escritorio (en celu el CSS la mantiene oculta)
   document.body.classList.add('has-sidebar');
   const secActiva = document.querySelector('.main-section:not(.section-hidden)');
@@ -690,13 +707,13 @@ function _sheetItemClick(i) {
 function toggleHdrMenu() {
   openSheet('Stock', [
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
-    { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
+    { icon: '🔒', label: 'Modo dueño', hide: _soloDueno(), onClick: toggleOwnerLock },
     { divider: true },
     { icon: '☑️', label: 'Selección múltiple', sub: 'Editar varios equipos a la vez', onClick: enterBatchMode },
-    { icon: '📊', label: 'Estadísticas', onClick: () => document.getElementById('stats-btn')?.click() },
-    { icon: '⚙️', label: 'Configuración', onClick: () => document.getElementById('settings-btn')?.click() },
-    { icon: '💾', label: 'Exportar stock', onClick: () => document.getElementById('export-btn')?.click() },
-    { icon: '🛟', label: 'Descargar backup', onClick: downloadBackup },
+    { icon: '📊', label: 'Estadísticas', hide: _soloDueno(), onClick: () => document.getElementById('stats-btn')?.click() },
+    { icon: '⚙️', label: 'Configuración', hide: _soloDueno(), onClick: () => document.getElementById('settings-btn')?.click() },
+    { icon: '💾', label: 'Exportar stock', hide: _soloDueno(), onClick: () => document.getElementById('export-btn')?.click() },
+    { icon: '🛟', label: 'Descargar backup', hide: _soloDueno(), onClick: downloadBackup },
     { divider: true },
     { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
   ]);
@@ -706,11 +723,11 @@ function closeHdrMenu() { closeSheet(); }
 function toggleRepMenu() {
   openSheet('Reparaciones', [
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
-    { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
+    { icon: '🔒', label: 'Modo dueño', hide: _soloDueno(), onClick: toggleOwnerLock },
     { divider: true },
     { icon: '🔬', label: 'Diagnóstico de placa', sub: 'Mediciones, pasos y base de conocimiento', onClick: () => location.href = 'placas.html' },
     { icon: '👥', label: 'Personal técnico', onClick: () => (typeof openPersonalModal === 'function') && openPersonalModal() },
-    { icon: '📊', label: 'Estadísticas', onClick: () => document.getElementById('rep-stats-btn')?.click() },
+    { icon: '📊', label: 'Estadísticas', hide: _soloDueno(), onClick: () => document.getElementById('rep-stats-btn')?.click() },
     { icon: '📋', label: 'Actividad reciente', onClick: () => (typeof openActivityFeed === 'function') && openActivityFeed() },
     { icon: '🟢', label: 'WhatsApp pendientes', onClick: () => (typeof sendPendingWA === 'function') && sendPendingWA() },
     { divider: true },
@@ -739,7 +756,7 @@ function closeRep2Menu() { closeSheet(); }
 function toggleDashMenu() {
   openSheet('Inicio', [
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
-    { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
+    { icon: '🔒', label: 'Modo dueño', hide: _soloDueno(), onClick: toggleOwnerLock },
     { icon: '🔔', label: 'Notificaciones', sub: 'Push + avisos in-app', onClick: () => (typeof openNotifConfig === 'function') && openNotifConfig() },
     { divider: true },
     { icon: '💰', label: 'Ir a caja', onClick: () => location.href = 'caja.html' },
@@ -752,6 +769,9 @@ function closeDashMenu() { closeSheet(); }
 
 // ── Secciones ─────────────────────────────────────────────
 function switchSection(section) {
+  // El dashboard es ganancia neta, ventas del período y top de productos:
+  // entero es plata. Un empleado cae en Equipos.
+  if (section === 'dash' && typeof tpEsEmpleado === 'function' && tpEsEmpleado()) section = 'stock';
   ['dash', 'stock', 'repairs', 'repuestos'].forEach(s => {
     const sec = document.getElementById(s + '-section');
     const btn = document.getElementById('nav-' + s);
@@ -2855,7 +2875,9 @@ async function logAccess() {
     await db.collection('accessLogs').add({
       fecha: new Date().toISOString(),
       ip,
-      ua: navigator.userAgent.slice(0, 200)
+      ua: navigator.userAgent.slice(0, 200),
+      // Con varias cuentas, "alguien entró" no alcanza: hace falta quién.
+      ...(typeof tpFirma === 'function' ? tpFirma() : {}),
     });
   } catch(e) { /* silent */ }
 }

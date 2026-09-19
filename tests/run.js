@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 
 const QUE_CUBRE = {
+  'test-roles.js':           'Roles: qué ve un empleado y qué no (pantalla + reglas de Firestore)',
   'test-modo-oscuro.js':     'Modo oscuro: una sola paleta y contraste medido de los textos',
   'test-cobro-escaneo.js':   'Cobrar escaneando: accesorio, repuesto, equipo o boleta',
   'test-mov-form.js':        'Formulario de la caja: categoría obligatoria y sin pasos numerados',

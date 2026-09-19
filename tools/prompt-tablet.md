@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 47 suites, ~1860 chequeos, 5 segundos.
+2. **`npm test` antes de cada push.** Son 48 suites, ~1880 chequeos, 6 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -56,12 +56,32 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - `webpush.js` + `api/send-push.js` — avisos a todos los dispositivos
 - `avisos.js` — campanita de novedades de reparaciones. Vive en las DOS
   páginas y es autosuficiente a propósito (caja.html no carga repairs.js)
+- `roles.js` — quién es cada cuenta: `dueno` o `empleado`. El empleado trabaja
+  pero no ve la plata del día. La lista de UIDs está hardcodeada (cuesta cero
+  lecturas) y tiene que coincidir con la de `firestore.rules`; lo vigila
+  `tests/test-roles.js`. Cómo agregar un empleado: `EMPLEADOS.md`
 - `api/` — funciones serverless de Vercel (push, crons, bot de Telegram).
   `api/_auth.js` y `api/_auth-edge.js` son el guardia: todos los endpoints
   exigen el ID token de Firebase de una cuenta de la allowlist
 
 
 ## Lo ultimo que se hizo (2026-09-19)
+
+**Roles de empleado** — `roles.js` nuevo + `firestore.rules`
+- Dos roles por UID: `dueno` y `empleado`. Una cuenta que no esta en la lista
+  se trata como empleado (que vea de menos y no de mas).
+- El empleado trabaja: reparaciones, equipos, ventas, gastos, inventario. NO ve
+  efectivo en caja, neto del dia, apertura, desglose, reporte, cierre, turnos,
+  dashboard, estadisticas ni configuracion. La LISTA de movimientos si la ve
+  (para no cargar dos veces la misma venta).
+- Dos capas: la pantalla (clase `.solo-dueno` + `body.rol-empleado`) es
+  comodidad; lo que de verdad frena es `firestore.rules`, que **no viaja con el
+  git push** - hay que correr el deploy aparte.
+- El modo dueno (el PIN) no se abre con cuenta de empleado aunque lo adivine.
+- Cada movimiento y cada cobro quedan firmados (`cargadoPor`, `cargadoPorUid`).
+- Con cuenta de empleado la caja ni pide arqueo/cierre/vs-ayer/turnos: son
+  lecturas que no se usan (cupo).
+
 
 **Cobrar escaneando** — `movEscanear()` / `_movDesdeCodigo()` en caja.js
 - Boton 📷 al lado del buscador del formulario de movimientos. Modo continuo:

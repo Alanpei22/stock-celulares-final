@@ -2497,7 +2497,8 @@ async function confirmarCobro() {
         metodoPago: metodo,
         fecha: hoy,
         createdAt: ahora,
-        repairId: r.id
+        repairId: r.id,
+        ...(typeof tpFirma === 'function' ? tpFirma() : {}),   // quién lo cobró
       });
     }
 

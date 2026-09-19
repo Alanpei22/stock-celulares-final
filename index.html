@@ -31,7 +31,7 @@
   <div class="sb-brand"><img src="icon-192.png" alt=""><b>TechPoint</b></div>
 
   <div class="sb-sec sb-sec-main">Principal</div>
-  <button class="sb-item" id="sb-dash"      onclick="switchSection('dash')"><span class="sb-ico">◆</span>Dashboard</button>
+  <button class="sb-item solo-dueno" id="sb-dash"      onclick="switchSection('dash')"><span class="sb-ico">◆</span>Dashboard</button>
   <button class="sb-item" id="sb-stock"     onclick="switchSection('stock')"><span class="sb-ico">▣</span>Equipos</button>
   <button class="sb-item" id="sb-repairs"   onclick="switchSection('repairs')"><span class="sb-ico">⚒</span>Reparaciones</button>
   <button class="sb-item" id="sb-repuestos" onclick="switchSection('repuestos')"><span class="sb-ico">⬡</span>Repuestos</button>
@@ -40,7 +40,7 @@
   <div class="sb-sec sb-sec-caja">Caja</div>
   <button class="sb-item" onclick="window.location.href='caja.html'"><span class="sb-ico">▤</span>Caja del día</button>
   <button class="sb-item" onclick="window.location.href='caja.html?tab=inventario'"><span class="sb-ico">◈</span>Accesorios</button>
-  <button class="sb-item" onclick="window.location.href='caja.html?action=reporte'"><span class="sb-ico">▦</span>Reporte del día</button>
+  <button class="sb-item solo-dueno" onclick="window.location.href='caja.html?action=reporte'"><span class="sb-ico">▦</span>Reporte del día</button>
 </aside>
 
 <div id="app" class="app-hidden">
@@ -73,14 +73,14 @@
               <button class="hdr-drop-item dark-toggle-btn" onclick="toggleDarkMode();closeHdrMenu()">
                 <span class="dark-icon">🌙</span> Modo oscuro/claro
               </button>
-              <button class="hdr-drop-item owner-lock-btn" onclick="toggleOwnerLock();closeHdrMenu()">
+              <button class="hdr-drop-item owner-lock-btn solo-dueno" onclick="toggleOwnerLock();closeHdrMenu()">
                 <span class="lock-icon">🔒</span> Modo dueño
               </button>
               <div class="hdr-drop-sep"></div>
               <button class="hdr-drop-item" onclick="abrirLote();closeHdrMenu()">📦 Ingreso por lote</button>
-              <button class="hdr-drop-item" id="stats-btn">📊 Estadísticas</button>
-              <button class="hdr-drop-item" id="settings-btn">⚙️ Configuración</button>
-              <button class="hdr-drop-item" id="export-btn">💾 Exportar stock</button>
+              <button class="hdr-drop-item solo-dueno" id="stats-btn">📊 Estadísticas</button>
+              <button class="hdr-drop-item solo-dueno" id="settings-btn">⚙️ Configuración</button>
+              <button class="hdr-drop-item solo-dueno" id="export-btn">💾 Exportar stock</button>
               <button class="hdr-drop-item" id="backup-btn" onclick="downloadBackup();closeHdrMenu()">🛟 Descargar backup</button>
             </div>
           </div>
@@ -172,7 +172,7 @@
               <button class="hdr-drop-item dark-toggle-btn" onclick="toggleDarkMode();closeRepMenu()">
                 <span class="dark-icon">🌙</span> Modo oscuro/claro
               </button>
-              <button class="hdr-drop-item owner-lock-btn" onclick="toggleOwnerLock();closeRepMenu()">
+              <button class="hdr-drop-item owner-lock-btn solo-dueno" onclick="toggleOwnerLock();closeRepMenu()">
                 <span class="lock-icon">🔒</span> Modo dueño
               </button>
               <div class="hdr-drop-sep"></div>
@@ -271,7 +271,7 @@
               <button class="hdr-drop-item dark-toggle-btn" onclick="toggleDarkMode();closeRep2Menu()">
                 <span class="dark-icon">🌙</span> Modo oscuro/claro
               </button>
-              <button class="hdr-drop-item owner-lock-btn" onclick="toggleOwnerLock();closeRep2Menu()">
+              <button class="hdr-drop-item owner-lock-btn solo-dueno" onclick="toggleOwnerLock();closeRep2Menu()">
                 <span class="lock-icon">🔒</span> Modo dueño
               </button>
               <button class="hdr-drop-item" onclick="location.href='bulk-edit-repuestos.html'">
@@ -435,7 +435,7 @@
   </button>
 
   <nav class="bottom-nav">
-    <button class="nav-btn" id="nav-dash" onclick="switchSection('dash')">
+    <button class="nav-btn solo-dueno" id="nav-dash" onclick="switchSection('dash')">
       <span class="nav-ico-wrap">
         <span class="nav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg></span>
         <span class="nav-badge nav-badge--alert" id="nav-badge-dash" style="display:none">!</span>
@@ -1568,6 +1568,7 @@
 <script defer src="utils.js"></script>
 <script defer src="firebase-config.js"></script>
 <script defer src="auth.js"></script>
+<script defer src="roles.js"></script>
 <!-- IA PANEL -->
 <div id="ai-overlay" class="ai-overlay hidden" onclick="closeAiPanel()"></div>
 <div id="ai-panel" class="ai-panel hidden">

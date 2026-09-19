@@ -118,6 +118,8 @@ function _updateDarkIcon() {
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.remove('app-hidden');
+  // Quién entró decide qué se ve. Antes de pintar nada. (roles.js)
+  if (typeof aplicarRol === 'function') aplicarRol();
   // Sidebar (pantalla grande): activarlo y marcar el tab inicial
   document.body.classList.add('has-sidebar');
   document.getElementById('sb-caja')?.classList.add('active');
@@ -136,10 +138,15 @@ function initApp() {
   if (typeof initAvisos === 'function') initAvisos();
   updateDateLabel();
   listenMovimientos();
-  loadArqueo();
-  loadCierre();
-  _loadYesterdayStats().then(() => renderStats()); // Feature 6: vs ayer
-  listenCierresParciales();        // ← turnos/cierres parciales
+  // Apertura, cierre, comparación con ayer y turnos son la plata del día:
+  // con una cuenta de empleado ni se piden. Son lecturas que no se van a
+  // mostrar, y las reglas de Firestore las niegan igual.
+  if (typeof tpEsEmpleado !== 'function' || !tpEsEmpleado()) {
+    loadArqueo();
+    loadCierre();
+    _loadYesterdayStats().then(() => renderStats()); // Feature 6: vs ayer
+    listenCierresParciales();      // ← turnos/cierres parciales
+  }
   // CUPO: repuestos, stock y reparaciones son para el AUTOCOMPLETE de la venta.
   // Antes se leían enteros al abrir la caja, aunque solo vinieras a mirar los
   // números del día. Ahora arrancan la primera vez que se toca el buscador
@@ -403,6 +410,7 @@ async function loadArqueo() {
 }
 
 function openArqueoModal(cajaChicaPreset = 0) {
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('La apertura de caja')) return;
   document.getElementById('arqueo-billetes').innerHTML = renderArqueoRows();
   updateArqueoTotal();
 
@@ -517,6 +525,7 @@ function closeArqueoModal() {
 }
 
 function reopenArqueo() {
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El arqueo')) return;
   if (!document.getElementById('arqueo-billetes')) return;
   // Pre-llenar nombre guardado
   const inputVend = document.getElementById('arqueo-vendedor-input');
@@ -1040,15 +1049,18 @@ function _sheetItemClick(i) {
 // ── Menú caja (bottom sheet) ──
 function toggleCajaMenu() {
   const isOwner = (typeof _cajaIsOwner !== 'undefined' && _cajaIsOwner) || (typeof OWNER_MODE !== 'undefined' && OWNER_MODE);
+  // Con cuenta de empleado: nada de apertura, cierre, turnos, reporte ni
+  // búsqueda histórica. `hide:` espera true cuando hay que esconder.
+  const emp = (typeof tpEsEmpleado === 'function') && tpEsEmpleado();
   openSheet('Caja', [
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
-    { icon: '🔒', label: 'Modo dueño', onClick: openCajaOwnerPin },
-    { divider: true },
-    { icon: '🧾', label: 'Arqueo de caja', onClick: reopenArqueo },
-    { icon: '🔄', label: 'Cierre de turno', sub: 'Cambio de cajero', onClick: openCierreParcialModal },
-    { icon: '🔐', label: CIERRE ? 'Cierre registrado' : 'Cerrar caja del día', sub: CIERRE ? `Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}` : null, onClick: openCierreModal },
-    { icon: '🔎', label: 'Buscar en ventas', sub: 'Producto o reparación en todas las fechas', onClick: openVentasSearch },
-    { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', onClick: openReporteModal },
+    { icon: '🔒', label: 'Modo dueño', hide: emp, onClick: openCajaOwnerPin },
+    { divider: true, hide: emp },
+    { icon: '🧾', label: 'Arqueo de caja', hide: emp, onClick: reopenArqueo },
+    { icon: '🔄', label: 'Cierre de turno', sub: 'Cambio de cajero', hide: emp, onClick: openCierreParcialModal },
+    { icon: '🔐', label: CIERRE ? 'Cierre registrado' : 'Cerrar caja del día', sub: CIERRE ? `Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}` : null, hide: emp, onClick: openCierreModal },
+    { icon: '🔎', label: 'Buscar en ventas', sub: 'Producto o reparación en todas las fechas', hide: emp, onClick: openVentasSearch },
+    { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', hide: emp, onClick: openReporteModal },
     { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
     { divider: true, hide: !isOwner },
     { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
@@ -1078,6 +1090,7 @@ let _vsTipo = 'todos';  // todos | ingreso | egreso
 function _vsInvalidar() { _vsCache = {}; }
 
 function openVentasSearch() {
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('La búsqueda en ventas')) return;
   const inp = document.getElementById('vsearch-input');
   if (inp) inp.value = '';
   _vsTipo = 'todos';
@@ -2078,7 +2091,8 @@ async function confirmVentaEquipo() {
       if (d.clienteNombre) data.clienteNombre = d.clienteNombre;
       if (d.clienteTel)    data.clienteTel    = d.clienteTel;
       if (d.vendedor)      data.vendedor      = d.vendedor;
-      const movRef = await db.collection('caja_movimientos').add(data);
+      const movRef = await db.collection('caja_movimientos').add(
+        { ...data, ...(typeof tpFirma === 'function' ? tpFirma() : {}) });   // quién lo cargó
       movId = movRef.id;
     }
 
@@ -3710,6 +3724,7 @@ async function saveMov() {
         ...data,
         createdAt: new Date().toISOString(),
         _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
+        ...(typeof tpFirma === 'function' ? tpFirma() : {}),   // quién lo cargó
       });
 
       let toastMsg = 'Movimiento registrado';
@@ -4075,6 +4090,7 @@ function renderCierreStatus() {
 }
 
 function openCierreModal() {
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El cierre de caja')) return;
   document.getElementById('cierre-billetes').innerHTML = renderCierreArqueoRows();
   if (CIERRE && CIERRE.billetes) {
     DENOMINACIONES.forEach(d => {
@@ -4451,6 +4467,7 @@ function _calcPeriodoStats(desdeISO) {
 }
 
 function openCierreParcialModal() {
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El cierre de turno')) return;
   closeCajaMenu();
   const desdeISO  = _getPeriodoDesde();
   const desdeHora = new Date(desdeISO).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
@@ -4675,6 +4692,7 @@ function _buildReporteText() {
 }
 
 function openReporteModal() {
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El reporte del día')) return;
   const txt = _buildReporteText();
   const pre = document.getElementById('reporte-texto');
   if (pre) pre.textContent = txt;

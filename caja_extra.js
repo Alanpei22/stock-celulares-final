@@ -32,6 +32,9 @@ function openCajaOwnerPin() {
   if (_cajaIsOwner) {
     lockCajaOwner(); return;
   }
+  // El modo dueño destapa costos y ganancias: una cuenta de empleado no lo
+  // tiene, aunque alguien haya mirado el PIN por encima del hombro.
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El modo dueño')) return;
   _cajaOwnerCallback = null;
   _cajaOwnerBuf = '';
   _updateCajaOwnerDots();
@@ -44,6 +47,7 @@ function openCajaOwnerPin() {
 
 // Usar cuando se necesita PIN para una acción puntual (sin entrar en modo dueño)
 function requireCajaOwnerPin(onSuccess, msg) {
+  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El modo dueño')) return;
   _cajaOwnerCallback = onSuccess;
   _cajaOwnerBuf = '';
   _updateCajaOwnerDots();
