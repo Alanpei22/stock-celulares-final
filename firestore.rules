@@ -122,13 +122,18 @@ service cloud.firestore {
     //  · `caja_chequeos_detalle` — cuánto había y cuánto tenía que haber.
     //    El empleado lo escribe (su celular hizo la cuenta) pero no lo lee:
     //    el chequeo es a ciegas, cuenta sin saber cuánto le tiene que dar.
+    //  Se puede escribir ENCIMA: si el dueño postergo el chequeo y cinco
+    //  minutos despues lo cuenta un empleado, ese conteo pisa el salteo. Sin
+    //  update, al empleado se le negaba la escritura y el conteo se perdia.
+    //  Leer el detalle sigue siendo solo del dueño: eso es lo que hace que el
+    //  conteo sea a ciegas.
     match /caja_chequeos/{doc} {
-      allow read, create: if isAllowed();
-      allow update, delete: if esDueno();
+      allow read, create, update: if isAllowed();
+      allow delete: if esDueno();
     }
     match /caja_chequeos_detalle/{doc} {
-      allow create: if isAllowed();
-      allow read, update, delete: if esDueno();
+      allow create, update: if isAllowed();
+      allow read, delete: if esDueno();
     }
 
     // ── Registro de accesos ──

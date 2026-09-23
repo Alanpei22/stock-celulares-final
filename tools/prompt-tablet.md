@@ -88,8 +88,14 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   que destraba el resto de los celulares) y `caja_chequeos_detalle` (cuanto).
 - Si falla el guardado la app se destraba igual y queda en `chqPendientes`.
   Trabar el mostrador porque se cayo internet es peor que no guardar.
-- El dueno puede saltear un chequeo con el PIN (queda registrado como
-  `salteado`), y ve contado vs esperado en "Chequeos de hoy".
+- El dueno puede POSTERGARLO 5 minutos con el PIN (`_CHQ_SALTEO_MIN`): queda
+  `salteado: true` + `repetirDesde`, y a los 5 minutos vuelve a trabar en TODOS
+  los celulares, no solo en el que lo salteo. Saltear no lo perdona: sirve para
+  terminar la venta que estabas haciendo. Ve contado vs esperado en
+  "Chequeos de hoy".
+- Por eso `caja_chequeos` y `caja_chequeos_detalle` aceptan update de los dos
+  roles: el conteo posterior pisa el salteo. LEER el detalle sigue siendo solo
+  del dueno, que es lo que hace que el conteo sea a ciegas.
 - Los horarios se ESCUCHAN (`onSnapshot` sobre `config/chequeoCaja`, UN
   documento). La primera version los cacheaba 6h y el chequeo aparecia solo en
   el celular donde se habia configurado: en los demas se seguia trabajando.

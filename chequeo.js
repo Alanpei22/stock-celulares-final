@@ -28,6 +28,10 @@
 const _CHQ_CFG_KEY   = 'chqCfg';          // cache local de la config
 const _CHQ_HECHOS    = 'chqHechos';       // { '2026-09-23': ['14:00'] }
 const _CHQ_PEND      = 'chqPendientes';   // los que no se pudieron guardar
+const _CHQ_POSPUESTOS = 'chqPospuestos';  // { '2026-09-23_1400': <ISO> }
+// Saltear no perdona el chequeo: lo patea 5 minutos. Sirve para terminar la
+// venta que estabas haciendo, no para saltearlo y seguir todo el día.
+const _CHQ_SALTEO_MIN = 5;
 const _CHQ_DENOM     = [20000, 10000, 2000, 1000, 500, 200, 100];
 
 let CHQ_CFG        = { activo: false, horarios: [] };
@@ -61,6 +65,22 @@ function _chqMarcar(hora) {
   // Los días viejos no sirven para nada
   Object.keys(d).forEach(k => { if (k < hoy) delete d[k]; });
   _chqSet(_CHQ_HECHOS, d);
+}
+
+// ── Salteos: el chequeo vuelve a los 5 minutos ──────────────
+function _chqPospuestoHasta(hora) {
+  const d = _chqLS(_CHQ_POSPUESTOS, {});
+  const iso = d[_chqId(_chqHoy(), hora)];
+  if (!iso) return 0;
+  const t = Date.parse(iso);
+  return t > Date.now() ? t : 0;
+}
+function _chqPosponer(hora, iso) {
+  const d = _chqLS(_CHQ_POSPUESTOS, {});
+  const hoy = _chqHoy();
+  d[_chqId(hoy, hora)] = iso;
+  Object.keys(d).forEach(k => { if (k.slice(0, 10) < hoy) delete d[k]; });
+  _chqSet(_CHQ_POSPUESTOS, d);
 }
 
 // ── Config ──────────────────────────────────────────────────
@@ -114,7 +134,9 @@ function _chqPendiente() {
   if (!CHQ_CFG.activo) return null;
   const ahora  = _chqAhora();
   const hechos = _chqHechosHoy();
-  return CHQ_CFG.horarios.find(h => h <= ahora && hechos.indexOf(h) === -1) || null;
+  return CHQ_CFG.horarios.find(h => h <= ahora
+                                 && hechos.indexOf(h) === -1
+                                 && !_chqPospuestoHasta(h)) || null;
 }
 
 // ── Ciclo ───────────────────────────────────────────────────
@@ -154,11 +176,21 @@ async function _chqRevisar() {
   if (!hora) return;
   // Puede haberlo hecho otro celular hace un minuto: una lectura antes de
   // trabarle el mostrador a alguien.
+  let salteadoAntes = false;
   try {
     const snap = await db.collection('caja_chequeos').doc(_chqId(_chqHoy(), hora)).get();
-    if (snap.exists) { _chqMarcar(hora); return; }
+    if (snap.exists) {
+      const d = snap.data() || {};
+      const hasta = d.repetirDesde ? Date.parse(d.repetirDesde) : 0;
+      // Sin `repetirDesde` es un conteo de verdad: listo por hoy.
+      if (!hasta) { _chqMarcar(hora); return; }
+      // Salteado hace poco: se respeta en TODOS los celulares, no solo en el
+      // que lo salteó.
+      if (Date.now() < hasta) { _chqPosponer(hora, d.repetirDesde); return; }
+      salteadoAntes = true;   // se venció el salteo: vuelve a pedirlo
+    }
   } catch (e) { console.warn('[chequeo] revisar:', e); }
-  _chqTrabar(hora);
+  _chqTrabar(hora, salteadoAntes);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -166,7 +198,7 @@ async function _chqRevisar() {
 // ══════════════════════════════════════════════════════════════
 function _chqEnCaja() { return typeof _getCierreEsperado === 'function'; }
 
-function _chqTrabar(hora) {
+function _chqTrabar(hora, salteadoAntes) {
   if (_chqAbierto) return;
   _chqAbierto = hora;
   let ov = document.getElementById('chq-overlay');
@@ -176,7 +208,7 @@ function _chqTrabar(hora) {
     ov.className = 'chq-overlay';
     document.body.appendChild(ov);
   }
-  ov.innerHTML = _chqEnCaja() ? _chqHtmlContar(hora) : _chqHtmlIrACaja(hora);
+  ov.innerHTML = _chqEnCaja() ? _chqHtmlContar(hora, salteadoAntes) : _chqHtmlIrACaja(hora, salteadoAntes);
   ov.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
   // El teclado del PIN (para saltear) vive muy por debajo de esta pantalla:
@@ -187,17 +219,18 @@ function _chqTrabar(hora) {
 
 // En index.html no están los movimientos del día, así que la cuenta no se
 // puede hacer acá. Se traba igual y se manda a la caja.
-function _chqHtmlIrACaja(hora) {
+function _chqHtmlIrACaja(hora, salteadoAntes) {
   return `
     <div class="chq-box">
       <div class="chq-ico">🔒</div>
       <h2 class="chq-ttl">Chequeo de caja de las ${hora}</h2>
+      ${salteadoAntes ? '<p class="chq-otravez">Lo salteaste hace un rato. Ahora hay que contar.</p>' : ''}
       <p class="chq-sub">Hay que contar el efectivo para poder seguir usando la app.</p>
       <button class="chq-ok" onclick="location.href='caja.html'">Ir a la caja y contar</button>
     </div>`;
 }
 
-function _chqHtmlContar(hora) {
+function _chqHtmlContar(hora, salteadoAntes) {
   const filas = _CHQ_DENOM.map(d => `
     <div class="chq-row">
       <span class="chq-denom">$${d.toLocaleString('es-AR')}</span>
@@ -212,13 +245,14 @@ function _chqHtmlContar(hora) {
     <div class="chq-box">
       <div class="chq-ico">🧾</div>
       <h2 class="chq-ttl">Chequeo de caja de las ${hora}</h2>
+      ${salteadoAntes ? '<p class="chq-otravez">Lo salteaste hace un rato. Ahora hay que contar.</p>' : ''}
       <p class="chq-sub">Contá el efectivo que hay ahora. La app sigue cuando termines.</p>
       <div class="chq-rows">${filas}</div>
       <div class="chq-total-row"><span>Contaste</span><b id="chq-total">$0</b></div>
       <input id="chq-notas" class="chq-notas" type="text" maxlength="120"
              placeholder="Nota (opcional): falta un vuelto, saqué para el flete…">
       <button class="chq-ok" id="chq-ok" onclick="_chqGuardar()">Confirmar el conteo</button>
-      <button class="chq-link" onclick="_chqSaltear()">Soy el dueño — saltear este chequeo</button>
+      <button class="chq-link" onclick="_chqSaltear()">Soy el dueño — postergar ${_CHQ_SALTEO_MIN} minutos</button>
     </div>`;
 }
 
@@ -349,9 +383,11 @@ async function _chqReintentar() {
   _chqSet(_CHQ_PEND, quedan);
 }
 
-// ── Saltear (solo dueño, con PIN) ───────────────────────────
-// Sin esto, un horario mal puesto deja el mostrador trabado hasta que alguien
-// llegue con la computadora. Queda registrado que se salteó y quién.
+// ── Saltear = POSTERGAR 5 minutos (solo dueño, con PIN) ─────
+// Es para terminar la venta que estabas haciendo, no para saltearlo y seguir
+// todo el día: a los 5 minutos el chequeo vuelve solo, en todos los celulares.
+// Sin esta salida, un horario mal puesto deja el mostrador trabado hasta que
+// alguien llegue con la computadora. Queda registrado que se salteó y quién.
 function _chqSaltear() {
   if (typeof tpEsDueno === 'function' && !tpEsDueno()) {
     if (typeof toast === 'function') toast('Saltear el chequeo es solo del dueño', 'error');
@@ -366,14 +402,17 @@ function _chqSaltear() {
 async function _chqHacerSalteo() {
   const hora = _chqAbierto;
   if (!hora) return;
+  const repetirDesde = new Date(Date.now() + _CHQ_SALTEO_MIN * 60 * 1000).toISOString();
   const base = {
     fecha: _chqHoy(), hora, cuando: new Date().toISOString(), salteado: true, notas: null,
+    repetirDesde,   // ← esto es lo que hace que vuelva, acá y en el resto
     ...(typeof tpFirma === 'function' ? tpFirma() : {}),
   };
   await _chqEscribir(base, { ...base, contado: null, esperado: null, diferencia: null });
-  _chqMarcar(hora);
+  // OJO: no va `_chqMarcar` — eso lo daría por hecho. Solo se posterga.
+  _chqPosponer(hora, repetirDesde);
   _chqDestrabar();
-  if (typeof toast === 'function') toast('Chequeo salteado', 'info');
+  if (typeof toast === 'function') toast(`Postergado ${_CHQ_SALTEO_MIN} minutos`, 'info');
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -38,7 +38,12 @@ export function armarMensaje(d, aperturaDelDia) {
   const quien = esc(d.cargadoPor || '—');
 
   if (d.salteado) {
-    return `⏭ <b>Chequeo de las ${hora} salteado</b>\n👤 ${quien}`;
+    // Saltear no lo perdona: lo patea unos minutos y vuelve solo.
+    const min = d.repetirDesde
+      ? Math.max(1, Math.round((Date.parse(d.repetirDesde) - Date.parse(d.cuando)) / 60000))
+      : 0;
+    return `⏭ <b>Chequeo de las ${hora} postergado</b>\n👤 ${quien}`
+         + (min ? `\n⏱ Vuelve a pedirse en ${min} minuto${min === 1 ? '' : 's'}` : '');
   }
 
   const apertura = (d.apertura === null || d.apertura === undefined) ? aperturaDelDia : d.apertura;

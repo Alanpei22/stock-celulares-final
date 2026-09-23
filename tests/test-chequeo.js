@@ -266,11 +266,11 @@ console.log('\n14) Las reglas de Firestore');
 const rules = fs.readFileSync(DIR + 'firestore.rules', 'utf8');
 ok(/match \/config\/chequeoCaja \{[\s\S]{0,120}allow read: if isAllowed\(\);[\s\S]{0,60}allow write: if esDueno\(\);/.test(rules),
    'los horarios los lee cualquiera (su celular tiene que saber cuándo frenar) pero los cambia el dueño');
-ok(/match \/caja_chequeos\/\{doc\} \{[\s\S]{0,140}allow read, create: if isAllowed\(\);/.test(rules),
-   'el empleado puede dejar hecho el chequeo');
+ok(/match \/caja_chequeos\/\{doc\} \{[\s\S]{0,140}allow read, create, update: if isAllowed\(\);/.test(rules),
+   'el empleado puede dejar hecho el chequeo, y contarlo despues de un salteo del dueno');
 const det = rules.slice(rules.indexOf('match /caja_chequeos_detalle/'), rules.indexOf('match /accessLogs/'));
-ok(/allow create: if isAllowed\(\);/.test(det) && /allow read, update, delete: if esDueno\(\);/.test(det),
-   'escribe el detalle pero no lo lee: eso hace que el conteo sea a ciegas', det.slice(0, 160));
+ok(/allow create, update: if isAllowed\(\);/.test(det) && /allow read, delete: if esDueno\(\);/.test(det),
+   'escribe el detalle pero no lo LEE: eso hace que el conteo sea a ciegas', det.slice(0, 160));
 ok(/'caja_chequeos_detalle'/.test(rules.slice(rules.indexOf('function sensible('), rules.indexOf('function sensible(') + 600)),
    'y está en sensible(), o el comodín general se lo devolvería');
 
@@ -349,8 +349,10 @@ ok(/\$4\.000/.test(m2) && /Sobra \$6\.000/.test(m2),
 const m3 = msg({ hora: '16:00', contado: 10000, apertura: null, movEfecNeto: 3000 }, null);
 ok(/no se puede saber/.test(m3), 'y si no hay arqueo del dia, lo dice en vez de inventar', m3);
 
-const m4 = msg({ hora: '19:00', cargadoPor: 'Alan', salteado: true });
-ok(/salteado/.test(m4) && !/Contado/.test(m4), 'un chequeo salteado se avisa igual', m4);
+const m4 = msg({ hora: '19:00', cargadoPor: 'Alan', salteado: true,
+                 cuando: '2026-09-23T19:30:00.000Z', repetirDesde: '2026-09-23T19:35:00.000Z' });
+ok(/postergado/.test(m4) && !/Contado/.test(m4), 'una postergacion se avisa igual', m4);
+ok(/en 5 minutos/.test(m4), 'diciendo en cuanto vuelve a pedirse', m4);
 
 const m5 = msg({ hora: '14:00', contado: 1, apertura: 0, movEfecNeto: 1, notas: '<b>ojo</b>' });
 ok(/&lt;b&gt;ojo&lt;\/b&gt;/.test(m5), 'la nota va escapada: Telegram interpreta HTML', m5);
@@ -432,6 +434,60 @@ await run('_chqSaltear()');
 await new Promise(r => setImmediate(r));
 ok(!ctx.document.body.classList.contains('chq-trabado'),
    'y al destrabar la marca se va (si no, el PIN queda flotando por encima de todo)');
+run('tpEsDueno = () => false;');
+
+console.log('\n23) Saltear no perdona el chequeo: lo patea 5 minutos');
+limpiar(); cfg(true, ['08:00']);
+Object.keys(BASE.caja_chequeos).forEach(k => delete BASE.caja_chequeos[k]);
+AHORA = '2026-09-23T08:10:00-03:00';
+run('tpEsDueno = () => true;');
+await run('_chqRevisar()');
+montarCampos();
+ok(run('_chqAbierto') === '08:00', 'traba');
+await run('_chqSaltear()');
+await new Promise(r => setImmediate(r));
+ok(run('_chqAbierto') === null, 'el dueno lo postergo y sigue trabajando');
+const doc = BASE.caja_chequeos['2026-09-23_0800'];
+ok(!!doc.repetirDesde, 'queda anotado cuando tiene que volver', doc);
+ok(Math.round((Date.parse(doc.repetirDesde) - Date.parse(doc.cuando)) / 60000) === 5,
+   'a los 5 minutos', doc.repetirDesde);
+
+// A los 2 minutos todavia no
+AHORA = '2026-09-23T08:12:00-03:00';
+ok(run('_chqPendiente()') === null, 'a los 2 minutos sigue sin molestar');
+await run('_chqRevisar()');
+ok(run('_chqAbierto') === null, 'y no traba');
+
+// A los 6 vuelve
+AHORA = '2026-09-23T08:16:00-03:00';
+ok(run('_chqPendiente()') === '08:00', 'a los 6 vuelve a pedirlo', run('_chqPendiente()'));
+await run('_chqRevisar()');
+ok(run('_chqAbierto') === '08:00', 'y traba de nuevo');
+ok(/salteaste/i.test(overlay().innerHTML), 'avisando que ya lo salteaste una vez', overlay().innerHTML.slice(0, 200));
+
+console.log('\n24) La postergacion vale para TODOS los celulares');
+// Si el dueno postergo en el suyo, el del mostrador no puede seguir trabado.
+// Este pedazo simula el OTRO celular: no tiene nada guardado localmente.
+Object.keys(LS).forEach(k => delete LS[k]);
+run('_chqAbierto = null');
+AHORA = '2026-09-23T08:12:00-03:00';
+BASE.caja_chequeos['2026-09-23_0800'] = {
+  fecha: '2026-09-23', hora: '08:00', salteado: true,
+  cuando: '2026-09-23T11:10:00.000Z', repetirDesde: '2026-09-23T11:15:00.000Z', cargadoPor: 'Alan',
+};
+await run('_chqRevisar()');
+ok(run('_chqAbierto') === null, 'el otro celular respeta la postergacion');
+AHORA = '2026-09-23T08:16:00-03:00';
+await run('_chqRevisar()');
+ok(run('_chqAbierto') === '08:00', 'y cuando se vence, tambien traba');
+
+// Contar despues de un salteo pisa el salteo y ahi si queda hecho
+montarCampos();
+els['chq-b-1000'].value = '2';
+await run('_chqGuardar()');
+ok(!BASE.caja_chequeos['2026-09-23_0800'].repetirDesde,
+   'el conteo pisa el salteo', BASE.caja_chequeos['2026-09-23_0800']);
+ok(run('_chqPendiente()') === null, 'y ahi si queda hecho por hoy');
 run('tpEsDueno = () => false;');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');

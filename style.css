@@ -6203,6 +6203,11 @@ body.chq-trabado #owner-pin-modal { z-index: 100001; }
 .chq-ico { font-size: 34px; text-align: center; }
 .chq-ttl { font-size: 19px; font-weight: 800; text-align: center; margin: 8px 0 4px; }
 .chq-sub { font-size: 13.5px; color: var(--text2, #667); text-align: center; margin: 0 0 16px; line-height: 1.45; }
+.chq-otravez {
+  margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; text-align: center;
+  background: rgba(212,167,106,.14); color: var(--accent, #C8965A);
+  font-size: 12.5px; font-weight: 700;
+}
 .chq-rows { display: flex; flex-direction: column; gap: 8px; }
 .chq-row { display: grid; grid-template-columns: 72px 1fr 84px; align-items: center; gap: 8px; }
 .chq-denom { font-size: 14px; font-weight: 700; }
