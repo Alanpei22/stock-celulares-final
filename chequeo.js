@@ -179,6 +179,9 @@ function _chqTrabar(hora) {
   ov.innerHTML = _chqEnCaja() ? _chqHtmlContar(hora) : _chqHtmlIrACaja(hora);
   ov.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  // El teclado del PIN (para saltear) vive muy por debajo de esta pantalla:
+  // sin esta clase se abre DETRÁS y no se puede ni tocar. Ver style.css.
+  try { document.body.classList.add('chq-trabado'); } catch {}
   if (_chqEnCaja()) _chqTotal();
 }
 
@@ -253,6 +256,7 @@ function _chqDestrabar() {
   const ov = document.getElementById('chq-overlay');
   if (ov) ov.classList.add('hidden');
   document.body.style.overflow = '';
+  try { document.body.classList.remove('chq-trabado'); } catch {}
   _chqAbierto = null;
 }
 

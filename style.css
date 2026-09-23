@@ -6184,6 +6184,16 @@ body.rol-empleado .solo-dueno { display: none !important; }
   padding: 16px; overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
 .chq-overlay.hidden { display: none; }
+
+/*  El teclado del PIN, por encima de la pantalla que traba.
+    El chequeo tapa la app con z-index 99999 y el teclado del PIN vive en 1100:
+    al tocar "Soy el dueño — saltear", el teclado se abría DETRÁS y no se podía
+    escribir el código. Solo mientras el chequeo está trabando (`chq-trabado`),
+    para no alterar el orden del resto de la app.  */
+body.chq-trabado #caja-owner-overlay,
+body.chq-trabado #owner-pin-overlay { z-index: 100000; }
+body.chq-trabado #caja-owner-modal,
+body.chq-trabado #owner-pin-modal { z-index: 100001; }
 .chq-box {
   background: var(--card, #fff); color: var(--text, #1a1a1a);
   border-radius: 18px; padding: 22px 18px 18px;

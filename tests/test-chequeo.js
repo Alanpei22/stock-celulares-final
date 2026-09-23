@@ -72,7 +72,11 @@ const ctx = {
     getElementById: id => els[id] || null,
     createElement: () => mk(''),
     addEventListener() {},
-    body: { style: {}, appendChild() {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
+    body: { style: {}, appendChild() {}, classList: {
+      _s: new Set(),
+      add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+      toggle(c, f) { f ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); },
+    } },
   },
   localStorage: { getItem: k => (k in LS ? LS[k] : null), setItem: (k, v) => { LS[k] = String(v); }, removeItem: k => { delete LS[k]; } },
   location: { href: '' },
@@ -398,6 +402,37 @@ ok(/window\.addEventListener\('focus'/.test(src) && /window\.addEventListener\('
    'y se revisa al volver a la app y al recuperar internet (el setInterval se congela en segundo plano)');
 ok(/window\._chequeoCleanup/.test(src) && /_chequeoCleanup/.test(fs.readFileSync(DIR + 'auth.js', 'utf8')),
    'al cerrar sesion se suelta el listener');
+
+console.log('\n22) El teclado del PIN, por encima de la pantalla que traba');
+// Al tocar "Soy el dueno - saltear", el teclado del PIN se abria DETRAS de la
+// pantalla del chequeo y no se podia escribir el codigo: el chequeo tapa la app
+// con z-index 99999 y el teclado vive en 1100.
+limpiar(); cfg(true, ['09:00']); AHORA = '2026-09-23T09:30:00-03:00';
+Object.keys(BASE.caja_chequeos).forEach(k => delete BASE.caja_chequeos[k]);
+await run('_chqRevisar()');
+ok(ctx.document.body.classList.contains('chq-trabado'),
+   'mientras traba, el body queda marcado');
+const cssTxt = fs.readFileSync(DIR + 'style.css', 'utf8');
+const zDe = sel => {
+  const i = cssTxt.indexOf(sel);
+  if (i < 0) return null;
+  const m = cssTxt.slice(i, cssTxt.indexOf('}', i)).match(/z-index:\s*(\d+)/);
+  return m ? Number(m[1]) : null;
+};
+const zTraba = zDe('.chq-overlay {');
+const zPin   = zDe('body.chq-trabado #caja-owner-modal');
+ok(zTraba > 0 && zPin > zTraba,
+   `y ahi el teclado del PIN va por encima (${zPin} > ${zTraba})`, [zPin, zTraba]);
+ok(zDe('body.chq-trabado #caja-owner-overlay') > zTraba, 'su fondo tambien');
+ok(/body\.chq-trabado #owner-pin-modal/.test(cssTxt),
+   'y el otro teclado de PIN, el de la pantalla de stock');
+// Al destrabar se saca la clase: el resto de la app vuelve a su orden normal.
+run('tpEsDueno = () => true;');
+await run('_chqSaltear()');
+await new Promise(r => setImmediate(r));
+ok(!ctx.document.body.classList.contains('chq-trabado'),
+   'y al destrabar la marca se va (si no, el PIN queda flotando por encima de todo)');
+run('tpEsDueno = () => false;');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
