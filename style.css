@@ -261,7 +261,7 @@ body {
 .install-banner {
  display: none;
  background: var(--text);
- color: #fff;
+ color: var(--card);
  padding: 10px 14px;
  font-size: .8rem;
  align-items: center; gap: 10px;
@@ -355,7 +355,7 @@ header {
 .hdr-btn--wa {
  background: var(--text);
  border-color: var(--text);
- color: #fff;
+ color: var(--card);
 }
 .hdr-btn--wa:active { background: #333; }
 
@@ -440,7 +440,7 @@ header {
  font-weight: 600; letter-spacing: 0.02em;
  box-shadow: var(--shadow);
 }
-.pill:focus { background: var(--text); color: #ffffff; border-color: var(--text); }
+.pill:focus { background: var(--text); color: var(--card); border-color: var(--text); }
 .pill option { background: var(--card); color: var(--text); }
 
 /* ── PRICE FILTER ── */
@@ -691,7 +691,7 @@ body.dark .bg-garantia { background: rgba(16,185,129,0.18); color: #6EE7B7; }
 /* ── BUTTONS ── */
 button { touch-action: manipulation; -webkit-appearance: none; user-select: none; }
 .btn-primary {
- background: var(--text); color: #ffffff; border: none;
+ background: var(--text); color: var(--card); border: none;
  border-radius: var(--radius); padding: 14px 28px;
  font-size: 15px; font-weight: 700; cursor: pointer;
  min-height: 48px;
@@ -837,7 +837,7 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 .btn-delete:active, .btn-whatsapp:active, .btn-copy:active {
  transform: scale(.97);
 }
-.btn-whatsapp { background: var(--text); color: #fff; }
+.btn-whatsapp { background: var(--text); color: var(--card); }
 .btn-copy { background: var(--card); color: var(--text); border: 1px solid var(--border); }
 .btn-edit { background: var(--bg1); color: var(--text); }
 .btn-sell { background: var(--accent); color: #fff; }
@@ -887,7 +887,7 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 }
 .hist-month-hdr {
  display: flex; align-items: center; justify-content: space-between;
- background: var(--text); color: #fff;
+ background: var(--text); color: var(--card);
  padding: 10px 14px; gap: 8px;
 }
 .hist-month-name {
@@ -934,7 +934,7 @@ button { touch-action: manipulation; -webkit-appearance: none; user-select: none
 /* ── TOAST ── */
 .toast {
  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px);
- background: var(--text); color: #ffffff;
+ background: var(--text); color: var(--card);
  padding: 12px 24px; border-radius: var(--radius);
  font-size: 15px; font-weight: 600;
  opacity: 0; pointer-events: none;
@@ -1777,7 +1777,7 @@ body.dark .rep-print-btn--out:hover { background: rgba(34,197,94,0.15); border-c
 .print-prompt-bar {
  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
  z-index: 900; display: flex; align-items: center; gap: 10px;
- background: var(--text); color: #ffffff; border-radius: var(--radius);
+ background: var(--text); color: var(--card); border-radius: var(--radius);
  padding: 12px 16px; box-shadow: var(--shadow-lg);
  max-width: calc(100vw - 32px); white-space: nowrap;
 }
@@ -1872,7 +1872,7 @@ code { background: var(--bg2); padding: 1px 5px; border-radius: 4px; font-size: 
 .btn-ai:active { opacity: .85; transform: scale(.97); }
 
 .btn-ai-wa {
- background: var(--text); color: #fff; border: none;
+ background: var(--text); color: var(--card); border: none;
  border-radius: 14px; padding: 8px 12px;
  font-size: .78rem; font-weight: 700;
  cursor: pointer; touch-action: manipulation;
@@ -1953,7 +1953,7 @@ code { background: var(--bg2); padding: 1px 5px; border-radius: 4px; font-size: 
  margin-top: 8px; flex-wrap: wrap;
 }
 .btn-patron-draw {
- background: var(--text); color: #ffffff;
+ background: var(--text); color: var(--card);
  border: none; border-radius: 14px;
  padding: 8px 14px; font-size: .82rem; font-weight: 600;
  cursor: pointer; touch-action: manipulation; transition: all .2s;
@@ -2419,7 +2419,7 @@ body.dark .sell-caja-toggle { background: #2f343b; }
  height: 48px; width: 48px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border);
 }
 .ai-add-img-clear {
- background: var(--text2); color: #fff; border: none; border-radius: 50%;
+ background: var(--text2); color: var(--card); border: none; border-radius: 50%;
  width: 22px; height: 22px; font-size: .75rem; cursor: pointer; flex-shrink: 0;
  display: flex; align-items: center; justify-content: center;
 }
@@ -6120,7 +6120,9 @@ body.dark .quick-amt {
 body.dark .cat-btn:active,
 body.dark .metodo-btn:active,
 body.dark .quick-amt:active { background: #23272d; }
-body.dark .cat-btn.cat-active {
+body.dark .cat-btn.cat-active,
+body.dark .metodo-btn.metodo-active,
+body.dark .metodo-btn2.metodo2-active {
   background: var(--accent); border-color: var(--accent); color: #14161a;
 }
 body.dark .fi,

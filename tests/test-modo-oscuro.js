@@ -85,5 +85,39 @@ console.log('\n6) El acento del local no cambió');
 const raiz = css.slice(css.indexOf(':root'), css.indexOf('}', css.indexOf(':root')));
 ok(/--accent:\s*#C8965A/i.test(raiz), 'sigue siendo #C8965A', raiz.match(/--accent:[^;]*/));
 
+console.log('\n7) Lo que elegís se tiene que ver elegido');
+// El bug: en oscuro los chips van en fantasma (`body.dark .metodo-btn` con
+// fondo transparente), y esa regla le GANA por especificidad a la que pinta el
+// elegido (`.metodo-btn.metodo-active`). Resultado: tocabas el método de pago
+// y no se marcaba ninguno. El de categorías sí andaba porque tenía su propia
+// regla oscura; los de método, no.
+const cajaCss = fs.readFileSync(DIR + 'caja.css', 'utf8');
+const CHIPS = [
+  ['cat-btn',    'cat-active',     'la categoría'],
+  ['metodo-btn', 'metodo-active',  'el método de pago'],
+  ['metodo-btn2', 'metodo2-active', 'el segundo método (pago dividido)'],
+];
+CHIPS.forEach(([chip, act, que]) => {
+  const fantasma = new RegExp('body\\.dark[^{]*\\.' + chip + '\\b[^{]*\\{[^}]*background:\\s*transparent');
+  if (!fantasma.test(css)) { ok(true, que + ': no va en fantasma, se pinta sola'); return; }
+  const marcado = new RegExp('body\\.dark[^{]*\\.' + chip + '\\.' + act + '\\b[^{]*\\{[^}]*background:\\s*[^;t]');
+  ok(marcado.test(css), que + ': el elegido se pinta distinto de los demás');
+});
+
+console.log('\n8) Pintar con el color del texto y escribir en blanco');
+// `--text` en modo oscuro ES casi blanco: blanco sobre blanco no se lee. Lo
+// que corresponde es `var(--card)`, que en modo día es blanco igual (no cambia
+// nada) y de noche es oscuro.
+const sospechosas = [];
+[['style.css', css], ['caja.css', cajaCss]].forEach(([nombre, txt]) => {
+  txt.replace(/([^{}]+)\{([^{}]*)\}/g, (todo, sel, cuerpo) => {
+    if (/background:\s*var\(--text[23]?[,)]/.test(cuerpo) && /color:\s*(#fff(?:fff)?|white)\b/i.test(cuerpo))
+      sospechosas.push(nombre + ' → ' + sel.trim().slice(0, 44));
+    return todo;
+  });
+});
+ok(sospechosas.length === 0,
+   'ninguna regla pinta con --text y escribe en blanco', sospechosas.slice(0, 6));
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
