@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 49 suites, ~1940 chequeos, 6 segundos.
+2. **`npm test` antes de cada push.** Son 49 suites, ~1980 chequeos, 7 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -56,6 +56,11 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - `webpush.js` + `api/send-push.js` — avisos a todos los dispositivos
 - `avisos.js` — campanita de novedades de reparaciones. Vive en las DOS
   páginas y es autosuficiente a propósito (caja.html no carga repairs.js)
+- `api/chequeo-aviso.js` — manda por Telegram el resultado de un chequeo. El
+  mensaje lo arma el SERVER desde lo guardado, no el celular: el celular del
+  empleado no sabe cuánto tendría que haber (la apertura es plata y las reglas
+  no se la dan), y un control que se edita desde el aparato controlado no
+  controla nada
 - `chequeo.js` — chequeo de caja obligatorio. A la hora que configuró el dueño
   traba la app en todos los celulares hasta que alguien cuente el efectivo. El
   conteo es **a ciegas**: la pantalla nunca muestra el esperado, que se guarda
@@ -87,6 +92,12 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   `salteado`), y ve contado vs esperado en "Chequeos de hoy".
 - Cupo: la config se cachea 6h; revisar cuesta UNA lectura y solo cuando hay un
   horario vencido sin hacer.
+- **Aviso por Telegram** al confirmar (`/api/chequeo-aviso`): contado, cuanto
+  deberia haber (apertura + efectivo del dia), la diferencia y la nota. Si el
+  guardado quedo en cola, el aviso sale cuando vuelve la conexion. Respeta el
+  toggle de Configuracion - Notificaciones.
+- **Son TRES allowlists**, no dos: roles.js, firestore.rules y api/_auth.js.
+  Sin la tercera, desde el celular del empleado no salen Telegram ni push.
 
 **ARREGLADO el mismo dia — las reglas de roles no frenaban nada.**
 Firestore evalua TODAS las reglas que matchean y deja pasar si CUALQUIERA dice

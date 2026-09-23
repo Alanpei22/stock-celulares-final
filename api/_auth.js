@@ -13,9 +13,17 @@
 
 import admin from 'firebase-admin';
 
-const UIDS_POR_DEFECTO = [
-  'G9jAIYy86MZ1qTjRmMFyK9yO93e2',   // guyrepair22@gmail.com (dueño)
+// Las MISMAS listas que `TP_USUARIOS` en roles.js y que firestore.rules.
+// Los empleados también entran acá: sin esto, una venta cargada desde su
+// celular no dispara el aviso de Telegram ni el push.
+// tests/test-roles.js falla si las tres listas se separan.
+const DUENOS = [
+  'G9jAIYy86MZ1qTjRmMFyK9yO93e2',   // guyrepair22@gmail.com (Alan)
 ];
+const EMPLEADOS = [
+  // 'UID_DEL_EMPLEADO',            // nombre@...
+];
+const UIDS_POR_DEFECTO = [...DUENOS, ...EMPLEADOS];
 
 export function uidsPermitidos() {
   const desdeEnv = String(process.env.ALLOWED_UIDS || '')

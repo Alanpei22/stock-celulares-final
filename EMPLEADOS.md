@@ -31,7 +31,7 @@ https://console.firebase.google.com/project/stockcelustech/authentication/users
 Poné su mail y una contraseña provisoria (que después la cambie con
 "olvidé mi contraseña"). Copiá el **UID** que aparece en la fila.
 
-### 2. Anotarlo en los dos lugares
+### 2. Anotarlo en los TRES lugares
 
 **`roles.js`**, en `TP_USUARIOS`:
 ```js
@@ -43,7 +43,14 @@ Poné su mail y una contraseña provisoria (que después la cambie con
 'EL-UID-QUE-COPIASTE'   // nacho@...
 ```
 
-Los dos tienen que decir lo mismo. Si se separan, `npm test` falla
+**`api/_auth.js`**, en `EMPLEADOS`:
+```js
+'EL-UID-QUE-COPIASTE',   // nacho@...
+```
+Sin este tercero, desde su celular no salen los avisos de Telegram ni los push:
+las funciones de `/api` tienen su propia allowlist.
+
+Los tres tienen que decir lo mismo. Si se separan, `npm test` falla
 (`tests/test-roles.js`).
 
 ### 3. Publicar — son dos cosas distintas

@@ -187,7 +187,7 @@ ok(sensibles.indexOf('config') >= 0, 'config tambien: adentro esta el PIN de due
 ok(/match \/config\/\{doc\} \{[\s\S]{0,120}allow read, write: if isAllowed\(\);/.test(rules),
    'config sigue abierto: ahí está el contador de números de orden');
 
-console.log('\n10) Las dos listas dicen lo mismo');
+console.log('\n10) Las tres listas dicen lo mismo');
 // roles.js decide qué se ve; firestore.rules decide qué se puede. Si se
 // separan, alguien ve una pantalla que la base le niega (o al revés).
 const uidsJs = {};
@@ -208,6 +208,24 @@ ok(JSON.stringify(duenosRules.sort()) === JSON.stringify(duenosJs.sort()),
    'la lista de dueños coincide en roles.js y en firestore.rules', [duenosRules, duenosJs]);
 ok(JSON.stringify(empRules.sort()) === JSON.stringify(empJs.sort()),
    'la de empleados también (si agregás uno, va en los dos lados)', [empRules, empJs]);
+
+// Y hay una TERCERA lista: la de /api. Si el empleado no esta ahi, una venta
+// cargada desde su celular no dispara el aviso de Telegram ni el push, y es un
+// error que no se ve hasta que falta un mensaje.
+const authApi = fs.readFileSync(DIR + 'api/_auth.js', 'utf8');
+const listaApi = nombre => {
+  const i = authApi.indexOf('const ' + nombre + ' = [');
+  if (i < 0) return null;
+  const trozo = authApi.slice(i, authApi.indexOf('];', i));
+  const vivo = trozo.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+  return (vivo.match(/'([A-Za-z0-9_-]{16,})'/g) || []).map(x => x.replace(/'/g, ''));
+};
+ok(JSON.stringify((listaApi('DUENOS') || []).sort()) === JSON.stringify(duenosJs.sort()),
+   'los duenos coinciden tambien en api/_auth.js', listaApi('DUENOS'));
+ok(JSON.stringify((listaApi('EMPLEADOS') || []).sort()) === JSON.stringify(empJs.sort()),
+   'y los empleados: son TRES listas, no dos', listaApi('EMPLEADOS'));
+ok(/const UIDS_POR_DEFECTO = \[\.\.\.DUENOS, \.\.\.EMPLEADOS\]/.test(authApi),
+   'y /api deja entrar a los dos roles', (authApi.match(/const UIDS_POR_DEFECTO[^;]*/) || [])[0]);
 
 console.log('\n11) Las dos páginas cargan roles.js');
 ok(/<script src="roles\.js"><\/script>/.test(cajaHtml), 'caja.html');

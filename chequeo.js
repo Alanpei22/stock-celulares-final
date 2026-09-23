@@ -257,6 +257,20 @@ async function _chqGuardar() {
   }
 }
 
+// Aviso por Telegram con el resultado del chequeo.
+// El mensaje lo arma el SERVER desde lo que quedó guardado, no el celular:
+//  · el celular del empleado no sabe cuánto tendría que haber (la apertura del
+//    día es plata y las reglas no se la dan);
+//  · un control que se puede editar desde el aparato que se está controlando
+//    no controla nada.
+function _chqAvisar(id) {
+  try {
+    if (typeof getNotifConfig === 'function' && getNotifConfig()?.telegram?.enabled === false) return;
+    if (typeof apiFetch !== 'function') return;
+    apiFetch('/api/chequeo-aviso', { method: 'POST', body: JSON.stringify({ id }) }).catch(() => {});
+  } catch { /* un aviso nunca rompe el mostrador */ }
+}
+
 async function _chqEscribir(base, detalle) {
   const id = _chqId(base.fecha, base.hora);
   try {
@@ -264,6 +278,7 @@ async function _chqEscribir(base, detalle) {
     // El detalle es aparte y puede fallar por permisos sin que importe:
     // lo que destraba la app es el de arriba.
     try { await db.collection('caja_chequeos_detalle').doc(id).set(detalle); } catch (e) { console.warn('[chequeo] detalle:', e); }
+    _chqAvisar(id);
     return true;
   } catch (e) {
     console.warn('[chequeo] guardar:', e);
@@ -283,6 +298,7 @@ async function _chqReintentar() {
     try {
       await db.collection('caja_chequeos').doc(id).set(p.base);
       try { await db.collection('caja_chequeos_detalle').doc(id).set(p.detalle); } catch {}
+      _chqAvisar(id);   // el que quedó en la cola también se avisa
     } catch { quedan.push(p); }
   }
   _chqSet(_CHQ_PEND, quedan);

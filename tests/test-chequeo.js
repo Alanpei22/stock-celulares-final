@@ -51,6 +51,8 @@ const TOASTS = [];
 const LS = {};
 let AHORA = '2026-09-23T13:00:00-03:00';
 let PIN_PEDIDO = null;
+const APIS = [];                              // llamadas a /api
+let NOTIF_CFG = { telegram: { enabled: true } };
 
 const ctx = {
   console, JSON, Math, Object, Number, String, Array, Promise, Set,
@@ -74,6 +76,8 @@ const ctx = {
   tpEsDueno: () => false,
   tpFrenarEmpleado: que => { TOASTS.push(['error', que + ' es solo del dueño']); return true; },
   requireCajaOwnerPin: (cb, msg) => { PIN_PEDIDO = msg; cb(); },
+  apiFetch: (url, opts) => { APIS.push({ url, body: JSON.parse(opts.body) }); return Promise.resolve({ ok: true }); },
+  getNotifConfig: () => NOTIF_CFG,
 };
 ctx.globalThis = ctx; ctx.window = ctx;
 vm.createContext(ctx);
@@ -267,6 +271,85 @@ ok(/if \(typeof initChequeoCaja === 'function'\) initChequeoCaja\(\);/.test(fs.r
    'la caja lo arranca');
 ok(/if \(typeof initChequeoCaja === 'function'\) initChequeoCaja\(\);/.test(fs.readFileSync(DIR + 'app.js', 'utf8')),
    'y la pantalla de stock/reparaciones también: si no, se seguía trabajando desde ahí sin contar');
+
+console.log('\n16) El aviso de Telegram sale solo');
+limpiar(); cfg(true, ['11:00']); AHORA = '2026-09-23T11:20:00-03:00';
+run('ARQUEO = { total: 50000 };');
+await run('_chqRevisar()');
+montarCampos();
+APIS.length = 0;
+els['chq-b-10000'].value = '2';
+await run('_chqGuardar()');
+ok(APIS.length === 1 && APIS[0].url === '/api/chequeo-aviso', 'se avisa al confirmar el conteo', APIS);
+ok(APIS[0].body.id === '2026-09-23_1100', 'mandando el id del chequeo, no los numeros', APIS[0].body);
+// El mensaje lo arma el server: si lo armara el celular, el que esta siendo
+// controlado podria escribir cualquier cosa en el aviso.
+ok(!/contado|esperado|monto/i.test(JSON.stringify(APIS[0].body)),
+   'el celular no dicta el contenido del mensaje', APIS[0].body);
+
+console.log('\n17) Cuando NO se avisa');
+limpiar(); cfg(true, ['12:00']); AHORA = '2026-09-23T12:20:00-03:00';
+await run('_chqRevisar()');
+montarCampos();
+APIS.length = 0;
+FALLAR = 'caja_chequeos';
+els['chq-b-1000'].value = '3';
+await run('_chqGuardar()');
+ok(APIS.length === 0, 'si no se pudo guardar, no se avisa de algo que no esta', APIS);
+FALLAR = null;
+await run('_chqReintentar()');
+ok(APIS.length === 1, 'y cuando vuelve la conexion, ahi si', APIS);
+// Toggle de Configuracion -> Notificaciones
+limpiar(); cfg(true, ['13:00']); AHORA = '2026-09-23T13:20:00-03:00';
+await run('_chqRevisar()');
+montarCampos();
+APIS.length = 0;
+NOTIF_CFG = { telegram: { enabled: false } };
+await run('_chqGuardar()');
+ok(APIS.length === 0, 'con Telegram apagado no manda nada', APIS);
+NOTIF_CFG = { telegram: { enabled: true } };
+
+console.log('\n18) El mensaje que llega al celular del dueno');
+// Se prueba la funcion de verdad del endpoint, no una copia.
+const apiSrc = fs.readFileSync(DIR + 'api/chequeo-aviso.js', 'utf8');
+const trozo = apiSrc.slice(apiSrc.indexOf('const fmt ='), apiSrc.indexOf('export default'));
+const ctxApi = { console, Number, String, Math, JSON };
+ctxApi.globalThis = ctxApi;
+vm.createContext(ctxApi);
+vm.runInContext(trozo.replace('export function', 'function'), ctxApi, { filename: 'chequeo-aviso.js' });
+const msg = (d, ap) => { ctxApi._d = d; ctxApi._ap = ap === undefined ? null : ap;
+                         return vm.runInContext('armarMensaje(_d, _ap)', ctxApi); };
+
+const m1 = msg({ hora: '14:00', cargadoPor: 'Nacho', contado: 42000, apertura: 50000, movEfecNeto: 200000, notas: null });
+ok(/Contado.*\$42\.000/.test(m1), 'dice cuanto se conto', m1);
+ok(/Debería haber: <b>\$250\.000<\/b>/.test(m1), 'y cuánto debería haber', m1);
+ok(/\$250\.000/.test(m1), 'que es la apertura mas el efectivo del dia', m1);
+ok(/Falta.*\$208\.000/.test(m1), 'con la diferencia hecha', m1);
+ok(/apertura \$50\.000 \+ efectivo del d/.test(m1), 'y el desglose, para saber de donde sale', m1);
+ok(/Nacho/.test(m1), 'y quien lo conto');
+
+ok(/Sobra \$1\.000/.test(msg({ hora: '14:00', contado: 5000, apertura: 1000, movEfecNeto: 3000 })), 'sobra cuando sobra');
+ok(/Justo/.test(msg({ hora: '14:00', contado: 4000, apertura: 1000, movEfecNeto: 3000 })), 'y justo cuando da justo');
+
+// El celular del empleado no tiene la apertura: la pone el server desde el arqueo.
+const m2 = msg({ hora: '16:00', contado: 10000, apertura: null, movEfecNeto: 3000 }, 1000);
+ok(/\$4\.000/.test(m2) && /Sobra \$6\.000/.test(m2),
+   'si el que conto no tenia la apertura, la completa el server', m2);
+const m3 = msg({ hora: '16:00', contado: 10000, apertura: null, movEfecNeto: 3000 }, null);
+ok(/no se puede saber/.test(m3), 'y si no hay arqueo del dia, lo dice en vez de inventar', m3);
+
+const m4 = msg({ hora: '19:00', cargadoPor: 'Alan', salteado: true });
+ok(/salteado/.test(m4) && !/Contado/.test(m4), 'un chequeo salteado se avisa igual', m4);
+
+const m5 = msg({ hora: '14:00', contado: 1, apertura: 0, movEfecNeto: 1, notas: '<b>ojo</b>' });
+ok(/&lt;b&gt;ojo&lt;\/b&gt;/.test(m5), 'la nota va escapada: Telegram interpreta HTML', m5);
+
+console.log('\n19) El endpoint nuevo tiene guardia');
+const av = apiSrc.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
+ok(/exigirSesion\(req, res\)/.test(av), 'exige sesion de Firebase');
+ok(av.indexOf('exigirSesion(req, res)') < av.indexOf('TELEGRAM_BOT_TOKEN'),
+   'y corta ANTES de tocar las credenciales del bot');
+ok(/caja_arqueos/.test(av), 'lee la apertura con las credenciales del server');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
