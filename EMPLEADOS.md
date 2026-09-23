@@ -13,6 +13,8 @@ solo sin tocar el resto.
 | Cargar ventas y gastos en la caja | Abrir el reporte del día ni el cierre |
 | Cargar productos al inventario | Hacer el arqueo ni el cierre de turno |
 | Ver la lista de movimientos del día | Ver otros días |
+| Hacer el chequeo de caja obligatorio | Ver cuánto tenía que haber (cuenta a ciegas) |
+| | Configurar o saltear el chequeo |
 | Corregir un movimiento que cargó mal | **Borrar** movimientos, equipos o reparaciones |
 | | Ver el Dashboard, Estadísticas ni Configuración |
 | | Entrar en modo dueño (ver costos y ganancias) |

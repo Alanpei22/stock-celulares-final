@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 48 suites, ~1880 chequeos, 6 segundos.
+2. **`npm test` antes de cada push.** Son 49 suites, ~1940 chequeos, 6 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -56,6 +56,11 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - `webpush.js` + `api/send-push.js` — avisos a todos los dispositivos
 - `avisos.js` — campanita de novedades de reparaciones. Vive en las DOS
   páginas y es autosuficiente a propósito (caja.html no carga repairs.js)
+- `chequeo.js` — chequeo de caja obligatorio. A la hora que configuró el dueño
+  traba la app en todos los celulares hasta que alguien cuente el efectivo. El
+  conteo es **a ciegas**: la pantalla nunca muestra el esperado, que se guarda
+  aparte en `caja_chequeos_detalle` (el empleado lo escribe pero no lo lee).
+  Vive en las DOS páginas, como avisos.js
 - `roles.js` — quién es cada cuenta: `dueno` o `empleado`. El empleado trabaja
   pero no ve la plata del día. La lista de UIDs está hardcodeada (cuesta cero
   lecturas) y tiene que coincidir con la de `firestore.rules`; lo vigila
@@ -64,6 +69,31 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   `api/_auth.js` y `api/_auth-edge.js` son el guardia: todos los endpoints
   exigen el ID token de Firebase de una cuenta de la allowlist
 
+
+## Lo ultimo que se hizo (2026-09-23)
+
+**Chequeo de caja obligatorio** — `chequeo.js` nuevo
+- El dueno configura horarios (caja - menu - Chequeo de caja, con PIN). A esa
+  hora la app se traba en TODOS los celulares hasta que alguien cuente el
+  efectivo. Sin boton de cerrar: es el punto.
+- **A ciegas**: la pantalla nunca dice cuanto tendria que haber. Si el que
+  cuenta ve el numero, copia. El esperado va a `caja_chequeos_detalle`, que el
+  empleado escribe pero no lee.
+- Dos colecciones: `caja_chequeos` (QUE esta hecho, lo lee cualquiera y es lo
+  que destraba el resto de los celulares) y `caja_chequeos_detalle` (cuanto).
+- Si falla el guardado la app se destraba igual y queda en `chqPendientes`.
+  Trabar el mostrador porque se cayo internet es peor que no guardar.
+- El dueno puede saltear un chequeo con el PIN (queda registrado como
+  `salteado`), y ve contado vs esperado en "Chequeos de hoy".
+- Cupo: la config se cachea 6h; revisar cuesta UNA lectura y solo cuando hay un
+  horario vencido sin hacer.
+
+**ARREGLADO el mismo dia — las reglas de roles no frenaban nada.**
+Firestore evalua TODAS las reglas que matchean y deja pasar si CUALQUIERA dice
+que si: no gana la mas especifica, gana la mas permisiva. El
+`match /{document=**}` del final le devolvia al empleado todo lo negado arriba.
+Ahora la regla general es `match /{col}/{doc=**}` con `!sensible(col)`. Nunca
+llego a produccion (las reglas no se habian deployado). Lo vigila test-roles.js.
 
 ## Lo ultimo que se hizo (2026-09-19)
 

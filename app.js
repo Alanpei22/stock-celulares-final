@@ -547,6 +547,9 @@ function initApp() {
   if (typeof imeiBotonCam === 'function') { imeiBotonCam('fi-imei'); imeiBotonCam('rep-fi-imei'); }
   loadConfig();
   loadWaTemplates();
+  // Chequeo de caja obligatorio: también traba acá, si no alcanzaba con
+  // quedarse en Reparaciones para seguir trabajando sin contar la plata.
+  if (typeof initChequeoCaja === 'function') initChequeoCaja();
   fetchDolarBlue();
   applyBizImage();
   setTimeout(logAccess, 800);

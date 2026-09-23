@@ -34,6 +34,41 @@ service cloud.firestore {
 
     function isAllowed() { return esDueno() || esEmpleado(); }
 
+    // ══════════════════════════════════════════════════════════
+    //  ⚠️ CÓMO SE LEE ESTE ARCHIVO — la trampa que casi me como
+    //  ─────────────────────────────────────────────────────────
+    //  Firestore evalúa TODAS las reglas que matchean y deja pasar si
+    //  CUALQUIERA dice que sí. No gana la más específica: gana la más
+    //  permisiva. Un `match /{document=**}` abierto al final le devuelve al
+    //  empleado todo lo que le negaste arriba, colección por colección.
+    //
+    //  Por eso la regla de abajo es la única general y excluye a mano las
+    //  colecciones con plata (`sensible()`), que se resuelven cada una en su
+    //  propio bloque. Si agregás una colección sensible, va en los DOS lados.
+    //  Lo vigila tests/test-roles.js.
+    // ══════════════════════════════════════════════════════════
+    function sensible(col) {
+      return col in [
+        'config',                   // adentro está el PIN de dueño
+        'caja_arqueos',             // apertura del día
+        'caja_cierres',             // cierre del día
+        'caja_cierres_parciales',   // cierres de turno
+        'caja_dueno_movimientos',   // caja del dueño
+        'caja_chequeos_detalle',    // esperado vs contado de cada chequeo
+        'backups',
+        'accessLogs'
+      ];
+    }
+
+    // ── Todas las colecciones del trabajo diario ──
+    // (stock, repairs, repuestos, productos, precios_reparaciones, placas,
+    //  pedidos, clientes, planes, actividad, caja_movimientos…)
+    // El empleado trabaja normalmente; borrar es del dueño.
+    match /{col}/{doc=**} {
+      allow read, create, update: if isAllowed() && !sensible(col);
+      allow delete: if esDueno() && !sensible(col);
+    }
+
     // ── config/owner: PIN de dueño (hasheado con PBKDF2) ──
     // Ni leerlo: el empleado no tiene que poder sacarle el hash ni borrarlo
     // para ponerse uno propio.
@@ -44,6 +79,14 @@ service cloud.firestore {
                    && (!('pin' in request.resource.data))
                    && (!('pinHash' in request.resource.data)
                        || request.resource.data.pinHash is string);
+    }
+
+    // ── config/chequeoCaja: horarios del chequeo obligatorio ──
+    // El empleado lo LEE (su celular tiene que saber a qué hora frenar) pero
+    // no lo toca: si pudiera, se corre el horario y listo.
+    match /config/chequeoCaja {
+      allow read: if isAllowed();
+      allow write: if esDueno();
     }
 
     // ── Resto de config (templates WA, numeración de órdenes, marcas…) ──
@@ -72,12 +115,20 @@ service cloud.firestore {
     match /caja_cierres_parciales/{doc} { allow read, write: if esDueno(); }
     match /caja_dueno_movimientos/{doc} { allow read, write: if esDueno(); }
 
-    // ── Movimientos de caja ──
-    // El empleado carga ventas y gastos, y puede corregir lo que cargó mal.
-    // Borrar, no: un error se corrige, no se hace desaparecer.
-    match /caja_movimientos/{doc} {
-      allow read, create, update: if isAllowed();
-      allow delete: if esDueno();
+    // ── Chequeo de caja obligatorio ──
+    // Dos colecciones a propósito:
+    //  · `caja_chequeos` — que el chequeo de las 14:00 ESTÁ hecho. Lo lee
+    //    cualquiera: es lo que destraba la app en todos los celulares.
+    //  · `caja_chequeos_detalle` — cuánto había y cuánto tenía que haber.
+    //    El empleado lo escribe (su celular hizo la cuenta) pero no lo lee:
+    //    el chequeo es a ciegas, cuenta sin saber cuánto le tiene que dar.
+    match /caja_chequeos/{doc} {
+      allow read, create: if isAllowed();
+      allow update, delete: if esDueno();
+    }
+    match /caja_chequeos_detalle/{doc} {
+      allow create: if isAllowed();
+      allow read, update, delete: if esDueno();
     }
 
     // ── Registro de accesos ──
@@ -100,15 +151,6 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
       allow write: if isAllowed();
-    }
-
-    // ── Todas las demás colecciones del negocio ──
-    // (stock, repairs, repuestos, productos, precios_reparaciones, placas,
-    //  pedidos, clientes, actividad, etc.)
-    // El empleado trabaja normalmente; borrar es del dueño.
-    match /{document=**} {
-      allow read, create, update: if isAllowed();
-      allow delete: if esDueno();
     }
   }
 }

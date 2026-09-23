@@ -167,6 +167,10 @@ function initApp() {
   // Estado colapsado/expandido del panel de detalle de caja
   _initCajaDetailState();
 
+  // Chequeo de caja obligatorio: a la hora configurada traba la app hasta que
+  // alguien cuente el efectivo. Va para todos, dueño y empleados.
+  if (typeof initChequeoCaja === 'function') initChequeoCaja();
+
   // ── URL action handler (?action=cierre desde notifs/banners) ──
   _handleUrlAction();
   // (Antes acá se miraba si había una venta pendiente dejada por
@@ -1063,6 +1067,8 @@ function toggleCajaMenu() {
     { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', hide: emp, onClick: openReporteModal },
     { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
     { divider: true, hide: !isOwner },
+    { icon: '⏰', label: 'Chequeo de caja', sub: 'Horarios obligatorios', hide: !isOwner, onClick: openChequeoConfig },
+    { icon: '🧾', label: 'Chequeos de hoy', sub: 'Contado vs esperado', hide: !isOwner, onClick: openChequeosHoy },
     { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
     { icon: '📦', label: 'Caja Dueño', hide: !isOwner, onClick: openCajaDueno },
     { icon: '📄', label: 'Reporte financiero', sub: 'Exportar a PDF por período', hide: !isOwner, onClick: () => (typeof openFinanzasReport === 'function') && openFinanzasReport() },

@@ -144,6 +144,8 @@ console.log('\n8) Las puertas de atrás (URL ?action=, teclado)');
 console.log('\n9) Las reglas de Firestore: lo que de verdad frena');
 // Esconder un botón no protege nada: cualquiera con la consola del navegador
 // abierta puede llamar a la función. Lo que decide es esto.
+// Las reglas SIN comentarios: lo que explica un comentario no es una regla.
+const reglasVivas = rules.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
 ok(/function esDueno\(\)/.test(rules) && /function esEmpleado\(\)/.test(rules), 'hay dos roles');
 ok(/function isAllowed\(\) \{ return esDueno\(\) \|\| esEmpleado\(\); \}/.test(rules),
    'y los dos pueden entrar a la base');
@@ -154,12 +156,33 @@ ok(/function isAllowed\(\) \{ return esDueno\(\) \|\| esEmpleado\(\); \}/.test(r
 });
 ok(/match \/config\/owner \{[\s\S]{0,200}allow read: if esDueno\(\);/.test(rules),
    'el PIN de dueño no se puede ni leer desde una cuenta de empleado');
-const mov = rules.slice(rules.indexOf('match /caja_movimientos/'), rules.indexOf('match /accessLogs/'));
-ok(/allow read, create, update: if isAllowed\(\);/.test(mov), 'el empleado carga ventas y gastos');
-ok(/allow delete: if esDueno\(\);/.test(mov), 'pero no los borra: un error se corrige, no desaparece');
-const resto = rules.slice(rules.indexOf('match /{document=**}'));
-ok(/allow read, create, update: if isAllowed\(\);/.test(resto) && /allow delete: if esDueno\(\);/.test(resto),
+// Los movimientos de caja son trabajo diario: entran por la regla general,
+// que deja cargar y corregir pero no borrar.
+ok(!/'caja_movimientos'/.test(reglasVivas), 'los movimientos no estan cerrados: el empleado carga ventas y gastos');
+const resto = rules.slice(rules.indexOf('match /{col}/{doc=**}'));
+ok(/allow read, create, update: if isAllowed\(\) && !sensible\(col\);/.test(resto) &&
+   /allow delete: if esDueno\(\) && !sensible\(col\);/.test(resto),
    'y en el resto (stock, repairs, productos…) tampoco borra');
+
+// ── La trampa de las reglas de Firestore ──
+// Matchean TODAS las que aplican y pasa si CUALQUIERA dice que si: no gana la
+// mas especifica, gana la mas permisiva. Un `match /{document=**}` abierto al
+// final le devuelve al empleado todo lo negado arriba. Me lo comi una vez.
+ok(!/match \/\{document=\*\*\}/.test(reglasVivas),
+   'no hay un comodin general que pise las reglas de arriba');
+const sensibles = (rules.slice(rules.indexOf('function sensible('), rules.indexOf(']', rules.indexOf('function sensible(')))
+  .match(/'([a-zA-Z_]+)'/g) || []).map(x => x.replace(/'/g, ''));
+// Toda coleccion que tenga su propio bloque solo-dueno tiene que estar en esa
+// lista, o el comodin se la devuelve al empleado.
+const soloDuenoEnReglas = [];
+rules.replace(/match \/([a-zA-Z_]+)\/\{doc\}[^{]*\{([^}]*)\}/g, (todo, col, cuerpo) => {
+  if (/esDueno\(\)/.test(cuerpo) && !/isAllowed\(\)/.test(cuerpo)) soloDuenoEnReglas.push(col);
+  return todo;
+});
+const olvidadas = soloDuenoEnReglas.filter(c => sensibles.indexOf(c) === -1);
+ok(olvidadas.length === 0,
+   'y cada coleccion cerrada esta en sensible(): ' + soloDuenoEnReglas.join(', '), olvidadas);
+ok(sensibles.indexOf('config') >= 0, 'config tambien: adentro esta el PIN de dueno', sensibles);
 // Sin esto no puede tomar una reparación: el número de orden sale de ahí.
 ok(/match \/config\/\{doc\} \{[\s\S]{0,120}allow read, write: if isAllowed\(\);/.test(rules),
    'config sigue abierto: ahí está el contador de números de orden');

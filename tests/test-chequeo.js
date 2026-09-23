@@ -1,0 +1,274 @@
+// Chequeo de caja obligatorio.
+//
+// El dueño pone horarios (14:00, 20:00…). Llegada la hora la app se traba en
+// todos los celulares hasta que alguien cuente el efectivo. Dos cosas que no
+// se negocian y que esta prueba vigila:
+//
+//   · es a CIEGAS — la pantalla nunca dice cuánto tendría que haber. Si el que
+//     cuenta ve el número, no está contando: está copiando.
+//   · si falla el guardado, la app se destraba igual. La persona contó la
+//     plata; trabarle el mostrador porque se cayó internet es peor.
+const fs = require('fs'), vm = require('vm'), path = require('path');
+const DIR = path.join(__dirname, '..') + '/';
+let fails = 0;
+const ok = (c, l, x) => { console.log((c ? '  OK  ' : '  FAIL') + ' · ' + l + (c ? '' : '  → ' + JSON.stringify(x))); if (!c) fails++; };
+
+// ── DOM de mentira ──────────────────────────────────────────
+const els = {};
+function mk(id) {
+  const e = {
+    value: '', textContent: '', innerHTML: '', disabled: false, checked: false, style: {},
+    classList: { _s: new Set(), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); },
+                 toggle(c, f) { f ? this._s.add(c) : this._s.delete(c); }, contains(c) { return this._s.has(c); } },
+    appendChild() {}, focus() {}, addEventListener() {}, querySelector: () => null, querySelectorAll: () => [],
+  };
+  let _id = id || '';
+  Object.defineProperty(e, 'id', { get: () => _id, set: v => { _id = v; els[v] = e; } });
+  if (id) els[id] = e;
+  return e;
+}
+
+// ── Firestore de mentira ────────────────────────────────────
+const BASE = { caja_chequeos: {}, caja_chequeos_detalle: {}, config: {} };
+let FALLAR = null;          // colección que rechaza escrituras
+const LEIDAS = [];
+function col(nombre) {
+  return {
+    doc: id => ({
+      get: async () => { LEIDAS.push(nombre + '/' + id); const d = BASE[nombre][id]; return { exists: !!d, data: () => d }; },
+      set: async data => {
+        if (FALLAR === nombre) throw new Error('permission-denied');
+        BASE[nombre][id] = JSON.parse(JSON.stringify(data));
+      },
+    }),
+    where: (campo, _op, val) => ({ get: async () => ({
+      docs: Object.values(BASE[nombre]).filter(d => d[campo] === val).map(d => ({ data: () => d })),
+    }) }),
+  };
+}
+
+const TOASTS = [];
+const LS = {};
+let AHORA = '2026-09-23T13:00:00-03:00';
+let PIN_PEDIDO = null;
+
+const ctx = {
+  console, JSON, Math, Object, Number, String, Array, Promise, Set,
+  setInterval: () => 0, clearInterval: () => {}, clearTimeout: () => {}, setTimeout: f => { f(); return 0; },
+  Date: class extends Date {
+    constructor(...a) { super(...(a.length ? a : [AHORA])); }
+    static now() { return new Date(AHORA).getTime(); }
+  },
+  document: {
+    getElementById: id => els[id] || null,
+    createElement: () => mk(''),
+    addEventListener() {},
+    body: { style: {}, appendChild() {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
+  },
+  localStorage: { getItem: k => (k in LS ? LS[k] : null), setItem: (k, v) => { LS[k] = String(v); }, removeItem: k => { delete LS[k]; } },
+  location: { href: '' },
+  db: { collection: col },
+  toast: (m, t) => TOASTS.push([t, m]),
+  _todayAR: () => new Date(AHORA).toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10),
+  tpFirma: () => ({ cargadoPor: 'Nacho', cargadoPorUid: 'uid-nacho' }),
+  tpEsDueno: () => false,
+  tpFrenarEmpleado: que => { TOASTS.push(['error', que + ' es solo del dueño']); return true; },
+  requireCajaOwnerPin: (cb, msg) => { PIN_PEDIDO = msg; cb(); },
+};
+ctx.globalThis = ctx; ctx.window = ctx;
+vm.createContext(ctx);
+const src = fs.readFileSync(DIR + 'chequeo.js', 'utf8');
+vm.runInContext(src, ctx, { filename: 'chequeo.js' });
+const run = e => vm.runInContext(e, ctx);
+
+const DENOM = [20000, 10000, 2000, 1000, 500, 200, 100];
+const overlay = () => els['chq-overlay'];
+const cfg = (activo, horarios) => run(`CHQ_CFG = ${JSON.stringify({ activo, horarios })}`);
+const limpiar = () => { Object.keys(LS).forEach(k => delete LS[k]); run('_chqAbierto = null'); TOASTS.length = 0; };
+
+// El DOM falso no interpreta el innerHTML, así que los campos se crean acá.
+// Que los ids coincidan con los del HTML real se chequea en la sección 3.
+function montarCampos() {
+  DENOM.forEach(d => { mk('chq-b-' + d); mk('chq-s-' + d); });
+  mk('chq-total'); mk('chq-notas'); mk('chq-ok');
+}
+
+(async () => {
+
+console.log('\n1) Los horarios que se guardan');
+ok(run("JSON.stringify(_chqNormalizar({activo:true, horarios:['20:00','9:5','14:00','14:00','25:00']}))")
+   === JSON.stringify({ activo: true, horarios: ['14:00', '20:00'] }),
+   'ordena, saca repetidos y tira las horas inventadas',
+   run("JSON.stringify(_chqNormalizar({activo:true,horarios:['20:00','9:5','14:00','14:00','25:00']}))"));
+ok(run('_chqNormalizar({activo:true, horarios:[]}).activo') === false,
+   'activo sin ningún horario no traba nada (sería una app trabada para siempre)');
+
+console.log('\n2) Cuándo hay que contar');
+limpiar(); cfg(true, ['14:00', '20:00']);
+AHORA = '2026-09-23T13:59:00-03:00';
+ok(run('_chqPendiente()') === null, 'a las 13:59 todavía no');
+AHORA = '2026-09-23T14:00:30-03:00';
+ok(run('_chqPendiente()') === '14:00', 'a las 14:00 sí', run('_chqPendiente()'));
+AHORA = '2026-09-23T21:00:00-03:00';
+ok(run('_chqPendiente()') === '14:00', 'si nadie lo hizo, sigue pidiendo el de las 14 antes que el de las 20');
+run("_chqMarcar('14:00')");
+ok(run('_chqPendiente()') === '20:00', 'hecho el de las 14, pide el de las 20');
+run("_chqMarcar('20:00')");
+ok(run('_chqPendiente()') === null, 'y con los dos hechos, nada');
+// Lo de ayer no traba hoy: el local estaba cerrado y listo.
+AHORA = '2026-09-24T10:00:00-03:00';
+ok(run('_chqPendiente()') === null, 'al otro día a las 10 tampoco (los de ayer no se arrastran)');
+AHORA = '2026-09-24T14:30:00-03:00';
+ok(run('_chqPendiente()') === '14:00', 'pero a las 14:30 del día nuevo, otra vez');
+limpiar(); cfg(false, ['14:00']);
+ok(run('_chqPendiente()') === null, 'apagado no pide nada');
+
+console.log('\n3) Traba la app y no se puede cerrar');
+limpiar(); cfg(true, ['14:00']); AHORA = '2026-09-23T15:00:00-03:00';
+run('_getCierreEsperado = () => 250000; ARQUEO = { total: 50000 };');   // estamos en la caja
+await run('_chqRevisar()');
+ok(!!overlay() && !overlay().classList.contains('hidden'), 'aparece la pantalla de conteo');
+ok(ctx.document.body.style.overflow === 'hidden', 'y no se puede scrollear por atrás');
+const html = overlay().innerHTML;
+ok(/Chequeo de caja de las 14:00/.test(html), 'dice de qué horario es');
+ok(!/onclick="[^"]*(close|cerrar|hidden)/i.test(html), 'no tiene botón de cerrar: es el punto');
+DENOM.forEach(d => ok(html.indexOf('id="chq-b-' + d + '"') > 0, `tiene la fila de $${d.toLocaleString('es-AR')}`));
+montarCampos();
+
+console.log('\n4) A ciegas: la pantalla no dice cuánto tendría que haber');
+// _getCierreEsperado() da 250.000. Si ese número aparece, el que cuenta lo
+// copia y el chequeo no sirve para nada.
+ok(!/250\.?000/.test(html), 'el esperado no está en la pantalla');
+ok(!/esperado/i.test(html), 'ni la palabra', (html.match(/.{0,30}esperado.{0,20}/i) || [])[0]);
+
+console.log('\n5) Contar');
+els['chq-b-10000'].value = '3';
+els['chq-b-1000'].value = '2';
+run('_chqTotal()');
+ok(els['chq-total'].textContent === '$32.000', 'suma los billetes', els['chq-total'].textContent);
+run('_chqMas(10000, 1)');
+ok(els['chq-b-10000'].value === 4, 'el + suma uno', els['chq-b-10000'].value);
+run('_chqMas(100, -1)');
+ok(els['chq-b-100'].value === 0, 'y el − no baja de cero', els['chq-b-100'].value);
+
+console.log('\n6) Confirmar');
+els['chq-notas'].value = 'saqué 5 lucas para el flete';
+await run('_chqGuardar()');
+const id = '2026-09-23_1400';
+const guardado = BASE.caja_chequeos[id];
+const detalle  = BASE.caja_chequeos_detalle[id];
+ok(!!guardado, 'queda registrado que se hizo');
+ok(guardado && guardado.cargadoPor === 'Nacho', 'con quién lo hizo', guardado && guardado.cargadoPor);
+ok(guardado && guardado.contado === undefined,
+   'el doc que lee todo el mundo NO lleva los montos (el empleado lo puede leer)', guardado);
+ok(detalle && detalle.contado === 42000, 'el detalle sí: contó $42.000', detalle && detalle.contado);
+ok(detalle && detalle.esperado === 250000 && detalle.diferencia === -208000,
+   'y la diferencia contra lo esperado', detalle && [detalle.esperado, detalle.diferencia]);
+ok(detalle && detalle.notas === 'saqué 5 lucas para el flete', 'con la nota que escribió');
+ok(overlay().classList.contains('hidden') && ctx.document.body.style.overflow === '', 'la app se destraba');
+ok(run('_chqPendiente()') === null, 'y no lo vuelve a pedir');
+
+console.log('\n7) Con cuenta de empleado no se ve la diferencia ni al final');
+ok(!TOASTS.some(t => /208|sobra|falta/.test(t[1])), 'el aviso no le canta el número', TOASTS);
+ok(TOASTS.some(t => /42\.000/.test(t[1])), 'solo le confirma lo que contó él', TOASTS);
+
+console.log('\n8) Sin la apertura cargada, no se inventa la cuenta');
+// El celular del empleado no tiene la apertura del día: las reglas no se la
+// dan. Se guarda lo que sabe y el dueño completa la cuenta después.
+limpiar(); cfg(true, ['16:00']); AHORA = '2026-09-23T16:10:00-03:00';
+run('ARQUEO = null');
+await run('_chqRevisar()');
+montarCampos();
+els['chq-b-10000'].value = '1'; els['chq-b-1000'].value = '0';
+await run('_chqGuardar()');
+const d2 = BASE.caja_chequeos_detalle['2026-09-23_1600'];
+ok(d2 && d2.apertura === null && d2.esperado === null && d2.diferencia === null,
+   'no dice una diferencia que no puede saber', d2);
+ok(d2 && d2.movEfecNeto === 250000, 'pero guarda el movimiento de efectivo, que sí sabe', d2 && d2.movEfecNeto);
+
+console.log('\n9) Si falla el guardado, la app se destraba igual');
+limpiar(); cfg(true, ['17:00']); AHORA = '2026-09-23T17:05:00-03:00';
+await run('_chqRevisar()');
+montarCampos();
+FALLAR = 'caja_chequeos';
+els['chq-b-1000'].value = '7';
+await run('_chqGuardar()');
+ok(overlay().classList.contains('hidden'), 'se destraba (la plata se contó igual)');
+ok(JSON.parse(LS['chqPendientes']).length === 1, 'y queda en la cola para reintentar', LS['chqPendientes']);
+ok(TOASTS.some(t => /conexión/.test(t[1])), 'avisando que falta guardarlo', TOASTS);
+FALLAR = null;
+await run('_chqReintentar()');
+ok(!!BASE.caja_chequeos['2026-09-23_1700'], 'al volver la conexión se guarda');
+ok(JSON.parse(LS['chqPendientes']).length === 0, 'y sale de la cola');
+
+console.log('\n10) Si ya lo hizo otro celular, no traba de nuevo');
+limpiar(); cfg(true, ['18:00']); AHORA = '2026-09-23T18:30:00-03:00';
+BASE.caja_chequeos['2026-09-23_1800'] = { fecha: '2026-09-23', hora: '18:00', cargadoPor: 'Alan' };
+LEIDAS.length = 0;
+await run('_chqRevisar()');
+ok(run('_chqAbierto') === null, 'no traba: lo contaron en el mostrador de al lado');
+ok(LEIDAS.length === 1, 'y le costó UNA lectura de Firebase, no un listener', LEIDAS);
+
+console.log('\n11) Saltear es del dueño');
+limpiar(); cfg(true, ['19:00']); AHORA = '2026-09-23T19:30:00-03:00';
+await run('_chqRevisar()');
+montarCampos();
+run('_chqSaltear()');
+ok(run('_chqAbierto') === '19:00', 'un empleado no puede saltearlo');
+ok(TOASTS.some(t => /solo del dueño/.test(t[1])), 'y se lo dice', TOASTS);
+run('tpEsDueno = () => true;');
+PIN_PEDIDO = null;
+await run('_chqSaltear()');
+await new Promise(r => setImmediate(r));
+ok(!!PIN_PEDIDO, 'al dueño le pide el PIN', PIN_PEDIDO);
+ok(BASE.caja_chequeos['2026-09-23_1900'] && BASE.caja_chequeos['2026-09-23_1900'].salteado === true,
+   'y queda registrado que se salteó (si no, no se sabría)', BASE.caja_chequeos['2026-09-23_1900']);
+ok(run('_chqAbierto') === null, 'ahí sí se destraba');
+run('tpEsDueno = () => false;');
+
+console.log('\n12) La configuración');
+limpiar();
+mk('chq-cfg-activo').checked = true;
+run("_chqCfgEdit = { activo: true, horarios: [] }");
+await run('guardarChequeoConfig()');
+ok(!BASE.config['chequeoCaja'], 'no deja activarlo sin horarios');
+ok(TOASTS.some(t => /al menos un horario/.test(t[1])), 'y explica por qué', TOASTS);
+run("_chqCfgEdit = { activo: true, horarios: ['14:00','20:00'] }");
+await run('guardarChequeoConfig()');
+ok(BASE.config['chequeoCaja'] && JSON.stringify(BASE.config['chequeoCaja'].horarios) === '["14:00","20:00"]',
+   'guarda los horarios', BASE.config['chequeoCaja']);
+ok(JSON.parse(LS['chqCfg']).cfg.activo === true,
+   'y los deja cacheados: si no, es una lectura de Firebase en cada apertura');
+
+console.log('\n13) El dueño sí ve el resultado');
+const hoySrc = src.slice(src.indexOf('async function openChequeosHoy'));
+ok(/tpFrenarEmpleado/.test(hoySrc.slice(0, 300)), 'la lista de chequeos es solo del dueño');
+ok(/caja_chequeos_detalle/.test(hoySrc), 'y lee el detalle, que es donde está la diferencia');
+ok(/tpFrenarEmpleado/.test(src.slice(src.indexOf('async function openChequeoConfig'), src.indexOf('async function openChequeoConfig') + 300)),
+   'configurar los horarios también');
+
+console.log('\n14) Las reglas de Firestore');
+const rules = fs.readFileSync(DIR + 'firestore.rules', 'utf8');
+ok(/match \/config\/chequeoCaja \{[\s\S]{0,120}allow read: if isAllowed\(\);[\s\S]{0,60}allow write: if esDueno\(\);/.test(rules),
+   'los horarios los lee cualquiera (su celular tiene que saber cuándo frenar) pero los cambia el dueño');
+ok(/match \/caja_chequeos\/\{doc\} \{[\s\S]{0,140}allow read, create: if isAllowed\(\);/.test(rules),
+   'el empleado puede dejar hecho el chequeo');
+const det = rules.slice(rules.indexOf('match /caja_chequeos_detalle/'), rules.indexOf('match /accessLogs/'));
+ok(/allow create: if isAllowed\(\);/.test(det) && /allow read, update, delete: if esDueno\(\);/.test(det),
+   'escribe el detalle pero no lo lee: eso hace que el conteo sea a ciegas', det.slice(0, 160));
+ok(/'caja_chequeos_detalle'/.test(rules.slice(rules.indexOf('function sensible('), rules.indexOf('function sensible(') + 600)),
+   'y está en sensible(), o el comodín general se lo devolvería');
+
+console.log('\n15) Está enganchado en las dos páginas');
+['caja.html', 'index.html'].forEach(p => {
+  ok(/src="chequeo\.js"/.test(fs.readFileSync(DIR + p, 'utf8')), p + ' carga chequeo.js');
+});
+ok(/if \(typeof initChequeoCaja === 'function'\) initChequeoCaja\(\);/.test(fs.readFileSync(DIR + 'caja.js', 'utf8')),
+   'la caja lo arranca');
+ok(/if \(typeof initChequeoCaja === 'function'\) initChequeoCaja\(\);/.test(fs.readFileSync(DIR + 'app.js', 'utf8')),
+   'y la pantalla de stock/reparaciones también: si no, se seguía trabajando desde ahí sin contar');
+
+console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
+process.exit(fails ? 1 : 0);
+
+})();
