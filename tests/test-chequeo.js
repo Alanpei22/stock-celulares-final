@@ -32,10 +32,17 @@ function mk(id) {
 const BASE = { caja_chequeos: {}, caja_chequeos_detalle: {}, config: {} };
 let FALLAR = null;          // colección que rechaza escrituras
 const LEIDAS = [];
+const ESCUCHAS = [];        // listeners abiertos { ruta, cb }
 function col(nombre) {
   return {
     doc: id => ({
       get: async () => { LEIDAS.push(nombre + '/' + id); const d = BASE[nombre][id]; return { exists: !!d, data: () => d }; },
+      onSnapshot: (cb) => {
+        LEIDAS.push(nombre + '/' + id + ' (listener)');
+        ESCUCHAS.push({ ruta: nombre + '/' + id, cb });
+        cb({ exists: !!BASE[nombre][id], data: () => BASE[nombre][id] });
+        return () => { ESCUCHAS.length = 0; };
+      },
       set: async data => {
         if (FALLAR === nombre) throw new Error('permission-denied');
         BASE[nombre][id] = JSON.parse(JSON.stringify(data));
@@ -248,7 +255,7 @@ console.log('\n13) El dueño sí ve el resultado');
 const hoySrc = src.slice(src.indexOf('async function openChequeosHoy'));
 ok(/tpFrenarEmpleado/.test(hoySrc.slice(0, 300)), 'la lista de chequeos es solo del dueño');
 ok(/caja_chequeos_detalle/.test(hoySrc), 'y lee el detalle, que es donde está la diferencia');
-ok(/tpFrenarEmpleado/.test(src.slice(src.indexOf('async function openChequeoConfig'), src.indexOf('async function openChequeoConfig') + 300)),
+ok(/tpFrenarEmpleado/.test(src.slice(src.indexOf('function openChequeoConfig'), src.indexOf('function openChequeoConfig') + 300)),
    'configurar los horarios también');
 
 console.log('\n14) Las reglas de Firestore');
@@ -350,6 +357,47 @@ ok(/exigirSesion\(req, res\)/.test(av), 'exige sesion de Firebase');
 ok(av.indexOf('exigirSesion(req, res)') < av.indexOf('TELEGRAM_BOT_TOKEN'),
    'y corta ANTES de tocar las credenciales del bot');
 ok(/caja_arqueos/.test(av), 'lee la apertura con las credenciales del server');
+
+console.log('\n20) El horario le llega a TODOS los celulares');
+// El bug del primer dia: la config se leia una vez y se cacheaba 6 horas, asi
+// que el chequeo aparecia solo en el celular donde se habia configurado. En
+// los demas se seguia trabajando. Eso no es obligatorio, es una sugerencia.
+limpiar();
+run('CHQ_CFG = { activo: false, horarios: [] }; _chqCfgListener = null; _chqEnganchado = false;');
+BASE.config['chequeoCaja'] = { activo: false, horarios: [] };
+Object.keys(BASE.caja_chequeos).forEach(k => delete BASE.caja_chequeos[k]);   // dia limpio
+AHORA = '2026-09-23T15:00:00-03:00';
+ESCUCHAS.length = 0; LEIDAS.length = 0;
+run('initChequeoCaja()');
+await new Promise(r => setImmediate(r));
+ok(ESCUCHAS.length === 1 && ESCUCHAS[0].ruta === 'config/chequeoCaja',
+   'la app queda escuchando el documento de los horarios', ESCUCHAS.map(e => e.ruta));
+ok(LEIDAS.filter(x => x.indexOf('config/') === 0).length === 1,
+   'un solo documento, no una coleccion: una lectura por apertura', LEIDAS);
+ok(run('_chqAbierto') === null, 'con el chequeo apagado no traba');
+
+// El dueno agrega un horario desde SU celular: al de al lado le tiene que
+// llegar solo, sin recargar nada.
+BASE.config['chequeoCaja'] = { activo: true, horarios: ['14:00'] };
+ESCUCHAS[0].cb({ exists: true, data: () => BASE.config['chequeoCaja'] });
+await new Promise(r => setImmediate(r));
+ok(run("JSON.stringify(CHQ_CFG.horarios)") === '["14:00"]', 'el horario nuevo llega solo', run('JSON.stringify(CHQ_CFG)'));
+ok(run('_chqAbierto') === '14:00', 'y este celular se traba tambien', run('_chqAbierto'));
+
+// Y al reves: si lo apaga, el que quedo trabado se destraba solo. Si no, hay
+// que ir local por local a contar plata por un horario que ya no existe.
+BASE.config['chequeoCaja'] = { activo: false, horarios: [] };
+ESCUCHAS[0].cb({ exists: true, data: () => BASE.config['chequeoCaja'] });
+await new Promise(r => setImmediate(r));
+ok(run('_chqAbierto') === null, 'apagarlo destraba a los que estaban trabados');
+
+console.log('\n21) Nada de cachear el horario');
+ok(!/_CHQ_CFG_TTL/.test(src), 'no queda el cache de 6 horas que causo el bug');
+ok(/onSnapshot/.test(src), 'el horario se escucha, no se consulta cada tanto');
+ok(/window\.addEventListener\('focus'/.test(src) && /window\.addEventListener\('online'/.test(src),
+   'y se revisa al volver a la app y al recuperar internet (el setInterval se congela en segundo plano)');
+ok(/window\._chequeoCleanup/.test(src) && /_chequeoCleanup/.test(fs.readFileSync(DIR + 'auth.js', 'utf8')),
+   'al cerrar sesion se suelta el listener');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

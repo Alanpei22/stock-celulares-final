@@ -90,8 +90,12 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   Trabar el mostrador porque se cayo internet es peor que no guardar.
 - El dueno puede saltear un chequeo con el PIN (queda registrado como
   `salteado`), y ve contado vs esperado en "Chequeos de hoy".
-- Cupo: la config se cachea 6h; revisar cuesta UNA lectura y solo cuando hay un
-  horario vencido sin hacer.
+- Los horarios se ESCUCHAN (`onSnapshot` sobre `config/chequeoCaja`, UN
+  documento). La primera version los cacheaba 6h y el chequeo aparecia solo en
+  el celular donde se habia configurado: en los demas se seguia trabajando.
+  Apagar el chequeo destraba solo a los que ya estaban trabados.
+- Cupo: una lectura por apertura (el attach del listener) mas una por cambio de
+  horarios. Revisar cuesta UNA lectura y solo cuando hay un horario vencido.
 - **Aviso por Telegram** al confirmar (`/api/chequeo-aviso`): contado, cuanto
   deberia haber (apertura + efectivo del dia), la diferencia y la nota. Si el
   guardado quedo en cola, el aviso sale cuando vuelve la conexion. Respeta el

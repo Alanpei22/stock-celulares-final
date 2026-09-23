@@ -26,13 +26,14 @@
 'use strict';
 
 const _CHQ_CFG_KEY   = 'chqCfg';          // cache local de la config
-const _CHQ_CFG_TTL   = 6 * 60 * 60 * 1000;
 const _CHQ_HECHOS    = 'chqHechos';       // { '2026-09-23': ['14:00'] }
 const _CHQ_PEND      = 'chqPendientes';   // los que no se pudieron guardar
 const _CHQ_DENOM     = [20000, 10000, 2000, 1000, 500, 200, 100];
 
-let CHQ_CFG      = { activo: false, horarios: [] };
-let _chqTimer    = null;
+let CHQ_CFG        = { activo: false, horarios: [] };
+let _chqTimer      = null;
+let _chqCfgListener = null;
+let _chqEnganchado  = false;   // los handlers de la ventana, una sola vez
 let _chqAbierto  = null;    // hora del chequeo que está trabando, o null
 let _chqGuardando = false;
 
@@ -63,18 +64,39 @@ function _chqMarcar(hora) {
 }
 
 // ── Config ──────────────────────────────────────────────────
-// Se cachea 6h: es una lectura por celular por sesión, y el cupo gratis de
-// Firebase ya se agotó una vez.
-async function _chqCargarCfg(forzar) {
+//  El horario tiene que llegarle a TODOS los celulares, y rápido.
+//
+//  La primera versión leía la config UNA vez y la cacheaba 6 horas. Resultado:
+//  el chequeo aparecía solo en el celular donde se había configurado, y los
+//  demás seguían trabajando con la config vieja hasta que se vencía el caché.
+//  Eso no es un chequeo obligatorio, es una sugerencia.
+//
+//  Ahora es un listener sobre UN documento: cuesta una lectura al abrir la app
+//  (lo mismo que costaba el .get()) más una por cada vez que se cambian los
+//  horarios. Nada que ver con enganchar una colección entera, que es lo que el
+//  cupo no perdona.
+function _chqSemilla() {
+  // Lo último que se supo, para no arrancar en blanco mientras llega Firestore.
   const cache = _chqLS(_CHQ_CFG_KEY, null);
   if (cache && cache.cfg) CHQ_CFG = cache.cfg;
-  if (!forzar && cache && (Date.now() - (cache.t || 0)) < _CHQ_CFG_TTL) return CHQ_CFG;
-  try {
-    const snap = await db.collection('config').doc('chequeoCaja').get();
-    CHQ_CFG = snap.exists ? _chqNormalizar(snap.data()) : { activo: false, horarios: [] };
-    _chqSet(_CHQ_CFG_KEY, { t: Date.now(), cfg: CHQ_CFG });
-  } catch (e) { console.warn('[chequeo] config:', e); }
   return CHQ_CFG;
+}
+
+function _chqEscucharCfg() {
+  if (_chqCfgListener) return;
+  try {
+    _chqCfgListener = db.collection('config').doc('chequeoCaja').onSnapshot(snap => {
+      CHQ_CFG = snap.exists ? _chqNormalizar(snap.data()) : { activo: false, horarios: [] };
+      _chqSet(_CHQ_CFG_KEY, { t: Date.now(), cfg: CHQ_CFG });
+      // Si el dueño apagó el chequeo o sacó ese horario desde su celular, el
+      // que está trabado tiene que destrabarse solo. Si no, hay que ir local
+      // por local a contar plata por un horario que ya no existe.
+      if (_chqAbierto && !(CHQ_CFG.activo && CHQ_CFG.horarios.indexOf(_chqAbierto) >= 0)) {
+        _chqDestrabar();
+      }
+      _chqRevisar();
+    }, e => { console.warn('[chequeo] config:', e); });
+  } catch (e) { console.warn('[chequeo] config:', e); }
 }
 
 function _chqNormalizar(d) {
@@ -96,15 +118,34 @@ function _chqPendiente() {
 }
 
 // ── Ciclo ───────────────────────────────────────────────────
-async function initChequeoCaja() {
+function initChequeoCaja() {
   if (typeof db === 'undefined' || !db) return;
   _chqReintentar();
-  await _chqCargarCfg();
+  _chqSemilla();
+  _chqEscucharCfg();
   _chqRevisar();
-  clearTimeout(_chqTimer);
+  clearInterval(_chqTimer);
   _chqTimer = setInterval(_chqRevisar, 60 * 1000);
-  // El celular pasa el día en el bolsillo: al desbloquearlo hay que mirar de nuevo.
+  if (_chqEnganchado) return;
+  _chqEnganchado = true;
+  // El celular pasa el día en el bolsillo: al desbloquearlo, al volver a la
+  // pestaña y al recuperar internet hay que mirar de nuevo. El setInterval
+  // solo no alcanza: el navegador lo congela con la app en segundo plano.
   document.addEventListener('visibilitychange', () => { if (!document.hidden) _chqRevisar(); });
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('focus',  () => _chqRevisar());
+    window.addEventListener('online', () => { _chqReintentar(); _chqRevisar(); });
+  }
+}
+
+// Al cerrar sesión se sueltan los listeners (lo llama signOut en auth.js).
+if (typeof window !== 'undefined') {
+  window._chequeoCleanup = function() {
+    try { if (_chqCfgListener) _chqCfgListener(); } catch {}
+    _chqCfgListener = null;
+    clearInterval(_chqTimer);
+    _chqTimer = null;
+  };
 }
 
 async function _chqRevisar() {
@@ -336,10 +377,10 @@ async function _chqHacerSalteo() {
 // ══════════════════════════════════════════════════════════════
 let _chqCfgEdit = null;
 
-async function openChequeoConfig() {
+function openChequeoConfig() {
   if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('La configuración del chequeo')) return;
   if (typeof closeSheet === 'function') closeSheet();
-  await _chqCargarCfg(true);
+  // No hace falta releer: el listener de arriba mantiene CHQ_CFG al día.
   _chqCfgEdit = { activo: CHQ_CFG.activo, horarios: CHQ_CFG.horarios.slice() };
   let m = document.getElementById('chq-cfg-modal');
   if (!m) {
