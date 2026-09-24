@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 
 const QUE_CUBRE = {
+  'test-resumen-telegram.js': 'Resumen de las 19:15 por Telegram: taller, equipos vendidos y plata',
   'test-chequeo.js':         'Chequeo de caja obligatorio: horarios, traba la app y conteo a ciegas',
   'test-roles.js':           'Roles: qué ve un empleado y qué no (pantalla + reglas de Firestore)',
   'test-modo-oscuro.js':     'Modo oscuro: una sola paleta y contraste medido de los textos',

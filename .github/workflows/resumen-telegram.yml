@@ -1,0 +1,21 @@
+name: Resumen por Telegram
+
+on:
+  schedule:
+    # 19:15 AR = 22:15 UTC (Argentina es UTC-3 todo el año, no hay horario de verano)
+    - cron: '15 22 * * *'
+  workflow_dispatch: {} # permite dispararlo a mano desde GitHub para probar
+
+jobs:
+  resumen-telegram:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/cron-resumen-telegram
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsSL -X POST "$BASE_URL/api/cron-resumen-telegram" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{}'
