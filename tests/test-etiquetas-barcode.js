@@ -76,6 +76,7 @@ const pCtx = {
   window: { _DAKI_NAME: 'TechPoint', open: () => null },
   navigator: { userAgent: 'node' },
   toast: (m, t) => TOASTS.push([t, m]),
+  localStorage: { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); } },
   alert: () => {}, btoa: s => Buffer.from(s, 'binary').toString('base64'), TextEncoder,
   unescape, encodeURIComponent,
 };
@@ -93,6 +94,19 @@ const imprimir = (fn, datos, copias) => {
   return IMPRESO ? IMPRESO.html : '';
 };
 
+// El SVG que dibujó la etiqueta mide en mm de verdad. Dos cosas que deciden si
+// el lector lee: que ENTRE en la etiqueta y que la barra más fina no baje de
+// 0,25mm. Se miden acá, no se suponen.
+function medirBarras(html, valor, que) {
+  const i = html.indexOf('>' + valor + '</text>');
+  const svgIni = html.lastIndexOf('<svg', i);
+  const ancho = Number((html.slice(svgIni, i).match(/width="([\d.]+)mm"/) || [])[1]);
+  const modulos = bits(valor).length + 20;
+  ok(ancho > 0 && ancho <= 40, `${que}: mide ${ancho}mm y entra en la etiqueta de 40mm`, ancho);
+  ok(ancho / modulos >= 0.2499, `${que}: la barra más fina es ${(ancho / modulos).toFixed(3)}mm (mínimo 0,25)`,
+     (ancho / modulos).toFixed(3));
+}
+
 (async () => {
 
 console.log('\n1) Lo que dibujamos, ¿se lee?');
@@ -108,14 +122,15 @@ for (const [txt, que] of [
   ok(leido === txt, `${que}: ${txt}`, leido);
 }
 
-console.log('\n2) El IMEI entra en la etiqueta');
-// Modo C (dos dígitos por símbolo) contra modo B. En una etiqueta de 63mm la
-// diferencia es 0,33mm por barra contra 0,20mm, y abajo de 0,25 los lectores
-// de mano empiezan a fallar.
-const modsImei = bits('356938035643809').length;
-ok(modsImei <= 145, `un IMEI son ${modsImei} módulos (en modo B serían ~200)`, modsImei);
-ok(modsImei * 0.33 < 50, 'a 0,33mm por barra entra en los 57mm útiles de la etiqueta',
-   Math.round(modsImei * 0.33) + 'mm');
+console.log('\n2) El IMEI entra en una etiqueta de 40mm');
+// Acá se juega todo: la etiquetadora usa rollos de 40×30 y un IMEI de 15
+// dígitos es el código más largo que imprimimos. Modo C (dos dígitos por
+// símbolo) contra modo B: 134 módulos contra 200. A 40mm de ancho eso es
+// 0,25mm por barra contra 0,17 — y abajo de 0,25 los lectores fallan.
+const modsImei = bits('356938035643809').length + 20;   // +20 = zonas mudas
+ok(modsImei <= 160, `un IMEI son ${modsImei} módulos con zona muda (en modo B serían ~220)`, modsImei);
+ok(modsImei * 0.25 <= 40, `a 0,25mm por barra mide ${(modsImei * 0.25).toFixed(1)}mm y entra en los 40mm`,
+   (modsImei * 0.25).toFixed(1) + 'mm');
 
 console.log('\n3) El SVG');
 const s1 = svg('7123');
@@ -130,7 +145,8 @@ console.log('\n4) Etiqueta de equipo');
 const eq = imprimir('printEtiquetas', [{ marca: 'Samsung', modelo: 'Galaxy A54', almacenamiento: '128GB',
   estado: 'Usado', precio: 350000, imei: '356938035643809' }]);
 ok(/Samsung Galaxy A54/.test(eq) && /\$350\.000/.test(eq), 'equipo y precio');
-ok(eq.includes(svg('356938035643809', { modulo: 0.33, alto: 8 })), 'con el IMEI en barras');
+ok(/>356938035643809<\/text>/.test(eq), 'con el IMEI en barras');
+medirBarras(eq, '356938035643809', 'el código del equipo');
 // Es lo mismo que busca la caja: _movDesdeCodigo matchea por IMEI.
 const caja = fs.readFileSync(DIR + 'caja.js', 'utf8');
 ok(/digitos\.length >= 14/.test(caja), 'y la caja busca el equipo por ese mismo IMEI al escanear');
@@ -141,7 +157,8 @@ const pr = imprimir('printEtiquetasProductos', [
   { nombre: 'Cable tipo C', categoria: 'Cables', precioVenta: 5000, codigo: '' },
 ]);
 ok(/Vidrio templado iPhone 13/.test(pr) && /\$8\.000/.test(pr), 'nombre y precio');
-ok(pr.includes(svg('7790895000997', { modulo: 0.33, alto: 8 })), 'con su código en barras');
+ok(/>7790895000997<\/text>/.test(pr), 'con su código en barras');
+medirBarras(pr, '7790895000997', 'el código del artículo');
 ok((pr.match(/<svg/g) || []).length === 1, 'el que no tiene código sale sin barras', (pr.match(/<svg/g) || []).length);
 ok(/sin código/.test(pr), 'y la etiqueta lo dice, para no pegarla y descubrirlo después');
 ok(TOASTS.some(t => /sin código/.test(t[1])), 'avisando cuántos fueron', TOASTS);
@@ -160,12 +177,16 @@ ok(/Motorola G54 · Negro/.test(rp), 'qué equipo es');
 ok(/Juan Pérez · 11 5555-5555/.test(rp), 'de quién es');
 ok(/Batería/.test(rp), 'y qué hay que hacerle');
 ok(/IMEI …643809/.test(rp), 'los últimos 6 del IMEI, para no confundir dos iguales');
-ok(rp.includes(svg('7123', { modulo: 0.4, alto: 9 })), 'con el número de orden en barras');
+ok(/>7123<\/text>/.test(rp), 'con el número de orden en barras');
+medirBarras(rp, '7123', 'el número de orden');
 // Escanear la etiqueta en la caja abre el cobro de esa orden.
 ok(/digitos && digitos\.length <= 7/.test(caja) && /String\(r\.nOrden \|\| ''\) === digitos/.test(caja),
    'y escanearla en la caja abre el cobro de esa orden');
-ok(/grid-template-columns:repeat\(2,97mm\)/.test(rp) && /grid-auto-rows:45mm/.test(rp),
-   'más grande que las otras: 2 por fila, que se lea colgando del equipo');
+ok(/@page\{size:40mm 30mm/.test(rp), 'en la etiquetadora, como las demás');
+ok(/\.etqr-arr\{display:none\}/.test(rp) && /\.etqr-pie\{display:none\}/.test(rp),
+   'en 30mm de alto no entra todo: se prioriza número, equipo y falla', rp.match(/\.etqr-(arr|pie)\{[^}]*\}/g));
+ok(/\.etqr-top \.etq-bc\{display:none\}/.test(rp),
+   'y el código va abajo a lo ancho, no apretado al lado del número');
 
 console.log('\n7) Varias copias del mismo');
 const tres = imprimir('printEtiquetasProductos', [{ nombre: 'Cable', precioVenta: 5000, codigo: 'TP00001' }], 3);
@@ -180,6 +201,21 @@ console.log('\n8) Sin nada que imprimir, no abre una hoja en blanco');
 ok(imprimir('printEtiquetasProductos', []) === '' && TOASTS.some(t => /No hay/.test(t[1])), 'artículos');
 ok(imprimir('printEtiquetasReparaciones', []) === '' && TOASTS.some(t => /No hay/.test(t[1])), 'reparaciones');
 
+console.log('\n8b) El formato: etiquetadora por defecto, A4 de emergencia');
+ok(vm.runInContext('etqFormato()', pCtx) === '40x30', 'arranca en la etiquetadora de 40×30');
+const eq40 = imprimir('printEtiquetas', [{ marca: 'Samsung', modelo: 'A54', precio: 1, imei: '356938035643809' }]);
+ok(/@page\{size:40mm 30mm;margin:0\}/.test(eq40), 'una etiqueta por página de 40×30');
+vm.runInContext("setEtqFormato('a4')", pCtx);
+const eqA4 = imprimir('printEtiquetas', [{ marca: 'Samsung', modelo: 'A54', precio: 1, imei: '356938035643809' }]);
+ok(/@page\{size:A4 portrait/.test(eqA4) && /repeat\(3,63mm\)/.test(eqA4), 'y la hoja A4 sigue ahí');
+// En A4 hay más ancho: la barra se engorda sola en vez de quedarse en el mínimo.
+const wA4 = Number((eqA4.match(/width="([\d.]+)mm"/) || [])[1]);
+const w40 = Number((eq40.match(/width="([\d.]+)mm"/) || [])[1]);
+ok(wA4 > w40, `en A4 el mismo código sale más ancho (${wA4}mm contra ${w40}mm)`, [wA4, w40]);
+const repA4 = imprimir('printEtiquetasReparaciones', [{ nOrden: 7123, marca: 'Motorola', modelo: 'G54', falla: 'x' }]);
+ok(/grid-template-columns:repeat\(2,97mm\)/.test(repA4), 'la de reparación en A4 sigue siendo la grande');
+vm.runInContext("setEtqFormato('40x30')", pCtx);
+
 console.log('\n9) Enganchado donde hace falta');
 const inv = fs.readFileSync(DIR + 'inventario.js', 'utf8');
 const idx = fs.readFileSync(DIR + 'index.html', 'utf8');
@@ -192,6 +228,8 @@ ok(/_invFiltrados\(\)/.test(inv.slice(inv.indexOf('function renderInventario')))
    'la lista usa ese mismo filtro (si no, se imprime una cosa y se ve otra)');
 ok(/onclick="imprimirEtiquetaProducto\(\)"/.test(cajaHtml), 'y una sola desde la ficha del artículo');
 ok(/label: 'Generar códigos de barras'/.test(inv), 'con cómo generar los códigos que faltan');
+ok(/label: 'Tamaño de etiqueta'/.test(inv) && /setEtqFormato/.test(inv),
+   'y cómo cambiar entre la etiquetadora y la hoja A4');
 ok(/onclick="etiquetaReparacion\(\)"/.test(idx), 'reparaciones: botón en la ficha');
 ok(/function etiquetaReparacion/.test(rep) && /printEtiquetasReparaciones/.test(rep), 'que imprime la etiqueta');
 ok(/src="barcode\.js"/.test(idx) && /src="barcode\.js"/.test(cajaHtml), 'y las dos páginas cargan barcode.js');

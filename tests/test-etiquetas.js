@@ -7,6 +7,9 @@
 // QR: el QR lo lee la cámara pero no el lector de mano del mostrador, y la
 // cámara lee los dos. Que las barras se puedan DECODIFICAR de verdad se prueba
 // aparte, en test-etiquetas-barcode.js.
+//
+// Salen de la etiquetadora térmica en 40×30mm, una etiqueta por página. La
+// hoja A4 de 24 quedó como salida de emergencia para cuando se acaba el rollo.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const DIR = path.join(__dirname, '..') + '/';
 let fails = 0;
@@ -22,6 +25,7 @@ const ctx = {
   navigator: { userAgent: 'node' },
   toast: (m, t) => TOASTS.push([t, m]),
   alert: () => {},
+  localStorage: { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); } },
   btoa: s => Buffer.from(s, 'binary').toString('base64'), TextEncoder,
   unescape, encodeURIComponent,
 };
@@ -66,20 +70,29 @@ console.log('\n4) El código de barras lleva el IMEI');
 // Es el mismo número que busca la caja al escanear (`_movDesdeCodigo` matchea
 // el equipo del stock por IMEI), así que escanear la etiqueta lo mete en la venta.
 ok((html.match(/<svg/g) || []).length === 2, 'barras solo en los que tienen IMEI', (html.match(/<svg/g) || []).length);
-ctx.__IMEI = '356938035643809';
-const bcEsperado = get('code128Svg(__IMEI, { modulo: 0.33, alto: 8 })');
-ok(html.includes(bcEsperado), 'y son las del IMEI de ese equipo');
+ok(/>356938035643809<\/text>/.test(html), 'y son las del IMEI de ese equipo');
 ok(/356938035643809/.test(html), 'con el número escrito abajo, para teclearlo si el lector no quiere');
 ok(!/qrSvg/.test(fs.readFileSync(DIR + 'print.js', 'utf8').slice(
      fs.readFileSync(DIR + 'print.js', 'utf8').indexOf('function _etiquetaHtml'),
      fs.readFileSync(DIR + 'print.js', 'utf8').indexOf('function _barrasEtq'))),
    'y ya no queda el QR, que el lector de mano no lee');
 
-console.log('\n5) La hoja');
-ok(/@page\{size:A4 portrait/.test(html), 'A4 (cualquier impresora)', html.match(/@page[^}]*}/));
-ok(/grid-template-columns:repeat\(3,63mm\)/.test(html) && /grid-auto-rows:34mm/.test(html),
+console.log('\n5) La etiquetadora');
+ok(/@page\{size:40mm 30mm;margin:0\}/.test(html), 'papel de 40×30, sin márgenes', html.match(/@page[^}]*}/));
+ok(!/class="hoja"/.test(html), 'una etiqueta por página: el rollo avanza sola');
+ok(/\.etq \+ \.etq\{page-break-before:always\}/.test(html.replace(/,\.etqr \+ \.etqr/, '')),
+   'el corte va ENTRE etiquetas, nunca después de la última (si no sale una en blanco)');
+ok(!/dashed/.test(html), 'sin línea de corte: en térmica es tinta al pedo');
+
+console.log('\n5b) La hoja A4 sigue estando, para cuando se acaba el rollo');
+run("setEtqFormato('a4')");
+run('printEtiquetas(__EQ)');
+const htmlA4 = IMPRESO.html;
+ok(/@page\{size:A4 portrait/.test(htmlA4), 'A4 (cualquier impresora)', htmlA4.match(/@page[^}]*}/));
+ok(/grid-template-columns:repeat\(3,63mm\)/.test(htmlA4) && /grid-auto-rows:34mm/.test(htmlA4),
    '3 columnas de 63×34 mm: la medida de las hojas autoadhesivas comunes');
-ok(/dashed/.test(html), 'con línea de corte punteada si se imprime en papel común');
+ok(/dashed/.test(htmlA4), 'con línea de corte punteada');
+run("setEtqFormato('40x30')");
 
 console.log('\n6) Sin equipos no abre una hoja en blanco');
 IMPRESO = null; TOASTS.length = 0;

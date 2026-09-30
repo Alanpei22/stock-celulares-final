@@ -360,6 +360,9 @@ function toggleInvMenu() {
     { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: openInvWizard },
     { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: imprimirEtiquetasInv },
     { icon: '🔢', label: 'Generar códigos de barras', sub: 'A los artículos que no tienen', onClick: generarCodigosInv },
+    { icon: '📐', label: 'Tamaño de etiqueta',
+      sub: (typeof etqFormato === 'function' && etqFormato() === 'a4') ? 'Hoja A4 para cortar' : 'Etiquetadora 40×30',
+      onClick: elegirFormatoEtiqueta },
     { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },
   ]);
 }
@@ -388,6 +391,21 @@ function imprimirEtiquetaProducto(id) {
   const copias = prompt('¿Cuántas etiquetas?', '1');
   if (copias === null) return;
   printEtiquetasProductos([p], Number(copias) || 1);
+}
+
+// ── De qué tamaño salen las etiquetas ──
+// Por dispositivo: la PC del local tiene la etiquetadora enchufada y la tablet
+// no. La hoja A4 queda como salida de emergencia para cuando se acaba el rollo.
+function elegirFormatoEtiqueta() {
+  closeInvMenu();
+  if (typeof etqFormato !== 'function') return;
+  const actual = etqFormato();
+  const a4 = confirm(
+    'Tamaño de etiqueta en ESTE dispositivo.\n\n' +
+    'Ahora: ' + (actual === 'a4' ? 'hoja A4 para cortar' : 'etiquetadora 40×30') + '\n\n' +
+    'Aceptar = hoja A4 de 24 etiquetas\nCancelar = etiquetadora 40×30');
+  setEtqFormato(a4 ? 'a4' : '40x30');
+  toast(a4 ? '📄 Etiquetas en hoja A4' : '🏷️ Etiquetas 40×30 (etiquetadora)', 'success');
 }
 
 // ── Códigos internos para los que no tienen ──
