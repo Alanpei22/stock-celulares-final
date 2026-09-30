@@ -98,10 +98,15 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   toca los vacios - los EAN de fabrica no se pisan.
 - Se imprime lo que esta A LA VISTA: `_invFiltrados()` lo comparten la lista y
   la impresion. Y se puede pedir varias copias del mismo (techo 20).
-- **Formato 40x30 (etiquetadora termica XPrinter) por defecto**: una etiqueta
-  por PAGINA, `@page{size:40mm 30mm;margin:0}`, sin bordes. La hoja A4 de 24
-  queda como salida de emergencia (Accesorios - menu - Tamano de etiqueta), se
-  guarda en localStorage por dispositivo.
+- **Etiquetadora termica XPrinter, rollo 40x30.** Tres formatos en
+  `ETQ_FORMATOS` (Accesorios - menu - Tamano de etiqueta, guardado en
+  localStorage por dispositivo):
+  `30x40` PARADA (el default: pagina 30x40 con la etiqueta girada 90),
+  `40x30` apaisada, y `a4` la hoja de 24 como emergencia.
+  El CONTENIDO siempre se disena sobre 40x30 y se gira entero - no se redisena,
+  porque el codigo del IMEI necesita 38,5mm y tiene que caer sobre los 40mm.
+- La etiqueta de REPARACION no lleva codigo de barras (se lee el numero, no se
+  escanea) y con ese lugar entran cliente, falla y arreglo juntos.
 - El modulo del codigo se CALCULA para llenar el ancho, con piso en 0,25mm: un
   IMEI en 40mm da 38,5mm justo en ese piso. Abajo de 0,25 los lectores fallan,
   y la prueba lo mide en vez de suponerlo.

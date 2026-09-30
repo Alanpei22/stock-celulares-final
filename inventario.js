@@ -361,7 +361,8 @@ function toggleInvMenu() {
     { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: imprimirEtiquetasInv },
     { icon: '🔢', label: 'Generar códigos de barras', sub: 'A los artículos que no tienen', onClick: generarCodigosInv },
     { icon: '📐', label: 'Tamaño de etiqueta',
-      sub: (typeof etqFormato === 'function' && etqFormato() === 'a4') ? 'Hoja A4 para cortar' : 'Etiquetadora 40×30',
+      sub: (typeof etqFormato === 'function' && typeof ETQ_FORMATO_NOMBRE === 'object')
+             ? ETQ_FORMATO_NOMBRE[etqFormato()] : '',
       onClick: elegirFormatoEtiqueta },
     { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },
   ]);
@@ -399,13 +400,16 @@ function imprimirEtiquetaProducto(id) {
 function elegirFormatoEtiqueta() {
   closeInvMenu();
   if (typeof etqFormato !== 'function') return;
-  const actual = etqFormato();
-  const a4 = confirm(
+  const opciones = ETQ_FORMATOS;
+  const elegido = prompt(
     'Tamaño de etiqueta en ESTE dispositivo.\n\n' +
-    'Ahora: ' + (actual === 'a4' ? 'hoja A4 para cortar' : 'etiquetadora 40×30') + '\n\n' +
-    'Aceptar = hoja A4 de 24 etiquetas\nCancelar = etiquetadora 40×30');
-  setEtqFormato(a4 ? 'a4' : '40x30');
-  toast(a4 ? '📄 Etiquetas en hoja A4' : '🏷️ Etiquetas 40×30 (etiquetadora)', 'success');
+    opciones.map((f, n) => `${n + 1}. ${ETQ_FORMATO_NOMBRE[f]}${f === etqFormato() ? '  ← ahora' : ''}`).join('\n') +
+    '\n\nNúmero:', String(opciones.indexOf(etqFormato()) + 1));
+  if (elegido === null) return;
+  const f = opciones[Number(String(elegido).trim()) - 1];
+  if (!f) { toast('Elegí 1, 2 o 3', 'error'); return; }
+  setEtqFormato(f);
+  toast('🏷️ ' + ETQ_FORMATO_NOMBRE[f], 'success');
 }
 
 // ── Códigos internos para los que no tienen ──

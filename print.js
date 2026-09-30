@@ -104,32 +104,52 @@ function _etiquetaHtml(p) {
   </div>`;
 }
 
-// Ancho útil para el código de barras, según el formato.
-// 40×30: la etiqueta entera menos un pelo de margen (el IMEI necesita hasta el
-// último milímetro). A4: el ancho de la celda de 63mm menos el padding.
-function _etqAncho()    { return etqFormato() === 'a4' ? 55 : 38.4; }
-function _etqAnchoRep() { return etqFormato() === 'a4' ? 40 : 38.4; }
+// Ancho útil para el código de barras.
+// En la etiquetadora el contenido mide 40mm de ancho en los dos sentidos (el
+// girado se rota entero), menos un pelo de margen: el IMEI necesita hasta el
+// último milímetro. En A4, el ancho de la celda de 63mm menos el padding.
+function _etqAncho()    { return etqEsA4() ? 55 : 38.4; }
 
 // ══════════════════════════════════════════════════════════════
 //  FORMATO DE ETIQUETA
 //  ─────────────────────────────────────────────────────────────
-//  · 40x30 — la etiquetadora térmica (XPrinter). Cada etiqueta es su propia
-//    PÁGINA de 40×30mm; el rollo avanza una por una y no hay nada que cortar.
-//    Es el formato de siempre.
-//  · a4    — la hoja de 24 etiquetas para cortar o pegar. Queda como salida de
-//    emergencia: si se acaba el rollo un sábado, el mostrador no se para.
+//  Etiquetadora térmica (XPrinter), rollo de 40×30. Cada etiqueta es su propia
+//  PÁGINA: el rollo avanza una por una y no hay nada que cortar.
+//
+//   · 30x40 — PARADA. La página es de 30mm de ancho por 40 de alto y el
+//     contenido va girado 90°. Es el sentido en el que sale el rollo de esta
+//     etiquetadora, así que es el que viene puesto.
+//   · 40x30 — APAISADA. La página es de 40 de ancho por 30 de alto, sin girar.
+//     Si tu driver ya alimenta el rollo en ese sentido, es este.
+//   · a4    — la hoja de 24 para cortar o pegar. Salida de emergencia: si se
+//     acaba el rollo un sábado, el mostrador no se para.
+//
+//  Girada o no, el CONTENIDO siempre se diseña sobre un rectángulo de 40×30 y
+//  después se rota entero. Eso no es un detalle: el código de barras de un
+//  IMEI necesita 38,5mm, así que tiene que ir SIEMPRE a lo largo de los 40mm.
+//  En 30mm no entra a un ancho que se pueda leer.
 //
 //  Se guarda por dispositivo: la PC del local puede tener la etiquetadora y la
 //  tablet no.
 // ══════════════════════════════════════════════════════════════
-const ETQ_FORMATO_DEF = '40x30';
+const ETQ_FORMATO_DEF = '30x40';
+const ETQ_FORMATOS = ['30x40', '40x30', 'a4'];
+const ETQ_FORMATO_NOMBRE = {
+  '30x40': 'Etiquetadora · 40×30 parada',
+  '40x30': 'Etiquetadora · 40×30 apaisada',
+  'a4':    'Hoja A4 para cortar',
+};
 
 function etqFormato() {
-  try { return localStorage.getItem('etqFormato') === 'a4' ? 'a4' : ETQ_FORMATO_DEF; } catch { return ETQ_FORMATO_DEF; }
+  try {
+    const f = localStorage.getItem('etqFormato');
+    return ETQ_FORMATOS.indexOf(f) >= 0 ? f : ETQ_FORMATO_DEF;
+  } catch { return ETQ_FORMATO_DEF; }
 }
 function setEtqFormato(f) {
-  try { localStorage.setItem('etqFormato', f === 'a4' ? 'a4' : ETQ_FORMATO_DEF); } catch {}
+  try { localStorage.setItem('etqFormato', ETQ_FORMATOS.indexOf(f) >= 0 ? f : ETQ_FORMATO_DEF); } catch {}
 }
+function etqEsA4() { return etqFormato() === 'a4'; }
 
 // El código de barras, estirado hasta llenar el ancho que le toca.
 //
@@ -165,30 +185,29 @@ function _etiquetaProdHtml(p) {
 }
 
 // ── Etiqueta de reparación — la que se cuelga del equipo ──
-// Más grande (2 por fila): acá lo que importa es que el técnico lea la falla
-// sin abrir la app, y que el mostrador encuentre el equipo por el número.
+// Sin código de barras, a propósito: al equipo en el taller se lo busca por el
+// número de orden leyéndolo, no escaneándolo. Y sin las barras entra lo que
+// de verdad se mira — la falla y el arreglo — que en 30mm de alto no entraba.
+// (Si algún día hace falta escanearla: la caja ya sabe abrir el cobro con el
+// número de orden suelto, ver `_movDesdeCodigo`.)
 function _etiquetaRepHtml(r) {
   const eq = [r.marca, r.modelo].filter(Boolean).join(' ').trim() || 'Equipo';
   const cli = [r.nombre, r.tlf].filter(Boolean).join(' · ');
   const falla = String(r.falla || '').trim();
   const arreglo = String(r.arreglo || '').trim();
-  const ing = r.fechaIngreso ? new Date(r.fechaIngreso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '';
+  const ing = r.fechaIngreso ? new Date(r.fechaIngreso).toLocaleDateString('es-AR',
+        { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit' }) : '';
   const nro = String(r.nOrden || '').trim();
-  // En A4 el código va arriba, al lado del número. En 40×30 no entra al lado
-  // sin comerse el lugar de la falla, así que va abajo, a lo ancho.
-  const a4 = etqFormato() === 'a4';
-  const barras = _barrasEtq(nro, _etqAnchoRep(), a4 ? 8 : 7);
   return `<div class="etqr">
     <div class="etqr-top">
       <div class="etqr-nro">N° ${_escEtq(nro)}</div>
-      ${a4 ? barras : ''}
+      ${ing ? `<div class="etqr-fecha">${_escEtq(ing)}</div>` : ''}
     </div>
     <div class="etqr-eq">${_escEtq(eq)}${r.color ? ' · ' + _escEtq(r.color) : ''}</div>
     ${cli ? `<div class="etqr-cli">${_escEtq(cli)}</div>` : ''}
     ${falla ? `<div class="etqr-falla"><b>Falla:</b> ${_escEtq(falla)}</div>` : ''}
     ${arreglo ? `<div class="etqr-arr">${_escEtq(arreglo)}</div>` : ''}
-    <div class="etqr-pie">${ing ? 'Ingresó ' + _escEtq(ing) : ''}${r.imei ? ' · IMEI …' + _escEtq(String(r.imei).slice(-6)) : ''}</div>
-    ${a4 ? '' : barras}
+    <div class="etqr-pie">${r.imei ? 'IMEI …' + _escEtq(String(r.imei).slice(-6)) : ''}</div>
   </div>`;
 }
 
@@ -220,16 +239,24 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;b
 .etqr-pie{font-size:6.4pt;color:#666;margin-top:auto;padding-top:1mm}
 @media print{.etq,.etqr{border-color:#ddd}}`;
 
-// ── Etiquetadora térmica de 40×30 ──
-// Una etiqueta = una página. El corte va ENTRE etiquetas y nunca después de la
+// ── Etiquetadora térmica ──
+// Una etiqueta = una página. El corte va ENTRE páginas y nunca después de la
 // última, si no el rollo escupe una en blanco al final de cada tanda.
 // Sin bordes: en térmica el borde es tinta que no aporta nada.
+//
+// El contenido SIEMPRE se arma sobre 40×30. Para el sentido parado, la página
+// pasa a 30×40 y la etiqueta se gira 90° adentro: rotar 90° un rectángulo
+// anclado en su esquina superior izquierda lo manda a las x negativas, así que
+// el translateX(30mm) lo devuelve al papel. Se gira entera y no se rediseña
+// porque el código de barras tiene que caer a lo largo de los 40mm sí o sí.
 const _CSS_ETQ_40 = `
-@page{size:40mm 30mm;margin:0}
+@page{size:SIZE;margin:0}
 *{box-sizing:border-box}
 body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;background:#fff}
+.pag{width:PAGW;height:PAGH;position:relative;overflow:hidden}
+.pag + .pag{page-break-before:always}
+.pag > .etq,.pag > .etqr{position:absolute;top:0;left:0;GIRO}
 .etq,.etqr{width:40mm;height:30mm;padding:1.2mm 1.2mm 0.8mm;display:flex;flex-direction:column;overflow:hidden;border:0}
-.etq + .etq,.etqr + .etqr{page-break-before:always}
 .etq-eq{font-size:8pt;font-weight:800;line-height:1.05;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .etq-eq--prod{font-size:7.5pt;-webkit-line-clamp:3}
 .etq-specs{font-size:5.6pt;color:#000;margin-top:.2mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -239,26 +266,35 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;b
 /* El código se sale del padding a propósito: un IMEI necesita los 38,5mm */
 .etq-bc{margin:.5mm -0.9mm 0;text-align:center}
 .etq-bc svg{display:block;margin:0 auto}
-/* Reparación en 40×30: entra el número, el equipo y la falla. Nada más. */
-.etqr{padding:1.2mm}
-.etqr-top{display:flex;align-items:baseline;justify-content:space-between;gap:1.5mm}
-.etqr-nro{font-size:13pt;font-weight:800;line-height:1;white-space:nowrap}
-.etqr-top .etq-bc{display:none}
-.etqr-eq{font-size:7.5pt;font-weight:800;margin-top:.5mm;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.etqr-cli{font-size:6pt;margin-top:.2mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.etqr-falla{font-size:6.4pt;margin-top:.6mm;line-height:1.15;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.etqr-arr{display:none}
-.etqr-pie{display:none}
-.etqr .etq-bc{margin:auto -0.9mm 0;text-align:center}`;
+/* Reparación: sin barras entra todo lo que se mira. */
+.etqr{padding:1.4mm}
+.etqr-top{display:flex;align-items:baseline;justify-content:space-between;gap:1.5mm;border-bottom:.3mm solid #000;padding-bottom:.6mm}
+.etqr-nro{font-size:15pt;font-weight:800;line-height:1;white-space:nowrap}
+.etqr-fecha{font-size:6.5pt;white-space:nowrap}
+.etqr-eq{font-size:8pt;font-weight:800;margin-top:.8mm;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etqr-cli{font-size:6.4pt;margin-top:.3mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etqr-falla{font-size:7pt;margin-top:.9mm;line-height:1.2;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.etqr-arr{font-size:6.4pt;margin-top:.5mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etqr-pie{font-size:6pt;margin-top:auto}`;
+
+// El mismo CSS, con la página y el giro del sentido elegido.
+function _cssEtqTermica() {
+  const parada = etqFormato() === '30x40';
+  return _CSS_ETQ_40
+    .replace('SIZE', parada ? '30mm 40mm' : '40mm 30mm')
+    .replace('PAGW', parada ? '30mm' : '40mm')
+    .replace('PAGH', parada ? '40mm' : '30mm')
+    .replace('GIRO', parada ? 'transform-origin:0 0;transform:translateX(30mm) rotate(90deg)' : '');
+}
 
 function _hojaEtiquetas(items, pintar, clase) {
   const biz = (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint';
-  const a4 = etqFormato() === 'a4';
+  const a4 = etqEsA4();
   const cuerpo = a4
     ? `<div class="hoja${clase ? ' ' + clase : ''}">${items.map(pintar).join('')}</div>`
-    : items.map(pintar).join('');
+    : items.map(it => `<div class="pag">${pintar(it)}</div>`).join('');
   return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
-<title>Etiquetas — ${_escEtq(biz)}</title><style>${a4 ? _CSS_ETQ_A4 : _CSS_ETQ_40}</style></head><body>
+<title>Etiquetas — ${_escEtq(biz)}</title><style>${a4 ? _CSS_ETQ_A4 : _cssEtqTermica()}</style></head><body>
 ${cuerpo}
 </body></html>`;
 }

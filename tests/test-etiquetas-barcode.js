@@ -166,6 +166,8 @@ ok(/PRODUCTOS/.test(caja) && /String\(p\.codigo \|\| ''\)\.trim\(\) === txt/.tes
    'y la caja busca el artículo por ese mismo código');
 
 console.log('\n6) Etiqueta de reparación — la que se cuelga del equipo');
+// Sin código de barras a propósito: al equipo en el taller se lo busca por el
+// número leyéndolo. Y sin las barras entra lo que de verdad se mira.
 const rp = imprimir('printEtiquetasReparaciones', [{
   nOrden: 7123, marca: 'Motorola', modelo: 'G54', color: 'Negro', nombre: 'Juan Pérez', tlf: '11 5555-5555',
   falla: 'se apaga solo cuando llega al 30%', arreglo: 'Batería', imei: '356938035643809',
@@ -177,16 +179,16 @@ ok(/Motorola G54 · Negro/.test(rp), 'qué equipo es');
 ok(/Juan Pérez · 11 5555-5555/.test(rp), 'de quién es');
 ok(/Batería/.test(rp), 'y qué hay que hacerle');
 ok(/IMEI …643809/.test(rp), 'los últimos 6 del IMEI, para no confundir dos iguales');
-ok(/>7123<\/text>/.test(rp), 'con el número de orden en barras');
-medirBarras(rp, '7123', 'el número de orden');
-// Escanear la etiqueta en la caja abre el cobro de esa orden.
+ok(/Batería/.test(rp), 'y el arreglo, que ahora entra porque no están las barras');
+ok(!/<svg/.test(rp), 'SIN código de barras: no se escanea, se lee', (rp.match(/<svg[^>]*>/) || [])[0]);
+ok(/24\/0?9/.test(rp), 'con la fecha de ingreso', (rp.match(/class="etqr-fecha">[^<]*/) || [])[0]);
+// Si algún día se le quiere poner el código: la caja ya sabe abrir el cobro
+// con el número de orden suelto, así que alcanzaría con volver a dibujarlo.
 ok(/digitos && digitos\.length <= 7/.test(caja) && /String\(r\.nOrden \|\| ''\) === digitos/.test(caja),
-   'y escanearla en la caja abre el cobro de esa orden');
-ok(/@page\{size:40mm 30mm/.test(rp), 'en la etiquetadora, como las demás');
-ok(/\.etqr-arr\{display:none\}/.test(rp) && /\.etqr-pie\{display:none\}/.test(rp),
-   'en 30mm de alto no entra todo: se prioriza número, equipo y falla', rp.match(/\.etqr-(arr|pie)\{[^}]*\}/g));
-ok(/\.etqr-top \.etq-bc\{display:none\}/.test(rp),
-   'y el código va abajo a lo ancho, no apretado al lado del número');
+   'la caja igual sabe abrir el cobro tecleando el número de orden');
+ok(/@page\{size:30mm 40mm/.test(rp), 'en la etiquetadora, como las demás');
+ok(/se apaga solo cuando llega al 30%/.test(rp) && /Juan Pérez/.test(rp) && /Batería/.test(rp),
+   'y ahora entran juntos cliente, falla y arreglo');
 
 console.log('\n7) Varias copias del mismo');
 const tres = imprimir('printEtiquetasProductos', [{ nombre: 'Cable', precioVenta: 5000, codigo: 'TP00001' }], 3);
@@ -201,10 +203,18 @@ console.log('\n8) Sin nada que imprimir, no abre una hoja en blanco');
 ok(imprimir('printEtiquetasProductos', []) === '' && TOASTS.some(t => /No hay/.test(t[1])), 'artículos');
 ok(imprimir('printEtiquetasReparaciones', []) === '' && TOASTS.some(t => /No hay/.test(t[1])), 'reparaciones');
 
-console.log('\n8b) El formato: etiquetadora por defecto, A4 de emergencia');
-ok(vm.runInContext('etqFormato()', pCtx) === '40x30', 'arranca en la etiquetadora de 40×30');
+console.log('\n8b) Los tres formatos');
+ok(vm.runInContext('etqFormato()', pCtx) === '30x40', 'arranca parada: es como alimenta el rollo esta etiquetadora');
 const eq40 = imprimir('printEtiquetas', [{ marca: 'Samsung', modelo: 'A54', precio: 1, imei: '356938035643809' }]);
-ok(/@page\{size:40mm 30mm;margin:0\}/.test(eq40), 'una etiqueta por página de 40×30');
+ok(/@page\{size:30mm 40mm;margin:0\}/.test(eq40) && /rotate\(90deg\)/.test(eq40),
+   'página de 30×40 con la etiqueta girada');
+vm.runInContext("setEtqFormato('40x30')", pCtx);
+const eqAp = imprimir('printEtiquetas', [{ marca: 'Samsung', modelo: 'A54', precio: 1, imei: '356938035643809' }]);
+ok(/@page\{size:40mm 30mm;margin:0\}/.test(eqAp) && !/rotate\(90deg\)/.test(eqAp), 'o apaisada, sin girar');
+// Girada o apaisada, el código mide lo mismo: siempre cae sobre los 40mm.
+ok((eqAp.match(/width="([\d.]+)mm"/) || [])[1] === (eq40.match(/width="([\d.]+)mm"/) || [])[1],
+   'y el código mide lo mismo en las dos: siempre cae a lo largo de los 40mm',
+   [(eq40.match(/width="([\d.]+)mm"/) || [])[1], (eqAp.match(/width="([\d.]+)mm"/) || [])[1]]);
 vm.runInContext("setEtqFormato('a4')", pCtx);
 const eqA4 = imprimir('printEtiquetas', [{ marca: 'Samsung', modelo: 'A54', precio: 1, imei: '356938035643809' }]);
 ok(/@page\{size:A4 portrait/.test(eqA4) && /repeat\(3,63mm\)/.test(eqA4), 'y la hoja A4 sigue ahí');
@@ -214,7 +224,8 @@ const w40 = Number((eq40.match(/width="([\d.]+)mm"/) || [])[1]);
 ok(wA4 > w40, `en A4 el mismo código sale más ancho (${wA4}mm contra ${w40}mm)`, [wA4, w40]);
 const repA4 = imprimir('printEtiquetasReparaciones', [{ nOrden: 7123, marca: 'Motorola', modelo: 'G54', falla: 'x' }]);
 ok(/grid-template-columns:repeat\(2,97mm\)/.test(repA4), 'la de reparación en A4 sigue siendo la grande');
-vm.runInContext("setEtqFormato('40x30')", pCtx);
+ok(!/<svg/.test(repA4), 'y tampoco lleva código de barras');
+vm.runInContext("setEtqFormato('30x40')", pCtx);
 
 console.log('\n9) Enganchado donde hace falta');
 const inv = fs.readFileSync(DIR + 'inventario.js', 'utf8');
@@ -229,7 +240,10 @@ ok(/_invFiltrados\(\)/.test(inv.slice(inv.indexOf('function renderInventario')))
 ok(/onclick="imprimirEtiquetaProducto\(\)"/.test(cajaHtml), 'y una sola desde la ficha del artículo');
 ok(/label: 'Generar códigos de barras'/.test(inv), 'con cómo generar los códigos que faltan');
 ok(/label: 'Tamaño de etiqueta'/.test(inv) && /setEtqFormato/.test(inv),
-   'y cómo cambiar entre la etiquetadora y la hoja A4');
+   'y cómo elegir entre parada, apaisada y hoja A4');
+// Las opciones del menu salen de la lista de formatos, no escritas a mano: si
+// se agrega un tamano de rollo, aparece solo y no queda uno afuera.
+ok(/opciones = ETQ_FORMATOS/.test(inv), 'y las tres salen de la lista de formatos', (inv.match(/const opciones = [^;]*/) || [])[0]);
 ok(/onclick="etiquetaReparacion\(\)"/.test(idx), 'reparaciones: botón en la ficha');
 ok(/function etiquetaReparacion/.test(rep) && /printEtiquetasReparaciones/.test(rep), 'que imprime la etiqueta');
 ok(/src="barcode\.js"/.test(idx) && /src="barcode\.js"/.test(cajaHtml), 'y las dos páginas cargan barcode.js');

@@ -8,8 +8,10 @@
 // cámara lee los dos. Que las barras se puedan DECODIFICAR de verdad se prueba
 // aparte, en test-etiquetas-barcode.js.
 //
-// Salen de la etiquetadora térmica en 40×30mm, una etiqueta por página. La
-// hoja A4 de 24 quedó como salida de emergencia para cuando se acaba el rollo.
+// Salen de la etiquetadora térmica, una etiqueta por página. El rollo de 40×30
+// entra parado (página de 30×40 con el contenido girado 90°), que es el sentido
+// en que alimenta esta etiquetadora. La hoja A4 de 24 quedó como salida de
+// emergencia para cuando se acaba el rollo.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const DIR = path.join(__dirname, '..') + '/';
 let fails = 0;
@@ -78,13 +80,31 @@ ok(!/qrSvg/.test(fs.readFileSync(DIR + 'print.js', 'utf8').slice(
    'y ya no queda el QR, que el lector de mano no lee');
 
 console.log('\n5) La etiquetadora');
-ok(/@page\{size:40mm 30mm;margin:0\}/.test(html), 'papel de 40×30, sin márgenes', html.match(/@page[^}]*}/));
+ok(/@page\{size:30mm 40mm;margin:0\}/.test(html), 'papel de 30×40 parado, sin márgenes', html.match(/@page[^}]*}/));
 ok(!/class="hoja"/.test(html), 'una etiqueta por página: el rollo avanza sola');
-ok(/\.etq \+ \.etq\{page-break-before:always\}/.test(html.replace(/,\.etqr \+ \.etqr/, '')),
+ok(/\.pag \+ \.pag\{page-break-before:always\}/.test(html),
    'el corte va ENTRE etiquetas, nunca después de la última (si no sale una en blanco)');
+ok((html.match(/class="pag"/g) || []).length === 3, 'una página por etiqueta', (html.match(/class="pag"/g) || []).length);
 ok(!/dashed/.test(html), 'sin línea de corte: en térmica es tinta al pedo');
 
-console.log('\n5b) La hoja A4 sigue estando, para cuando se acaba el rollo');
+console.log('\n5b) El giro');
+// El contenido se diseña sobre 40×30 y se gira entero. No se rediseña: el
+// código de barras de un IMEI necesita 38,5mm y tiene que caer a lo largo de
+// los 40mm. En 30 no entra a un ancho que se pueda leer.
+ok(/transform:translateX\(30mm\) rotate\(90deg\)/.test(html), 'la etiqueta va girada 90° sobre la página');
+ok(/transform-origin:0 0/.test(html), 'desde la esquina, que es lo que hace que el translate la devuelva al papel');
+ok(/\.etq,\.etqr\{width:40mm;height:30mm/.test(html), 'y el contenido sigue midiendo 40×30');
+const anchoBc = Number((html.match(/width="([\d.]+)mm"/) || [])[1]);
+ok(anchoBc > 30 && anchoBc <= 40, `el código mide ${anchoBc}mm: usa el lado largo, no el de 30`, anchoBc);
+
+console.log('\n5c) También se puede apaisada, si el driver alimenta al revés');
+run("setEtqFormato('40x30')");
+run('printEtiquetas(__EQ)');
+const htmlAp = IMPRESO.html;
+ok(/@page\{size:40mm 30mm;margin:0\}/.test(htmlAp), 'ahí la página es 40×30', htmlAp.match(/@page[^}]*}/));
+ok(!/rotate\(90deg\)/.test(htmlAp), 'y no se gira nada');
+
+console.log('\n5d) La hoja A4 sigue estando, para cuando se acaba el rollo');
 run("setEtqFormato('a4')");
 run('printEtiquetas(__EQ)');
 const htmlA4 = IMPRESO.html;
@@ -92,7 +112,7 @@ ok(/@page\{size:A4 portrait/.test(htmlA4), 'A4 (cualquier impresora)', htmlA4.ma
 ok(/grid-template-columns:repeat\(3,63mm\)/.test(htmlA4) && /grid-auto-rows:34mm/.test(htmlA4),
    '3 columnas de 63×34 mm: la medida de las hojas autoadhesivas comunes');
 ok(/dashed/.test(htmlA4), 'con línea de corte punteada');
-run("setEtqFormato('40x30')");
+run("setEtqFormato('30x40')");
 
 console.log('\n6) Sin equipos no abre una hoja en blanco');
 IMPRESO = null; TOASTS.length = 0;
