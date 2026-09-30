@@ -1931,6 +1931,10 @@
       <div class="fg fg--full" id="rep2-ac-wrap" style="position:relative">
         <label class="fl">Nombre * <span class="fl-hint">— escribí para buscar en catálogo</span></label>
         <input id="rep2-fi-nombre" class="fi" type="text" placeholder="Ej: A14 5G, iPhone 14 Pro, G32…" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label class="fl">Código de barras <span class="fl-hint" style="font-weight:500">para la etiqueta y para escanearlo en la caja</span></label>
+        <input id="rep2-fi-codigo" class="fi" type="text" placeholder="Vacío = se genera uno (TP…)" autocomplete="off" autocapitalize="characters">
         <div id="rep2-ac-list" class="rep2-ac-dropdown hidden"></div>
       </div>
       <div style="display:flex;gap:10px">
@@ -1991,6 +1995,7 @@
         <button class="btn-danger" id="rep2-delete-btn">🗑 Eliminar repuesto</button>
       </div>
       <div class="modal-footer" style="display:flex;gap:10px;margin-top:4px">
+        <button class="btn-secondary" id="rep2-form-etq" style="display:none" onclick="imprimirEtiquetaRepuesto()" title="Imprimir etiqueta">🏷️</button>
         <button class="btn-secondary" id="rep2-form-cancel" style="flex:1">Cancelar</button>
         <button class="btn-primary" id="rep2-form-save" style="flex:2">💾 Guardar</button>
       </div>

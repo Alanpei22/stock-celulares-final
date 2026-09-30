@@ -283,6 +283,23 @@ function selectCatalogItem(marca, nombre, precio, notas) {
 }
 
 // ── Render ────────────────────────────────
+// Los repuestos que están a la vista con los filtros puestos. Lo usan la lista
+// y la impresión de etiquetas: si imprimieran cosas distintas de lo que se ve,
+// nadie entendería qué salió.
+function _rep2Filtrados() {
+  const q      = (document.getElementById('rep2-search')?.value || '').trim().toLowerCase();
+  const fTipo  = document.getElementById('rep2-f-tipo')?.value || '';
+  const fMarca = document.getElementById('rep2-f-marca')?.value || '';
+  return REPUESTOS.filter(r => {
+    if (fTipo  && r.tipo  !== fTipo)  return false;
+    if (fMarca && r.marca !== fMarca) return false;
+    // El código entra en la búsqueda: si está impreso en la etiqueta, tiene que
+    // servir para encontrar el repuesto tecleándolo.
+    if (q && !searchMatch([r.nombre, r.marca, r.modelo, r.tipo, r.proveedor, r.codigo], q)) return false;
+    return true;
+  });
+}
+
 function renderRepuestos() {
   const q      = (document.getElementById('rep2-search').value || '').trim().toLowerCase();
   const fTipo  = document.getElementById('rep2-f-tipo').value;
@@ -299,14 +316,7 @@ function renderRepuestos() {
   });
   selM.value = prev;
 
-  let filtered = REPUESTOS.filter(r => {
-    if (fTipo  && r.tipo  !== fTipo)  return false;
-    if (fMarca && r.marca !== fMarca) return false;
-    if (q) {
-      if (!searchMatch([r.nombre, r.marca, r.modelo, r.tipo, r.proveedor], q)) return false;
-    }
-    return true;
-  });
+  let filtered = _rep2Filtrados();
 
   // Stats — sobre el total completo
   const lowStock = REPUESTOS.filter(r =>
@@ -421,6 +431,10 @@ function openRepuestoForm(id) {
   editingRepuestoId = id || null;
   const title = document.getElementById('rep2-form-title');
   const delWrap = document.getElementById('rep2-delete-wrap');
+  // La etiqueta solo tiene sentido con el repuesto guardado: uno nuevo todavía
+  // no tiene código ni precio.
+  const etqBtn = document.getElementById('rep2-form-etq');
+  if (etqBtn) etqBtn.style.display = id ? '' : 'none';
 
   if (id) {
     const r = REPUESTOS.find(x => x.id === id);
@@ -435,6 +449,8 @@ function openRepuestoForm(id) {
     document.getElementById('rep2-fi-stockmin').value    = r.stockMin        ?? '';
     document.getElementById('rep2-fi-costoUSD').value    = r.precioCostoUSD  ?? '';
     document.getElementById('rep2-fi-precioVenta').value = r.precioVenta     ?? '';
+    const codEl = document.getElementById('rep2-fi-codigo');
+    if (codEl) codEl.value = r.codigo || '';
     document.getElementById('rep2-fi-proveedor').value   = r.proveedor       || '';
     document.getElementById('rep2-fi-notas').value       = r.notas           || '';
   } else {
@@ -488,6 +504,51 @@ function _updateCostoARSHint() {
   }
 }
 
+// ══════════════════════════════════════════
+//  ETIQUETAS DE REPUESTOS
+// ══════════════════════════════════════════
+// Sale lo que está a la vista: filtrás por marca o tipo y salen esas.
+function imprimirEtiquetasRep2() {
+  if (typeof closeRep2Menu === 'function') closeRep2Menu();
+  const lista = _rep2Filtrados();
+  if (!lista.length) { toast('No hay repuestos en la lista', 'error'); return; }
+  if (typeof printEtiquetasRepuestos !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
+  const copias = prompt(`${lista.length} repuesto${lista.length > 1 ? 's' : ''} a la vista.\n¿Cuántas etiquetas de cada uno?`, '1');
+  if (copias === null) return;
+  printEtiquetasRepuestos(lista, Number(copias) || 1);
+}
+
+// Una sola, desde la ficha.
+function imprimirEtiquetaRepuesto(id) {
+  const rep = REPUESTOS.find(x => x.id === (id || editingRepuestoId));
+  if (!rep) { toast('Guardá el repuesto primero', 'error'); return; }
+  if (typeof printEtiquetasRepuestos !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
+  const copias = prompt('¿Cuántas etiquetas?', '1');
+  if (copias === null) return;
+  printEtiquetasRepuestos([rep], Number(copias) || 1);
+}
+
+// ── Códigos internos para los repuestos que no tienen ──
+// El número lo reparte un contador común con los accesorios (ver
+// tpReservarCodigos en utils.js): dos cosas con el mismo código serían la misma
+// cosa para la caja, que busca primero en accesorios y después acá.
+async function generarCodigosRep2() {
+  if (typeof closeRep2Menu === 'function') closeRep2Menu();
+  const sin = REPUESTOS.filter(r => !String(r.codigo || '').trim());
+  if (!sin.length) { toast('Todos los repuestos ya tienen código', 'success'); return; }
+  if (!confirm(`${sin.length} repuesto${sin.length > 1 ? 's' : ''} sin código.\n¿Les genero uno interno (TP…)?`)) return;
+  try {
+    const codigos = await tpReservarCodigos(db, sin.length, tpMaxCodigoLocal(REPUESTOS));
+    const batch = db.batch();
+    sin.forEach((rep, i) => batch.update(db.collection('repuestos').doc(rep.id), { codigo: codigos[i] }));
+    await batch.commit();
+    toast(`✅ ${sin.length} código${sin.length > 1 ? 's' : ''} generado${sin.length > 1 ? 's' : ''}`, 'success');
+  } catch (e) {
+    console.error('generarCodigosRep2:', e);
+    toast('No se pudieron generar', 'error');
+  }
+}
+
 function closeRepuestoForm() {
   document.getElementById('rep2-form-modal').classList.add('hidden');
   document.body.style.overflow = '';
@@ -503,6 +564,10 @@ function saveRepuesto() {
   const stockMin       = parseInt(document.getElementById('rep2-fi-stockmin').value) || 0;
   const precioCostoUSD = parseFloat(document.getElementById('rep2-fi-costoUSD').value)    || 0;
   const precioVenta    = parseFloat(document.getElementById('rep2-fi-precioVenta').value) || 0;
+  // Campo NUEVO: los repuestos que ya están guardados no lo tienen y siguen
+  // funcionando igual. La caja ya buscaba por acá (`CAJA_REPUESTOS.codigo`),
+  // solo que nunca había dónde cargarlo.
+  const codigo = (document.getElementById('rep2-fi-codigo')?.value || '').trim().toUpperCase();
   const proveedor      = document.getElementById('rep2-fi-proveedor').value.trim();
   const notas          = document.getElementById('rep2-fi-notas').value.trim();
 
@@ -516,7 +581,7 @@ function saveRepuesto() {
   const precioCompra = precioCostoUSD > 0 && dolar > 0 ? Math.round(precioCostoUSD * dolar) : 0;
 
   const data = { nombre, marca, modelo, tipo, cantidad, stockMin,
-                 precioCostoUSD, precioVenta, precioCompra,
+                 precioCostoUSD, precioVenta, precioCompra, codigo,
                  proveedor, notas };
 
   if (editingRepuestoId) {

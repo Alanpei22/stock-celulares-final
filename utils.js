@@ -368,6 +368,51 @@ function tgMonto(n) {
 }
 
 // ══════════════════════════════════════════════════════════
+//  CÓDIGOS INTERNOS PARA ETIQUETAS (TP00001, TP00002…)
+// ══════════════════════════════════════════════════════════
+//  Los accesorios y los repuestos que no vienen con código de fábrica igual
+//  necesitan uno para poder etiquetarlos y escanearlos en la caja.
+//
+//  El número sale de UN contador en Firestore y no del máximo que haya en la
+//  lista, porque las dos colecciones se cargan en páginas distintas: los
+//  accesorios viven en la caja y los repuestos en la pantalla de stock. Sin un
+//  contador común, generar códigos en una le pisaría los de la otra — y la
+//  caja, al escanear, busca primero en accesorios y después en repuestos: dos
+//  cosas con el mismo código serían la misma cosa.
+//
+//  `maxLocal` es un paracaídas: si el contador todavía no existe (o alguien lo
+//  borró), arranca por encima del código más alto que haya a la vista.
+const TP_COD_PREFIJO = 'TP';
+
+// El TP##### más alto de una lista de productos/repuestos. 0 si no hay ninguno.
+function tpMaxCodigoLocal(lista) {
+  return (Array.isArray(lista) ? lista : []).reduce((max, p) => {
+    const m = /^TP(\d{3,})$/.exec(String((p && p.codigo) || '').trim());
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+}
+
+function tpFormatoCodigo(n) { return TP_COD_PREFIJO + String(n).padStart(5, '0'); }
+
+// Reserva `cuantos` códigos y devuelve el array. Una lectura y una escritura
+// por tanda, no por artículo.
+async function tpReservarCodigos(db, cuantos, maxLocal) {
+  const n = Math.max(0, Number(cuantos) || 0);
+  if (!n) return [];
+  const ref = db.collection('config').doc('etiquetasMeta');
+  let ultimo = 0;
+  try {
+    const snap = await ref.get();
+    if (snap.exists) ultimo = Number(snap.data().ultimoCodigo) || 0;
+  } catch (e) { console.warn('[codigos] leer contador:', e); }
+  ultimo = Math.max(ultimo, Number(maxLocal) || 0);
+  const codigos = [];
+  for (let i = 1; i <= n; i++) codigos.push(tpFormatoCodigo(ultimo + i));
+  await ref.set({ ultimoCodigo: ultimo + n, updatedAt: new Date().toISOString() }, { merge: true });
+  return codigos;
+}
+
+// ══════════════════════════════════════════════════════════
 //  IMEI — validación
 // ══════════════════════════════════════════════════════════
 // Un IMEI son 15 dígitos y el último es un verificador Luhn (el mismo

@@ -98,9 +98,8 @@ const imprimir = (fn, datos, copias) => {
 // el lector lee: que ENTRE en la etiqueta y que la barra más fina no baje de
 // 0,25mm. Se miden acá, no se suponen.
 function medirBarras(html, valor, que) {
-  const i = html.indexOf('>' + valor + '</text>');
-  const svgIni = html.lastIndexOf('<svg', i);
-  const ancho = Number((html.slice(svgIni, i).match(/width="([\d.]+)mm"/) || [])[1]);
+  const svgIni = html.indexOf('<svg');
+  const ancho = Number((html.slice(svgIni, svgIni + 400).match(/width="([\d.]+)mm"/) || [])[1]);
   const modulos = bits(valor).length + 20;
   ok(ancho > 0 && ancho <= 40, `${que}: mide ${ancho}mm y entra en la etiqueta de 40mm`, ancho);
   ok(ancho / modulos >= 0.2499, `${que}: la barra más fina es ${(ancho / modulos).toFixed(3)}mm (mínimo 0,25)`,
@@ -157,13 +156,31 @@ const pr = imprimir('printEtiquetasProductos', [
   { nombre: 'Cable tipo C', categoria: 'Cables', precioVenta: 5000, codigo: '' },
 ]);
 ok(/Vidrio templado iPhone 13/.test(pr) && /\$8\.000/.test(pr), 'nombre y precio');
-ok(/>7790895000997<\/text>/.test(pr), 'con su código en barras');
+ok(/class="etq-cod">7790895000997</.test(pr), 'con el CÓDIGO escrito, que es lo que se lee en el mostrador',
+   (pr.match(/class="etq-cod">[^<]*/) || [])[0]);
+ok(/Vidrio templado \/ Hidrogel/.test(pr), 'y la categoría');
+ok(!/<text/.test(pr), 'las barras van sin su leyenda: el número ya está arriba y no se escribe dos veces');
 medirBarras(pr, '7790895000997', 'el código del artículo');
 ok((pr.match(/<svg/g) || []).length === 1, 'el que no tiene código sale sin barras', (pr.match(/<svg/g) || []).length);
-ok(/sin código/.test(pr), 'y la etiqueta lo dice, para no pegarla y descubrirlo después');
+ok(/SIN CÓDIGO/.test(pr), 'y el que no tiene lo dice en la cara, para no pegarla y descubrirlo después');
 ok(TOASTS.some(t => /sin código/.test(t[1])), 'avisando cuántos fueron', TOASTS);
 ok(/PRODUCTOS/.test(caja) && /String\(p\.codigo \|\| ''\)\.trim\(\) === txt/.test(caja),
    'y la caja busca el artículo por ese mismo código');
+
+console.log('\n5b) Etiqueta de repuesto');
+// "Módulo" solo no dice nada: el nombre es el tipo con la marca y el modelo.
+const rpu = imprimir('printEtiquetasRepuestos', [
+  { id: 'r1', tipo: 'Módulo', nombre: 'A54 5G', marca: 'Samsung', modelo: 'A54',
+    precioVenta: 90000, codigo: 'TP00007' },
+  { id: 'r2', tipo: 'Batería', marca: 'Apple', modelo: 'iPhone 11', precioVenta: 45000, codigo: '' },
+]);
+ok(/Módulo A54 5G/.test(rpu), 'el tipo y el nombre juntos', (rpu.match(/etq-eq--prod">[^<]*/g) || []));
+ok(/Samsung A54/.test(rpu), 'con la marca y el modelo, que es lo que lo identifica');
+ok(/class="etq-cod">TP00007</.test(rpu), 'y el código escrito');
+ok(/\$90\.000/.test(rpu), 'con el precio de venta');
+ok((rpu.match(/<svg/g) || []).length === 1, 'barras solo en el que tiene código');
+ok(/SIN CÓDIGO/.test(rpu), 'y el otro lo dice');
+medirBarras(rpu, 'TP00007', 'el código del repuesto');
 
 console.log('\n6) Etiqueta de reparación — la que se cuelga del equipo');
 // Sin código de barras a propósito: al equipo en el taller se lo busca por el
@@ -250,10 +267,68 @@ ok(/src="barcode\.js"/.test(idx) && /src="barcode\.js"/.test(cajaHtml), 'y las d
 ok(idx.indexOf('barcode.js') < idx.indexOf('print.js'), 'antes que print.js, que es quien lo usa');
 
 console.log('\n10) Los códigos internos que se generan');
-ok(/'TP' \+ String\(n\)\.padStart\(5, '0'\)/.test(inv), 'quedan como TP00001', inv.match(/'TP' \+[^;]*/));
-ok(/\/\^TP\(\\d\{5,\}\)\$\//.test(inv), 'y el siguiente sale del más alto que ya haya, para no pisar ninguno');
+// El contador es UNO para accesorios y repuestos, que viven en pantallas
+// distintas. Si cada uno llevara su cuenta, dos cosas terminarían con el mismo
+// código — y para la caja, que busca primero en accesorios y después en
+// repuestos, serían la misma cosa.
+const utilsSrc = fs.readFileSync(DIR + 'utils.js', 'utf8');
+const uCtx = { console, Math, Number, String, Array, JSON, Date, RegExp };
+uCtx.globalThis = uCtx;
+vm.createContext(uCtx);
+vm.runInContext(utilsSrc.slice(utilsSrc.indexOf('const TP_COD_PREFIJO'),
+                               utilsSrc.indexOf('//  IMEI — validación') - 60), uCtx);
+const META = {};
+uCtx.__db = { collection: () => ({ doc: () => ({
+  get: async () => ({ exists: 'ultimoCodigo' in META, data: () => META }),
+  set: async d => Object.assign(META, d),
+}) }) };
+const reservar = async (n, maxLocal) => {
+  uCtx.__n = n; uCtx.__m = maxLocal || 0;
+  return await vm.runInContext('tpReservarCodigos(__db, __n, __m)', uCtx);
+};
+ok(vm.runInContext('tpFormatoCodigo(1)', uCtx) === 'TP00001', 'quedan como TP00001',
+   vm.runInContext('tpFormatoCodigo(1)', uCtx));
+const c1 = await reservar(3);
+ok(JSON.stringify(c1) === '["TP00001","TP00002","TP00003"]', 'la primera tanda arranca en 1', c1);
+const c2 = await reservar(2);
+ok(JSON.stringify(c2) === '["TP00004","TP00005"]', 'la segunda sigue donde quedó la primera', c2);
+// Y esto es lo que evita el choque entre pantallas: la otra colección pide al
+// mismo contador y no repite ninguno.
+const c3 = await reservar(1);
+ok(c3[0] === 'TP00006' && c1.concat(c2, c3).length === new Set(c1.concat(c2, c3)).size,
+   'nunca repite un código, venga de accesorios o de repuestos', c3);
+// Paracaídas: si el contador se borró, arranca por encima de lo que ya hay.
+delete META.ultimoCodigo;
+const c4 = await reservar(1, vm.runInContext("tpMaxCodigoLocal([{codigo:'TP00042'},{codigo:'7790895'}])", uCtx));
+ok(c4[0] === 'TP00043', 'y si el contador se pierde, sigue del más alto que haya cargado', c4);
+ok(vm.runInContext("tpMaxCodigoLocal([{codigo:'7790895000997'}])", uCtx) === 0,
+   'los códigos de fábrica no cuentan para la serie');
 ok(/p => !String\(p\.codigo \|\| ''\)\.trim\(\)/.test(inv),
    'solo a los que no tienen: los códigos de fábrica no se tocan');
+ok(/tpReservarCodigos\(db, sin\.length, tpMaxCodigoLocal\(PRODUCTOS\)\)/.test(inv),
+   'los accesorios piden al contador común');
+const rep2 = fs.readFileSync(DIR + 'repuestos.js', 'utf8');
+ok(/tpReservarCodigos\(db, sin\.length, tpMaxCodigoLocal\(REPUESTOS\)\)/.test(rep2),
+   'y los repuestos también');
+
+console.log('\n11) Repuestos: el campo código, que no existía');
+// La caja ya buscaba el repuesto por `codigo` (`CAJA_REPUESTOS.codigo`), solo
+// que no había dónde cargarlo: ese camino nunca encontraba nada.
+ok(/id="rep2-fi-codigo"/.test(idx), 'hay campo en el formulario');
+ok(/const codigo = \(document\.getElementById\('rep2-fi-codigo'\)\?\.value \|\| ''\)\.trim\(\)\.toUpperCase\(\)/.test(rep2),
+   'se guarda en mayúsculas');
+ok(/precioCostoUSD, precioVenta, precioCompra, codigo,/.test(rep2), 'y va al documento');
+ok(/codEl\.value = r\.codigo \|\| ''/.test(rep2), 'y se vuelve a cargar al editar');
+ok(/r\.proveedor, r\.codigo\]/.test(rep2),
+   'el buscador lo encuentra por el código (si está impreso, tiene que servir para buscarlo)');
+const buscaRepu = caja.slice(caja.indexOf('const repu = '), caja.indexOf('const repu = ') + 200);
+ok(/CAJA_REPUESTOS/.test(buscaRepu) && /String\(r\.codigo \|\| ''\)\.trim\(\) === txt/.test(buscaRepu),
+   'y la caja lo encuentra al escanear ese código', buscaRepu.slice(0, 120));
+ok(/onclick="imprimirEtiquetaRepuesto\(\)"/.test(idx), 'con su botón de etiqueta en la ficha');
+ok(/label: 'Imprimir etiquetas'/.test(fs.readFileSync(DIR + 'app.js', 'utf8')),
+   'y en el menú de Repuestos');
+ok(/_rep2Filtrados\(\)/.test(rep2.slice(rep2.indexOf('function renderRepuestos'))),
+   'la lista y las etiquetas comparten el filtro');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

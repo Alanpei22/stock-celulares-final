@@ -415,22 +415,18 @@ function elegirFormatoEtiqueta() {
 // ── Códigos internos para los que no tienen ──
 // Sin código no hay barras, y sin barras la etiqueta no se puede escanear en
 // la caja. Los de fábrica (EAN) se respetan: esto solo toca los vacíos.
+// El número lo reparte un contador común con los repuestos (ver
+// tpReservarCodigos en utils.js), que viven en otra pantalla: dos cosas con el
+// mismo código serían la misma cosa al escanear.
 async function generarCodigosInv() {
   closeInvMenu();
   const sin = PRODUCTOS.filter(p => !String(p.codigo || '').trim());
   if (!sin.length) { toast('Todos los artículos ya tienen código', 'success'); return; }
   if (!confirm(`${sin.length} artículo${sin.length > 1 ? 's' : ''} sin código de barras.\n¿Les genero uno interno (TP…)?`)) return;
-  // El número sale del más alto que ya exista, así no se pisan.
-  let n = PRODUCTOS.reduce((max, p) => {
-    const m = /^TP(\d{5,})$/.exec(String(p.codigo || '').trim());
-    return m ? Math.max(max, Number(m[1])) : max;
-  }, 0);
   try {
+    const codigos = await tpReservarCodigos(db, sin.length, tpMaxCodigoLocal(PRODUCTOS));
     const batch = db.batch();
-    sin.forEach(p => {
-      n++;
-      batch.update(db.collection('productos').doc(p.id), { codigo: 'TP' + String(n).padStart(5, '0') });
-    });
+    sin.forEach((p, n) => batch.update(db.collection('productos').doc(p.id), { codigo: codigos[n] }));
     await batch.commit();
     toast(`✅ ${sin.length} código${sin.length > 1 ? 's' : ''} generado${sin.length > 1 ? 's' : ''}`, 'success');
   } catch (e) {

@@ -93,9 +93,17 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   mostrador. La camara lee los dos, asi que en barras funcionan ambos.
 - Lo impreso es lo que busca `_movDesdeCodigo` en la caja: escanear la etiqueta
   de un equipo lo mete en la venta, y la de una reparacion abre su cobro.
-- Articulos sin codigo: la etiqueta sale igual pero sin barras y avisa. En el
-  menu de Accesorios hay "Generar codigos de barras" (TP00001...), que solo
-  toca los vacios - los EAN de fabrica no se pisan.
+- La de ARTICULO y la de REPUESTO llevan el CODIGO escrito arriba del precio, y
+  las barras van sin leyenda (el numero ya esta escrito). El repuesto muestra
+  tipo + nombre + marca/modelo: "Modulo" solo no dice nada.
+- Los REPUESTOS no tenian campo `codigo` y la caja igual lo buscaba
+  (`CAJA_REPUESTOS.codigo`): ese camino nunca encontraba nada. Ahora esta en el
+  formulario, entra en el buscador y tiene etiquetas propias (menu Repuestos).
+- Sin codigo: la etiqueta sale igual pero sin barras y dice SIN CODIGO. Hay
+  "Generar codigos de barras" en los DOS menus, y el numero lo reparte UN
+  contador en `config/etiquetasMeta` (`tpReservarCodigos` en utils.js): las dos
+  colecciones viven en paginas distintas y si cada una llevara su cuenta, dos
+  cosas terminarian con el mismo codigo. Los EAN de fabrica no se tocan.
 - Se imprime lo que esta A LA VISTA: `_invFiltrados()` lo comparten la lista y
   la impresion. Y se puede pedir varias copias del mismo (techo 20).
 - **Etiquetadora termica XPrinter, rollo 40x30.** Tres formatos en

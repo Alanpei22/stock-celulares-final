@@ -160,27 +160,35 @@ function etqEsA4() { return etqFormato() === 'a4'; }
 // los largos se achican solo hasta el piso, nunca por debajo.
 const _ETQ_MODULO_MIN = 0.25;
 
-function _barrasEtq(valor, anchoMm, altoMm) {
+function _barrasEtq(valor, anchoMm, altoMm, leyenda) {
   const v = String(valor == null ? '' : valor).trim();
   if (!v || typeof code128Svg !== 'function' || typeof code128Bits !== 'function') return '';
   const modulos = code128Bits(v).length + 20;          // +20 = las dos zonas mudas
   const ancho = Number(anchoMm) || 36;
   const modulo = Math.max(_ETQ_MODULO_MIN, Math.min(0.5, ancho / modulos));
-  return `<div class="etq-bc">${code128Svg(v, { modulo, alto: Number(altoMm) || 8 })}</div>`;
+  return `<div class="etq-bc">${code128Svg(v, {
+    modulo, alto: Number(altoMm) || 8, leyenda: leyenda === false ? false : true,
+  })}</div>`;
 }
 
 // ── Etiqueta de artículo (accesorios, repuestos de mostrador) ──
+// Artículos y repuestos: el CÓDIGO y el NOMBRE son lo que se mira en el
+// mostrador para saber qué es y encontrarlo en la app. El código va escrito, no
+// solo en barras: si el lector no quiere, se teclea. Y por eso las barras van
+// sin su leyenda — el número ya está arriba y en 30mm de alto no sobra lugar
+// para escribirlo dos veces.
 function _etiquetaProdHtml(p) {
   const precio = Number(p.precioVenta ?? p.precio) || 0;
   const cod = String(p.codigo || '').trim();
+  const sub = [p.marca, p.modelo].filter(Boolean).join(' ') || p.categoria || p.tipo || '';
   return `<div class="etq">
     <div class="etq-eq etq-eq--prod">${_escEtq(p.nombre || 'Producto')}</div>
-    ${p.categoria ? `<div class="etq-specs">${_escEtq(p.categoria)}</div>` : ''}
+    ${sub ? `<div class="etq-specs">${_escEtq(sub)}</div>` : ''}
+    <div class="etq-cod">${cod ? _escEtq(cod) : 'SIN CÓDIGO'}</div>
     <div class="etq-fila">
-      <span class="etq-estado">${cod ? '' : 'sin código'}</span>
       <span class="etq-precio">$${precio.toLocaleString('es-AR')}</span>
     </div>
-    ${_barrasEtq(cod, _etqAncho(), 7.5)}
+    ${_barrasEtq(cod, _etqAncho(), 7.5, false)}
   </div>`;
 }
 
@@ -224,6 +232,7 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;b
 .etq-specs{font-size:6.6pt;color:#333;margin-top:.4mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .etq-fila{display:flex;align-items:baseline;justify-content:space-between;gap:2mm;margin-top:auto}
 .etq-estado{font-size:6pt;text-transform:uppercase;letter-spacing:.06em;color:#555}
+.etq-cod{font-family:'Courier New',monospace;font-size:8.5pt;font-weight:700;letter-spacing:.04em;margin-top:.6mm}
 .etq-precio{font-size:13pt;font-weight:800;line-height:1}
 .etq-bc{margin-top:.8mm;text-align:center}
 .etq-bc svg{max-width:100%;height:auto;display:block;margin:0 auto}
@@ -262,7 +271,8 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;b
 .etq-specs{font-size:5.6pt;color:#000;margin-top:.2mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .etq-fila{display:flex;align-items:baseline;justify-content:space-between;gap:1mm;margin-top:auto}
 .etq-estado{font-size:5pt;text-transform:uppercase;letter-spacing:.04em}
-.etq-precio{font-size:12pt;font-weight:800;line-height:1}
+.etq-cod{font-family:'Courier New',monospace;font-size:7.5pt;font-weight:700;letter-spacing:.03em;margin-top:.4mm}
+.etq-precio{font-size:11pt;font-weight:800;line-height:1}
 /* El código se sale del padding a propósito: un IMEI necesita los 38,5mm */
 .etq-bc{margin:.5mm -0.9mm 0;text-align:center}
 .etq-bc svg{display:block;margin:0 auto}
@@ -324,6 +334,19 @@ function printEtiquetasProductos(lista, copias) {
     toast(`${sinCod} sin código de barras: cargáselo o generalo desde el menú`, 'info');
   }
   _openPrint(_hojaEtiquetas(prods, _etiquetaProdHtml), 'Etiquetas');
+}
+
+// Repuestos: "Módulo" solo no dice nada, así que el nombre es el tipo con la
+// marca y el modelo. Sale por el mismo cartel que los artículos.
+function printEtiquetasRepuestos(lista, copias) {
+  const reps = (Array.isArray(lista) ? lista : [lista]).filter(Boolean).map(r => ({
+    id: r.id,
+    nombre: [r.tipo || r.nombre || 'Repuesto', r.nombre && r.tipo ? r.nombre : ''].filter(Boolean).join(' '),
+    marca: r.marca, modelo: r.modelo,
+    precioVenta: Number(r.precioVenta) || 0,
+    codigo: r.codigo,
+  }));
+  printEtiquetasProductos(reps, copias);
 }
 
 function printEtiquetasReparaciones(lista, copias) {
