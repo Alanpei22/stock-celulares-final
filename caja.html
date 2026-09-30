@@ -791,6 +791,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn-danger" id="inv-form-del" style="display:none" onclick="deleteProducto(_invEditingId)">🗑</button>
+      <button class="btn-secondary" id="inv-form-etq" style="display:none" onclick="imprimirEtiquetaProducto()" title="Imprimir etiqueta">🏷️</button>
       <button class="btn-secondary" id="inv-form-cancel" style="flex:1">Cancelar</button>
       <button class="btn-primary" id="inv-form-save" style="flex:2">💾 Guardar</button>
     </div>
@@ -1001,6 +1002,7 @@
 <!-- Comprobante de venta A5: el mismo que usa Stock. qr.js va antes porque
      print.js le pide el QR de WhatsApp. -->
 <script src="qr.js"></script>
+<script src="barcode.js"></script>
 <script src="print.js"></script>
 <script src="caja_extra.js"></script>
 <script src="clientes.js"></script>

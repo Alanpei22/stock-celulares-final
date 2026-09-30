@@ -86,22 +86,29 @@ function _listenProductos() {
 }
 
 // ── Render lista ────────────────────────────────────────────
-function renderInventario() {
+// Los productos que están a la vista, con los filtros puestos. Lo usan la
+// lista y la impresión de etiquetas: si imprimieran cosas distintas de lo que
+// se ve en pantalla, nadie entendería qué salió.
+function _invFiltrados() {
   const search = (document.getElementById('inv-search')?.value || '').trim();
   const catF   = document.getElementById('inv-f-cat')?.value || '';
   const estF   = document.getElementById('inv-f-estado')?.value || '';
 
   let lista = PRODUCTOS;
-
-  if (search) {
-    lista = lista.filter(p =>
-      searchMatch([p.nombre, p.codigo, p.categoria], search)
-    );
-  }
+  if (search) lista = lista.filter(p => searchMatch([p.nombre, p.codigo, p.categoria], search));
   if (catF)  lista = lista.filter(p => p.categoria === catF);
   if (estF === 'activo')    lista = lista.filter(p => p.activo !== false);
   if (estF === 'inactivo')  lista = lista.filter(p => p.activo === false);
   if (estF === 'bajo')      lista = lista.filter(p => p.stockMin > 0 && (p.stock || 0) <= p.stockMin);
+  return lista;
+}
+
+function renderInventario() {
+  const search = (document.getElementById('inv-search')?.value || '').trim();
+  const catF   = document.getElementById('inv-f-cat')?.value || '';
+  const estF   = document.getElementById('inv-f-estado')?.value || '';
+
+  const lista = _invFiltrados();
 
   // Stats
   const total   = PRODUCTOS.filter(p => p.activo !== false).length;
@@ -157,6 +164,10 @@ function openProductoForm(id, precodigo) {
   _invEditingId = id || null;
   const title = document.getElementById('inv-form-title');
   const delBtn = document.getElementById('inv-form-del');
+  // La etiqueta solo tiene sentido con el artículo ya guardado: uno nuevo
+  // todavía no tiene ni código ni precio.
+  const etqBtn = document.getElementById('inv-form-etq');
+  if (etqBtn) etqBtn.style.display = id ? '' : 'none';
 
   _clearProductoForm();
 
@@ -347,10 +358,64 @@ function toggleInvMenu() {
     { icon: '🔒', label: 'Modo dueño', onClick: openCajaOwnerPin },
     { divider: true },
     { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: openInvWizard },
+    { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: imprimirEtiquetasInv },
+    { icon: '🔢', label: 'Generar códigos de barras', sub: 'A los artículos que no tienen', onClick: generarCodigosInv },
     { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },
   ]);
 }
 function closeInvMenu() { if (typeof closeSheet === 'function') closeSheet(); }
+
+// ══════════════════════════════════════════
+//  ETIQUETAS DE ARTÍCULOS
+// ══════════════════════════════════════════
+// Se imprime lo que está a la vista: filtrás por categoría y salen las de esa
+// categoría. Una copia por artículo; para la góndola se pide cuántas.
+function imprimirEtiquetasInv() {
+  closeInvMenu();
+  const lista = _invFiltrados();
+  if (!lista.length) { toast('No hay artículos en la lista', 'error'); return; }
+  if (typeof printEtiquetasProductos !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
+  const copias = prompt(`${lista.length} artículo${lista.length > 1 ? 's' : ''} a la vista.\n¿Cuántas etiquetas de cada uno?`, '1');
+  if (copias === null) return;
+  printEtiquetasProductos(lista, Number(copias) || 1);
+}
+
+// Una etiqueta sola, desde la ficha del artículo.
+function imprimirEtiquetaProducto(id) {
+  const p = PRODUCTOS.find(x => x.id === (id || _invEditingId));
+  if (!p) { toast('Guardá el artículo primero', 'error'); return; }
+  if (typeof printEtiquetasProductos !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
+  const copias = prompt('¿Cuántas etiquetas?', '1');
+  if (copias === null) return;
+  printEtiquetasProductos([p], Number(copias) || 1);
+}
+
+// ── Códigos internos para los que no tienen ──
+// Sin código no hay barras, y sin barras la etiqueta no se puede escanear en
+// la caja. Los de fábrica (EAN) se respetan: esto solo toca los vacíos.
+async function generarCodigosInv() {
+  closeInvMenu();
+  const sin = PRODUCTOS.filter(p => !String(p.codigo || '').trim());
+  if (!sin.length) { toast('Todos los artículos ya tienen código', 'success'); return; }
+  if (!confirm(`${sin.length} artículo${sin.length > 1 ? 's' : ''} sin código de barras.\n¿Les genero uno interno (TP…)?`)) return;
+  // El número sale del más alto que ya exista, así no se pisan.
+  let n = PRODUCTOS.reduce((max, p) => {
+    const m = /^TP(\d{5,})$/.exec(String(p.codigo || '').trim());
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+  try {
+    const batch = db.batch();
+    sin.forEach(p => {
+      n++;
+      batch.update(db.collection('productos').doc(p.id), { codigo: 'TP' + String(n).padStart(5, '0') });
+    });
+    await batch.commit();
+    toast(`✅ ${sin.length} código${sin.length > 1 ? 's' : ''} generado${sin.length > 1 ? 's' : ''}`, 'success');
+  } catch (e) {
+    console.error('generarCodigosInv:', e);
+    toast('No se pudieron generar', 'error');
+  }
+}
 
 // ══════════════════════════════════════════
 //  EXPORTAR INVENTARIO A CSV

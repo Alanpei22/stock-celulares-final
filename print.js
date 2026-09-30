@@ -64,7 +64,20 @@ function _openPrint(html, title) {
 //  de las hojas autoadhesivas comunes). Si no tenés hojas de etiquetas, se
 //  imprime en papel normal y se corta: las líneas de corte están marcadas.
 //
-//  El QR lleva el IMEI: escaneándolo con la app encontrás el equipo.
+//  Son TRES etiquetas distintas:
+//   · equipo del stock  — marca, modelo, specs, precio y el IMEI en barras
+//   · artículo          — nombre, categoría, precio y su código en barras
+//   · reparación        — la que se cuelga del equipo en el taller: número de
+//                         orden, cliente, equipo y LA FALLA
+//
+//  El código va en barras (Code 128, ver barcode.js) y no en QR: el QR lo lee
+//  la cámara pero no un lector de mano, que es lo que hay en el mostrador. La
+//  cámara lee los dos, así que en barras funcionan ambos.
+//
+//  Y lo que va impreso es lo mismo que busca la caja al escanear
+//  (`_movDesdeCodigo`): el IMEI del equipo, el código del artículo y el número
+//  de orden de la reparación. Escanear la etiqueta de un equipo lo mete en la
+//  venta; escanear la de una reparación abre su cobro.
 // ══════════════════════════════════════════════════════════════
 // Escapar acá y no en bluetooth-print.js: este archivo no depende de ese
 function _escEtq(v) {
@@ -80,44 +93,131 @@ function _etiquetaHtml(p) {
   const precio = Number(p.precio) || 0;
   const usd = (p.moneda === 'usd' && p.precioUSD) ? p.precioUSD : 0;
   const imei = String(p.imei || '').trim();
-  const qr = (imei && typeof qrSvg === 'function') ? qrSvg(imei, 16, 2) : '';
   return `<div class="etq">
-    <div class="etq-txt">
-      <div class="etq-eq">${_escEtq(marca)} ${_escEtq(modelo)}</div>
-      ${specs ? `<div class="etq-specs">${_escEtq(specs)}</div>` : ''}
-      <div class="etq-estado">${_escEtq(p.estado || '')}</div>
-      <div class="etq-precio">${usd ? 'u$' + usd.toLocaleString('es-AR') : '$' + precio.toLocaleString('es-AR')}</div>
-      ${imei ? `<div class="etq-imei">IMEI …${_escEtq(imei.slice(-6))}</div>` : ''}
+    <div class="etq-eq">${_escEtq(marca)} ${_escEtq(modelo)}</div>
+    ${specs ? `<div class="etq-specs">${_escEtq(specs)}</div>` : ''}
+    <div class="etq-fila">
+      <span class="etq-estado">${_escEtq(p.estado || '')}</span>
+      <span class="etq-precio">${usd ? 'u$' + usd.toLocaleString('es-AR') : '$' + precio.toLocaleString('es-AR')}</span>
     </div>
-    ${qr ? `<div class="etq-qr">${qr}</div>` : ''}
+    ${_barrasEtq(imei)}
+  </div>`;
+}
+
+// El código de barras de la etiqueta, o nada si no hay qué codificar.
+// 0.33mm por barra: abajo de 0.25 los lectores de mano empiezan a fallar.
+function _barrasEtq(valor, opts) {
+  const v = String(valor == null ? '' : valor).trim();
+  if (!v || typeof code128Svg !== 'function') return '';
+  const o = opts || {};
+  return `<div class="etq-bc">${code128Svg(v, { modulo: o.modulo || 0.33, alto: o.alto || 8 })}</div>`;
+}
+
+// ── Etiqueta de artículo (accesorios, repuestos de mostrador) ──
+function _etiquetaProdHtml(p) {
+  const precio = Number(p.precioVenta ?? p.precio) || 0;
+  const cod = String(p.codigo || '').trim();
+  return `<div class="etq">
+    <div class="etq-eq etq-eq--prod">${_escEtq(p.nombre || 'Producto')}</div>
+    ${p.categoria ? `<div class="etq-specs">${_escEtq(p.categoria)}</div>` : ''}
+    <div class="etq-fila">
+      <span class="etq-estado">${cod ? '' : 'sin código'}</span>
+      <span class="etq-precio">$${precio.toLocaleString('es-AR')}</span>
+    </div>
+    ${_barrasEtq(cod)}
+  </div>`;
+}
+
+// ── Etiqueta de reparación — la que se cuelga del equipo ──
+// Más grande (2 por fila): acá lo que importa es que el técnico lea la falla
+// sin abrir la app, y que el mostrador encuentre el equipo por el número.
+function _etiquetaRepHtml(r) {
+  const eq = [r.marca, r.modelo].filter(Boolean).join(' ').trim() || 'Equipo';
+  const cli = [r.nombre, r.tlf].filter(Boolean).join(' · ');
+  const falla = String(r.falla || '').trim();
+  const arreglo = String(r.arreglo || '').trim();
+  const ing = r.fechaIngreso ? new Date(r.fechaIngreso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '';
+  const nro = String(r.nOrden || '').trim();
+  return `<div class="etqr">
+    <div class="etqr-top">
+      <div class="etqr-nro">N° ${_escEtq(nro)}</div>
+      ${_barrasEtq(nro, { modulo: 0.4, alto: 9 })}
+    </div>
+    <div class="etqr-eq">${_escEtq(eq)}${r.color ? ' · ' + _escEtq(r.color) : ''}</div>
+    ${cli ? `<div class="etqr-cli">${_escEtq(cli)}</div>` : ''}
+    ${falla ? `<div class="etqr-falla"><b>Falla:</b> ${_escEtq(falla)}</div>` : ''}
+    ${arreglo ? `<div class="etqr-arr">${_escEtq(arreglo)}</div>` : ''}
+    <div class="etqr-pie">${ing ? 'Ingresó ' + _escEtq(ing) : ''}${r.imei ? ' · IMEI …' + _escEtq(String(r.imei).slice(-6)) : ''}</div>
   </div>`;
 }
 
 // lista = equipos (los del lote recién cargado, o uno solo desde la ficha)
-function printEtiquetas(lista) {
-  const equipos = (Array.isArray(lista) ? lista : [lista]).filter(Boolean);
-  if (!equipos.length) { if (typeof toast === 'function') toast('No hay equipos para etiquetar', 'error'); return; }
-  const biz = (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint';
-  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
-<title>Etiquetas — ${_escEtq(biz)}</title><style>
+const _CSS_ETQ = `
 @page{size:A4 portrait;margin:8mm}
 *{box-sizing:border-box}
 body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;background:#fff}
 .hoja{display:grid;grid-template-columns:repeat(3,63mm);grid-auto-rows:34mm;gap:0}
-.etq{border:.3mm dashed #bbb;padding:2.4mm 2.8mm;display:flex;gap:1.5mm;align-items:center;overflow:hidden}
-.etq-txt{flex:1;min-width:0}
-.etq-eq{font-size:10pt;font-weight:800;line-height:1.12;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.etq-specs{font-size:7pt;color:#333;margin-top:.5mm}
-.etq-estado{font-size:6.5pt;text-transform:uppercase;letter-spacing:.06em;color:#555}
-.etq-precio{font-size:14pt;font-weight:800;margin-top:1mm;line-height:1}
-.etq-imei{font-size:6pt;color:#666;margin-top:.6mm}
-.etq-qr{width:16mm;flex-shrink:0}
-.etq-qr svg{width:16mm;height:16mm;display:block}
-@media print{.etq{border-color:#ddd}}
-</style></head><body>
-<div class="hoja">${equipos.map(_etiquetaHtml).join('')}</div>
+.hoja--rep{grid-template-columns:repeat(2,97mm);grid-auto-rows:45mm}
+.etq{border:.3mm dashed #bbb;padding:2.2mm 2.6mm;display:flex;flex-direction:column;overflow:hidden}
+.etq-eq{font-size:9.5pt;font-weight:800;line-height:1.1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.etq-eq--prod{font-size:9pt}
+.etq-specs{font-size:6.6pt;color:#333;margin-top:.4mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etq-fila{display:flex;align-items:baseline;justify-content:space-between;gap:2mm;margin-top:auto}
+.etq-estado{font-size:6pt;text-transform:uppercase;letter-spacing:.06em;color:#555}
+.etq-precio{font-size:13pt;font-weight:800;line-height:1}
+.etq-bc{margin-top:.8mm;text-align:center}
+.etq-bc svg{max-width:100%;height:auto;display:block;margin:0 auto}
+/* Reparación: la que se cuelga del equipo */
+.etqr{border:.3mm dashed #bbb;padding:3mm 3.4mm;display:flex;flex-direction:column;overflow:hidden}
+.etqr-top{display:flex;align-items:center;justify-content:space-between;gap:3mm;border-bottom:.4mm solid #000;padding-bottom:1.2mm}
+.etqr-nro{font-size:18pt;font-weight:800;line-height:1;white-space:nowrap}
+.etqr-top .etq-bc{margin:0}
+.etqr-eq{font-size:10.5pt;font-weight:800;margin-top:1.6mm;line-height:1.1}
+.etqr-cli{font-size:7.6pt;color:#222;margin-top:.5mm}
+.etqr-falla{font-size:8pt;margin-top:1.4mm;line-height:1.2;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.etqr-arr{font-size:7pt;color:#444;margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etqr-pie{font-size:6.4pt;color:#666;margin-top:auto;padding-top:1mm}
+@media print{.etq,.etqr{border-color:#ddd}}`;
+
+function _hojaEtiquetas(items, pintar, clase) {
+  const biz = (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint';
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<title>Etiquetas — ${_escEtq(biz)}</title><style>${_CSS_ETQ}</style></head><body>
+<div class="hoja${clase ? ' ' + clase : ''}">${items.map(pintar).join('')}</div>
 </body></html>`;
-  _openPrint(html, 'Etiquetas');
+}
+
+// Cada etiqueta se repite `copias` veces (para el mismo artículo en góndola).
+function _repetir(items, copias) {
+  const n = Math.max(1, Math.min(20, Number(copias) || 1));
+  if (n === 1) return items;
+  const out = [];
+  items.forEach(it => { for (let i = 0; i < n; i++) out.push(it); });
+  return out;
+}
+
+function printEtiquetas(lista, copias) {
+  const equipos = _repetir((Array.isArray(lista) ? lista : [lista]).filter(Boolean), copias);
+  if (!equipos.length) { if (typeof toast === 'function') toast('No hay equipos para etiquetar', 'error'); return; }
+  _openPrint(_hojaEtiquetas(equipos, _etiquetaHtml), 'Etiquetas');
+}
+
+function printEtiquetasProductos(lista, copias) {
+  const prods = _repetir((Array.isArray(lista) ? lista : [lista]).filter(Boolean), copias);
+  if (!prods.length) { if (typeof toast === 'function') toast('No hay artículos para etiquetar', 'error'); return; }
+  // Sin código no hay barras: la etiqueta sale igual (nombre y precio) pero se
+  // avisa, porque esa no se va a poder escanear en la caja.
+  const sinCod = prods.filter(p => !String(p.codigo || '').trim()).length;
+  if (sinCod && typeof toast === 'function') {
+    toast(`${sinCod} sin código de barras: cargáselo o generalo desde el menú`, 'info');
+  }
+  _openPrint(_hojaEtiquetas(prods, _etiquetaProdHtml), 'Etiquetas');
+}
+
+function printEtiquetasReparaciones(lista, copias) {
+  const reps = _repetir((Array.isArray(lista) ? lista : [lista]).filter(Boolean), copias);
+  if (!reps.length) { if (typeof toast === 'function') toast('No hay reparaciones para etiquetar', 'error'); return; }
+  _openPrint(_hojaEtiquetas(reps, _etiquetaRepHtml, 'hoja--rep'), 'Etiquetas');
 }
 
 // ── Punto de entrada — Ticket de ingreso ─────────────────────

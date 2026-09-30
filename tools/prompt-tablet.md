@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 50 suites, ~2030 chequeos, 7 segundos.
+2. **`npm test` antes de cada push.** Son 51 suites, ~2100 chequeos, 7 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -51,6 +51,10 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - `print.js` — comprobantes A5 (recepción, que también sirve de entrega) y venta
   A5 con original + copia. Todo B/N, con auto-ajuste para que entre en una hoja
 - `qr.js` — generador de QR propio, sin librerías ni internet
+- `barcode.js` — generador de Code 128, igual de propio. La tabla de patrones se
+  verifica DECODIFICANDO lo que dibuja con la ZXing de verdad
+  (tests/test-etiquetas-barcode.js): escribirla de memoria y confiar no alcanza.
+  Modo C (2 dígitos por símbolo) para que un IMEI entre en una etiqueta de 63mm
 - `estado.html` + `seguimiento.js` — página pública que ve el cliente al escanear
   el QR del comprobante. Sin SDK: lee por REST
 - `webpush.js` + `api/send-push.js` — avisos a todos los dispositivos
@@ -79,7 +83,23 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   exigen el ID token de Firebase de una cuenta de la allowlist
 
 
-## Lo ultimo que se hizo (2026-09-23)
+## Lo ultimo que se hizo (2026-09-30)
+
+**Etiquetas con codigo de barras** — `barcode.js` nuevo + print.js
+- TRES etiquetas: equipo del stock (IMEI en barras), articulo (su codigo) y
+  **reparacion** (numero de orden grande, cliente, equipo y LA FALLA; 2 por
+  fila, 97x45mm, para colgarla del equipo).
+- Barras y no QR: el QR lo lee la camara pero NO el lector de mano del
+  mostrador. La camara lee los dos, asi que en barras funcionan ambos.
+- Lo impreso es lo que busca `_movDesdeCodigo` en la caja: escanear la etiqueta
+  de un equipo lo mete en la venta, y la de una reparacion abre su cobro.
+- Articulos sin codigo: la etiqueta sale igual pero sin barras y avisa. En el
+  menu de Accesorios hay "Generar codigos de barras" (TP00001...), que solo
+  toca los vacios - los EAN de fabrica no se pisan.
+- Se imprime lo que esta A LA VISTA: `_invFiltrados()` lo comparten la lista y
+  la impresion. Y se puede pedir varias copias del mismo (techo 20).
+
+## Lo que se hizo el 2026-09-23
 
 **Chequeo de caja obligatorio** — `chequeo.js` nuevo
 - El dueno configura horarios (caja - menu - Chequeo de caja, con PIN). A esa

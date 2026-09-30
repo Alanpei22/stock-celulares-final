@@ -1278,6 +1278,15 @@ function abrirCobro(id) {
   if (r) openCobroModal(r);
 }
 
+// La etiqueta del equipo (la que queda pegada en el taller).
+// Sale de la ficha abierta; `window._printRep` es lo que ya usa print.js.
+function etiquetaReparacion(id) {
+  const r = id ? REPAIRS.find(x => x.id === id) : window._printRep;
+  if (!r) { toast('No encontré esa reparación', 'error'); return; }
+  if (typeof printEtiquetasReparaciones !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
+  printEtiquetasReparaciones([r]);
+}
+
 // Reimprimir la boleta desde la lista, sin abrir la ficha.
 function reimprimirBoleta(id) {
   const r = REPAIRS.find(x => x.id === id);

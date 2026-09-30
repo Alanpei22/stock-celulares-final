@@ -3,8 +3,10 @@
 // Después de cargar un lote, los equipos quedan en el cajón sin nada pegado y
 // para saber el precio hay que buscarlos en la app uno por uno.
 //
-// La etiqueta lleva modelo, precio y un QR con el IMEI: escaneándolo con la
-// misma app se encuentra el equipo.
+// La etiqueta lleva modelo, precio y el IMEI en CÓDIGO DE BARRAS. Barras y no
+// QR: el QR lo lee la cámara pero no el lector de mano del mostrador, y la
+// cámara lee los dos. Que las barras se puedan DECODIFICAR de verdad se prueba
+// aparte, en test-etiquetas-barcode.js.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const DIR = path.join(__dirname, '..') + '/';
 let fails = 0;
@@ -26,6 +28,7 @@ const ctx = {
 ctx.globalThis = ctx; ctx.self = ctx;
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(DIR + 'qr.js', 'utf8'), ctx, { filename: 'qr.js' });
+vm.runInContext(fs.readFileSync(DIR + 'barcode.js', 'utf8'), ctx, { filename: 'barcode.js' });
 vm.runInContext(fs.readFileSync(DIR + 'print.js', 'utf8'), ctx, { filename: 'print.js' });
 const run = c => vm.runInContext(c, ctx);
 const get = e => vm.runInContext(e, ctx);
@@ -59,12 +62,18 @@ ok(/128GB · 8GB RAM/.test(html), 'capacidad y RAM', html.match(/etq-specs">[^<]
 ok(/🔋 89%/.test(html), 'batería en los usados (es lo primero que pregunta el cliente)');
 ok(/Nuevo/.test(html) && /Usado/.test(html), 'el estado');
 
-console.log('\n4) El QR lleva el IMEI');
-// Así se escanea la etiqueta del cajón y la app encuentra el equipo.
-ok((html.match(/<svg/g) || []).length === 2, 'QR solo en los que tienen IMEI', (html.match(/<svg/g) || []).length);
-const qrEsperado = get(`qrSvg('356938035643809', 16, 2)`);
-ok(html.includes(qrEsperado), 'y es el QR del IMEI de ese equipo');
-ok(/IMEI …643809/.test(html), 'con los últimos 6 dígitos escritos, para el ojo');
+console.log('\n4) El código de barras lleva el IMEI');
+// Es el mismo número que busca la caja al escanear (`_movDesdeCodigo` matchea
+// el equipo del stock por IMEI), así que escanear la etiqueta lo mete en la venta.
+ok((html.match(/<svg/g) || []).length === 2, 'barras solo en los que tienen IMEI', (html.match(/<svg/g) || []).length);
+ctx.__IMEI = '356938035643809';
+const bcEsperado = get('code128Svg(__IMEI, { modulo: 0.33, alto: 8 })');
+ok(html.includes(bcEsperado), 'y son las del IMEI de ese equipo');
+ok(/356938035643809/.test(html), 'con el número escrito abajo, para teclearlo si el lector no quiere');
+ok(!/qrSvg/.test(fs.readFileSync(DIR + 'print.js', 'utf8').slice(
+     fs.readFileSync(DIR + 'print.js', 'utf8').indexOf('function _etiquetaHtml'),
+     fs.readFileSync(DIR + 'print.js', 'utf8').indexOf('function _barrasEtq'))),
+   'y ya no queda el QR, que el lector de mano no lee');
 
 console.log('\n5) La hoja');
 ok(/@page\{size:A4 portrait/.test(html), 'A4 (cualquier impresora)', html.match(/@page[^}]*}/));
