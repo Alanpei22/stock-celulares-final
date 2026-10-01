@@ -1,2 +1,10 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Los archivos de texto se guardan con LF y TAMBIEN se bajan con LF, en
+# Windows igual.
+#
+# Por que `eol=lf` y no solo `text=auto`: con autodeteccion, git deja CRLF en el
+# directorio de trabajo al hacer checkout en Windows. Varias pruebas buscan
+# trozos de codigo con saltos de linea adentro (`'\n}\n'`, `'if (x) {\n  const'`)
+# y con CRLF esos trozos no matchean: `npm test` se ponia en rojo despues de
+# cada `git pull`, sin que nada del codigo estuviera mal. Perder media hora
+# buscando un bug que no existe es peor que cualquier ventaja de CRLF.
+* text=auto eol=lf

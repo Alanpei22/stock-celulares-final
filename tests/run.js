@@ -15,6 +15,19 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+// ── Antes de nada: los finales de línea ──
+// Varias pruebas buscan trozos de código con saltos adentro. Si el checkout
+// dejó CRLF (Windows con autocrlf), no matchean y salen 4 fallas que no tienen
+// nada que ver con el código. Pasó: media hora buscando un bug inexistente.
+(function avisarCRLF() {
+  try {
+    const muestra = fs.readFileSync(path.join(__dirname, '..', 'escaner.js'), 'utf8');
+    if (!muestra.includes('\r\n')) return;
+    console.log('\n⚠️  Los archivos están con fin de línea CRLF y varias pruebas no van a matchear.');
+    console.log('   Se arregla una vez:  git config core.autocrlf false && git rm --cached -r . && git reset --hard\n');
+  } catch {}
+})();
+
 const QUE_CUBRE = {
   'test-orden.js':            'N° de orden: corregirlo al editar y arreglar el contador',
   'test-costos-usd.js':       'Costo de accesorios en dólares y carga de costos en lista',

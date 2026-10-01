@@ -191,10 +191,22 @@ try {
   ok(fs.existsSync(path.join(DIR, 'api/_arca.js')), '_arca.js es ayudante, no ruta');
 
   console.log('\n10) La clave privada no está en el repo');
-  // Si un .key entra al repo y se pushea, queda publico en GitHub y con eso
-  // se puede facturar a nombre del local.
-  const enRepo = fs.readdirSync(DIR).filter(f => /\.(key|crt|pem|p12|pfx)$/i.test(f));
-  ok(enRepo.length === 0, 'no hay certificados ni claves sueltas en el repo', enRepo);
+  // Si una clave privada entra al repo y se pushea, queda pública en GitHub y
+  // con eso se puede facturar a nombre del local.
+  //
+  // Se mira el CONTENIDO y no la extensión: un certificado público (el de QZ
+  // Tray, `qz-cert.pem`) tiene que estar en el repo — es la mitad que el
+  // navegador manda para que lo firmen. La que nunca puede estar es la privada,
+  // que vive en una variable de entorno de Vercel.
+  const candidatos = fs.readdirSync(DIR).filter(f => /\.(key|crt|pem|p12|pfx)$/i.test(f));
+  const privadas = candidatos.filter(f => {
+    if (/\.(key|p12|pfx)$/i.test(f)) return true;              // formato de clave: ni se abre
+    try { return /PRIVATE KEY/.test(fs.readFileSync(path.join(DIR, f), 'utf8')); } catch { return true; }
+  });
+  ok(privadas.length === 0, 'no hay ninguna clave privada suelta en el repo', privadas);
+  const publicos = candidatos.filter(f => privadas.indexOf(f) === -1);
+  ok(publicos.every(f => /CERTIFICATE/.test(fs.readFileSync(path.join(DIR, f), 'utf8'))),
+     'y lo que sí está es solo certificado público: ' + (publicos.join(', ') || 'nada'), publicos);
   // Ojo: el archivo TIENE las cadenas "BEGIN CERTIFICATE" y "BEGIN PRIVATE
   // KEY" como regex de validacion. Una clave pegada de verdad viene con los
   // guiones (-----BEGIN ...-----), que es lo que hay que buscar.
