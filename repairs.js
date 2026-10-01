@@ -315,6 +315,87 @@ async function _numeroDeOrden(ordenInputVal) {
   }
 }
 
+// El último "próximo N°" que se leyó de la base (para avisar si se tipea uno
+// muy lejos).
+let _ultimoContadorVisto = 0;
+
+// ¿Hay OTRA reparación con ese número? Primero lo que hay en el celu; si no
+// está, se pregunta a la base (el historial viejo no siempre está cargado).
+async function _ordenOcupado(n, exceptoId) {
+  if (REPAIRS.some(r => Number(r.nOrden) === n && r.id !== exceptoId)) return true;
+  try {
+    const snap = await db.collection('repairs').where('nOrden', '==', n).limit(2).get();
+    return snap.docs.some(d => d.id !== exceptoId);
+  } catch (e) {
+    console.error('chequeo de N° repetido:', e);
+    return false;
+  }
+}
+
+// Sube el contador si hace falta; nunca lo baja (eso es a propósito, desde el
+// menú, con PIN).
+function _contadorAlMenos(n) {
+  const ref = db.collection('config').doc('repairsMeta');
+  db.runTransaction(async t => {
+    const meta = await t.get(ref);
+    const next = meta.exists ? (meta.data().nextOrderNum || 0) : 0;
+    if (n > next) t.set(ref, { nextOrderNum: n }, { merge: true });
+  }).catch(e => console.error('contador de órdenes:', e));
+}
+
+// ── Menú → 🔢 Próximo N° de orden ──
+// Para arreglar el contador cuando quedó mal (un número tipeado de más lo
+// mandaba lejos y no había cómo volverlo). Solo el dueño. No deja ponerlo en
+// un número que ya existe: el próximo ingreso saldría repetido.
+async function corregirContadorOrdenes() {
+  if (typeof closeSheet === 'function') closeSheet();
+  const correr = async () => {
+    const ref = db.collection('config').doc('repairsMeta');
+    let actual = 0, mayor = 0;
+    try {
+      const meta = await ref.get();
+      actual = meta.exists ? (meta.data().nextOrderNum || 0) : 0;
+      // El where deja solo los numéricos: si alguna vieja quedó como texto,
+      // Firestore pone los textos antes que los números al ordenar de mayor a menor.
+      const top = await db.collection('repairs').where('nOrden', '>', 0).orderBy('nOrden', 'desc').limit(1).get();
+      mayor = top.empty ? 0 : (Number(top.docs[0].data().nOrden) || 0);
+    } catch (e) {
+      console.error('contador de órdenes:', e);
+      toast('No se pudo leer el contador (¿sin conexión?)', 'error');
+      return;
+    }
+    mayor = Math.max(mayor, ...REPAIRS.map(r => Number(r.nOrden) || 0));
+    const resp = prompt(
+      `Próximo N° de orden: ${actual || '—'}\n` +
+      `La orden más alta que existe: ${mayor || '—'}\n\n` +
+      `¿Con qué número sigue la próxima reparación?`, String(actual || mayor + 1));
+    if (resp === null) return;
+    const n = parseInt(String(resp).trim(), 10);
+    if (!(n > 0)) { toast('Poné un número', 'error'); return; }
+    if (n <= mayor) {
+      // Si la más alta es un número mal cargado, primero hay que corregir esa
+      // orden (editarla); si no, el próximo ingreso choca con ella.
+      alert(`No puede ser ${n}: ya existe la orden N°${mayor}.\n\n` +
+            `Si la N°${mayor} es un número mal cargado, primero abrí esa reparación, ` +
+            `corregile el N° y después volvé acá.`);
+      return;
+    }
+    try {
+      await ref.set({ nextOrderNum: n }, { merge: true });
+      _ultimoContadorVisto = n;
+      toast(`✅ La próxima reparación va a ser la N°${n}`, 'success');
+      if (typeof logActivity === 'function') {
+        logActivity({ tipo: 'edicion', desc: `Cambió el próximo N° de orden: ${actual} → ${n}` });
+      }
+    } catch (e) {
+      console.error('contador de órdenes:', e);
+      toast('No se pudo guardar el contador', 'error');
+    }
+  };
+  if (typeof requireOwnerPin === 'function') requireOwnerPin(correr, 'PIN de dueño para cambiar el N° de orden');
+  else correr();
+}
+
 // ── Init ──────────────────────────────────
 function initRepairs() {
   document.getElementById('rep-add-btn').addEventListener('click', () => openRepairForm());
@@ -1435,12 +1516,14 @@ function openRepairForm(id) {
     document.getElementById('rep-form-title').textContent = '✏️ Editar Reparación';
     document.getElementById('rep-orden-row').style.display    = '';
     document.getElementById('rep-orden-spacer').style.display = '';
-    document.getElementById('rep-orden-label').textContent    = 'N° Orden';
+    // Editable: si un número quedó mal cargado, tiene que poder corregirse
+    // (antes quedaba trabado y no había forma de arreglarlo).
+    document.getElementById('rep-orden-label').textContent    = 'N° Orden (editable)';
     const ordenInput = document.getElementById('rep-fi-orden');
     ordenInput.value    = r.nOrden || '';
-    ordenInput.readOnly = true;
-    ordenInput.style.background = '#f1f5f9';
-    ordenInput.style.color      = '#64748b';
+    ordenInput.readOnly = false;
+    ordenInput.style.background = '';
+    ordenInput.style.color      = '';
     document.getElementById('rep-fi-marca').value  = r.marca  || '';
     document.getElementById('rep-fi-modelo').value = r.modelo || '';
 
@@ -1515,6 +1598,7 @@ function openRepairForm(id) {
     // Fetch suggested nOrden asynchronously
     db.collection('config').doc('repairsMeta').get().then(snap => {
       const suggested = snap.exists ? (snap.data().nextOrderNum || 7100) : 7100;
+      _ultimoContadorVisto = suggested;
       if (!ordenInput.value) ordenInput.value = suggested;
     }).catch(() => {});
 
@@ -1724,6 +1808,23 @@ async function saveRepair() {
     if (editingRepairId) {
       const existing = REPAIRS.find(x => x.id === editingRepairId);
       if (!existing) { closeRepairForm(); return; }
+      // ¿Cambió el N° de orden? Se valida como en un ingreso nuevo: que sea un
+      // número y que no lo tenga OTRA reparación.
+      const ordenNuevo = parseInt(document.getElementById('rep-fi-orden').value) || 0;
+      const ordenViejo = Number(existing.nOrden) || 0;
+      const cambiaOrden = ordenNuevo > 0 && ordenNuevo !== ordenViejo;
+      if (!ordenNuevo) { toast('Ingresá el N° de orden', 'error'); btn.disabled = false; return; }
+      if (cambiaOrden) {
+        if (await _ordenOcupado(ordenNuevo, editingRepairId)) {
+          toast(`⚠️ Ya existe una reparación con el N°${ordenNuevo}`, 'error');
+          btn.disabled = false;
+          return;
+        }
+        if (!confirm(`¿Cambiar el N° de orden ${ordenViejo} por ${ordenNuevo}?\n\nLa boleta y la etiqueta impresas siguen diciendo ${ordenViejo}: reimprimilas.`)) {
+          btn.disabled = false;
+          return;
+        }
+      }
       const updateData = {
         ...existing,
         marca, modelo, arreglo, arreglos, falla, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
@@ -1732,6 +1833,13 @@ async function saveRepair() {
         seguimientoFecha, seguimientoNota, seguimientoAck: seguimientoFecha ? (existing.seguimientoFecha === seguimientoFecha ? (existing.seguimientoAck || false) : false) : null
       };
       if (foto) updateData.foto = foto;
+      if (cambiaOrden) {
+        updateData.nOrden = ordenNuevo;
+        delete updateData.numeroProvisorio;   // corregido a mano: ya no es provisorio
+        // Si el número nuevo pasa al contador, el contador lo sigue (si no, el
+        // próximo ingreso saldría con este mismo número).
+        _contadorAlMenos(ordenNuevo + 1);
+      }
       await db.collection('repairs').doc(editingRepairId).set(_stripUndefined(updateData));
       _repPatchLocal(editingRepairId, _stripUndefined(updateData));
       // Seguimiento público (QR): si cambió el modelo, el IMEI o la fecha
@@ -1743,10 +1851,12 @@ async function saveRepair() {
       if (tlf && typeof upsertCliente === 'function') {
         upsertCliente({ tlf, nombre, dni });
       }
-      toast('Reparación actualizada', 'success');
+      toast(cambiaOrden ? `Reparación actualizada · ahora es la N°${ordenNuevo}` : 'Reparación actualizada', 'success');
       logActivity({
         tipo: 'edicion',
-        desc: `Editó ${marca} ${modelo} N°${existing.nOrden}`,
+        desc: cambiaOrden
+          ? `Cambió el N° de orden ${ordenViejo} → ${ordenNuevo} (${marca} ${modelo})`
+          : `Editó ${marca} ${modelo} N°${existing.nOrden}`,
         repairId: editingRepairId,
         tecnico,
         extra: { nOrden: existing.nOrden, marca, modelo, arreglo }
@@ -1754,6 +1864,16 @@ async function saveRepair() {
     } else {
       // Usar nOrden ingresado por el usuario (o auto si está vacío)
       const ordenInputVal = parseInt(document.getElementById('rep-fi-orden').value) || 0;
+
+      // Un número tipeado de más (75000 en vez de 7500) arrastraba el contador
+      // y todas las órdenes siguientes salían mal. Se pregunta antes.
+      const sugerido = _ultimoContadorVisto || 0;
+      if (ordenInputVal > 0 && sugerido > 0 && ordenInputVal > sugerido + 100 &&
+          !confirm(`El N° ${ordenInputVal} está muy lejos del que sigue (${sugerido}).\n\n` +
+                   `Si lo dejás, las próximas órdenes van a seguir desde ${ordenInputVal + 1}.\n\n¿Es correcto?`)) {
+        btn.disabled = false;
+        return;
+      }
 
       // CRIT-06: verificar que el número manual no esté ya en uso.
       // Si la consulta falla (sin cupo, sin internet) NO se frena el ingreso:

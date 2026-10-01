@@ -16,6 +16,7 @@ const fs = require('fs');
 const path = require('path');
 
 const QUE_CUBRE = {
+  'test-orden.js':            'N° de orden: corregirlo al editar y arreglar el contador',
   'test-costos-usd.js':       'Costo de accesorios en dólares y carga de costos en lista',
   'test-qz.js':              'Impresión directa con QZ Tray: cada cosa a su impresora, y el diálogo si falla',
   'test-etiquetas-barcode.js': 'Etiquetas con codigo de barras: equipo, articulo y reparacion',

@@ -739,6 +739,8 @@ function toggleRepMenu() {
     { icon: '📊', label: 'Estadísticas', hide: _soloDueno(), onClick: () => document.getElementById('rep-stats-btn')?.click() },
     { icon: '📋', label: 'Actividad reciente', onClick: () => (typeof openActivityFeed === 'function') && openActivityFeed() },
     { icon: '🟢', label: 'WhatsApp pendientes', onClick: () => (typeof sendPendingWA === 'function') && sendPendingWA() },
+    { icon: '🔢', label: 'Próximo N° de orden', sub: 'Corregir el contador de órdenes', hide: _soloDueno(),
+      onClick: () => (typeof corregirContadorOrdenes === 'function') && corregirContadorOrdenes() },
     { divider: true },
     { icon: '👤', label: 'Generar fichas de clientes', sub: 'Desde tu historial de reparaciones', onClick: () => (typeof migrarClientesDesdeHistorial === 'function') && migrarClientesDesdeHistorial() },
     { icon: '💾', label: 'Importar historial', onClick: () => document.getElementById('rep-import-btn')?.click() },
