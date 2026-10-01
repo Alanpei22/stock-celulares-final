@@ -140,14 +140,38 @@ const ETQ_FORMATO_NOMBRE = {
   'a4':    'Hoja A4 para cortar',
 };
 
+// La clave cambió a propósito (antes `etqFormato`). La versión anterior venía
+// con la apaisada por defecto y la dejaba guardada, así que el sentido nuevo no
+// llegaba a los dispositivos que ya habían impreso: seguían imprimiendo 40mm de
+// ancho sobre una etiqueta de 30 y el contenido se iba a la etiqueta siguiente.
+const _ETQ_KEY = 'etqFmt';
+
 function etqFormato() {
   try {
-    const f = localStorage.getItem('etqFormato');
+    const f = localStorage.getItem(_ETQ_KEY);
     return ETQ_FORMATOS.indexOf(f) >= 0 ? f : ETQ_FORMATO_DEF;
   } catch { return ETQ_FORMATO_DEF; }
 }
 function setEtqFormato(f) {
-  try { localStorage.setItem('etqFormato', ETQ_FORMATOS.indexOf(f) >= 0 ? f : ETQ_FORMATO_DEF); } catch {}
+  try { localStorage.setItem(_ETQ_KEY, ETQ_FORMATOS.indexOf(f) >= 0 ? f : ETQ_FORMATO_DEF); } catch {}
+}
+
+// ── Elegir el sentido ──
+// Vive acá y no en inventario.js porque las dos pantallas imprimen etiquetas y
+// print.js es el único archivo que cargan las dos. (Estaba en inventario.js, que
+// solo carga la caja: desde Repuestos el botón no hacía nada.)
+function elegirFormatoEtiqueta() {
+  if (typeof closeSheet === 'function') closeSheet();
+  const elegido = prompt(
+    'Sentido de la etiqueta en ESTE dispositivo.\n\n' +
+    ETQ_FORMATOS.map((f, n) => `${n + 1}. ${ETQ_FORMATO_NOMBRE[f]}${f === etqFormato() ? '  ← ahora' : ''}`).join('\n') +
+    '\n\nSi el texto se pasa a la etiqueta de al lado, es el otro sentido.\n\nNúmero:',
+    String(ETQ_FORMATOS.indexOf(etqFormato()) + 1));
+  if (elegido === null) return;
+  const f = ETQ_FORMATOS[Number(String(elegido).trim()) - 1];
+  if (!f) { if (typeof toast === 'function') toast('Elegí 1, 2 o 3', 'error'); return; }
+  setEtqFormato(f);
+  if (typeof toast === 'function') toast('🏷️ ' + ETQ_FORMATO_NOMBRE[f], 'success');
 }
 function etqEsA4() { return etqFormato() === 'a4'; }
 
@@ -297,7 +321,16 @@ function _cssEtqTermica() {
     .replace('GIRO', parada ? 'transform-origin:0 0;transform:translateX(30mm) rotate(90deg)' : '');
 }
 
+// Al imprimir se avisa en qué sentido va. Si sale corrida, el aviso dice dónde
+// cambiarlo en vez de dejarte mirando una etiqueta arruinada sin saber por qué.
+function _avisarFormato() {
+  if (typeof toast !== 'function') return;
+  toast('🏷️ ' + (ETQ_FORMATO_NOMBRE[etqFormato()] || '') +
+        (etqEsA4() ? '' : ' · si sale corrida, cambiá el sentido en el menú'), 'info');
+}
+
 function _hojaEtiquetas(items, pintar, clase) {
+  _avisarFormato();
   const biz = (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint';
   const a4 = etqEsA4();
   const cuerpo = a4

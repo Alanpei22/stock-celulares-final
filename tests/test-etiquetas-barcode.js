@@ -69,6 +69,7 @@ async function leerConZxing(IMG) {
 // ── print.js de verdad, con el HTML capturado ───────────────
 let IMPRESO = null;
 const TOASTS = [];
+const printSrc = fs.readFileSync(DIR + 'print.js', 'utf8');
 const pCtx = {
   console, Date, Math, JSON, Number, String, Array,
   setTimeout: f => { f(); return 0; },
@@ -244,6 +245,22 @@ ok(/grid-template-columns:repeat\(2,97mm\)/.test(repA4), 'la de reparación en A
 ok(!/<svg/.test(repA4), 'y tampoco lleva código de barras');
 vm.runInContext("setEtqFormato('30x40')", pCtx);
 
+console.log('\n8c) El sentido guardado, y que se note cuál está puesto');
+// La versión anterior venía apaisada por defecto y la dejaba guardada. En los
+// dispositivos que ya habían impreso, el sentido nuevo no llegaba: seguían
+// tirando 40mm de ancho sobre una etiqueta de 30 y el contenido se iba a la
+// etiqueta de al lado (pasó de verdad, con una foto de por medio).
+ok(/_ETQ_KEY = 'etqFmt'/.test(printSrc), 'la clave cambió, así el sentido nuevo llega igual', (printSrc.match(/_ETQ_KEY = [^;]*/) || [])[0]);
+ok(!/'etqFormato'/.test(printSrc), 'y no queda leyendo la vieja');
+pCtx.localStorage._d['etqFormato'] = '40x30';   // lo que tenía guardado antes
+ok(vm.runInContext('etqFormato()', pCtx) === '30x40', 'lo guardado por la versión vieja ya no manda');
+// Y al imprimir se dice en qué sentido va: si sale corrida, el aviso explica
+// dónde cambiarlo en vez de dejarte mirando la etiqueta sin saber por qué.
+TOASTS.length = 0;
+imprimir('printEtiquetas', [{ marca: 'S', modelo: 'A20', precio: 1, imei: '356938035643809' }]);
+ok(TOASTS.some(t => /parada/.test(t[1])), 'al imprimir avisa el sentido', TOASTS);
+ok(TOASTS.some(t => /corrida/.test(t[1])), 'y qué hacer si sale mal', TOASTS);
+
 console.log('\n9) Enganchado donde hace falta');
 const inv = fs.readFileSync(DIR + 'inventario.js', 'utf8');
 const idx = fs.readFileSync(DIR + 'index.html', 'utf8');
@@ -256,11 +273,21 @@ ok(/_invFiltrados\(\)/.test(inv.slice(inv.indexOf('function renderInventario')))
    'la lista usa ese mismo filtro (si no, se imprime una cosa y se ve otra)');
 ok(/onclick="imprimirEtiquetaProducto\(\)"/.test(cajaHtml), 'y una sola desde la ficha del artículo');
 ok(/label: 'Generar códigos de barras'/.test(inv), 'con cómo generar los códigos que faltan');
-ok(/label: 'Tamaño de etiqueta'/.test(inv) && /setEtqFormato/.test(inv),
-   'y cómo elegir entre parada, apaisada y hoja A4');
-// Las opciones del menu salen de la lista de formatos, no escritas a mano: si
-// se agrega un tamano de rollo, aparece solo y no queda uno afuera.
-ok(/opciones = ETQ_FORMATOS/.test(inv), 'y las tres salen de la lista de formatos', (inv.match(/const opciones = [^;]*/) || [])[0]);
+// El sentido se elige desde las TRES pantallas que imprimen. Vivía en
+// inventario.js, que solo carga la caja: desde Repuestos el botón no hacía nada.
+const appSrc = fs.readFileSync(DIR + 'app.js', 'utf8');
+ok(/function elegirFormatoEtiqueta\(/.test(printSrc),
+   'elegir el sentido vive en print.js, que es el único que cargan las dos páginas');
+ok(!/function elegirFormatoEtiqueta\(/.test(inv), 'y no quedó una copia en inventario.js');
+// Los menús la llaman sin typeof: si print.js no estuviera en las dos páginas,
+// el menú reventaría al armarse en vez de no hacer nada.
+ok(/src="print\.js"/.test(idx) && /src="print\.js"/.test(cajaHtml), 'y las dos páginas cargan print.js');
+ok((appSrc.match(/label: 'Sentido de la etiqueta'/g) || []).length === 2,
+   'está en el menú de Stock y en el de Repuestos', (appSrc.match(/label: 'Sentido de la etiqueta'/g) || []).length);
+ok(/label: 'Sentido de la etiqueta'/.test(inv), 'y en el de Accesorios');
+// Las opciones salen de la lista de formatos, no escritas a mano.
+ok(/ETQ_FORMATOS\.map\(/.test(printSrc), 'las tres salen de la lista de formatos',
+   (printSrc.match(/ETQ_FORMATOS\.map[^\n]*/) || [])[0]);
 ok(/onclick="etiquetaReparacion\(\)"/.test(idx), 'reparaciones: botón en la ficha');
 ok(/function etiquetaReparacion/.test(rep) && /printEtiquetasReparaciones/.test(rep), 'que imprime la etiqueta');
 ok(/src="barcode\.js"/.test(idx) && /src="barcode\.js"/.test(cajaHtml), 'y las dos páginas cargan barcode.js');

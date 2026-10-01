@@ -360,10 +360,10 @@ function toggleInvMenu() {
     { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: openInvWizard },
     { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: imprimirEtiquetasInv },
     { icon: '🔢', label: 'Generar códigos de barras', sub: 'A los artículos que no tienen', onClick: generarCodigosInv },
-    { icon: '📐', label: 'Tamaño de etiqueta',
+    { icon: '📐', label: 'Sentido de la etiqueta',
       sub: (typeof etqFormato === 'function' && typeof ETQ_FORMATO_NOMBRE === 'object')
              ? ETQ_FORMATO_NOMBRE[etqFormato()] : '',
-      onClick: elegirFormatoEtiqueta },
+      onClick: () => { closeInvMenu(); elegirFormatoEtiqueta(); } },
     { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },
   ]);
 }
@@ -392,24 +392,6 @@ function imprimirEtiquetaProducto(id) {
   const copias = prompt('¿Cuántas etiquetas?', '1');
   if (copias === null) return;
   printEtiquetasProductos([p], Number(copias) || 1);
-}
-
-// ── De qué tamaño salen las etiquetas ──
-// Por dispositivo: la PC del local tiene la etiquetadora enchufada y la tablet
-// no. La hoja A4 queda como salida de emergencia para cuando se acaba el rollo.
-function elegirFormatoEtiqueta() {
-  closeInvMenu();
-  if (typeof etqFormato !== 'function') return;
-  const opciones = ETQ_FORMATOS;
-  const elegido = prompt(
-    'Tamaño de etiqueta en ESTE dispositivo.\n\n' +
-    opciones.map((f, n) => `${n + 1}. ${ETQ_FORMATO_NOMBRE[f]}${f === etqFormato() ? '  ← ahora' : ''}`).join('\n') +
-    '\n\nNúmero:', String(opciones.indexOf(etqFormato()) + 1));
-  if (elegido === null) return;
-  const f = opciones[Number(String(elegido).trim()) - 1];
-  if (!f) { toast('Elegí 1, 2 o 3', 'error'); return; }
-  setEtqFormato(f);
-  toast('🏷️ ' + ETQ_FORMATO_NOMBRE[f], 'success');
 }
 
 // ── Códigos internos para los que no tienen ──
