@@ -93,22 +93,31 @@ function _escEtq(v) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ── Etiqueta del equipo del stock ──
+// SIN precio y SIN el IMEI escrito: va pegada en la vidriera o en la caja del
+// equipo, a la vista del cliente, y ninguna de las dos cosas tiene por qué
+// estar ahí. Lo que queda es qué equipo es y el código para escanearlo.
+//
+// Las barras llevan el código corto del equipo (TP…) y no el IMEI. No es un
+// detalle estético: un IMEI son 154 módulos y en 38mm cada barra queda en
+// 0,25mm, el mínimo que lee un lector. El código corto son ~100 y cada barra
+// queda en 0,38mm — un 50% más gruesa. Con la cámara de un celular, que es con
+// lo que se escanea en el mostrador, esa diferencia es todo.
+// Si el equipo todavía no tiene código, cae al IMEI para no imprimir una
+// etiqueta muda (ver asegurarCodigosStock en app.js, que los asigna antes).
 function _etiquetaHtml(p) {
   const marca = String(p.marca || '').trim();
   const modelo = String(p.modelo || '').trim();
   const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : '',
                  p.bateria ? '🔋 ' + p.bateria + '%' : ''].filter(Boolean).join(' · ');
-  const precio = Number(p.precio) || 0;
-  const usd = (p.moneda === 'usd' && p.precioUSD) ? p.precioUSD : 0;
-  const imei = String(p.imei || '').trim();
+  const cod = String(p.codigo || '').trim() || String(p.imei || '').trim();
   return `<div class="etq">
     <div class="etq-eq">${_escEtq(marca)} ${_escEtq(modelo)}</div>
     ${specs ? `<div class="etq-specs">${_escEtq(specs)}</div>` : ''}
     <div class="etq-fila">
       <span class="etq-estado">${_escEtq(p.estado || '')}</span>
-      <span class="etq-precio">${usd ? 'u$' + usd.toLocaleString('es-AR') : '$' + precio.toLocaleString('es-AR')}</span>
     </div>
-    ${_barrasEtq(imei, _etqAncho(), 7.5)}
+    ${_barrasEtq(cod, _etqAncho(), 11, false)}
   </div>`;
 }
 

@@ -23,9 +23,15 @@ const mk = id => els[id] = {
 let CAMARA = { pedidos: [], falla: null };
 let TRACKS = [];
 function nuevoTrack(conLinterna) {
-  const t = { activo: true, torch: false, stop() { this.activo = false; },
-              getCapabilities: () => (conLinterna ? { torch: true } : {}),
-              applyConstraints: async c => { t.torch = !!(c.advanced && c.advanced[0].torch); } };
+  const t = { activo: true, torch: false, zoom: 1, enfoque: '', stop() { this.activo = false; },
+              getCapabilities: () => Object.assign({ zoom: { min: 1, max: 4 }, focusMode: ['continuous'] },
+                                                   conLinterna ? { torch: true } : {}),
+              applyConstraints: async c => {
+                const a = (c.advanced && c.advanced[0]) || {};
+                if ('torch' in a) t.torch = !!a.torch;
+                if ('zoom' in a) t.zoom = a.zoom;
+                if ('focusMode' in a) t.enfoque = a.focusMode;
+              } };
   TRACKS.push(t);
   return t;
 }
@@ -103,6 +109,15 @@ const pedido = CAMARA.pedidos[0].video;
 ok(pedido.facingMode && pedido.facingMode.ideal === 'environment',
    'pide la cámara de atrás como "ideal", no "exact" (con exact, una tablet de una sola cámara no abre nada)', pedido);
 ok(CAMARA.pedidos[0].audio === false, 'y no pide el micrófono');
+// Lo que decide si un código chico se lee es cuántos píxeles entran en la barra
+// más fina. A 1280 son ~4 y el lector no engancha; a 1920 son ~6.
+ok(pedido.width && pedido.width.ideal === 1920, 'pide 1920 de ancho, no 1280', pedido.width);
+ok(pedido.height && pedido.height.ideal === 1080, 'y 1080 de alto', pedido.height);
+await new Promise(r => setImmediate(r));
+// El celular no enfoca abajo de ~10cm: con zoom se lo deja a una distancia
+// donde enfoca y el código igual ocupa buena parte del cuadro.
+ok(TRACKS[0].zoom === 2, 'y arranca con algo de zoom, si la cámara lo tiene', TRACKS[0].zoom);
+ok(TRACKS[0].enfoque === 'continuous', 'con el enfoque continuo', TRACKS[0].enfoque);
 ok(!els['esc-modal'].classList.contains('hidden'), 'se ve el lector');
 ok(els['esc-titulo'].textContent === 'Escaneá el código del producto', 'con el título que le pasaron', els['esc-titulo'].textContent);
 ok(typeof TICK === 'function', 'quedó buscando códigos');

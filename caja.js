@@ -3026,6 +3026,18 @@ function movEscanear() {
   });
 }
 
+// Un equipo del stock, al carrito. Es el mismo renglón se haya llegado por el
+// código de la etiqueta o por el IMEI de la caja de fábrica.
+function _addEquipoAlCarrito(eq) {
+  _addToCart({
+    source: 'equipo', id: eq.id,
+    nombre: `${eq.marca || ''} ${eq.modelo || ''}`.trim() || 'Equipo',
+    extra: [eq.almacenamiento, eq.estado].filter(Boolean).join(' · '),
+    stock: 1, precio: Number(eq.precio) || 0,
+    costoUSD: 0, costoARS: Number(eq.costo) || 0, icon: '📱',
+  });
+}
+
 // Lo que se escaneó, convertido en algo que la caja entiende.
 function _movDesdeCodigo(cod) {
   const txt = String(cod || '').trim();
@@ -3063,20 +3075,16 @@ function _movDesdeCodigo(cod) {
     return;
   }
 
-  // 3) Equipo del stock, por el IMEI de la etiqueta o de la caja
+  // 3) Equipo del stock, por el código corto de SU etiqueta
+  const eqCod = (typeof CAJA_STOCK !== 'undefined' ? CAJA_STOCK : [])
+    .find(p => !p.vendido && String(p.codigo || '').trim() && String(p.codigo).trim() === txt);
+  if (eqCod) { _addEquipoAlCarrito(eqCod); return; }
+
+  // 4) …o por el IMEI, que es lo que trae impreso la caja de fábrica
   if (digitos.length >= 14) {
     const eq = (typeof CAJA_STOCK !== 'undefined' ? CAJA_STOCK : [])
       .find(p => !p.vendido && String(p.imei || '').replace(/\D/g, '') === digitos);
-    if (eq) {
-      _addToCart({
-        source: 'equipo', id: eq.id,
-        nombre: `${eq.marca || ''} ${eq.modelo || ''}`.trim() || 'Equipo',
-        extra: [eq.almacenamiento, eq.estado].filter(Boolean).join(' · '),
-        stock: 1, precio: Number(eq.precio) || 0,
-        costoUSD: 0, costoARS: Number(eq.costo) || 0, icon: '📱',
-      });
-      return;
-    }
+    if (eq) { _addEquipoAlCarrito(eq); return; }
   }
 
   // 4) Boleta de una reparación: el QR lleva el token de seguimiento, y el

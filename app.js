@@ -1443,10 +1443,33 @@ function openForm(id) {
 }
 
 // Reimprimir la etiqueta de un equipo (la del lote sale sola al cargarlo)
-function etiquetaDe(id) {
+// Los equipos no nacen con código: se los asigna acá, la primera vez que se
+// les imprime una etiqueta. Sin código la etiqueta tendría que llevar el IMEI
+// en barras, que es el doble de fino y la cámara no lo lee.
+// Devuelve la lista con el código ya puesto.
+async function asegurarCodigosStock(lista) {
+  const sin = lista.filter(p => !String(p.codigo || '').trim());
+  if (!sin.length) return lista;
+  try {
+    const codigos = await tpReservarCodigos(db, sin.length, tpMaxCodigoLocal(STOCK));
+    const batch = db.batch();
+    sin.forEach((p, i) => {
+      p.codigo = codigos[i];                                   // para imprimir ya
+      batch.update(db.collection('stock').doc(p.id), { codigo: codigos[i] });
+    });
+    await batch.commit();
+  } catch (e) {
+    console.error('asegurarCodigosStock:', e);
+    toast('No se pudo asignar el código: la etiqueta sale con el IMEI', 'error');
+  }
+  return lista;
+}
+
+async function etiquetaDe(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
   if (typeof printEtiquetas !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
+  await asegurarCodigosStock([p]);
   printEtiquetas([p]);
 }
 

@@ -160,8 +160,13 @@ async function abrirEscaner(cb, opts = {}) {
   try {
     // facingMode ideal (no exact): en una tablet con una sola cámara, `exact`
     // falla y no abre nada.
+    //
+    // 1920 y no 1280: un código de barras chico se juega en cuántos píxeles
+    // entran en la barra más fina. A 1280, una barra de 0,25mm en una etiqueta
+    // que ocupa medio cuadro son ~4 píxeles; a 1920 son ~6, y ahí el lector
+    // empieza a engancharla. `ideal` y no `exact`: si la cámara no da, baja sola.
     _escStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: false,
     });
   } catch (e) {
@@ -177,6 +182,7 @@ async function abrirEscaner(cb, opts = {}) {
 
   _escTrack = _escStream.getVideoTracks()[0] || null;
   _escEnfoqueContinuo();
+  _escZoomUtil();
   _escMostrarLinterna();
 
   _escLector = nativo ? new BarcodeDetector({ formats: ESCANER_FORMATOS }) : _escLectorZxing();
@@ -260,6 +266,28 @@ function _escEnfoqueContinuo() {
       _escTrack.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
     }
   } catch { /* la cámara no deja tocar el enfoque: seguimos igual */ }
+}
+
+// Un poco de zoom, si la cámara lo tiene.
+//
+// El problema de fondo con los códigos chicos es que el celular NO ENFOCA abajo
+// de unos 10 cm: acercás para que se vea grande y sale todo borroso. Con zoom
+// óptico/digital se lo deja a una distancia donde enfoca y el código igual
+// ocupa buena parte del cuadro.
+//
+// 2x o lo máximo que dé, lo que sea menor. Más que eso recorta tanto que hay
+// que tener mucho pulso para encuadrar.
+function _escZoomUtil() {
+  if (!_escTrack || !_escTrack.applyConstraints) return;
+  try {
+    const cap = _escTrack.getCapabilities ? _escTrack.getCapabilities() : {};
+    if (!cap || typeof cap.zoom !== 'object' || !cap.zoom) return;
+    const min = Number(cap.zoom.min) || 1;
+    const max = Number(cap.zoom.max) || 1;
+    if (!(max > min)) return;
+    const z = Math.min(max, Math.max(min, min * 2));
+    _escTrack.applyConstraints({ advanced: [{ zoom: z }] }).catch(() => {});
+  } catch { /* la cámara no deja tocar el zoom: seguimos igual */ }
 }
 
 // ── Linterna ────────────────────────────────────────────────

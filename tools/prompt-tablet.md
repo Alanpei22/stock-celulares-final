@@ -51,6 +51,9 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
 - `print.js` — comprobantes A5 (recepción, que también sirve de entrega) y venta
   A5 con original + copia. Todo B/N, con auto-ajuste para que entre en una hoja
 - `qr.js` — generador de QR propio, sin librerías ni internet
+- Lector de camara: 1920x1080 (a 1280 una barra de 0,25mm son ~4 pixeles y no
+  engancha) y zoom 2x si la camara lo tiene, porque abajo de ~10cm el celular no
+  enfoca. Ver `_escZoomUtil` en escaner.js.
 - `barcode.js` — generador de Code 128, igual de propio. La tabla de patrones se
   verifica DECODIFICANDO lo que dibuja con la ZXing de verdad
   (tests/test-etiquetas-barcode.js): escribirla de memoria y confiar no alcanza.
@@ -93,6 +96,12 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   mostrador. La camara lee los dos, asi que en barras funcionan ambos.
 - Lo impreso es lo que busca `_movDesdeCodigo` en la caja: escanear la etiqueta
   de un equipo lo mete en la venta, y la de una reparacion abre su cobro.
+- La del EQUIPO va SIN precio y SIN el IMEI escrito (se pega a la vista del
+  cliente). Las barras llevan un codigo corto propio (`codigo`, TP...) y no el
+  IMEI: 121 modulos contra 154, o sea 0,32mm por barra contra 0,25. Con la
+  camara de un celular esa diferencia decide si lee o no. `asegurarCodigosStock`
+  en app.js se lo asigna la primera vez que se imprime; la caja lo busca por el
+  codigo Y por el IMEI (`_movDesdeCodigo`).
 - La de ARTICULO y la de REPUESTO llevan el CODIGO escrito arriba del precio, y
   las barras van sin leyenda (el numero ya esta escrito). El repuesto muestra
   tipo + nombre + marca/modelo: "Modulo" solo no dice nada.

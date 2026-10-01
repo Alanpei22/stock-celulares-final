@@ -44,9 +44,10 @@ ctx.__CAP = (html, titulo) => { IMPRESO = { html, titulo }; };
 
 const EQUIPOS = [
   { id: 'a', marca: 'Samsung', modelo: 'Galaxy A54', almacenamiento: '128GB', ram: '8GB', estado: 'Nuevo',
-    precio: 350000, imei: '356938035643809' },
+    precio: 350000, imei: '356938035643809', codigo: 'TP00123' },
   { id: 'b', marca: 'Apple', modelo: 'iPhone 13', almacenamiento: '256GB', estado: 'Usado',
-    precio: 750000, precioUSD: 500, moneda: 'usd', bateria: 89, imei: '356938035643817' },
+    precio: 750000, precioUSD: 500, moneda: 'usd', bateria: 89, imei: '356938035643817', codigo: 'TP00124' },
+  // Sin código ni IMEI: no hay nada que codificar, la etiqueta sale sin barras.
   { id: 'c', marca: 'Motorola', modelo: 'G54', estado: 'Nuevo', precio: 290000, imei: '' },
 ];
 
@@ -59,21 +60,37 @@ const html = IMPRESO.html;
 ok((html.match(/class="etq"/g) || []).length === 3, 'tres etiquetas', (html.match(/class="etq"/g) || []).length);
 ok(/Samsung Galaxy A54/.test(html) && /Apple iPhone 13/.test(html), 'con marca y modelo');
 
-console.log('\n2) Lo que se mira de lejos: el precio');
-ok(/\$350\.000/.test(html), 'precio en pesos', html.match(/etq-precio">[^<]*/g));
-ok(/u\$500/.test(html), 'y en dólares el que se compró en dólares (no el convertido)', html.match(/u\$[\d.]+/g));
+console.log('\n2) Ni el precio ni el IMEI van escritos');
+// La etiqueta del equipo va pegada en la vidriera o en la caja, a la vista del
+// cliente: el precio se canta, no se imprime, y el IMEI no es asunto suyo.
+ok(!/350\.000/.test(html) && !/u\$500/.test(html), 'no sale el precio', html.match(/etq-precio[^<]*/g));
+ok(!/356938035643809/.test(html), 'ni el IMEI escrito');
+ok(!/<text/.test(html), 'ni debajo de las barras');
 
 console.log('\n3) Especificaciones y estado');
 ok(/128GB · 8GB RAM/.test(html), 'capacidad y RAM', html.match(/etq-specs">[^<]*/g));
 ok(/🔋 89%/.test(html), 'batería en los usados (es lo primero que pregunta el cliente)');
 ok(/Nuevo/.test(html) && /Usado/.test(html), 'el estado');
 
-console.log('\n4) El código de barras lleva el IMEI');
-// Es el mismo número que busca la caja al escanear (`_movDesdeCodigo` matchea
-// el equipo del stock por IMEI), así que escanear la etiqueta lo mete en la venta.
-ok((html.match(/<svg/g) || []).length === 2, 'barras solo en los que tienen IMEI', (html.match(/<svg/g) || []).length);
-ok(/>356938035643809<\/text>/.test(html), 'y son las del IMEI de ese equipo');
-ok(/356938035643809/.test(html), 'con el número escrito abajo, para teclearlo si el lector no quiere');
+console.log('\n4) El código de barras lleva el código corto del equipo');
+// Y no el IMEI: un IMEI son 154 módulos y en 38mm cada barra queda en 0,25mm,
+// el mínimo que lee un lector. El código corto son ~100 y cada barra queda en
+// 0,38mm. Con la cámara de un celular esa diferencia es todo.
+ok((html.match(/<svg/g) || []).length === 2, 'barras en los que tienen código', (html.match(/<svg/g) || []).length);
+ctx.__COD = 'TP00123';
+const modsCod  = get('code128Bits(__COD)').length + 20;
+const modsImei = get("code128Bits('356938035643809')").length + 20;
+ctx.__MOD = Math.max(0.25, Math.min(0.5, 38.4 / modsCod));          // la misma cuenta que print.js
+const esperado = get('code128Svg(__COD, { modulo: __MOD, alto: 11, leyenda: false })');
+ok(html.includes(esperado), 'son las del código del equipo, no las del IMEI');
+ok(modsCod < modsImei * 0.8,
+   `el código corto son ${modsCod} módulos contra ${modsImei} del IMEI`, [modsCod, modsImei]);
+ok(ctx.__MOD >= 0.3, `así cada barra mide ${ctx.__MOD.toFixed(2)}mm en vez de 0,25 — la cámara las ve`,
+   ctx.__MOD.toFixed(3));
+// Y las barras más altas: sin el precio ni el IMEI escritos sobra lugar, y una
+// barra alta le da al lector más chances de cruzarla derecho.
+ok(/height="11"/.test(html) || /height="1[0-9]/.test(html), 'y más altas que antes (7,5mm)',
+   (html.match(/<rect[^>]*height="[\d.]+"/) || [])[0]);
 ok(!/qrSvg/.test(fs.readFileSync(DIR + 'print.js', 'utf8').slice(
      fs.readFileSync(DIR + 'print.js', 'utf8').indexOf('function _etiquetaHtml'),
      fs.readFileSync(DIR + 'print.js', 'utf8').indexOf('function _barrasEtq'))),

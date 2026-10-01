@@ -143,13 +143,37 @@ ok(svg('okéé') === svg('ok'), 'los acentos se sacan: Code 128 no los tiene');
 
 console.log('\n4) Etiqueta de equipo');
 const eq = imprimir('printEtiquetas', [{ marca: 'Samsung', modelo: 'Galaxy A54', almacenamiento: '128GB',
-  estado: 'Usado', precio: 350000, imei: '356938035643809' }]);
-ok(/Samsung Galaxy A54/.test(eq) && /\$350\.000/.test(eq), 'equipo y precio');
-ok(/>356938035643809<\/text>/.test(eq), 'con el IMEI en barras');
-medirBarras(eq, '356938035643809', 'el código del equipo');
-// Es lo mismo que busca la caja: _movDesdeCodigo matchea por IMEI.
+  estado: 'Usado', precio: 350000, imei: '356938035643809', codigo: 'TP00123' }]);
+ok(/Samsung Galaxy A54/.test(eq), 'qué equipo es');
+ok(/128GB/.test(eq) && /Usado/.test(eq), 'con las specs y el estado');
+// Va pegada a la vista del cliente: el precio se canta, no se imprime.
+ok(!/350\.000/.test(eq), 'SIN precio');
+ok(!/356938035643809/.test(eq), 'y SIN el IMEI escrito');
+ok(/>TP00123</.test(eq) === false, 'tampoco el código escrito: lo que se mira es el equipo');
+medirBarras(eq, 'TP00123', 'el código del equipo');
 const caja = fs.readFileSync(DIR + 'caja.js', 'utf8');
-ok(/digitos\.length >= 14/.test(caja), 'y la caja busca el equipo por ese mismo IMEI al escanear');
+// Las barras llevan el código corto y no el IMEI, y la caja lo busca por ahí.
+const buscaEqCod = caja.slice(caja.indexOf('const eqCod = '), caja.indexOf('const eqCod = ') + 260);
+ok(/CAJA_STOCK/.test(buscaEqCod) && /String\(p\.codigo\)\.trim\(\) === txt/.test(buscaEqCod),
+   'la caja encuentra el equipo por el código de su etiqueta', buscaEqCod.slice(0, 120));
+ok(/digitos\.length >= 14/.test(caja),
+   'y por el IMEI también, que es lo que trae impreso la caja de fábrica');
+// Un IMEI en barras no entra a un grosor que la cámara lea: por eso el cambio.
+const mCod = bits('TP00123').length + 20, mImei = bits('356938035643809').length + 20;
+ok(38.4 / mCod >= 0.3 && 38.4 / mImei < 0.3,
+   `la barra pasa de ${(38.4 / mImei).toFixed(2)}mm a ${(38.4 / mCod).toFixed(2)}mm`,
+   [(38.4 / mImei).toFixed(2), (38.4 / mCod).toFixed(2)]);
+
+console.log('\n4b) El código del equipo se asigna al imprimir');
+// Los equipos no nacen con código: se lo asigna la primera etiqueta.
+const appSrc0 = fs.readFileSync(DIR + 'app.js', 'utf8');
+ok(/async function asegurarCodigosStock/.test(appSrc0), 'hay quien lo asigna');
+ok(/tpReservarCodigos\(db, sin\.length, tpMaxCodigoLocal\(STOCK\)\)/.test(appSrc0),
+   'pidiendo al mismo contador que accesorios y repuestos (si no, dos cosas con el mismo código)');
+ok(/await asegurarCodigosStock\(\[p\]\);[\s\S]{0,60}printEtiquetas/.test(appSrc0),
+   'antes de imprimir desde la ficha');
+ok(/asegurarCodigosStock\(docs\)[\s\S]{0,60}printEtiquetas\(docs\)/.test(fs.readFileSync(DIR + 'lote.js', 'utf8')),
+   'y antes de imprimir las del lote');
 
 console.log('\n5) Etiqueta de artículo');
 const pr = imprimir('printEtiquetasProductos', [

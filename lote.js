@@ -326,7 +326,8 @@ async function loteGuardar() {
     const n = docs.length;
     // Los equipos van al cajón: sin etiqueta hay que buscar el precio en la app
     if (typeof printEtiquetas === 'function' &&
-        confirm(`✅ ${n} equipos cargados.\n\n¿Imprimo las etiquetas con precio y QR?`)) {
+        confirm(`✅ ${n} equipos cargados.\n\n¿Imprimo las etiquetas?`)) {
+      if (typeof asegurarCodigosStock === 'function') await asegurarCodigosStock(docs);
       printEtiquetas(docs);
     }
     _lote = _loteVacio();
