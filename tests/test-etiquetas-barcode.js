@@ -243,6 +243,13 @@ ok(wA4 > w40, `en A4 el mismo código sale más ancho (${wA4}mm contra ${w40}mm)
 const repA4 = imprimir('printEtiquetasReparaciones', [{ nOrden: 7123, marca: 'Motorola', modelo: 'G54', falla: 'x' }]);
 ok(/grid-template-columns:repeat\(2,97mm\)/.test(repA4), 'la de reparación en A4 sigue siendo la grande');
 ok(!/<svg/.test(repA4), 'y tampoco lleva código de barras');
+// Apaisada dada vuelta: hay drivers que tiran el rollo al revés y Chrome no
+// deja girar la página, así que se gira acá. Misma página, contenido a 180°.
+vm.runInContext("setEtqFormato('40x30r')", pCtx);
+const eqR = imprimir('printEtiquetas', [{ marca: 'S', modelo: 'A20', precio: 1, imei: '356938035643809' }]);
+ok(vm.runInContext('etqFormato()', pCtx) === '40x30r', 'la dada vuelta se guarda');
+ok(/size:40mm 30mm/.test(eqR), 'dada vuelta: la página sigue siendo 40×30');
+ok(/translate\(40mm,30mm\) rotate\(180deg\)/.test(eqR), 'y el contenido va girado 180° adentro del papel');
 vm.runInContext("setEtqFormato('30x40')", pCtx);
 
 console.log('\n8c) El sentido guardado, y que se note cuál está puesto');

@@ -121,6 +121,9 @@ function _etqAncho()    { return etqEsA4() ? 55 : 38.4; }
 //     etiquetadora, así que es el que viene puesto.
 //   · 40x30 — APAISADA. La página es de 40 de ancho por 30 de alto, sin girar.
 //     Si tu driver ya alimenta el rollo en ese sentido, es este.
+//   · 40x30r — APAISADA DADA VUELTA. Igual que la apaisada pero girada 180°:
+//     hay drivers que tiran el rollo al revés y la etiqueta sale cabeza abajo.
+//     Se arregla acá y no en el driver porque Chrome no deja girar la página.
 //   · a4    — la hoja de 24 para cortar o pegar. Salida de emergencia: si se
 //     acaba el rollo un sábado, el mostrador no se para.
 //
@@ -133,10 +136,11 @@ function _etqAncho()    { return etqEsA4() ? 55 : 38.4; }
 //  tablet no.
 // ══════════════════════════════════════════════════════════════
 const ETQ_FORMATO_DEF = '30x40';
-const ETQ_FORMATOS = ['30x40', '40x30', 'a4'];
+const ETQ_FORMATOS = ['30x40', '40x30', '40x30r', 'a4'];
 const ETQ_FORMATO_NOMBRE = {
   '30x40': 'Etiquetadora · 40×30 parada',
   '40x30': 'Etiquetadora · 40×30 apaisada',
+  '40x30r': 'Etiquetadora · 40×30 apaisada dada vuelta',
   'a4':    'Hoja A4 para cortar',
 };
 
@@ -169,7 +173,7 @@ function elegirFormatoEtiqueta() {
     String(ETQ_FORMATOS.indexOf(etqFormato()) + 1));
   if (elegido === null) return;
   const f = ETQ_FORMATOS[Number(String(elegido).trim()) - 1];
-  if (!f) { if (typeof toast === 'function') toast('Elegí 1, 2 o 3', 'error'); return; }
+  if (!f) { if (typeof toast === 'function') toast('Elegí un número de 1 a ' + ETQ_FORMATOS.length, 'error'); return; }
   setEtqFormato(f);
   if (typeof toast === 'function') toast('🏷️ ' + ETQ_FORMATO_NOMBRE[f], 'success');
 }
@@ -313,12 +317,18 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;b
 
 // El mismo CSS, con la página y el giro del sentido elegido.
 function _cssEtqTermica() {
-  const parada = etqFormato() === '30x40';
+  const f = etqFormato();
+  const parada = f === '30x40';
+  // Dada vuelta: rotar 180° desde la esquina la manda a x e y negativas; el
+  // translate la devuelve entera al papel.
+  const giro = parada ? 'transform-origin:0 0;transform:translateX(30mm) rotate(90deg)'
+             : f === '40x30r' ? 'transform-origin:0 0;transform:translate(40mm,30mm) rotate(180deg)'
+             : '';
   return _CSS_ETQ_40
     .replace('SIZE', parada ? '30mm 40mm' : '40mm 30mm')
     .replace('PAGW', parada ? '30mm' : '40mm')
     .replace('PAGH', parada ? '40mm' : '30mm')
-    .replace('GIRO', parada ? 'transform-origin:0 0;transform:translateX(30mm) rotate(90deg)' : '');
+    .replace('GIRO', giro);
 }
 
 // Al imprimir se avisa en qué sentido va. Si sale corrida, el aviso dice dónde
