@@ -213,8 +213,20 @@ function _barrasEtq(valor, anchoMm, altoMm, leyenda) {
 // solo en barras: si el lector no quiere, se teclea. Y por eso las barras van
 // sin su leyenda — el número ya está arriba y en 30mm de alto no sobra lugar
 // para escribirlo dos veces.
+// El precio de los artículos va EN CLAVE: lo entienden los vendedores, no el
+// cliente que mira la góndola. Un 0 adelante y los primeros números del
+// precio: 2 si es menos de $100.000, 3 si es más (si no, $150.000 y $15.000
+// darían lo mismo). $8.500 → 085 · $25.000 → 025 · $150.000 → 0150.
+// Sin "$" a propósito: que no parezca un precio.
+function _precioClave(n) {
+  const v = Math.round(Number(n) || 0);
+  if (v <= 0) return '';
+  return '0' + String(v).slice(0, v >= 100000 ? 3 : 2);
+}
+
 function _etiquetaProdHtml(p) {
   const precio = Number(p.precioVenta ?? p.precio) || 0;
+  const clave = _precioClave(precio);
   const cod = String(p.codigo || '').trim();
   const sub = [p.marca, p.modelo].filter(Boolean).join(' ') || p.categoria || p.tipo || '';
   return `<div class="etq">
@@ -222,7 +234,7 @@ function _etiquetaProdHtml(p) {
     ${sub ? `<div class="etq-specs">${_escEtq(sub)}</div>` : ''}
     <div class="etq-cod">${cod ? _escEtq(cod) : 'SIN CÓDIGO'}</div>
     <div class="etq-fila">
-      <span class="etq-precio">$${precio.toLocaleString('es-AR')}</span>
+      <span class="etq-precio">${clave}</span>
     </div>
     ${_barrasEtq(cod, _etqAncho(), 7.5, false)}
   </div>`;

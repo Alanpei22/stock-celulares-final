@@ -156,7 +156,14 @@ const pr = imprimir('printEtiquetasProductos', [
   { nombre: 'Vidrio templado iPhone 13', categoria: 'Vidrio templado / Hidrogel', precioVenta: 8000, codigo: '7790895000997' },
   { nombre: 'Cable tipo C', categoria: 'Cables', precioVenta: 5000, codigo: '' },
 ]);
-ok(/Vidrio templado iPhone 13/.test(pr) && /\$8\.000/.test(pr), 'nombre y precio');
+ok(/Vidrio templado iPhone 13/.test(pr), 'nombre');
+// El precio de los artículos va en clave: 0 + los primeros números.
+ok(/class="etq-precio">080</.test(pr) && !/\$8\.000/.test(pr), 'el precio en clave ($8.000 → 080), no a la vista del cliente');
+pCtx._n = 0;
+const clave = n => { pCtx._n = n; return vm.runInContext('_precioClave(_n)', pCtx); };
+ok(clave(8500) === '085' && clave(25000) === '025' && clave(99999) === '099', 'menos de $100.000: 0 + dos números');
+ok(clave(150000) === '0150' && clave(15000) === '015', 'desde $100.000: 0 + tres (si no, $150.000 y $15.000 darían lo mismo)');
+ok(clave(0) === '' && clave(null) === '', 'sin precio no se inventa una clave');
 ok(/class="etq-cod">7790895000997</.test(pr), 'con el CÓDIGO escrito, que es lo que se lee en el mostrador',
    (pr.match(/class="etq-cod">[^<]*/) || [])[0]);
 ok(/Vidrio templado \/ Hidrogel/.test(pr), 'y la categoría');
@@ -178,7 +185,7 @@ const rpu = imprimir('printEtiquetasRepuestos', [
 ok(/Módulo A54 5G/.test(rpu), 'el tipo y el nombre juntos', (rpu.match(/etq-eq--prod">[^<]*/g) || []));
 ok(/Samsung A54/.test(rpu), 'con la marca y el modelo, que es lo que lo identifica');
 ok(/class="etq-cod">TP00007</.test(rpu), 'y el código escrito');
-ok(/\$90\.000/.test(rpu), 'con el precio de venta');
+ok(/class="etq-precio">090</.test(rpu) && !/\$90\.000/.test(rpu), 'con el precio de venta en clave');
 ok((rpu.match(/<svg/g) || []).length === 1, 'barras solo en el que tiene código');
 ok(/SIN CÓDIGO/.test(rpu), 'y el otro lo dice');
 medirBarras(rpu, 'TP00007', 'el código del repuesto');
