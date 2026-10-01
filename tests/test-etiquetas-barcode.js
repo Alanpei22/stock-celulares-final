@@ -369,7 +369,8 @@ const save = rep.slice(rep.indexOf('async function saveRepair('), rep.indexOf('a
 ok(/imprimirIngresoReparacion\(newDoc\)/.test(save), 'saveRepair imprime con el doc recién creado (REPAIRS todavía no lo tiene)');
 const fnIng = printSrc.slice(printSrc.indexOf('async function imprimirIngresoReparacion'), printSrc.indexOf('async function imprimirIngresoReparacion') + 400);
 ok(fnIng.indexOf('_buildA5') >= 0 && fnIng.indexOf('_buildA5') < fnIng.indexOf('_etiquetaRepHtml'), 'primero la hoja A5, después la etiqueta');
-ok(/await _imprimirEnIframe\(_buildA5/.test(fnIng), 'y la etiqueta espera a que se cierre el diálogo de la hoja');
+ok(/await _imprimirEnIframe\(hoja\)/.test(fnIng) && fnIng.indexOf('await _imprimirEnIframe(hoja)') < fnIng.indexOf('_etiquetaRepHtml'),
+   'y la etiqueta espera a que se cierre el diálogo de la hoja');
 // document.open() borra los listeners de la ventana: el load puesto antes no
 // se dispara y no imprime nada (pasó al hacerlo).
 const fnIf = printSrc.slice(printSrc.indexOf('function _imprimirEnIframe'), printSrc.indexOf('async function imprimirIngresoReparacion'));

@@ -14,6 +14,14 @@ function _prMoney(v) {
 }
 function _prDate(str) {
   if (!str) return '—';
+  // Los ingresos nuevos guardan fecha Y hora (ISO en UTC): partirlo por '-'
+  // imprimía "01T14:07:11.395Z/10/2026". Se pasa a la fecha de Argentina,
+  // que no es la de UTC después de las 21hs.
+  if (String(str).includes('T')) {
+    const f = new Date(str);
+    if (!isNaN(f)) return f.toLocaleDateString('es-AR',
+      { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
   try { const [y, m, d] = str.split('-'); return `${d}/${m}/${y}`; }
   catch { return str; }
 }
@@ -413,7 +421,7 @@ function _repetir(items, copias) {
 function printEtiquetas(lista, copias) {
   const equipos = _repetir((Array.isArray(lista) ? lista : [lista]).filter(Boolean), copias);
   if (!equipos.length) { if (typeof toast === 'function') toast('No hay equipos para etiquetar', 'error'); return; }
-  _openPrint(_hojaEtiquetas(equipos, _etiquetaHtml), 'Etiquetas');
+  _imprimirTocando('etiqueta', _hojaEtiquetas(equipos, _etiquetaHtml), 'Etiquetas');
 }
 
 function printEtiquetasProductos(lista, copias) {
@@ -425,7 +433,7 @@ function printEtiquetasProductos(lista, copias) {
   if (sinCod && typeof toast === 'function') {
     toast(`${sinCod} sin código de barras: cargáselo o generalo desde el menú`, 'info');
   }
-  _openPrint(_hojaEtiquetas(prods, _etiquetaProdHtml), 'Etiquetas');
+  _imprimirTocando('etiqueta', _hojaEtiquetas(prods, _etiquetaProdHtml), 'Etiquetas');
 }
 
 // Repuestos: "Módulo" solo no dice nada, así que el nombre es el tipo con la
@@ -444,7 +452,7 @@ function printEtiquetasRepuestos(lista, copias) {
 function printEtiquetasReparaciones(lista, copias) {
   const reps = _repetir((Array.isArray(lista) ? lista : [lista]).filter(Boolean), copias);
   if (!reps.length) { if (typeof toast === 'function') toast('No hay reparaciones para etiquetar', 'error'); return; }
-  _openPrint(_hojaEtiquetas(reps, _etiquetaRepHtml, 'hoja--rep'), 'Etiquetas');
+  _imprimirTocando('etiqueta', _hojaEtiquetas(reps, _etiquetaRepHtml, 'hoja--rep'), 'Etiquetas');
 }
 
 // ── Al ingresar un equipo: la hoja y la etiqueta, solas ──────
@@ -491,8 +499,27 @@ function _imprimirEnIframe(html) {
 async function imprimirIngresoReparacion(rep) {
   if (!rep) return;
   if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);
-  await _imprimirEnIframe(_buildA5(rep));
-  await _imprimirEnIframe(_hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep'));
+  const hoja = _buildA5(rep);
+  if (!await _imprimirDirecto('hoja', hoja)) await _imprimirEnIframe(hoja);
+  const etq = _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep');
+  if (!await _imprimirDirecto('etiqueta', etq)) await _imprimirEnIframe(etq);
+}
+
+// Con QZ Tray configurado en esta PC (qz-print.js), sale directo a su
+// impresora, sin diálogo. Devuelve false si no hay QZ o falló.
+function _imprimirDirecto(tipo, html) {
+  if (typeof qzImprimir !== 'function' || typeof qzActivo !== 'function' || !qzActivo(tipo)) {
+    return Promise.resolve(false);
+  }
+  return qzImprimir(tipo, html);
+}
+
+// Para los botones: sin QZ, la ventana de siempre, abierta EN el toque (si se
+// espera algo antes, el navegador la bloquea). Con QZ, directo; si QZ falla,
+// el diálogo sale por iframe, que no depende del toque.
+function _imprimirTocando(tipo, html, titulo) {
+  if (typeof qzActivo !== 'function' || !qzActivo(tipo)) { _openPrint(html, titulo); return; }
+  _imprimirDirecto(tipo, html).then(ok => { if (!ok) _imprimirEnIframe(html); });
 }
 
 // ── Punto de entrada — Ticket de ingreso ─────────────────────
@@ -505,7 +532,7 @@ function printRepair(format) {
   // Asegurar el doc de seguimiento público (para que el QR funcione,
   // también en reparaciones viejas que se reimprimen)
   if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);
-  _openPrint(_buildA5(rep));
+  _imprimirTocando('hoja', _buildA5(rep));
 }
 
 // ══════════════════════════════════════════
@@ -737,7 +764,7 @@ function printVentaTicket(stockId, extra, formato = 'A5') {
 
   // Hoja A5: una para el cliente y otra para el negocio
   if (formato === 'A5') {
-    _openPrint(_buildVentaA5({ p, businessName, fechaVenta, horaVenta, fGarantia, qrSvgWa }),
+    _imprimirTocando('hoja', _buildVentaA5({ p, businessName, fechaVenta, horaVenta, fGarantia, qrSvgWa }),
                `Venta ${p.marca} ${p.modelo}`);
     return;
   }

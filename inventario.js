@@ -364,6 +364,9 @@ function toggleInvMenu() {
       sub: (typeof etqFormato === 'function' && typeof ETQ_FORMATO_NOMBRE === 'object')
              ? ETQ_FORMATO_NOMBRE[etqFormato()] : '',
       onClick: () => { closeInvMenu(); elegirFormatoEtiqueta(); } },
+    { icon: '🖨️', label: 'Impresión directa',
+      sub: (typeof qzMenuSub === 'function') ? qzMenuSub() : '',
+      onClick: () => { closeInvMenu(); if (typeof configurarImpresoras === 'function') configurarImpresoras(); } },
     { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },
   ]);
 }
