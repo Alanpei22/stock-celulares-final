@@ -234,17 +234,52 @@ function _etiquetaRepHtml(r) {
   const ing = r.fechaIngreso ? new Date(r.fechaIngreso).toLocaleDateString('es-AR',
         { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit' }) : '';
   const nro = String(r.nOrden || '').trim();
-  return `<div class="etqr">
+  // La clave y el patrón SÍ van acá, a diferencia de la boleta A5: la boleta
+  // se la lleva el cliente, la etiqueta queda pegada al equipo en el taller y
+  // es lo que mira el técnico para desbloquearlo.
+  const clave = String(r.codigo || '').trim();
+  const patron = _patronEtqSvg(r.patron);
+  return `<div class="etqr${clave || patron ? ' etqr--clave' : ''}">
     <div class="etqr-top">
       <div class="etqr-nro">N° ${_escEtq(nro)}</div>
       ${ing ? `<div class="etqr-fecha">${_escEtq(ing)}</div>` : ''}
     </div>
-    <div class="etqr-eq">${_escEtq(eq)}${r.color ? ' · ' + _escEtq(r.color) : ''}</div>
-    ${cli ? `<div class="etqr-cli">${_escEtq(cli)}</div>` : ''}
-    ${falla ? `<div class="etqr-falla"><b>Falla:</b> ${_escEtq(falla)}</div>` : ''}
-    ${arreglo ? `<div class="etqr-arr">${_escEtq(arreglo)}</div>` : ''}
-    <div class="etqr-pie">${r.imei ? 'IMEI …' + _escEtq(String(r.imei).slice(-6)) : ''}</div>
+    <div class="etqr-cuerpo">
+      <div class="etqr-txt">
+        <div class="etqr-eq">${_escEtq(eq)}${r.color ? ' · ' + _escEtq(r.color) : ''}</div>
+        ${cli ? `<div class="etqr-cli">${_escEtq(cli)}</div>` : ''}
+        ${falla ? `<div class="etqr-falla"><b>Falla:</b> ${_escEtq(falla)}</div>` : ''}
+        ${arreglo ? `<div class="etqr-arr">${_escEtq(arreglo)}</div>` : ''}
+        ${clave ? `<div class="etqr-clave">Clave: ${_escEtq(clave)}</div>` : ''}
+        <div class="etqr-pie">${r.imei ? 'IMEI …' + _escEtq(String(r.imei).slice(-6)) : ''}</div>
+      </div>
+      ${patron ? `<div class="etqr-patron">${patron}</div>` : ''}
+    </div>
   </div>`;
+}
+
+// El patrón de desbloqueo, dibujado para la térmica: negro sobre blanco y sin
+// grises (el de la app es violeta sobre fondo oscuro y en térmica sale una
+// mancha). El punto donde arranca va relleno y más grande, y la última línea
+// lleva flecha: sin eso no se sabe hacia dónde se dibuja.
+// `dots` = índices 0..8 de la grilla de 3×3, en el orden en que se marcan.
+function _patronEtqSvg(dots) {
+  const d = (Array.isArray(dots) ? dots : []).map(Number).filter(n => n >= 0 && n <= 8);
+  if (d.length < 2) return '';
+  const pos = i => ({ x: 15 + (i % 3) * 30, y: 15 + Math.floor(i / 3) * 30 });
+  let lineas = '';
+  for (let i = 1; i < d.length; i++) {
+    const a = pos(d[i - 1]), b = pos(d[i]);
+    lineas += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#000" stroke-width="5" stroke-linecap="round"${i === d.length - 1 ? ' marker-end="url(#pf)"' : ''}/>`;
+  }
+  let puntos = '';
+  for (let i = 0; i < 9; i++) {
+    const p = pos(i);
+    puntos += i === d[0]
+      ? `<circle cx="${p.x}" cy="${p.y}" r="8" fill="#000"/>`
+      : `<circle cx="${p.x}" cy="${p.y}" r="${d.includes(i) ? 4.5 : 2.5}" fill="#000"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90"><defs><marker id="pf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="3" markerHeight="3" orient="auto"><path d="M0,0L10,5L0,10z" fill="#000"/></marker></defs>${lineas}${puntos}</svg>`;
 }
 
 // lista = equipos (los del lote recién cargado, o uno solo desde la ficha)
@@ -274,6 +309,11 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;b
 .etqr-falla{font-size:8pt;margin-top:1.4mm;line-height:1.2;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .etqr-arr{font-size:7pt;color:#444;margin-top:.6mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .etqr-pie{font-size:6.4pt;color:#666;margin-top:auto;padding-top:1mm}
+.etqr-cuerpo{display:flex;gap:2mm;flex:1;min-height:0}
+.etqr-txt{flex:1;min-width:0;display:flex;flex-direction:column}
+.etqr-clave{font-size:8pt;font-weight:800;margin-top:.8mm;word-break:break-all}
+.etqr-patron{flex:0 0 16mm;align-self:center}
+.etqr-patron svg{display:block;width:16mm;height:16mm}
 @media print{.etq,.etqr{border-color:#ddd}}`;
 
 // ── Etiquetadora térmica ──
@@ -313,7 +353,16 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;b
 .etqr-cli{font-size:6.4pt;margin-top:.3mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .etqr-falla{font-size:7pt;margin-top:.9mm;line-height:1.2;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .etqr-arr{font-size:6.4pt;margin-top:.5mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.etqr-pie{font-size:6pt;margin-top:auto}`;
+.etqr-pie{font-size:6pt;margin-top:auto}
+.etqr-cuerpo{display:flex;gap:1mm;flex:1;min-height:0}
+.etqr-txt{flex:1;min-width:0;display:flex;flex-direction:column}
+.etqr-clave{font-size:7.5pt;font-weight:800;margin-top:.5mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etqr-patron{flex:0 0 11mm;align-self:flex-end}
+.etqr-patron svg{display:block;width:11mm;height:11mm}
+/* En 30mm de alto no hay lugar para estirar nada: cada línea mide lo suyo */
+.etqr-txt > *{flex-shrink:0}
+/* La clave le quita una línea a la falla: con 4 no entra todo */
+.etqr--clave .etqr-falla{-webkit-line-clamp:2}`;
 
 // El mismo CSS, con la página y el giro del sentido elegido.
 function _cssEtqTermica() {

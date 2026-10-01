@@ -376,6 +376,21 @@ const fnIf = printSrc.slice(printSrc.indexOf('function _imprimirEnIframe'), prin
 ok(fnIf.indexOf('document.close()') < fnIf.indexOf("addEventListener('load'"), 'el load se escucha después de escribir el iframe');
 ok(!/window\.open/.test(fnIf), 'en iframe y no en ventana: después de esperar el N° el navegador bloquearía la ventana');
 
+console.log('\n13) La clave y el patrón en la etiqueta de reparación');
+const conClave = imprimir('printEtiquetasReparaciones', [{ nOrden: 7501, marca: 'Samsung', modelo: 'A32', falla: 'No carga',
+  codigo: '147<258', patron: [0, 3, 6, 7, 8] }]);
+ok(/Clave: 147&lt;258/.test(conClave), 'la clave sale escrita (y escapada)');
+ok(/class="etqr-patron"><svg/.test(conClave), 'el patrón sale dibujado');
+ok((conClave.match(/<line /g) || []).length === 4, 'una línea por tramo del patrón', (conClave.match(/<line /g) || []).length);
+ok(/marker-end/.test(conClave) && /r="8" fill="#000"/.test(conClave), 'con el punto de arranque marcado y flecha al final: se sabe para dónde va');
+ok(!/#6366f1|#0f172a/.test(conClave), 'en negro: el violeta sobre oscuro de la app en térmica es una mancha');
+ok(/class="etqr etqr--clave"/.test(conClave), 'y con clave la falla corta antes, para que entre todo');
+const sinClave = imprimir('printEtiquetasReparaciones', [{ nOrden: 7502, marca: 'Moto', modelo: 'G54', falla: 'x', patron: [4] }]);
+ok(!/Clave:/.test(sinClave) && !/class="etqr-patron"/.test(sinClave) && !/class="etqr etqr--clave"/.test(sinClave),
+   'sin clave ni patrón (o un patrón de un solo punto) queda como antes');
+ok(!/_patronEtqSvg|etqr-clave/.test(printSrc.slice(printSrc.indexOf('function _a5Body'), printSrc.indexOf('function _a5Body') + 3000)),
+   'la boleta A5 que se lleva el cliente sigue sin clave');
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
 })().catch(e => { console.error('Error:', e); process.exit(1); });
