@@ -241,10 +241,36 @@ async function qzPrueba() {
     res.push('Etiqueta (' + c.etiqueta + '): ' +
       (await qzImprimir('etiqueta', _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep')) ? 'OK' : 'FALLÓ — ' + _qzUltimoError));
   }
-  alert('Prueba de impresión directa\n\n' + res.join('\n'));
+  alert('Prueba de impresión directa\n\n' + res.join('\n') + '\n\n' + await qzDiagnosticoConfianza());
 }
 
 function qzMenuSub() {
   const c = qzImpresoras();
   return (c.hoja || c.etiqueta) ? 'Con QZ Tray, sin diálogo' : 'Imprimir sin el diálogo (QZ Tray)';
 }
+
+// ¿Por qué QZ Tray pregunta "¿Permitir?"? Confía sin preguntar solo si la
+// firma del server coincide con el certificado que tiene instalado. Esto
+// revisa la parte que se puede ver desde la app: el certificado publicado y
+// que el server firme (si no hay clave en Vercel, firma vacía = pregunta).
+async function qzDiagnosticoConfianza() {
+  const out = [];
+  try {
+    const r = await fetch('qz-cert.pem', { cache: 'no-store' });
+    const t = r.ok ? await r.text() : '';
+    out.push(/BEGIN CERTIFICATE/.test(t) ? '✔ Certificado publicado' : '✘ No se encuentra qz-cert.pem en la app');
+  } catch { out.push('✘ No se pudo leer qz-cert.pem'); }
+  try {
+    const r = await apiFetch('/api/qz-sign', { method: 'POST', body: JSON.stringify({ data: 'prueba' }) });
+    const j = r.ok ? await r.json() : {};
+    if (r.status === 401) out.push('✘ Firma: la sesión no fue aceptada (cerrá sesión y volvé a entrar)');
+    else if (j.signature) out.push('✔ Firma: el server firma bien');
+    else if (j.skipped) out.push('✘ Firma: falta QZ_PRIVATE_KEY en Vercel (o no se hizo Redeploy después de cargarla)');
+    else out.push('✘ Firma: el server respondió ' + r.status + (j.error ? ' (' + j.error + ')' : ''));
+  } catch (e) { out.push('✘ Firma: no se pudo llamar al server'); }
+  if (out.every(l => l.startsWith('✔'))) {
+    out.push('Si igual pregunta: falta override.crt en C:\\Program Files\\QZ Tray\\ o reiniciar QZ Tray (clic derecho → Exit y abrirlo de nuevo).');
+  }
+  return 'Confianza:\n' + out.join('\n');
+}
+
