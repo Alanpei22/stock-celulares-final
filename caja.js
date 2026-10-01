@@ -2759,8 +2759,8 @@ function _onMovDescInput() {
           extra: [p.categoria, p.codigo].filter(Boolean).join(' · '),
           stock: Number(p.stock) || 0,
           precio: Number(p.precioVenta) || 0,
-          costoUSD: 0,
-          costoARS: Number(p.precioCosto) || 0,
+          costoUSD: Number(p.precioCostoUSD) || 0,
+          costoARS: (typeof invCostoARS === 'function') ? invCostoARS(p) : (Number(p.precioCosto) || 0),
           icon: '📦',
         });
       }
@@ -3040,7 +3040,8 @@ function _movDesdeCodigo(cod) {
       source: 'producto', id: prod.id, nombre: prod.nombre || '(sin nombre)',
       extra: [prod.categoria, prod.codigo].filter(Boolean).join(' · '),
       stock: Number(prod.stock) || 0, precio: Number(prod.precioVenta) || 0,
-      costoUSD: 0, costoARS: Number(prod.precioCosto) || 0, icon: '📦',
+      costoUSD: Number(prod.precioCostoUSD) || 0,
+      costoARS: (typeof invCostoARS === 'function') ? invCostoARS(prod) : (Number(prod.precioCosto) || 0), icon: '📦',
     });
     return;
   }

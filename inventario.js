@@ -3,7 +3,22 @@
 // ══════════════════════════════════════════
 
 // Colección Firestore: productos
-// Schema: { codigo, nombre, categoria, precioVenta, precioCosto, stock, stockMin, activo, fechaAlta, updatedAt }
+// Schema: { codigo, nombre, categoria, precioVenta, precioCostoUSD, precioCosto, stock, stockMin, activo, fechaAlta, updatedAt }
+//
+// El costo se carga en DÓLARES (precioCostoUSD), igual que en repuestos: la
+// mercadería se compra en dólares y el costo en pesos cambia con el dólar.
+// precioCosto (pesos) queda como el costo al momento de guardar, y es el que
+// tienen los productos cargados antes; vale solo si no hay costo en dólares.
+function invDolar() {
+  if (typeof _dolarActual === 'function') return _dolarActual() || 0;
+  if (typeof dolarBlue === 'number' && dolarBlue > 0) return dolarBlue;
+  return (typeof getCurrentDolar === 'function') ? (getCurrentDolar() || 0) : 0;
+}
+function invCostoUSD(p) { return Number(p && p.precioCostoUSD) || 0; }
+function invCostoARS(p) {
+  const usd = invCostoUSD(p), d = invDolar();
+  return usd > 0 && d > 0 ? Math.round(usd * d) : (Number(p && p.precioCosto) || 0);
+}
 
 let PRODUCTOS = [];        // array completo (onSnapshot)
 let PRODUCTOS_MAP = new Map(); // codigo → producto (O(1) lookup para POS e inventario)
@@ -39,6 +54,7 @@ function initInventario(opts = {}) {
   document.getElementById('inv-form-close').addEventListener('click', closeProductoForm);
   document.getElementById('inv-form-cancel').addEventListener('click', closeProductoForm);
   document.getElementById('inv-form-save').addEventListener('click', saveProducto);
+  document.getElementById('inv-fi-costoUSD')?.addEventListener('input', _invCostoHint);
   document.getElementById('inv-form-modal').addEventListener('click', e => {
     if (e.target.id === 'inv-form-modal') closeProductoForm();
   });
@@ -113,7 +129,7 @@ function renderInventario() {
   // Stats
   const total   = PRODUCTOS.filter(p => p.activo !== false).length;
   const bajost  = PRODUCTOS.filter(p => p.activo !== false && p.stockMin > 0 && (p.stock || 0) <= p.stockMin).length;
-  const valorT  = PRODUCTOS.filter(p => p.activo !== false).reduce((s, p) => s + (p.precioCosto || 0) * (p.stock || 0), 0);
+  const valorT  = PRODUCTOS.filter(p => p.activo !== false).reduce((s, p) => s + invCostoARS(p) * (p.stock || 0), 0);
   document.getElementById('inv-s-total').textContent  = total;
   document.getElementById('inv-s-bajo').textContent   = bajost;
   document.getElementById('inv-s-valor').textContent  = '$' + _fmtNum(valorT);
@@ -179,7 +195,8 @@ function openProductoForm(id, precodigo) {
     document.getElementById('inv-fi-nom').value   = p.nombre || '';
     document.getElementById('inv-fi-cat').value   = p.categoria || '';
     document.getElementById('inv-fi-pv').value    = p.precioVenta ?? '';
-    document.getElementById('inv-fi-pc').value    = p.precioCosto ?? '';
+    document.getElementById('inv-fi-costoUSD').value = invCostoUSD(p) || '';
+    _invCostoAnterior = Number(p.precioCosto) || 0;
     document.getElementById('inv-fi-stock').value = p.stock ?? 0;
     document.getElementById('inv-fi-stockmin').value = p.stockMin ?? 0;
     document.getElementById('inv-fi-activo').checked = p.activo !== false;
@@ -190,6 +207,7 @@ function openProductoForm(id, precodigo) {
     if (delBtn) delBtn.style.display = 'none';
   }
 
+  _invCostoHint();
   document.getElementById('inv-form-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('inv-fi-nom').focus(), 100);
 }
@@ -199,8 +217,23 @@ function closeProductoForm() {
   _invEditingId = null;
 }
 
+// Costo en pesos que tenía el producto (los cargados antes de pasar a dólares).
+// Se muestra como referencia y no se pisa si no se carga el costo en dólares.
+let _invCostoAnterior = 0;
+
+function _invCostoHint() {
+  const el = document.getElementById('inv-fi-costoARS-hint');
+  if (!el) return;
+  const usd = parseFloat(document.getElementById('inv-fi-costoUSD')?.value) || 0;
+  const d = invDolar();
+  if (usd > 0 && d > 0) el.textContent = '≈ $' + Math.round(usd * d).toLocaleString('es-AR');
+  else if (_invCostoAnterior > 0) el.textContent = '(antes $' + _invCostoAnterior.toLocaleString('es-AR') + ' en pesos)';
+  else el.textContent = '';
+}
+
 function _clearProductoForm() {
-  ['inv-fi-cod','inv-fi-nom','inv-fi-pv','inv-fi-pc'].forEach(id => {
+  _invCostoAnterior = 0;
+  ['inv-fi-cod','inv-fi-nom','inv-fi-pv','inv-fi-costoUSD'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -215,7 +248,7 @@ async function saveProducto() {
   const nom    = document.getElementById('inv-fi-nom').value.trim();
   const cat    = document.getElementById('inv-fi-cat').value;
   const pv     = parseFloat(document.getElementById('inv-fi-pv').value) || 0;
-  const pc     = parseFloat(document.getElementById('inv-fi-pc').value) || 0;
+  const costoUSD = parseFloat(document.getElementById('inv-fi-costoUSD').value) || 0;
   const stock  = parseInt(document.getElementById('inv-fi-stock').value)    || 0;
   const stmin  = parseInt(document.getElementById('inv-fi-stockmin').value) || 0;
   const activo = document.getElementById('inv-fi-activo').checked;
@@ -238,10 +271,15 @@ async function saveProducto() {
   try {
     const data = {
       codigo: cod, nombre: nom, categoria: cat,
-      precioVenta: pv, precioCosto: pc,
+      precioVenta: pv, precioCostoUSD: costoUSD,
       stock, stockMin: stmin, activo,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
+    // Pesos al dólar de hoy, para reportes y lo que lee el costo en pesos.
+    // Sin dólares cargados no se toca: un producto viejo conserva su costo.
+    const dolarHoy = invDolar();
+    if (costoUSD > 0 && dolarHoy > 0) data.precioCosto = Math.round(costoUSD * dolarHoy);
+    else if (!_invEditingId) data.precioCosto = 0;
 
     if (_invEditingId) {
       await db.collection('productos').doc(_invEditingId).update(data);
@@ -367,6 +405,8 @@ function toggleInvMenu() {
     { icon: '🖨️', label: 'Impresión directa',
       sub: (typeof qzMenuSub === 'function') ? qzMenuSub() : '',
       onClick: () => { closeInvMenu(); if (typeof configurarImpresoras === 'function') configurarImpresoras(); } },
+    { icon: '💵', label: 'Cargar costos', sub: 'En dólares, todos en una lista (modo dueño)',
+      onClick: () => { closeInvMenu(); abrirCostosInv(); } },
     { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },
   ]);
 }
@@ -425,7 +465,7 @@ async function generarCodigosInv() {
 // ══════════════════════════════════════════
 function exportInventarioCSV() {
   if (!PRODUCTOS.length) { toast('No hay productos para exportar', 'info'); return; }
-  const rows = [['codigo','nombre','categoria','stock','stockMin','precioVenta','precioCosto','activo']];
+  const rows = [['codigo','nombre','categoria','stock','stockMin','precioVenta','precioCostoUSD','precioCosto','activo']];
   PRODUCTOS.forEach(p => {
     rows.push([
       p.codigo || '',
@@ -434,7 +474,8 @@ function exportInventarioCSV() {
       p.stock ?? 0,
       p.stockMin ?? 0,
       p.precioVenta ?? 0,
-      p.precioCosto ?? 0,
+      invCostoUSD(p),
+      invCostoARS(p),
       p.activo === false ? 'no' : 'sí',
     ]);
   });
@@ -564,3 +605,107 @@ function _invWizFinish() {
   toast(`✅ Control terminado · ${_invWizStats.actualizados} actualizados · ${_invWizStats.omitidos} omitidos · ${restantes} sin revisar`, 'success');
   closeInvWizard();
 }
+
+// ══════════════════════════════════════════
+//  CARGAR COSTOS — todos en una lista
+// ══════════════════════════════════════════
+// Abrir artículo por artículo para ponerle el costo era eterno. Acá van todos
+// los de la lista que estás viendo (mismos filtros y búsqueda), con un
+// casillero de costo en dólares cada uno. Se guardan solo los que cambiaron.
+// Solo el dueño: el costo no lo ven los empleados.
+function abrirCostosInv() {
+  if (!_invIsOwner()) { toast('🔒 Activá el modo dueño para cargar costos', 'error'); return; }
+  const lista = _invFiltrados().filter(p => p.activo !== false)
+    .slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+  if (!lista.length) { toast('No hay artículos en la lista', 'error'); return; }
+  const d = invDolar();
+
+  document.getElementById('inv-costos-modal')?.remove();
+  const m = document.createElement('div');
+  m.id = 'inv-costos-modal';
+  m.className = 'modal-overlay';
+  m.innerHTML = `
+  <div class="modal-card form-card">
+    <div class="modal-header">
+      <h3>💵 Cargar costos <small style="font-weight:500;color:var(--t3)">${lista.length} artículos${d > 0 ? ' · dólar $' + d.toLocaleString('es-AR') : ''}</small></h3>
+      <button class="modal-close" onclick="cerrarCostosInv()">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:65vh;overflow:auto">
+      ${lista.map(p => {
+        const usd = invCostoUSD(p), viejo = Number(p.precioCosto) || 0;
+        return `<div class="invc-fila" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd, #e5e7eb)">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.nombre || '(sin nombre)')}</div>
+            <div style="font-size:12px;color:var(--t3)">${esc(p.codigo || 'sin código')} · venta $${(Number(p.precioVenta) || 0).toLocaleString('es-AR')}${!usd && viejo ? ' · antes $' + viejo.toLocaleString('es-AR') + ' en pesos' : ''}</div>
+          </div>
+          <span style="font-size:13px;color:var(--t3)">u$</span>
+          <input class="fi invc-usd" data-id="${esc(p.id)}" data-antes="${usd || ''}" type="number" min="0" step="0.01"
+                 inputmode="decimal" value="${usd || ''}" placeholder="0" style="width:90px"
+                 oninput="_invCostosFila(this)">
+          <span class="invc-ars" style="width:78px;font-size:12px;color:var(--t3);text-align:right">${usd && d ? '$' + Math.round(usd * d).toLocaleString('es-AR') : ''}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px">
+      <button class="btn-secondary" onclick="cerrarCostosInv()">Cancelar</button>
+      <button class="btn-primary" id="inv-costos-save" onclick="guardarCostosInv()">Guardar costos</button>
+    </div>
+  </div>`;
+  m.addEventListener('click', e => { if (e.target === m) cerrarCostosInv(); });
+  document.body.appendChild(m);
+  // Enter pasa al siguiente: cargar 50 costos sin tocar el mouse.
+  const inputs = [...m.querySelectorAll('.invc-usd')];
+  inputs.forEach((el, i) => el.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); (inputs[i + 1] || document.getElementById('inv-costos-save')).focus(); }
+  }));
+  setTimeout(() => inputs[0]?.focus(), 100);
+}
+
+function _invCostosFila(el) {
+  const usd = parseFloat(el.value) || 0, d = invDolar();
+  const ars = el.parentElement.querySelector('.invc-ars');
+  if (ars) ars.textContent = usd > 0 && d > 0 ? '$' + Math.round(usd * d).toLocaleString('es-AR') : '';
+}
+
+function cerrarCostosInv() {
+  document.getElementById('inv-costos-modal')?.remove();
+}
+
+// Lo que cambió en la lista, listo para guardar. Aparte para poder probarlo.
+function _invCostosCambios(inputs, dolar) {
+  const out = [];
+  inputs.forEach(el => {
+    const nuevo = Math.max(0, parseFloat(el.value) || 0);
+    const antes = parseFloat(el.dataset.antes) || 0;
+    if (Math.abs(nuevo - antes) < 0.005) return;
+    const data = { precioCostoUSD: nuevo };
+    if (nuevo > 0 && dolar > 0) data.precioCosto = Math.round(nuevo * dolar);
+    out.push({ id: el.dataset.id, data });
+  });
+  return out;
+}
+
+async function guardarCostosInv() {
+  const m = document.getElementById('inv-costos-modal');
+  if (!m) return;
+  const cambios = _invCostosCambios([...m.querySelectorAll('.invc-usd')], invDolar());
+  if (!cambios.length) { cerrarCostosInv(); toast('No cambiaste ningún costo', 'info'); return; }
+  const btn = document.getElementById('inv-costos-save');
+  if (btn) btn.disabled = true;
+  try {
+    // Firestore acepta hasta 500 escrituras por tanda.
+    for (let i = 0; i < cambios.length; i += 450) {
+      const batch = db.batch();
+      cambios.slice(i, i + 450).forEach(c => batch.update(db.collection('productos').doc(c.id),
+        Object.assign({}, c.data, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() })));
+      await batch.commit();
+    }
+    cerrarCostosInv();
+    toast(`✅ ${cambios.length} costo${cambios.length === 1 ? '' : 's'} guardado${cambios.length === 1 ? '' : 's'}`, 'success');
+  } catch (e) {
+    console.error('costos:', e);
+    toast('Error al guardar los costos', 'error');
+    if (btn) btn.disabled = false;
+  }
+}
+

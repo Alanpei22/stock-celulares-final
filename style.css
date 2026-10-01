@@ -6274,3 +6274,7 @@ body.chq-trabado #owner-pin-modal { z-index: 100001; }
 .chq-hoy-nota { width: 100%; color: var(--text3, #8a919b); font-style: italic; }
 .chq-hoy-ok { color: #10b981; font-weight: 700; }
 .chq-hoy-dif { color: #ef4444; font-weight: 700; }
+
+/* Un campo de formulario solo-dueño va en bloque, como los demás: con el
+   display:inline de arriba quedaba amontonado al lado del anterior. */
+body.owner-mode .fg.owner-only { display: block !important; }
