@@ -364,6 +364,18 @@ ok(/label: 'Imprimir etiquetas'/.test(fs.readFileSync(DIR + 'app.js', 'utf8')),
 ok(/_rep2Filtrados\(\)/.test(rep2.slice(rep2.indexOf('function renderRepuestos'))),
    'la lista y las etiquetas comparten el filtro');
 
+console.log('\n12) Al ingresar un equipo salen solas la hoja y la etiqueta');
+const save = rep.slice(rep.indexOf('async function saveRepair('), rep.indexOf('async function saveRepair(') + 12000);
+ok(/imprimirIngresoReparacion\(newDoc\)/.test(save), 'saveRepair imprime con el doc recién creado (REPAIRS todavía no lo tiene)');
+const fnIng = printSrc.slice(printSrc.indexOf('async function imprimirIngresoReparacion'), printSrc.indexOf('async function imprimirIngresoReparacion') + 400);
+ok(fnIng.indexOf('_buildA5') >= 0 && fnIng.indexOf('_buildA5') < fnIng.indexOf('_etiquetaRepHtml'), 'primero la hoja A5, después la etiqueta');
+ok(/await _imprimirEnIframe\(_buildA5/.test(fnIng), 'y la etiqueta espera a que se cierre el diálogo de la hoja');
+// document.open() borra los listeners de la ventana: el load puesto antes no
+// se dispara y no imprime nada (pasó al hacerlo).
+const fnIf = printSrc.slice(printSrc.indexOf('function _imprimirEnIframe'), printSrc.indexOf('async function imprimirIngresoReparacion'));
+ok(fnIf.indexOf('document.close()') < fnIf.indexOf("addEventListener('load'"), 'el load se escucha después de escribir el iframe');
+ok(!/window\.open/.test(fnIf), 'en iframe y no en ventana: después de esperar el N° el navegador bloquearía la ventana');
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
 })().catch(e => { console.error('Error:', e); process.exit(1); });

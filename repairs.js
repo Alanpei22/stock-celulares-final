@@ -1589,6 +1589,13 @@ function printPromptFmt(format) {
   printRepair(format);
 }
 
+function printPromptEtiqueta() {
+  const bar = document.getElementById('print-prompt-bar');
+  if (!bar) return;
+  bar.classList.add('hidden');
+  etiquetaReparacion(bar.dataset.repairId);
+}
+
 function printPromptDismiss() {
   const bar = document.getElementById('print-prompt-bar');
   if (bar) bar.classList.add('hidden');
@@ -1840,8 +1847,11 @@ async function saveRepair() {
         upsertSeguimientoPublico(newDoc);
       }
       closeRepairForm();
-      // Ofrecer imprimir ticket inmediatamente — MED-11: no local push, onSnapshot adds it
+      // La hoja de recepción y la etiqueta salen solas. Con newDoc y no con
+      // REPAIRS: el onSnapshot todavía no lo trajo. La barra queda para
+      // reimprimir si algo salió mal.
       _showPrintPrompt(id);
+      if (typeof imprimirIngresoReparacion === 'function') imprimirIngresoReparacion(newDoc);
       return;
     }
     closeRepairForm();

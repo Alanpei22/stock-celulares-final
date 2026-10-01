@@ -398,6 +398,54 @@ function printEtiquetasReparaciones(lista, copias) {
   _openPrint(_hojaEtiquetas(reps, _etiquetaRepHtml, 'hoja--rep'), 'Etiquetas');
 }
 
+// ── Al ingresar un equipo: la hoja y la etiqueta, solas ──────
+// Se imprimen en un iframe escondido y no en una ventana nueva: cuando se
+// guarda, la app primero espera el N° de orden a la base, y para entonces el
+// navegador ya no considera que vino de un toque y bloquea la ventana. El
+// iframe no es una ventana, así que no hay nada que bloquear.
+//
+// Van una detrás de la otra: la segunda espera a que se cierre el diálogo de
+// la primera. Si salieran juntas, Chrome muestra solo una.
+function _imprimirEnIframe(html) {
+  return new Promise(resolve => {
+    const f = document.createElement('iframe');
+    f.setAttribute('aria-hidden', 'true');
+    // Con tamaño de hoja y fuera de la pantalla: el auto-ajuste de la A5 mide
+    // el alto real, y en un iframe de 0×0 mediría cualquier cosa.
+    f.style.cssText = 'position:fixed;left:-10000px;top:0;width:210mm;height:297mm;border:0;visibility:hidden';
+    document.body.appendChild(f);
+    let listo = false;
+    const fin = () => {
+      if (listo) return;
+      listo = true;
+      // Se saca después: si se borra en el momento, algunos Chrome cortan la impresión.
+      setTimeout(() => { f.remove(); resolve(); }, 500);
+    };
+    const w = f.contentWindow;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    // El load se escucha DESPUÉS de escribir: document.open() borra los
+    // listeners de la ventana, y uno puesto antes no se dispara nunca.
+    w.addEventListener('load', () => {
+      setTimeout(() => {
+        w.addEventListener('afterprint', fin);
+        try { w.focus(); w.print(); } catch (e) { console.error('imprimir:', e); fin(); }
+        // En Chrome print() espera a que se cierre el diálogo; si el navegador
+        // no avisa con afterprint, esto destraba la cola igual.
+        setTimeout(fin, 1000);
+      }, 350);
+    });
+  });
+}
+
+async function imprimirIngresoReparacion(rep) {
+  if (!rep) return;
+  if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);
+  await _imprimirEnIframe(_buildA5(rep));
+  await _imprimirEnIframe(_hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep'));
+}
+
 // ── Punto de entrada — Ticket de ingreso ─────────────────────
 // El comprobante de RECEPCIÓN se imprime siempre en A5: es el único formato
 // que quedó (se sacaron A4, 80mm y BT del menú). El parámetro se mantiene por
