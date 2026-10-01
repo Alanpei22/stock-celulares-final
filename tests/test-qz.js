@@ -75,7 +75,7 @@ ctx.etqEsA4 = () => false;
 console.log('\n3) Si QZ Tray no está, el ingreso igual tiene su hoja');
 QZ_FALLA = true; TOASTS.length = 0;
 ok(await run("qzImprimir('hoja', '<x>')") === false, 'QZ caído devuelve false (y print.js abre el diálogo)');
-ok(TOASTS.some(t => /QZ Tray no respondió/.test(t[1])), 'y avisa que salió por el diálogo');
+ok(TOASTS.some(t => /sin QZ · sale el diálogo de siempre/.test(t[1])), 'y avisa por qué falló y que salió por el diálogo');
 QZ_FALLA = false;
 
 console.log('\n4) Enganchado en print.js');

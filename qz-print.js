@@ -146,6 +146,7 @@ async function _qzPaginasPng(html, selector, anchoMm, altoMm, dpi, byn) {
 // tipo 'etiqueta': la etiquetadora (cada .pag es una etiqueta), en el sentido
 // elegido en 📐 — el mismo tamaño de página que ya le funciona al driver.
 // Devuelve true si salió por QZ Tray; false si hay que usar el diálogo.
+let _qzUltimoError = '';
 async function qzImprimir(tipo, html) {
   const impresora = qzImpresoras()[tipo];
   if (!impresora) return false;
@@ -161,7 +162,7 @@ async function qzImprimir(tipo, html) {
   try {
     await qzConectar();
     const pngs = await _qzPaginasPng(html, pag.selector, pag.ancho, pag.alto, pag.dpi, pag.byn);
-    if (!pngs.length) return false;
+    if (!pngs.length) throw new Error('no se armó ninguna página');
     const cfg = qz.configs.create(impresora, {
       units: 'mm',
       size: { width: pag.papelAncho, height: pag.papelAlto },
@@ -175,8 +176,9 @@ async function qzImprimir(tipo, html) {
     return true;
   } catch (e) {
     console.error('QZ Tray:', e);
+    _qzUltimoError = (e && e.message) || String(e);
     if (typeof toast === 'function') {
-      toast('🖨️ QZ Tray no respondió (' + impresora + ') · sale el diálogo de siempre', 'error');
+      toast('🖨️ ' + impresora + ': ' + _qzUltimoError + ' · sale el diálogo de siempre', 'error');
     }
     return false;
   }
@@ -221,6 +223,25 @@ async function configurarImpresoras() {
   if (typeof toast === 'function') {
     toast('🖨️ Hojas: ' + (hoja || 'diálogo') + ' · Etiquetas: ' + (etiqueta || 'diálogo'), 'success');
   }
+  if ((hoja || etiqueta) && confirm('¿Imprimo una prueba en cada impresora elegida?')) qzPrueba();
+}
+
+// Prueba de punta a punta: lo mismo que sale al ingresar un equipo, con una
+// reparación inventada. Si algo falla dice QUÉ, en vez de caer al diálogo
+// callado y dejarte sin saber por qué no imprime solo.
+async function qzPrueba() {
+  const rep = { id: 'prueba', nOrden: 'PRUEBA', marca: 'Prueba', modelo: 'de impresión', nombre: 'TechPoint',
+    falla: 'Si esto salió sin diálogo, la impresión directa anda.', arreglo: '', monto: 0, sena: 0,
+    fechaIngreso: new Date().toISOString(), accesorios: '', observaciones: '', checklist: {} };
+  const c = qzImpresoras(), res = [];
+  if (c.hoja && typeof _buildA5 === 'function') {
+    res.push('Hoja (' + c.hoja + '): ' + (await qzImprimir('hoja', _buildA5(rep)) ? 'OK' : 'FALLÓ — ' + _qzUltimoError));
+  }
+  if (c.etiqueta && typeof _hojaEtiquetas === 'function') {
+    res.push('Etiqueta (' + c.etiqueta + '): ' +
+      (await qzImprimir('etiqueta', _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep')) ? 'OK' : 'FALLÓ — ' + _qzUltimoError));
+  }
+  alert('Prueba de impresión directa\n\n' + res.join('\n'));
 }
 
 function qzMenuSub() {
