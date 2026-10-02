@@ -90,27 +90,6 @@ window._cajaCleanup = function() {
 //  DARK MODE
 // ══════════════════════════════════════════
 
-function initDarkMode() {
-  const dm = localStorage.getItem('darkMode');
-  if (dm === '1') document.body.classList.add('dark');
-  else document.body.classList.remove('dark');
-  _updateDarkIcon();
-}
-
-function toggleDarkMode() {
-  const isDark = document.body.classList.toggle('dark');
-  localStorage.setItem('darkMode', isDark ? '1' : '0');
-  _updateDarkIcon();
-}
-
-function _updateDarkIcon() {
-  // LOW-01: actualizar solo el span del ícono, no el textContent completo del botón
-  const icon = document.querySelector('.dark-toggle-btn .dark-icon');
-  if (!icon) return;
-  const isDark = document.body.classList.contains('dark');
-  icon.textContent = isDark ? '☀️' : '🌙';
-}
-
 // ══════════════════════════════════════════
 //  AUTH — Firebase
 // ══════════════════════════════════════════
@@ -1000,55 +979,7 @@ function _renderTurnoSep(c) {
 // ══════════════════════════════════════════
 //  BOTTOM SHEET — menú deslizante reutilizable
 // ══════════════════════════════════════════
-let _sheetItems = [];
 let _sheetHideTimer = null; // BUG-FIX: cancelable
-
-function openSheet(title, items) {
-  // Cancelar cualquier close pendiente
-  if (_sheetHideTimer) { clearTimeout(_sheetHideTimer); _sheetHideTimer = null; }
-
-  _sheetItems = items.filter(it => !it.hide);
-  const titleEl = document.getElementById('sheet-title');
-  const cont    = document.getElementById('sheet-items');
-  const overlay = document.getElementById('sheet-overlay');
-  const sheet   = document.getElementById('sheet');
-  if (!titleEl || !cont || !overlay || !sheet) return;
-
-  titleEl.textContent = title || '';
-  cont.innerHTML = _sheetItems.map((it, i) => {
-    if (it.divider) return '<div class="sheet-sep"></div>';
-    const cls = 'sheet-item' + (it.danger ? ' sheet-item--danger' : '');
-    return `<button class="${cls}" type="button" onclick="_sheetItemClick(${i})">
-      <span class="sheet-item-icon">${it.icon || ''}</span>
-      <span class="sheet-item-label">${it.label}</span>
-      ${it.sub ? `<span class="sheet-item-sub">${it.sub}</span>` : ''}
-    </button>`;
-  }).join('');
-
-  overlay.classList.remove('hidden');
-  sheet.classList.remove('hidden');
-  requestAnimationFrame(() => sheet.classList.add('sheet--open'));
-}
-
-function closeSheet() {
-  const overlay = document.getElementById('sheet-overlay');
-  const sheet   = document.getElementById('sheet');
-  if (!sheet) return;
-  sheet.classList.remove('sheet--open');
-  if (_sheetHideTimer) clearTimeout(_sheetHideTimer);
-  _sheetHideTimer = setTimeout(() => {
-    overlay?.classList.add('hidden');
-    sheet.classList.add('hidden');
-    _sheetHideTimer = null;
-  }, 280);
-}
-
-function _sheetItemClick(i) {
-  const it = _sheetItems[i];
-  if (!it) return;
-  closeSheet();
-  if (it.onClick) setTimeout(() => it.onClick(), 220);
-}
 
 // ── Menú caja (bottom sheet) ──
 function toggleCajaMenu() {
@@ -3122,7 +3053,6 @@ function _selectMovSuggestion(idx) {
   _addToCart(r);
 }
 
-
 // ══════════════════════════════════════════
 //  CARRITO DE VENTA (varios productos)
 // ══════════════════════════════════════════
@@ -3372,11 +3302,6 @@ function _repairCartLineHtml() {
                oninput="_setRepairAmt(this.value)">
       </div>
     </div>`;
-}
-
-function _hideQtyPicker() {
-  const wrap = document.getElementById('mov-sale-item-info');
-  if (wrap) { wrap.classList.add('hidden'); wrap.innerHTML = ''; }
 }
 
 function _clearSaleItem(clearText = true) {
@@ -4593,15 +4518,6 @@ async function saveCierreParcial() {
 // LOW-03: esc() defined in utils.js — duplicate removed
 
 // fmt() vive en utils.js — se movió porque index.html no carga caja.js.
-
-function toast(msg, type = 'success') {
-  const el = document.createElement('div');
-  el.className = `toast toast-${type}`;
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.classList.add('show'), 10);
-  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
-}
 
 // ══════════════════════════════════════════
 //  REPORTE DE CIERRE DEL DÍA

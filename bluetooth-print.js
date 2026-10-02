@@ -8,27 +8,6 @@
 const TERM_WIDTH = 32; // caracteres por línea en 58mm (fuente A)
 
 // ── Helpers de formato de texto ─────────────
-function termLine(ch = '-') { return ch.repeat(TERM_WIDTH); }
-
-function termCenter(text) {
-  text = String(text || '');
-  if (text.length >= TERM_WIDTH) return text.slice(0, TERM_WIDTH);
-  const pad = Math.floor((TERM_WIDTH - text.length) / 2);
-  return ' '.repeat(pad) + text;
-}
-
-// Texto a izquierda + valor a derecha en la misma línea
-function termLR(left, right) {
-  left = String(left || ''); right = String(right || '');
-  const space = TERM_WIDTH - left.length - right.length;
-  if (space < 1) {
-    // No entra en una línea → cortar el left
-    const maxLeft = Math.max(0, TERM_WIDTH - right.length - 1);
-    left = left.slice(0, maxLeft);
-    return left + ' ' + right;
-  }
-  return left + ' '.repeat(space) + right;
-}
 
 // Envuelve texto largo en varias líneas de 32
 function termWrap(text) {

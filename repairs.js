@@ -502,12 +502,6 @@ function initRepairs() {
 }
 
 // ── Filtro rápido desde stat bar ──────────
-function filterRepsByStatus(status) {
-  const sel = document.getElementById('rep-f-estado');
-  if (!sel) return;
-  sel.value = sel.value === status ? '' : status;
-  renderRepairs();
-}
 
 // ── Render ────────────────────────────────
 // Demorado con respaldo por si tp-fases.js no cargó (la regla vieja: más de
@@ -1653,13 +1647,6 @@ function _showPrintPrompt(repairId) {
   bar.dataset.repairId = repairId;
   clearTimeout(bar._hideTimer);
   bar._hideTimer = setTimeout(() => bar.classList.add('hidden'), 15000);
-}
-
-function printPromptAction() {
-  const bar = document.getElementById('print-prompt-bar');
-  if (!bar) return;
-  bar.classList.add('hidden');
-  openTicket(bar.dataset.repairId);
 }
 
 // Imprimir el comprobante de recepción directo en el tamaño elegido
@@ -2980,7 +2967,6 @@ function buildAndSendPendingWA(tipo) {
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
 }
 
-
 // ── Eliminar ──────────────────────────────
 async function deleteRepair(id) {
   const r = REPAIRS.find(x => x.id === id);
@@ -3774,144 +3760,6 @@ function _filterRepairsByEstado(estado) {
 // existe en ningún lado: el botón no hacía nada.
 function sendWAToCustomer(repairId) {
   if (typeof repairWhatsApp === 'function') repairWhatsApp(repairId);
-}
-
-function buildStatsMonthHTML_LEGACY(now, thisMonth) {
-  const reparando = REPAIRS.filter(r => r.estado === 'reparando').length;
-  const listo     = REPAIRS.filter(r => r.estado === 'listo').length;
-  const demorados = REPAIRS.filter(_repDemorado).length;
-
-  const mesReps    = REPAIRS.filter(r => r.fechaIngreso && r.fechaIngreso.startsWith(thisMonth));
-  const mesTotal   = mesReps.length;
-  const mesEntregados = mesReps.filter(r => r.estado === 'entregado').length;
-  const mesIngreso = mesReps.reduce((s, r) => s + (r.monto || 0), 0);
-  const mesGanancia = mesReps.filter(r => r.costo).reduce((s, r) => s + (r.monto || 0) - (r.costo || 0), 0);
-  const mesSeñas   = mesReps.reduce((s, r) => s + (r.sena || 0), 0);
-  const promedio   = mesTotal > 0 ? Math.round(mesIngreso / mesTotal) : 0;
-  const garantiasMes = mesReps.filter(r => r.esGarantia).length;
-
-  // Top arreglos del mes
-  const arregloCount = {};
-  mesReps.forEach(r => {
-    if (r.arreglo) arregloCount[r.arreglo] = (arregloCount[r.arreglo] || 0) + 1;
-  });
-  const topArreglos = Object.entries(arregloCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-  const mesLabel = now.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-
-  return `
-    <p class="stats-period-label">${mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)}</p>
-    <div class="ss-grid">
-      <div class="ss-card"><div class="ss-num">${reparando}</div><div class="ss-lbl">🔧 En reparación</div></div>
-      <div class="ss-card ss-green"><div class="ss-num">${listo}</div><div class="ss-lbl">✅ Listos p/ retirar</div></div>
-      <div class="ss-card ss-blue"><div class="ss-num">${mesTotal}</div><div class="ss-lbl">📥 Ingresados mes</div></div>
-      <div class="ss-card ss-blue"><div class="ss-num">${mesEntregados}</div><div class="ss-lbl">📦 Entregados mes</div></div>
-      <div class="ss-card ss-green"><div class="ss-num">$${mesIngreso.toLocaleString('es-AR')}</div><div class="ss-lbl">💰 Recaudado mes</div></div>
-      ${mesGanancia > 0 ? `<div class="ss-card ss-green"><div class="ss-num">$${mesGanancia.toLocaleString('es-AR')}</div><div class="ss-lbl">📈 Ganancia mes</div></div>` : ''}
-      ${mesSeñas > 0 ? `<div class="ss-card"><div class="ss-num">$${mesSeñas.toLocaleString('es-AR')}</div><div class="ss-lbl">🤝 Señas recibidas</div></div>` : ''}
-      ${promedio > 0 ? `<div class="ss-card"><div class="ss-num">$${promedio.toLocaleString('es-AR')}</div><div class="ss-lbl">📊 Promedio por rep.</div></div>` : ''}
-      ${demorados > 0 ? `<div class="ss-card" style="border-left:3px solid #ef4444"><div class="ss-num" style="color:#ef4444">${demorados}</div><div class="ss-lbl">⚠️ Demorados +3días</div></div>` : ''}
-      ${garantiasMes > 0 ? `<div class="ss-card"><div class="ss-num">${garantiasMes}</div><div class="ss-lbl">🔄 Garantías mes</div></div>` : ''}
-    </div>
-
-    ${topArreglos.length > 0 ? `
-    <h4 class="hist-title" style="margin-top:12px">Top reparaciones del mes</h4>
-    ${topArreglos.map(([arreglo, count], i) => `
-      <div class="hist-item">
-        <div class="hist-item-info"><div class="hist-item-name">${i + 1}. ${esc(arreglo)}</div></div>
-        <span class="badge bg-reparando">${count}</span>
-      </div>`).join('')}` : ''}
-  `;
-}
-
-function buildStatsAnnualHTML_LEGACY(now, thisYear, thisMonth) {
-  const yearReps = REPAIRS.filter(r => r.fechaIngreso && r.fechaIngreso.startsWith(String(thisYear)));
-  const yearTotal    = yearReps.length;
-  const yearIngreso  = yearReps.reduce((s, r) => s + (r.monto || 0), 0);
-  const yearGanancia = yearReps.filter(r => r.costo).reduce((s, r) => s + (r.monto || 0) - (r.costo || 0), 0);
-  const yearEntregados = yearReps.filter(r => r.estado === 'entregado').length;
-  const garantiasYear = yearReps.filter(r => r.esGarantia).length;
-
-  // Historial mensual del año
-  const byMonth = {};
-  yearReps.forEach(r => {
-    const d   = new Date(r.fechaIngreso);
-    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    const lbl = d.toLocaleDateString('es-AR', { month: 'long' });
-    if (!byMonth[key]) byMonth[key] = { label: lbl, count: 0, ingresos: 0, ganancia: 0 };
-    byMonth[key].count++;
-    byMonth[key].ingresos += r.monto || 0;
-    if (r.costo) byMonth[key].ganancia += (r.monto || 0) - (r.costo || 0);
-  });
-  const monthKeys = Object.keys(byMonth).sort().reverse();
-  const bestMonth = monthKeys.reduce((best, k) => (!best || byMonth[k].count > byMonth[best].count) ? k : best, null);
-  const avgMensual = monthKeys.length > 0 ? Math.round(yearTotal / monthKeys.length) : 0;
-
-  // Top arreglos del año
-  const arregloCount = {};
-  yearReps.forEach(r => {
-    if (r.arreglo) arregloCount[r.arreglo] = (arregloCount[r.arreglo] || 0) + 1;
-  });
-  const topArreglos = Object.entries(arregloCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-  // Tiempo promedio por tipo
-  const avgByTipo = {};
-  REPAIRS.filter(r => r.estado === 'entregado' && r.fechaIngreso && r.fechaEntrega && r.arreglo
-    && r.fechaIngreso.startsWith(String(thisYear)))
-    .forEach(r => {
-      const dias = (new Date(r.fechaEntrega) - new Date(r.fechaIngreso)) / 86400000;
-      if (!avgByTipo[r.arreglo]) avgByTipo[r.arreglo] = { sum: 0, cnt: 0 };
-      avgByTipo[r.arreglo].sum += dias;
-      avgByTipo[r.arreglo].cnt++;
-    });
-  const avgTipoRows = Object.entries(avgByTipo)
-    .map(([tipo, v]) => ({ tipo, avg: v.sum / v.cnt, cnt: v.cnt }))
-    .sort((a, b) => b.cnt - a.cnt).slice(0, 6);
-
-  return `
-    <p class="stats-period-label">Año ${thisYear}</p>
-    <div class="ss-grid">
-      <div class="ss-card ss-blue"><div class="ss-num">${yearTotal}</div><div class="ss-lbl">📋 Total año</div></div>
-      <div class="ss-card ss-blue"><div class="ss-num">${yearEntregados}</div><div class="ss-lbl">📦 Entregados</div></div>
-      <div class="ss-card ss-green"><div class="ss-num">$${yearIngreso.toLocaleString('es-AR')}</div><div class="ss-lbl">💰 Recaudado año</div></div>
-      ${yearGanancia > 0 ? `<div class="ss-card ss-green"><div class="ss-num">$${yearGanancia.toLocaleString('es-AR')}</div><div class="ss-lbl">📈 Ganancia año</div></div>` : ''}
-      ${avgMensual > 0 ? `<div class="ss-card"><div class="ss-num">${avgMensual}</div><div class="ss-lbl">📊 Promedio mensual</div></div>` : ''}
-      ${garantiasYear > 0 ? `<div class="ss-card"><div class="ss-num">${garantiasYear}</div><div class="ss-lbl">🔄 Garantías año</div></div>` : ''}
-    </div>
-
-    <h4 class="hist-title" style="margin-top:12px">Historial mensual ${thisYear}</h4>
-    ${monthKeys.length === 0
-      ? '<p class="hist-empty">Sin datos aún</p>'
-      : monthKeys.map(k => {
-          const m = byMonth[k];
-          const isBest = k === bestMonth && monthKeys.length > 1;
-          return `<div class="hist-month">
-            <div class="hist-month-hdr">
-              <span class="hist-month-name">${m.label.charAt(0).toUpperCase() + m.label.slice(1)}${isBest ? ' 🏆' : ''}</span>
-              <span class="hist-month-stats">${m.count} rep. · $${m.ingresos.toLocaleString('es-AR')}</span>
-            </div>
-          </div>`;
-        }).join('')}
-
-    ${topArreglos.length > 0 ? `
-    <h4 class="hist-title" style="margin-top:12px">Top reparaciones del año</h4>
-    ${topArreglos.map(([arreglo, count], i) => `
-      <div class="hist-item">
-        <div class="hist-item-info"><div class="hist-item-name">${i + 1}. ${esc(arreglo)}</div></div>
-        <span class="badge bg-reparando">${count}</span>
-      </div>`).join('')}` : ''}
-
-    ${avgTipoRows.length > 0 ? `
-    <h4 class="hist-title" style="margin-top:12px">⏱ Tiempo promedio por tipo</h4>
-    ${avgTipoRows.map(row => `
-      <div class="hist-item">
-        <div class="hist-item-info">
-          <div class="hist-item-name">${esc(row.tipo)}</div>
-          <div class="hist-item-specs">${row.cnt} entregados</div>
-        </div>
-        <span class="badge bg-entregado">${row.avg < 1 ? '<1 día' : Math.round(row.avg) + ' día' + (Math.round(row.avg) !== 1 ? 's' : '')}</span>
-      </div>`).join('')}` : ''}
-  `;
 }
 
 // ── Importar historial ────────────────────

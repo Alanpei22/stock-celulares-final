@@ -321,11 +321,6 @@ function startCrossDeviceListener() {
   }
 }
 
-function stopCrossDeviceListener() {
-  if (_crossDeviceListener) { _crossDeviceListener(); _crossDeviceListener = null; }
-  if (_crossDeviceListenerRepairs) { _crossDeviceListenerRepairs(); _crossDeviceListenerRepairs = null; }
-}
-
 function _showLocalNotif({ title, body, tag, url }) {
   if (Notification.permission !== 'granted') return;
   // Preferir SW notification (más confiable en mobile)

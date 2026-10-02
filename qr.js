@@ -382,9 +382,4 @@ function qrSvg(texto, mm = 25, quiet = 4) {
     `<path d="${path}" fill="#000"/></svg>`;
 }
 
-// Igual pero como data URI, para usar en <img src="...">
-function qrDataUri(texto, mm = 25, quiet = 4) {
-  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(qrSvg(texto, mm, quiet))));
-}
-
 if (typeof module !== 'undefined') module.exports = { qrMatriz, qrSvg, _qrECC, _qrFormato, _qrCodewords, _qrEntrelazar };

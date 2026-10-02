@@ -165,28 +165,6 @@ function listenStock() {
 }
 
 // ── Modo Oscuro ────────────────────────────────────────────
-function initDarkMode() {
-  if (localStorage.getItem('darkMode') === '1') {
-    document.body.classList.add('dark');
-  }
-  _updateDarkIcon();
-}
-
-function toggleDarkMode() {
-  document.body.classList.toggle('dark');
-  localStorage.setItem('darkMode', document.body.classList.contains('dark') ? '1' : '0');
-  _updateDarkIcon();
-}
-
-function _updateDarkIcon() {
-  const isDark = document.body.classList.contains('dark');
-  document.querySelectorAll('.dark-toggle-btn').forEach(btn => {
-    const iconEl = btn.querySelector('.dark-icon');
-    if (iconEl) iconEl.textContent = isDark ? '☀️' : '🌙';
-    else btn.textContent = isDark ? '☀️' : '🌙';
-    btn.title = isDark ? 'Modo claro' : 'Modo oscuro';
-  });
-}
 
 // ── Backup Automático ──────────────────────────────────────
 async function autoBackup() {
@@ -430,11 +408,6 @@ function saveBizData() {
   if (db) db.collection('config').doc('appSettings').set({ bizData: BIZ_DATA }, { merge: true }).catch(() => {});
 }
 
-function loadStock() {
-  try { STOCK = JSON.parse(localStorage.getItem(STOCK_KEY) || '[]'); } catch { STOCK = []; }
-}
-function saveStock() { localStorage.setItem(STOCK_KEY, JSON.stringify(STOCK)); }
-
 // ── Config: localStorage (caché) + Firestore (persistencia) ──
 function loadConfig() {
   // Carga instantánea desde localStorage (caché)
@@ -655,56 +628,6 @@ function _initBannersAutoRefresh() {
 // ══════════════════════════════════════════
 //  BOTTOM SHEET — menú deslizante reutilizable
 // ══════════════════════════════════════════
-let _sheetItems = [];
-let _sheetHideTimer = null; // BUG-FIX: cancelable para evitar que un close en transición tape un open nuevo
-
-function openSheet(title, items) {
-  // Cancelar cualquier close pendiente — si se abre un sheet nuevo, no debemos ocultarlo
-  if (_sheetHideTimer) { clearTimeout(_sheetHideTimer); _sheetHideTimer = null; }
-
-  _sheetItems = items.filter(it => !it.hide);
-  const titleEl = document.getElementById('sheet-title');
-  const cont    = document.getElementById('sheet-items');
-  const overlay = document.getElementById('sheet-overlay');
-  const sheet   = document.getElementById('sheet');
-  if (!titleEl || !cont || !overlay || !sheet) return;
-
-  titleEl.textContent = title || '';
-  cont.innerHTML = _sheetItems.map((it, i) => {
-    if (it.divider) return '<div class="sheet-sep"></div>';
-    const cls = 'sheet-item' + (it.danger ? ' sheet-item--danger' : '');
-    return `<button class="${cls}" type="button" data-i="${i}" onclick="_sheetItemClick(${i})">
-      <span class="sheet-item-icon">${it.icon || ''}</span>
-      <span class="sheet-item-label">${it.label}</span>
-      ${it.sub ? `<span class="sheet-item-sub">${it.sub}</span>` : ''}
-    </button>`;
-  }).join('');
-
-  overlay.classList.remove('hidden');
-  sheet.classList.remove('hidden');
-  // Trigger transition
-  requestAnimationFrame(() => sheet.classList.add('sheet--open'));
-}
-
-function closeSheet() {
-  const overlay = document.getElementById('sheet-overlay');
-  const sheet   = document.getElementById('sheet');
-  if (!sheet) return;
-  sheet.classList.remove('sheet--open');
-  if (_sheetHideTimer) clearTimeout(_sheetHideTimer);
-  _sheetHideTimer = setTimeout(() => {
-    overlay?.classList.add('hidden');
-    sheet.classList.add('hidden');
-    _sheetHideTimer = null;
-  }, 280);
-}
-
-function _sheetItemClick(i) {
-  const it = _sheetItems[i];
-  if (!it) return;
-  closeSheet();
-  if (it.onClick) setTimeout(() => it.onClick(), 220);
-}
 
 // ── Menús por sección (cada uno construye sus items) ─────
 function toggleHdrMenu() {
@@ -779,12 +702,10 @@ function toggleDashMenu() {
     { icon: '🔔', label: 'Notificaciones', sub: 'Push + avisos in-app', onClick: () => (typeof openNotifConfig === 'function') && openNotifConfig() },
     { divider: true },
     { icon: '💰', label: 'Ir a caja', onClick: () => location.href = 'caja.html' },
-    { icon: '🛒', label: 'Punto de venta', onClick: () => location.href = 'pos.html' },
     { divider: true },
     { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
   ]);
 }
-function closeDashMenu() { closeSheet(); }
 
 // ── Secciones ─────────────────────────────────────────────
 function switchSection(section) {
@@ -875,7 +796,6 @@ function renderDashFollowUps() {
   if (badge) badge.style.display = pend.length ? '' : 'none';
   _refreshDashIfVisible();
 }
-function loadDashCaja() { return _loadDashPeriodo(); }
 
 // ── Saludo ──
 function _renderDashSaludo() {
@@ -1174,16 +1094,6 @@ function _syncSidebar(sec) {
     const el = document.getElementById(map[k]);
     if (el) el.classList.toggle('active', k === sec);
   });
-}
-
-async function ackFollowUp(id) {
-  try {
-    await db.collection('repairs').doc(id).update({ seguimientoAck: true });
-    const r = REPAIRS.find(x => x.id === id);
-    if (r) r.seguimientoAck = true;
-    renderDashFollowUps();
-    toast('Recordatorio marcado como listo', 'success');
-  } catch(e) { toast('Error al actualizar', 'error'); }
 }
 
 // ── Render ────────────────────────────────────────────────
@@ -1753,15 +1663,6 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('es-AR', {
     timeZone: TZ, day: '2-digit', month: 'short', year: 'numeric'
   });
-}
-function fmtTime(iso) {
-  return new Date(iso).toLocaleTimeString('es-AR', {
-    timeZone: TZ, hour: '2-digit', minute: '2-digit'
-  });
-}
-function nowAR() {
-  // Retorna string ISO en hora AR (para guardar en Firestore)
-  return new Date().toLocaleString('sv-SE', { timeZone: TZ }).replace(' ', 'T') + ':00.000Z';
 }
 
 // ── WhatsApp ──────────────────────────────────────────────
@@ -2705,12 +2606,6 @@ function updateBizPreview() {
 }
 
 // ── Toast ─────────────────────────────────────────────────
-let toastTimer;
-function toast(msg, type) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'toast show ' + (type || 'info');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
-}
 
 // ── PWA ───────────────────────────────────────────────────
 function initPWA() {
@@ -2832,7 +2727,6 @@ function toggleMoneda() {
     input.value = '';
   }
 }
-
 
 // WA_TEMPLATES declared at top of file (see top of app.js)
 
@@ -2961,11 +2855,6 @@ function closeAccessLogModal() {
 }
 
 // ── AGREGAR STOCK DESDE IA CHAT ───────────────────────────
-async function addPhoneFromAI(phone) {
-  const ref = db.collection('stock').doc();
-  phone.id = ref.id;
-  await ref.set(phone);
-}
 
 // ── IA ────────────────────────────────────────────────────
 async function callAI(action, data) {

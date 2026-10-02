@@ -48,6 +48,8 @@ vm.runInContext(`
   var fmtNum = n => String(n);
   var fmtMoney = n => '$' + n;
   var safeListener = (prev, crear) => { if (prev) prev(); return crear(); };
+  var initDarkMode = () => {}; var toggleDarkMode = () => {};
+  var openSheet = () => {}; var closeSheet = () => {};
 `, ctx);
 vm.runInContext(fs.readFileSync(DIR + 'inventario.js', 'utf8'), ctx, { filename: 'inventario.js' });
 vm.runInContext(fs.readFileSync(DIR + 'caja.js', 'utf8'), ctx, { filename: 'caja.js' });

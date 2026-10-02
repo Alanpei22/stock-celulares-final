@@ -234,15 +234,6 @@ function _js(s) {
   return esc(String(s ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
 }
 
-function toast(msg, type = 'success') {
-  const el = document.createElement('div');
-  el.className = `toast toast-${type}`;
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.classList.add('show'), 10);
-  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
-}
-
 function _sintoma(id)  { return PL_SINTOMAS.find(s => s.id === id) || PL_SINTOMAS[PL_SINTOMAS.length - 1]; }
 function _estado(id)   { return PL_ESTADOS.find(e => e.id === id)  || PL_ESTADOS[0]; }
 function _resultado(id){ return PL_RESULTADOS.find(r => r.id === (id || '')) || PL_RESULTADOS[0]; }
@@ -265,16 +256,6 @@ function _horaCorta(iso) {
 // ══════════════════════════════════════════════════════════
 //  DARK MODE + BOOT
 // ══════════════════════════════════════════════════════════
-
-function initDarkMode() {
-  if (localStorage.getItem('darkMode') === '1') document.body.classList.add('dark');
-  else document.body.classList.remove('dark');
-}
-
-function toggleDarkMode() {
-  const isDark = document.body.classList.toggle('dark');
-  localStorage.setItem('darkMode', isDark ? '1' : '0');
-}
 
 function showApp() {
   document.getElementById('login-screen').style.display = 'none';

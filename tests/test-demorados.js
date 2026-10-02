@@ -67,7 +67,11 @@ const rep = fs.readFileSync(DIR + 'repairs.js', 'utf8');
 const app = fs.readFileSync(DIR + 'app.js', 'utf8');
 ok(!/> 3\)\.length/.test(rep.replace(/function _repDemorado[\s\S]*?\n}\n/, '')),
    'repairs.js ya no cuenta "más de 3 días" por su lado');
-ok((rep.match(/_repDemorado\)/g) || []).length >= 3, 'estadísticas (estado actual, lista de demoradas y resumen) usan la misma');
+// Eran 3 lugares; el tercero vivia en buildStatsMonthHTML_LEGACY, la pantalla
+// de estadisticas vieja que se borro por no llamarla nadie. Quedan los dos que
+// se ven: el numero de arriba y la lista de demoradas.
+ok((rep.match(/_repDemorado\)/g) || []).length >= 2, 'el numero y la lista de demoradas usan la misma cuenta',
+   (rep.match(/_repDemorado\)/g) || []).length);
 ok(/if \(!tpDemorado\(r\)\) return false/.test(rep), 'el filtro de la lista');
 ok(/BASE\.filter\(r => _tpOn \? tpDemorado\(r\)/.test(rep), 'el número de arriba');
 ok(/_repDemorado\(r\)/.test(app), 'y el panel de inicio');

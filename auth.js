@@ -13,8 +13,6 @@ function currentUser() {
   try { return _a().currentUser; } catch { return null; }
 }
 
-function isAuthed() { return !!currentUser(); }
-
 // ── onAuthStateChanged con Promise ───────────────────────
 // Resuelve una única vez cuando Firebase decide si hay sesión.
 function waitForAuth() {
@@ -25,8 +23,6 @@ function waitForAuth() {
     });
   });
 }
-
-function onAuthChange(cb) { return _a().onAuthStateChanged(cb); }
 
 // ── Login ─────────────────────────────────────────────────
 async function signIn(email, password) {

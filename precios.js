@@ -844,12 +844,6 @@ function _addCategoriaToModelo() {
   _addVariante(equipo, disponibles[idx]);
 }
 
-function _toggleRepModelo(equipo) {
-  if (_reparOpenModelos.has(equipo)) _reparOpenModelos.delete(equipo);
-  else _reparOpenModelos.add(equipo);
-  _renderReparTab();
-}
-
 // Mostrar/ocultar botón ✕ del buscador según haya texto
 function _repSearchToggleClear() {
   const inp = document.getElementById('rep-tab-search');
@@ -999,20 +993,6 @@ function _onPrecioInlineKey(e) {
     if (p) e.target.value = p.precio || '';
     e.target.blur();
   }
-}
-
-function _addServicioAModelo(equipo) {
-  // Reutilizar openPrecioForm con un equipo pre-llenado
-  openPrecioForm(null);
-  // Override post-apertura: setear equipo y título contextual
-  setTimeout(() => {
-    const eq = document.getElementById('precio-fi-equipo');
-    if (eq) eq.value = equipo;
-    const title = document.getElementById('precio-form-title');
-    if (title) title.textContent = '➕ Servicio para ' + equipo;
-    // Foco en el select de tipo (no en equipo, que ya está cargado)
-    document.getElementById('precio-fi-tipo')?.focus();
-  }, 130);
 }
 
 async function _deleteModeloComplete(equipo) {
@@ -1278,7 +1258,6 @@ async function _pwizGuardar() {
       : 'Error al guardar el modelo', 'error');
   }
 }
-
 
 // Importar modelos del catálogo de proveedor (modulos_catalog.js)
 function _bulkImportCatalog() {

@@ -46,12 +46,6 @@ function fmtNum(n) {
 }
 
 // ── Fechas ─────────────────────────────────────────────────
-// Fecha legible: "05/04/2025"
-function fmtDateShort(iso) {
-  if (!iso) return '—';
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
-}
 
 // Fecha actual en zona Argentina (UTC-3)
 function todayAR() {
@@ -365,6 +359,115 @@ function tgHora() {
 // Formato $ para los mensajes
 function tgMonto(n) {
   return '$' + Math.round(Number(n) || 0).toLocaleString('es-AR');
+}
+
+// ══════════════════════════════════════════════════════════
+//  LO QUE USAN TODAS LAS PANTALLAS
+//  ─────────────────────────────────────────────────────────
+//  El aviso de abajo, el menú deslizante y el modo oscuro estaban copiados en
+//  app.js, caja.js y placas.js — tres copias que se fueron separando solas.
+//  El `toast` de la caja, por ejemplo, armaba la clase `toast-error`, que no
+//  existe en el CSS: en la pantalla que maneja plata, un error se veía igual
+//  que un "guardado". Y el modo oscuro de la caja actualizaba el ícono de UN
+//  botón y el de app.js el de todos.
+//
+//  Ahora hay una sola copia acá. utils.js lo cargan index.html, caja.html,
+//  placas.html, login.html y bulk-edit: lo que se arregle acá, se arregla en
+//  todos lados.
+// ══════════════════════════════════════════════════════════
+
+// ── Aviso de abajo ──
+// Usa el div #toast si la página lo trae (index.html) y si no lo crea. Las
+// clases son las del CSS de siempre: success, error, info.
+let _toastTimer = null;
+function toast(msg, tipo) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = 'toast ' + (tipo || 'info');
+  // Un respiro antes de `show` para que la transición se vea también la
+  // primera vez, cuando el div acaba de nacer.
+  setTimeout(() => el.classList.add('show'), 10);
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Menú deslizante de abajo ──
+// Las páginas que no tienen el markup del sheet (placas) no revientan: se sale.
+let _sheetItems = [];
+let _sheetHideTimer = null;   // cancelable: un close en transición no tapa un open nuevo
+
+function openSheet(title, items) {
+  if (_sheetHideTimer) { clearTimeout(_sheetHideTimer); _sheetHideTimer = null; }
+  _sheetItems = items.filter(it => !it.hide);
+  const titleEl = document.getElementById('sheet-title');
+  const cont    = document.getElementById('sheet-items');
+  const overlay = document.getElementById('sheet-overlay');
+  const sheet   = document.getElementById('sheet');
+  if (!titleEl || !cont || !overlay || !sheet) return;
+
+  titleEl.textContent = title || '';
+  cont.innerHTML = _sheetItems.map((it, i) => {
+    if (it.divider) return '<div class="sheet-sep"></div>';
+    const cls = 'sheet-item' + (it.danger ? ' sheet-item--danger' : '');
+    return `<button class="${cls}" type="button" data-i="${i}" onclick="_sheetItemClick(${i})">
+      <span class="sheet-item-icon">${it.icon || ''}</span>
+      <span class="sheet-item-label">${it.label}</span>
+      ${it.sub ? `<span class="sheet-item-sub">${it.sub}</span>` : ''}
+    </button>`;
+  }).join('');
+
+  overlay.classList.remove('hidden');
+  sheet.classList.remove('hidden');
+  requestAnimationFrame(() => sheet.classList.add('sheet--open'));
+}
+
+function closeSheet() {
+  const overlay = document.getElementById('sheet-overlay');
+  const sheet   = document.getElementById('sheet');
+  if (!sheet) return;
+  sheet.classList.remove('sheet--open');
+  if (_sheetHideTimer) clearTimeout(_sheetHideTimer);
+  _sheetHideTimer = setTimeout(() => {
+    overlay?.classList.add('hidden');
+    sheet.classList.add('hidden');
+    _sheetHideTimer = null;
+  }, 280);
+}
+
+function _sheetItemClick(i) {
+  const it = _sheetItems[i];
+  if (!it) return;
+  closeSheet();
+  if (it.onClick) setTimeout(() => it.onClick(), 220);
+}
+
+// ── Modo oscuro ──
+function toggleDarkMode() {
+  const oscuro = document.body.classList.toggle('dark');
+  try { localStorage.setItem('darkMode', oscuro ? '1' : '0'); } catch {}
+  _updateDarkIcon();
+}
+function initDarkMode() {
+  let oscuro = false;
+  try { oscuro = localStorage.getItem('darkMode') === '1'; } catch {}
+  document.body.classList.toggle('dark', oscuro);
+  _updateDarkIcon();
+}
+// TODOS los botones, no solo el primero: hay pantallas con el botón repetido
+// en varios menús y quedaba uno con el sol y otro con la luna.
+function _updateDarkIcon() {
+  const oscuro = document.body.classList.contains('dark');
+  document.querySelectorAll('.dark-toggle-btn').forEach(btn => {
+    const ico = btn.querySelector('.dark-icon');
+    if (ico) ico.textContent = oscuro ? '☀️' : '🌙';
+    else btn.textContent = oscuro ? '☀️' : '🌙';
+    btn.title = oscuro ? 'Modo claro' : 'Modo oscuro';
+  });
 }
 
 // ══════════════════════════════════════════════════════════

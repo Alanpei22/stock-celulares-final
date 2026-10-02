@@ -54,7 +54,6 @@ function tpEsEmpleado() { return !tpEsDueno(); }
 
 // Nombre para firmar movimientos y reparaciones ("lo cargó Fulano").
 function tpNombre() { const u = tpUsuario(); return u ? u.nombre : ''; }
-function tpUid()    { const u = tpUsuario(); return u ? u.uid : ''; }
 
 // Quién cargó esto. Campos NUEVOS: no pisan nada de lo que ya está guardado.
 function tpFirma() {

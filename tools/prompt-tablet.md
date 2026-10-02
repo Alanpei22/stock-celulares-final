@@ -16,7 +16,7 @@ Buenos Aires). Este repo ES la app en producción.
 
 1. **Producción es Vercel y se deploya sola con cada `git push` a `main`.** No hay
    staging. Si pusheás algo roto, se rompe el local. (NO es Firebase Hosting.)
-2. **`npm test` antes de cada push.** Son 51 suites, ~2100 chequeos, 7 segundos.
+2. **`npm test` antes de cada push.** Son 55 suites, ~2150 chequeos, 7 segundos.
    Si algo falla, no pushees. Ver `tests/README.md`.
 3. **Subí `const CACHE` en `sw.js`** cada vez que toques un `.js`, `.css` o `.html`.
    Si no, los celulares siguen sirviendo la versión vieja desde el caché.
@@ -50,6 +50,10 @@ App web (HTML/JS/CSS sin framework) + Firebase/Firestore. Sin build.
   equipos y planes de ahorro (colección `planes`)
 - `print.js` — comprobantes A5 (recepción, que también sirve de entrega) y venta
   A5 con original + copia. Todo B/N, con auto-ajuste para que entre en una hoja
+- `utils.js` — lo que usan TODAS las pantallas: `toast`, el menú deslizante
+  (`openSheet`) y el modo oscuro. Estaban copiados en app.js, caja.js y
+  placas.js y se habían separado solos. Si agregás algo que usen dos páginas,
+  va acá: lo vigila tests/test-una-sola-copia.js
 - `qr.js` — generador de QR propio, sin librerías ni internet
 - Lector de camara: 1920x1080 (a 1280 una barra de 0,25mm son ~4 pixeles y no
   engancha) y zoom 2x si la camara lo tiene, porque abajo de ~10cm el celular no
