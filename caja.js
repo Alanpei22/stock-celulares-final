@@ -979,7 +979,6 @@ function _renderTurnoSep(c) {
 // ══════════════════════════════════════════
 //  BOTTOM SHEET — menú deslizante reutilizable
 // ══════════════════════════════════════════
-let _sheetHideTimer = null; // BUG-FIX: cancelable
 
 // ── Menú caja (bottom sheet) ──
 function toggleCajaMenu() {
