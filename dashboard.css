@@ -44,7 +44,6 @@
   font-variant-numeric: tabular-nums; letter-spacing: -.02em;
   color: var(--d-tx);
 }
-#dash-section .d-num-sm { font-size: 22px; }
 #dash-section .d-usd {
   font-size: 12.5px; font-weight: 600; color: var(--d-cyan);
   font-variant-numeric: tabular-nums; margin-top: 3px;
@@ -221,15 +220,6 @@
 #dash-section .d-st-list { background: rgba(34,197,94,.12); color: var(--d-green); border: 1px solid rgba(34,197,94,.28); }
 #dash-section .d-st-dem  { background: rgba(244,63,94,.12); color: var(--d-red);  border: 1px solid rgba(244,63,94,.28); }
 #dash-section .d-empty { color: var(--d-mut); font-size: 12px; padding: 14px 0; text-align: center; }
-
-/* Alertas / pendientes (reusa el bloque existente) */
-#dash-section .d-alert-row {
-  display: flex; align-items: center; gap: 9px; padding: 9px 0;
-  border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer;
-}
-#dash-section .d-alert-row:last-child { border-bottom: none; }
-#dash-section .d-alert-n { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 26px; }
-#dash-section .d-alert-lbl { font-size: 12.5px; flex: 1; }
 
 /* ══════════ SIDEBAR (solo pantalla grande) ══════════ */
 #app-sidebar { display: none; }
