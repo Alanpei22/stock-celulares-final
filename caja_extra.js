@@ -28,6 +28,16 @@ function _totRetiroItem(total) {
     '<span class="hist-tot-val desglose-num--retiro">' + fmt(total) + '</span></div>';
 }
 
+// Los 15 minutos cuentan desde la última vez que hiciste algo de dueño, no
+// desde que pusiste el PIN. Es para que una pantalla abandonada se bloquee,
+// no para cortarte a la mitad de una carga de inventario: el campo del costo
+// vive adentro de `.owner-only` y, al apagarse, desaparece sin avisar.
+function _cajaOwnerRenovar() {
+  if (!_cajaIsOwner) return;
+  clearTimeout(_cajaOwnerTimer);
+  _cajaOwnerTimer = setTimeout(lockCajaOwner, 15 * 60 * 1000);
+}
+
 function openCajaOwnerPin() {
   if (_cajaIsOwner) {
     lockCajaOwner(); return;
@@ -108,8 +118,7 @@ async function submitCajaOwnerPin() {
       _cajaIsOwner = true;
       document.body.classList.add('owner-mode');
       const _ob1 = document.getElementById('caja-owner-btn'); if (_ob1) _ob1.textContent = '🔓';
-      clearTimeout(_cajaOwnerTimer);
-      _cajaOwnerTimer = setTimeout(lockCajaOwner, 15 * 60 * 1000);
+      _cajaOwnerRenovar();
       closeCajaOwnerPin();
       toast('Modo dueño activado', 'success');
     } else {

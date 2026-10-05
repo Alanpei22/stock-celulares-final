@@ -35,8 +35,8 @@ ok(/else if \(!_invEditingId\) data\.precioCosto = 0/.test(save), 'al editar sin
 // en pesos, los repuestos en dólares. Antes era solo USD y para una funda de
 // $4.500 había que dividir de memoria.
 ok(/const enUSD    = invMoneda\(\) === 'usd';/.test(save), 'en la moneda que elegiste');
-ok(/const costoUSD = enUSD \? costoIn : \(dolarHoy > 0 \? costoIn \/ dolarHoy : 0\)/.test(save),
-   'si cargás pesos, los dólares salen del dólar de hoy');
+ok(/const costoUSD = enUSD \? costoIn : \(dolarHoy > 0 \? Math\.round\(\(costoIn \/ dolarHoy\) \* 100\) \/ 100 : 0\)/.test(save),
+   'si cargás pesos, los dólares salen del dólar de hoy (redondeado a centavos)');
 ok(/const costoARS = enUSD \? \(dolarHoy > 0 \? Math\.round\(costoIn \* dolarHoy\) : 0\) : Math\.round\(costoIn\)/.test(save),
    'y al revés: lo que escribiste se guarda tal cual, lo otro convertido');
 const caja = leer('caja.html');

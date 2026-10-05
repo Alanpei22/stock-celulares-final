@@ -144,7 +144,10 @@ function _listenProductos() {
 // guardar, como null (el servidor todavía no la resolvió). En ese caso cuenta
 // como de hoy: lo acabás de cargar vos.
 function _invEsDeHoy(p) {
-  if (!p || !p.fechaAlta) return p && p.fechaAlta === null && !!p._reciente;
+  // Sin fechaAlta no hay con qué decidir: o es de antes de que existiera el
+  // campo, o el servidor todavía no resolvió la marca (dura un parpadeo, el
+  // listener la completa enseguida).
+  if (!p || !p.fechaAlta) return false;
   const d = typeof p.fechaAlta.toDate === 'function' ? p.fechaAlta.toDate() : new Date(p.fechaAlta);
   if (isNaN(d)) return false;
   const hoy = (typeof _todayAR === 'function') ? _todayAR()
@@ -310,7 +313,9 @@ async function saveProducto(opts) {
   const enUSD    = invMoneda() === 'usd';
   const dolarHoy = invDolar();
   // Lo que escribiste se guarda tal cual; lo otro, convertido al dólar de hoy.
-  const costoUSD = enUSD ? costoIn : (dolarHoy > 0 ? costoIn / dolarHoy : 0);
+  // A dos decimales: cargando $2.800 el canónico salía 2.3333333333333335 y
+  // eso es lo que veías al reabrir el artículo en modo dólares.
+  const costoUSD = enUSD ? costoIn : (dolarHoy > 0 ? Math.round((costoIn / dolarHoy) * 100) / 100 : 0);
   const costoARS = enUSD ? (dolarHoy > 0 ? Math.round(costoIn * dolarHoy) : 0) : Math.round(costoIn);
   const stock  = parseInt(document.getElementById('inv-fi-stock').value)    || 0;
   const stmin  = parseInt(document.getElementById('inv-fi-stockmin').value) || 0;
@@ -341,6 +346,10 @@ async function saveProducto(opts) {
     };
     if (costoARS > 0) data.precioCosto = costoARS;
     else if (!_invEditingId) data.precioCosto = 0;
+
+    // Cada guardado cuenta como actividad: cargando una tanda larga, el modo
+    // dueño no se tiene que apagar solo y llevarse el campo del costo.
+    if (typeof _cajaOwnerRenovar === 'function') _cajaOwnerRenovar();
 
     if (_invEditingId) {
       await db.collection('productos').doc(_invEditingId).update(data);
@@ -505,8 +514,12 @@ function _invSiguiente(cat) {
   _invEditingId = null;
   const t = document.getElementById('inv-form-title');
   if (t) t.textContent = '➕ Nuevo producto';
+  const stminAntes = document.getElementById('inv-fi-stockmin')?.value;
   _clearProductoForm();
   if (cat) document.getElementById('inv-fi-cat').value = cat;
+  // La cantidad SÍ se borra (cada artículo tiene la suya) pero el mínimo suele
+  // repetirse en toda la tanda: volver a escribirlo 150 veces no tiene sentido.
+  if (stminAntes) document.getElementById('inv-fi-stockmin').value = stminAntes;
   const del = document.getElementById('inv-form-del');
   if (del) del.style.display = 'none';
   const etq = document.getElementById('inv-form-etq');

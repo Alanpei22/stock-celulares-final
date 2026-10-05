@@ -74,8 +74,8 @@ run("invSetMoneda('ars')");
 
 console.log('\n3) Lo que se guarda, en las dos monedas');
 const save = inv.slice(inv.indexOf('async function saveProducto'), inv.indexOf('function _invSiguiente'));
-ok(/const costoUSD = enUSD \? costoIn : \(dolarHoy > 0 \? costoIn \/ dolarHoy : 0\)/.test(save),
-   'cargás pesos → los dólares salen del dólar de hoy');
+ok(/const costoUSD = enUSD \? costoIn : \(dolarHoy > 0 \? Math\.round\(\(costoIn \/ dolarHoy\) \* 100\) \/ 100 : 0\)/.test(save),
+   'cargás pesos → los dólares salen del dólar de hoy, a dos decimales');
 ok(/const costoARS = enUSD \? \(dolarHoy > 0 \? Math\.round\(costoIn \* dolarHoy\) : 0\) : Math\.round\(costoIn\)/.test(save),
    'cargás dólares → los pesos salen del dólar de hoy');
 ok(/precioCostoUSD: costoUSD/.test(save) && /data\.precioCosto = costoARS/.test(save),
@@ -89,13 +89,29 @@ const sig = inv.slice(inv.indexOf('function _invSiguiente'), inv.indexOf('functi
 ok(/_invEditingId = null/.test(sig), 'queda listo para un artículo nuevo, no editando el anterior');
 ok(/if \(cat\) document\.getElementById\('inv-fi-cat'\)\.value = cat/.test(sig),
    'conservando la categoría: en una tanda suelen ser todos del mismo rubro');
-ok(/cod\.focus\(\)/.test(sig), 'y con el foco en el código, que es donde escribe el lector de mano');
+ok(/cod\.focus\(\)/.test(inv.slice(inv.indexOf('function _invSiguiente'), inv.indexOf('function _invSiguiente') + 1100)),
+   'y con el foco en el código, que es donde escribe el lector de mano');
+// La cantidad se borra (cada articulo tiene la suya) pero el minimo se repite
+// en toda la tanda: volver a escribirlo 150 veces no tiene sentido.
+ok(/if \(stminAntes\) document\.getElementById\('inv-fi-stockmin'\)\.value = stminAntes/.test(inv),
+   'y el stock minimo se conserva, la cantidad no');
 // El lector manda el codigo y despues un Enter: ese Enter no puede mandar el
 // formulario a medio llenar.
 const atajos = inv.slice(inv.indexOf('function _initInvFormAtajos'), inv.indexOf('function _initInvScanInput'));
 ok(/e\.preventDefault\(\)/.test(atajos) && /'inv-fi-nom'\)\?\.focus\(\)/.test(atajos),
    'el Enter del lector pasa al nombre, no guarda a medias');
 ok(/otroBtn\.style\.display = id \? 'none' : ''/.test(inv), 'y editando uno viejo, ese botón no aparece');
+
+console.log('\n4b) El modo dueño no se apaga en el medio de la tanda');
+// El campo del COSTO vive adentro de `.owner-only`. Si el modo dueño se apaga
+// solo a los 15 minutos, el campo desaparece en el medio y todo lo que cargues
+// después queda con costo cero, sin que nada avise.
+const extra = fs.readFileSync(DIR + 'caja_extra.js', 'utf8');
+ok(/function _cajaOwnerRenovar/.test(extra), 'los 15 minutos se pueden renovar');
+ok(/_cajaOwnerRenovar\(\);\s*\n\s*closeCajaOwnerPin\(\)/.test(extra), 'al poner el PIN arranca el reloj');
+ok(/if \(typeof _cajaOwnerRenovar === 'function'\) _cajaOwnerRenovar\(\)/.test(inv),
+   'y cada artículo guardado lo renueva');
+ok(/<div class="fg owner-only">/.test(caja), '(el costo sigue siendo solo del dueño)');
 
 console.log('\n5) Las etiquetas de lo cargado hoy');
 const hoy = { fechaAlta: { toDate: () => new Date('2026-10-06T14:00:00-03:00') } };
