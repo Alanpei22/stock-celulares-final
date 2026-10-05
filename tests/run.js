@@ -32,6 +32,7 @@ const QUE_CUBRE = {
   'test-orden.js':            'N° de orden: corregirlo al editar y arreglar el contador',
   'test-costos-usd.js':       'Costo de accesorios en dólares y carga de costos en lista',
   'test-qz.js':              'Impresión directa con QZ Tray: cada cosa a su impresora, y el diálogo si falla',
+  'test-carga-inventario.js':'Cargar accesorios: costo en $ o u$, alta en cadena y etiquetas de hoy',
   'test-css-orden.js':       'Que el desorden del CSS no crezca: selectores repetidos y reglas tapadas',
   'test-pagina-arranca.js':  'Que cada pagina arranque: sus scripts leidos juntos, como el navegador',
   'test-una-sola-copia.js':  'Una sola copia de toast, menu y modo oscuro (y lo borrado sigue borrado)',

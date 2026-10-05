@@ -15,6 +15,43 @@ function invDolar() {
   return (typeof getCurrentDolar === 'function') ? (getCurrentDolar() || 0) : 0;
 }
 function invCostoUSD(p) { return Number(p && p.precioCostoUSD) || 0; }
+
+// ── En qué moneda se carga el costo ─────────────────────────
+// Los accesorios se compran en pesos casi siempre; los repuestos, en dólares.
+// El formulario tenía solo dólares: para cargar una funda que salió $4.500
+// había que dividir de memoria. Ahora se elige, y la elección queda guardada
+// para no tocarla en cada artículo de la tanda.
+//
+// Guardado: `precioCostoUSD` sigue siendo el canónico (es lo que ya leen los
+// reportes) y `precioCosto` los pesos. Se guarda SIEMPRE lo que escribiste tal
+// cual y lo otro convertido, así nunca se pierde el número que pusiste.
+function invMoneda() {
+  try { return localStorage.getItem('invMonedaCosto') === 'usd' ? 'usd' : 'ars'; } catch { return 'ars'; }
+}
+function invSetMoneda(m) {
+  try { localStorage.setItem('invMonedaCosto', m === 'usd' ? 'usd' : 'ars'); } catch {}
+  _invPintarMoneda();
+}
+function _invPintarMoneda() {
+  const usd = invMoneda() === 'usd';
+  document.getElementById('inv-mon-ars')?.classList.toggle('inv-mon-on', !usd);
+  document.getElementById('inv-mon-usd')?.classList.toggle('inv-mon-on', usd);
+  const inp = document.getElementById('inv-fi-costoUSD');
+  if (inp) inp.placeholder = usd ? '0.00' : '0';
+  _invHintCosto();
+}
+// El equivalente en la otra moneda, al dólar de hoy. Es el control de que no
+// te comiste un cero.
+function _invHintCosto() {
+  const el = document.getElementById('inv-fi-costoARS-hint');
+  if (!el) return;
+  const v = parseFloat(document.getElementById('inv-fi-costoUSD')?.value) || 0;
+  const d = invDolar();
+  if (!v || !d) { el.textContent = ''; return; }
+  el.textContent = invMoneda() === 'usd'
+    ? '≈ $' + Math.round(v * d).toLocaleString('es-AR')
+    : '≈ u$' + (v / d).toFixed(2);
+}
 function invCostoARS(p) {
   const usd = invCostoUSD(p), d = invDolar();
   return usd > 0 && d > 0 ? Math.round(usd * d) : (Number(p && p.precioCosto) || 0);
@@ -102,6 +139,19 @@ function _listenProductos() {
 }
 
 // ── Render lista ────────────────────────────────────────────
+// ¿Se cargó hoy? `fechaAlta` es una marca del servidor: puede venir como
+// Timestamp de Firestore, como Date o, los primeros segundos después de
+// guardar, como null (el servidor todavía no la resolvió). En ese caso cuenta
+// como de hoy: lo acabás de cargar vos.
+function _invEsDeHoy(p) {
+  if (!p || !p.fechaAlta) return p && p.fechaAlta === null && !!p._reciente;
+  const d = typeof p.fechaAlta.toDate === 'function' ? p.fechaAlta.toDate() : new Date(p.fechaAlta);
+  if (isNaN(d)) return false;
+  const hoy = (typeof _todayAR === 'function') ? _todayAR()
+            : new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
+  return d.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10) === hoy;
+}
+
 // Los productos que están a la vista, con los filtros puestos. Lo usan la
 // lista y la impresión de etiquetas: si imprimieran cosas distintas de lo que
 // se ve en pantalla, nadie entendería qué salió.
@@ -116,6 +166,7 @@ function _invFiltrados() {
   if (estF === 'activo')    lista = lista.filter(p => p.activo !== false);
   if (estF === 'inactivo')  lista = lista.filter(p => p.activo === false);
   if (estF === 'bajo')      lista = lista.filter(p => p.stockMin > 0 && (p.stock || 0) <= p.stockMin);
+  if (estF === 'hoy')       lista = lista.filter(_invEsDeHoy);
   return lista;
 }
 
@@ -184,6 +235,10 @@ function openProductoForm(id, precodigo) {
   // todavía no tiene ni código ni precio.
   const etqBtn = document.getElementById('inv-form-etq');
   if (etqBtn) etqBtn.style.display = id ? '' : 'none';
+  // "Guardar y cargar otro" solo al dar de alta: editando no tiene sentido.
+  const otroBtn = document.getElementById('inv-form-save-otro');
+  if (otroBtn) otroBtn.style.display = id ? 'none' : '';
+  _invPintarMoneda();
 
   _clearProductoForm();
 
@@ -195,7 +250,10 @@ function openProductoForm(id, precodigo) {
     document.getElementById('inv-fi-nom').value   = p.nombre || '';
     document.getElementById('inv-fi-cat').value   = p.categoria || '';
     document.getElementById('inv-fi-pv').value    = p.precioVenta ?? '';
-    document.getElementById('inv-fi-costoUSD').value = invCostoUSD(p) || '';
+    // Se muestra en la moneda que estas usando, no siempre en dolares.
+    document.getElementById('inv-fi-costoUSD').value = invMoneda() === 'usd'
+      ? (invCostoUSD(p) || '')
+      : (invCostoARS(p) || '');
     _invCostoAnterior = Number(p.precioCosto) || 0;
     document.getElementById('inv-fi-stock').value = p.stock ?? 0;
     document.getElementById('inv-fi-stockmin').value = p.stockMin ?? 0;
@@ -243,12 +301,17 @@ function _clearProductoForm() {
   document.getElementById('inv-fi-activo').checked = true;
 }
 
-async function saveProducto() {
+async function saveProducto(opts) {
   const cod    = document.getElementById('inv-fi-cod').value.trim();
   const nom    = document.getElementById('inv-fi-nom').value.trim();
   const cat    = document.getElementById('inv-fi-cat').value;
   const pv     = parseFloat(document.getElementById('inv-fi-pv').value) || 0;
-  const costoUSD = parseFloat(document.getElementById('inv-fi-costoUSD').value) || 0;
+  const costoIn  = parseFloat(document.getElementById('inv-fi-costoUSD').value) || 0;
+  const enUSD    = invMoneda() === 'usd';
+  const dolarHoy = invDolar();
+  // Lo que escribiste se guarda tal cual; lo otro, convertido al dólar de hoy.
+  const costoUSD = enUSD ? costoIn : (dolarHoy > 0 ? costoIn / dolarHoy : 0);
+  const costoARS = enUSD ? (dolarHoy > 0 ? Math.round(costoIn * dolarHoy) : 0) : Math.round(costoIn);
   const stock  = parseInt(document.getElementById('inv-fi-stock').value)    || 0;
   const stmin  = parseInt(document.getElementById('inv-fi-stockmin').value) || 0;
   const activo = document.getElementById('inv-fi-activo').checked;
@@ -265,7 +328,8 @@ async function saveProducto() {
     }
   }
 
-  const btn = document.getElementById('inv-form-save');
+  const seguir = !!(opts && opts.seguir);
+  const btn = document.getElementById(seguir ? 'inv-form-save-otro' : 'inv-form-save');
   btn.disabled = true;
 
   try {
@@ -275,10 +339,7 @@ async function saveProducto() {
       stock, stockMin: stmin, activo,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    // Pesos al dólar de hoy, para reportes y lo que lee el costo en pesos.
-    // Sin dólares cargados no se toca: un producto viejo conserva su costo.
-    const dolarHoy = invDolar();
-    if (costoUSD > 0 && dolarHoy > 0) data.precioCosto = Math.round(costoUSD * dolarHoy);
+    if (costoARS > 0) data.precioCosto = costoARS;
     else if (!_invEditingId) data.precioCosto = 0;
 
     if (_invEditingId) {
@@ -289,7 +350,11 @@ async function saveProducto() {
       await db.collection('productos').add(data);
       toast('✅ Producto guardado', 'success');
     }
-    closeProductoForm();
+    // Cargando una tanda, cerrar el formulario y volver a tocar "escanear" en
+    // cada artículo son dos toques de más por artículo. Con "guardar y cargar
+    // otro" queda listo para el siguiente, con la categoría puesta.
+    if (seguir) _invSiguiente(cat);
+    else closeProductoForm();
   } catch(e) {
     console.error(e);
     toast('Error al guardar', 'error');
@@ -327,7 +392,27 @@ async function deleteProducto(id) {
 // El lector actúa como teclado (keyboard-wedge): tipea el código y envía Enter.
 // Usamos un input siempre visible con inputmode="none" para capturar el escaneo.
 
+// El lector de mano manda el codigo y despues un Enter. En el campo de codigo
+// ese Enter tiene que pasar al nombre, no mandar el formulario a medio llenar.
+function _initInvFormAtajos() {
+  const cod = document.getElementById('inv-fi-cod');
+  if (cod && !cod._atado) {
+    cod._atado = true;
+    cod.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      document.getElementById('inv-fi-nom')?.focus();
+    });
+  }
+  const costo = document.getElementById('inv-fi-costoUSD');
+  if (costo && !costo._atado) {
+    costo._atado = true;
+    costo.addEventListener('input', _invHintCosto);
+  }
+}
+
 function _initInvScanInput() {
+  _initInvFormAtajos();
   const inp = document.getElementById('inv-scan-input');
   if (!inp) return;
 
@@ -397,6 +482,7 @@ function toggleInvMenu() {
     { divider: true },
     { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: openInvWizard },
     { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: imprimirEtiquetasInv },
+    { icon: '🆕', label: 'Etiquetas de lo cargado hoy', sub: 'Al terminar una tanda', onClick: etiquetasDeHoy },
     { icon: '🔢', label: 'Generar códigos de barras', sub: 'A los artículos que no tienen', onClick: generarCodigosInv },
     { icon: '📐', label: 'Sentido de la etiqueta',
       sub: (typeof etqFormato === 'function' && typeof ETQ_FORMATO_NOMBRE === 'object')
@@ -412,6 +498,24 @@ function toggleInvMenu() {
 }
 function closeInvMenu() { if (typeof closeSheet === 'function') closeSheet(); }
 
+// Deja el formulario listo para el que viene, conservando la categoría (en una
+// tanda suelen ser todos del mismo rubro) y el foco en el código, que es donde
+// escribe el lector de mano.
+function _invSiguiente(cat) {
+  _invEditingId = null;
+  const t = document.getElementById('inv-form-title');
+  if (t) t.textContent = '➕ Nuevo producto';
+  _clearProductoForm();
+  if (cat) document.getElementById('inv-fi-cat').value = cat;
+  const del = document.getElementById('inv-form-del');
+  if (del) del.style.display = 'none';
+  const etq = document.getElementById('inv-form-etq');
+  if (etq) etq.style.display = 'none';
+  _invPintarMoneda();
+  const cod = document.getElementById('inv-fi-cod');
+  if (cod) { cod.value = ''; setTimeout(() => cod.focus(), 60); }
+}
+
 // ══════════════════════════════════════════
 //  ETIQUETAS DE ARTÍCULOS
 // ══════════════════════════════════════════
@@ -425,6 +529,18 @@ function imprimirEtiquetasInv() {
   const copias = prompt(`${lista.length} artículo${lista.length > 1 ? 's' : ''} a la vista.\n¿Cuántas etiquetas de cada uno?`, '1');
   if (copias === null) return;
   printEtiquetasProductos(lista, Number(copias) || 1);
+}
+
+// Al terminar de cargar una tanda: las etiquetas de todo lo que entró hoy, sin
+// tener que acordarse cuáles fueron ni buscarlos uno por uno.
+function etiquetasDeHoy() {
+  closeInvMenu();
+  const hoy = PRODUCTOS.filter(_invEsDeHoy);
+  if (!hoy.length) { toast('Todavía no cargaste ningún artículo hoy', 'info'); return; }
+  if (typeof printEtiquetasProductos !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
+  const copias = prompt(`${hoy.length} artículo${hoy.length > 1 ? 's' : ''} cargado${hoy.length > 1 ? 's' : ''} hoy.\n¿Cuántas etiquetas de cada uno?`, '1');
+  if (copias === null) return;
+  printEtiquetasProductos(hoy, Number(copias) || 1);
 }
 
 // Una etiqueta sola, desde la ficha del artículo.

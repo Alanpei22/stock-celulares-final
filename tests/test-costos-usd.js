@@ -29,12 +29,30 @@ console.log('\n2) Guardar desde el formulario');
 const inv = leer('inventario.js');
 const save = inv.slice(inv.indexOf('async function saveProducto'), inv.indexOf('function _invIsOwner'));
 ok(/precioCostoUSD: costoUSD/.test(save), 'se guarda el costo en dólares');
-ok(/if \(costoUSD > 0 && dolarHoy > 0\) data\.precioCosto = Math\.round\(costoUSD \* dolarHoy\)/.test(save), 'y su equivalente en pesos del día');
-ok(/else if \(!_invEditingId\) data\.precioCosto = 0/.test(save), 'al editar sin dólares no se borra el costo en pesos que tenía');
+ok(/if \(costoARS > 0\) data\.precioCosto = costoARS/.test(save), 'y también en pesos');
+ok(/else if \(!_invEditingId\) data\.precioCosto = 0/.test(save), 'al editar sin costo no se borra el que tenía');
+// El costo se carga en la moneda en que compraste: los accesorios casi siempre
+// en pesos, los repuestos en dólares. Antes era solo USD y para una funda de
+// $4.500 había que dividir de memoria.
+ok(/const enUSD    = invMoneda\(\) === 'usd';/.test(save), 'en la moneda que elegiste');
+ok(/const costoUSD = enUSD \? costoIn : \(dolarHoy > 0 \? costoIn \/ dolarHoy : 0\)/.test(save),
+   'si cargás pesos, los dólares salen del dólar de hoy');
+ok(/const costoARS = enUSD \? \(dolarHoy > 0 \? Math\.round\(costoIn \* dolarHoy\) : 0\) : Math\.round\(costoIn\)/.test(save),
+   'y al revés: lo que escribiste se guarda tal cual, lo otro convertido');
 const caja = leer('caja.html');
-ok(/id="inv-fi-costoUSD"/.test(caja) && /💵 Costo USD/.test(caja) && !/id="inv-fi-pc"/.test(caja), 'el formulario pide el costo en USD');
-ok(/<div class="fg owner-only">\s*<label class="fl">💵 Costo USD/.test(caja), 'y sigue siendo solo del dueño');
+ok(/id="inv-fi-costoUSD"/.test(caja) && !/id="inv-fi-pc"/.test(caja), 'el formulario pide el costo');
+ok(/onclick="invSetMoneda\('ars'\)"/.test(caja) && /onclick="invSetMoneda\('usd'\)"/.test(caja),
+   'con el botoncito para elegir $ o u$');
+ok(/<div class="fg owner-only">\s*<label class="fl">\s*Costo/.test(caja), 'y sigue siendo solo del dueño');
 ok(/body\.owner-mode \.fg\.owner-only \{ display: block !important; \}/.test(leer('style.css')), 'y en modo dueño se ve en su renglón, no amontonado');
+
+console.log('\n2b) La moneda queda elegida para toda la tanda');
+// Cargando 50 fundas seguidas, tocar $ / u$ en cada una es un toque al pedo.
+ok(/localStorage\.setItem\('invMonedaCosto'/.test(inv), 'la eleccion se guarda en el dispositivo');
+ok(/getItem\('invMonedaCosto'\) === 'usd' \? 'usd' : 'ars'/.test(inv), 'y arranca en pesos, que es como se compran los accesorios');
+const hint = inv.slice(inv.indexOf('function _invHintCosto'), inv.indexOf('function _invHintCosto') + 700);
+ok(/≈ \$/.test(hint) && /≈ u\$/.test(hint),
+   'y al lado te muestra el equivalente en la otra moneda (el control de que no te comiste un cero)');
 
 console.log('\n3) La caja usa el mismo costo');
 const cj = leer('caja.js');

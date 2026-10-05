@@ -219,6 +219,7 @@
         <select class="pill" id="inv-f-cat"><option value="">Todas las categorías</option></select>
         <select class="pill" id="inv-f-estado">
           <option value="">Todos</option>
+          <option value="hoy">🆕 Cargados hoy</option>
           <option value="activo">Activos</option>
           <option value="bajo">Stock bajo</option>
           <option value="inactivo">Inactivos</option>
@@ -770,7 +771,14 @@
           <input id="inv-fi-pv" class="fi" type="number" placeholder="0" min="0" inputmode="decimal">
         </div>
         <div class="fg owner-only">
-          <label class="fl">💵 Costo USD <span class="fl-hint" id="inv-fi-costoARS-hint" style="font-weight:500"></span></label>
+          <label class="fl">
+            Costo
+            <span class="inv-moneda">
+              <button type="button" id="inv-mon-ars" class="inv-mon-btn" onclick="invSetMoneda('ars')">$</button>
+              <button type="button" id="inv-mon-usd" class="inv-mon-btn" onclick="invSetMoneda('usd')">u$</button>
+            </span>
+            <span class="fl-hint" id="inv-fi-costoARS-hint" style="font-weight:500"></span>
+          </label>
           <input id="inv-fi-costoUSD" class="fi" type="number" placeholder="0" min="0" step="0.01" inputmode="decimal">
         </div>
         <div class="fg">
@@ -794,6 +802,8 @@
       <button class="btn-secondary" id="inv-form-etq" style="display:none" onclick="imprimirEtiquetaProducto()" title="Imprimir etiqueta">🏷️</button>
       <button class="btn-secondary" id="inv-form-cancel" style="flex:1">Cancelar</button>
       <button class="btn-primary" id="inv-form-save" style="flex:2">💾 Guardar</button>
+      <button class="btn-primary inv-save-seguir" id="inv-form-save-otro" style="flex:2;display:none"
+              onclick="saveProducto({ seguir: true })">💾 Guardar y cargar otro</button>
     </div>
   </div>
 </div>

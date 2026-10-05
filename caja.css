@@ -1696,3 +1696,18 @@ body.dark .comprobante-item-imei { color:#eee; }
 .dolar-usa:empty { display: none; }
 .dolar-bar--manual .dolar-par { display: none; }
 .dolar-bar--manual .dolar-usa { margin-left: 0; color: var(--t2, #5c5c5c); font-weight: 700; }
+
+
+/*  Moneda del costo en el alta de accesorios.
+    Los accesorios se compran en pesos y los repuestos en dolares: el que carga
+    elige, y la eleccion queda para toda la tanda.  */
+.inv-moneda { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: -1px; }
+.inv-mon-btn {
+  min-width: 30px; padding: 1px 7px; border: 1px solid var(--border, #E3E1DE);
+  background: var(--card, #fff); color: var(--text2, #5C5C5C);
+  border-radius: 7px; font-size: .78rem; font-weight: 800; cursor: pointer; line-height: 1.5;
+}
+.inv-mon-btn.inv-mon-on { background: var(--text, #1A1A1A); border-color: var(--text, #1A1A1A); color: var(--card, #fff); }
+body.dark .inv-mon-btn { background: transparent; border-color: #2f343b; color: #c7cdd6; }
+body.dark .inv-mon-btn.inv-mon-on { background: var(--accent); border-color: var(--accent); color: #14161a; }
+.inv-save-seguir { background: var(--accent, #C8965A) !important; }
