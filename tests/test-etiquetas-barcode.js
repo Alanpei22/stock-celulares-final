@@ -398,10 +398,10 @@ ok(/_rep2Filtrados\(\)/.test(rep2.slice(rep2.indexOf('function renderRepuestos')
 console.log('\n12) Al ingresar un equipo salen solas la hoja y la etiqueta');
 const save = rep.slice(rep.indexOf('async function saveRepair('), rep.indexOf('async function saveRepair(') + 12000);
 ok(/imprimirIngresoReparacion\(newDoc\)/.test(save), 'saveRepair imprime con el doc recién creado (REPAIRS todavía no lo tiene)');
-const fnIng = printSrc.slice(printSrc.indexOf('async function imprimirIngresoReparacion'), printSrc.indexOf('async function imprimirIngresoReparacion') + 400);
+const fnIng = printSrc.slice(printSrc.indexOf('async function imprimirIngresoReparacion'), printSrc.indexOf('async function imprimirIngresoReparacion') + 1200);
 ok(fnIng.indexOf('_buildA5') >= 0 && fnIng.indexOf('_buildA5') < fnIng.indexOf('_etiquetaRepHtml'), 'primero la hoja A5, después la etiqueta');
-ok(/await _imprimirEnIframe\(hoja\)/.test(fnIng) && fnIng.indexOf('await _imprimirEnIframe(hoja)') < fnIng.indexOf('_etiquetaRepHtml'),
-   'y la etiqueta espera a que se cierre el diálogo de la hoja');
+ok(/await _imprimirEnIframe\(hoja\)/.test(fnIng) && fnIng.indexOf('await _imprimirEnIframe(hoja)') < fnIng.indexOf('await _imprimirEnIframe(etq)'),
+   'por el diálogo, la etiqueta espera a que se cierre el de la hoja');
 // document.open() borra los listeners de la ventana: el load puesto antes no
 // se dispara y no imprime nada (pasó al hacerlo).
 const fnIf = printSrc.slice(printSrc.indexOf('function _imprimirEnIframe'), printSrc.indexOf('async function imprimirIngresoReparacion'));

@@ -53,16 +53,22 @@ function _qzCargarLib() {
 }
 
 let _qzSeguridadLista = false;
+let _qzCert = null;
 function _qzSeguridad() {
   if (_qzSeguridadLista) return;
   _qzSeguridadLista = true;
   // El certificado es público (qz-cert.pem). La firma se hace en el server con
   // la clave privada (api/qz-sign.js). Si el server no tiene la clave, QZ
   // Tray igual imprime pero pregunta "¿Permitir?" una vez por sesión.
-  qz.security.setCertificatePromise((ok, mal) => {
-    fetch('qz-cert.pem', { cache: 'no-store' })
-      .then(r => r.ok ? r.text() : '')
-      .then(ok, () => ok(''));
+  // El certificado se baja UNA vez por sesión: QZ Tray lo pide en cada
+  // conexión y no cambia.
+  qz.security.setCertificatePromise((ok) => {
+    if (!_qzCert) {
+      _qzCert = fetch('qz-cert.pem', { cache: 'no-store' })
+        .then(r => r.ok ? r.text() : '')
+        .catch(() => { _qzCert = null; return ''; });
+    }
+    _qzCert.then(ok);
   });
   qz.security.setSignatureAlgorithm('SHA512');
   qz.security.setSignaturePromise(datos => (ok) => {
@@ -133,7 +139,10 @@ async function _qzPaginasPng(html, selector, anchoMm, altoMm, dpi, byn) {
         }
         x.putImageData(px, 0, 0);
       }
-      paginas.push(c.toDataURL('image/png').split(',')[1]);
+      // La hoja va en JPEG: es una foto de la página para una impresora común,
+      // y pesa la mitad que el PNG (menos para mandar y para que QZ la abra).
+      // La térmica sigue en PNG: blanco y negro puro, sin manchas de JPEG.
+      paginas.push(c.toDataURL(byn ? 'image/png' : 'image/jpeg', 0.9).split(',')[1]);
     }
     return paginas;
   } finally {
@@ -272,5 +281,25 @@ async function qzDiagnosticoConfianza() {
     out.push('Si igual pregunta: falta override.crt en C:\\Program Files\\QZ Tray\\ o reiniciar QZ Tray (clic derecho → Exit y abrirlo de nuevo).');
   }
   return 'Confianza:\n' + out.join('\n');
+}
+
+// ── Dejar todo listo antes de la primera impresión ──
+// La primera impresión del día era la lenta: conectar con QZ Tray, bajar el
+// certificado y despertar al server que firma (en Vercel, la función que no
+// se usó hace rato tarda 1–3 segundos en arrancar). Se hace al abrir la app,
+// en segundo plano, solo en la PC que tiene impresoras configuradas: cuando
+// llega el primer ingreso, la conexión ya está abierta.
+function qzPrecalentar() {
+  const c = qzImpresoras();
+  if (!c.hoja && !c.etiqueta) return;
+  qzConectar().catch(() => {});   // si QZ Tray no está, ya avisará al imprimir
+  // Despierta la función que firma, para que no arranque en frío con el
+  // primer ingreso. La respuesta no se usa.
+  if (typeof apiFetch === 'function') {
+    apiFetch('/api/qz-sign', { method: 'POST', body: JSON.stringify({ data: 'calentar' }) }).catch(() => {});
+  }
+}
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && window.addEventListener) {
+  window.addEventListener('load', () => setTimeout(qzPrecalentar, 1500));
 }
 

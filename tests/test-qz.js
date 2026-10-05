@@ -81,8 +81,16 @@ QZ_FALLA = false;
 console.log('\n4) Enganchado en print.js');
 const pr = leer('print.js');
 const ing = pr.slice(pr.indexOf('async function imprimirIngresoReparacion'), pr.indexOf('function _imprimirTocando'));
-ok(/if \(!await _imprimirDirecto\('hoja', hoja\)\) await _imprimirEnIframe\(hoja\)/.test(ing), 'ingreso: la hoja por QZ, o el diálogo si no');
-ok(/if \(!await _imprimirDirecto\('etiqueta', etq\)\) await _imprimirEnIframe\(etq\)/.test(ing), 'ingreso: la etiqueta por QZ, o el diálogo si no');
+ok(/Promise\.all\(\[_imprimirDirecto\('hoja', hoja\), _imprimirDirecto\('etiqueta', etq\)\]\)/.test(ing),
+   'ingreso: por QZ la hoja y la etiqueta salen a la vez (impresoras distintas, nada que esperar)');
+ok(/if \(!hojaOk\) await _imprimirEnIframe\(hoja\)/.test(ing) && /if \(!etqOk\) await _imprimirEnIframe\(etq\)/.test(ing),
+   'y la que no salió por QZ va por el diálogo');
+const qzs = leer('qz-print.js');
+ok(/toDataURL\(byn \? 'image\/png' : 'image\/jpeg', 0\.9\)/.test(qzs), 'la hoja viaja en JPEG (la mitad de peso); la térmica en PNG blanco y negro');
+ok(/function qzPrecalentar/.test(qzs) && /addEventListener\('load', \(\) => setTimeout\(qzPrecalentar/.test(qzs),
+   'al abrir la app se conecta con QZ Tray y despierta al server: la primera impresión no arranca en frío');
+ok(/if \(!c\.hoja && !c\.etiqueta\) return;/.test(qzs.slice(qzs.indexOf('function qzPrecalentar'))), 'solo en la PC que tiene impresoras configuradas');
+ok(/if \(!_qzCert\)/.test(qzs), 'el certificado se baja una vez por sesión');
 const toc = pr.slice(pr.indexOf('function _imprimirTocando'), pr.indexOf('function _imprimirTocando') + 500);
 ok(/!qzActivo\(tipo\)\) \{ _openPrint\(html, titulo\); return; \}/.test(toc),
    'botones sin QZ: la ventana se abre en el toque, como antes (si espera, el navegador la bloquea)');

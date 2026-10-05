@@ -521,9 +521,13 @@ async function imprimirIngresoReparacion(rep) {
   if (!rep) return;
   if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);
   const hoja = _buildA5(rep);
-  if (!await _imprimirDirecto('hoja', hoja)) await _imprimirEnIframe(hoja);
   const etq = _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep');
-  if (!await _imprimirDirecto('etiqueta', etq)) await _imprimirEnIframe(etq);
+  // Por QZ Tray las dos salen A LA VEZ: son impresoras distintas y no hay por
+  // qué esperar a que la hoja termine para mandar la etiqueta.
+  const [hojaOk, etqOk] = await Promise.all([_imprimirDirecto('hoja', hoja), _imprimirDirecto('etiqueta', etq)]);
+  // Lo que no salió directo va por el diálogo, de a uno (Chrome muestra uno solo).
+  if (!hojaOk) await _imprimirEnIframe(hoja);
+  if (!etqOk) await _imprimirEnIframe(etq);
 }
 
 // Con QZ Tray configurado en esta PC (qz-print.js), sale directo a su
