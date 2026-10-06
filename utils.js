@@ -442,6 +442,9 @@ function closeSheet() {
 function _sheetItemClick(i) {
   const it = _sheetItems[i];
   if (!it) return;
+  // `submenu` abre otra hoja en el mismo lugar. No se cierra primero: si se
+  // cerrara, la de adentro entraría 220 ms después y se vería el salto.
+  if (typeof it.submenu === 'function') { it.submenu(); return; }
   closeSheet();
   if (it.onClick) setTimeout(() => it.onClick(), 220);
 }

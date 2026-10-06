@@ -174,7 +174,60 @@ ok(/PRODUCTOS\.filter\(_invEsDeHoy\)/.test(inv.slice(inv.indexOf('function etiqu
 ok(/value="hoy">🆕 Cargados hoy/.test(caja), 'también como filtro de la lista');
 ok(/if \(estF === 'hoy'\)\s+lista = lista\.filter\(_invEsDeHoy\)/.test(inv), 'con la misma cuenta');
 
+console.log('\n6) El men\u00fa \u22ee se lee de una mirada');
+// Lleg\u00f3 a doce opciones corridas, cinco de ellas de etiquetas. Un men\u00fa de
+// doce no se lee: se busca. Las cinco se fueron adentro de una sola.
+const HOJAS = [];
+ctx.openSheet = (titulo, items) => HOJAS.push({ titulo, items });
+ctx.toggleDarkMode = () => {};
+ctx.openCajaOwnerPin = () => {};
+
+run('toggleInvMenu()');
+const menu = HOJAS[HOJAS.length - 1];
+const nombres = h => h.items.filter(i => !i.divider).map(i => i.label);
+ok(menu.titulo === 'Inventario', 'el men\u00fa se llama Inventario', menu.titulo);
+ok(nombres(menu).length <= 8, `${nombres(menu).length} opciones arriba (antes 11)`, nombres(menu));
+
+const DE_ETIQUETAS = ['Imprimir etiquetas', 'Etiquetas de lo cargado hoy',
+  'Generar c\u00f3digos de barras', 'Sentido de la etiqueta', 'Impresi\u00f3n directa'];
+DE_ETIQUETAS.forEach(l => ok(nombres(menu).indexOf(l) < 0,
+  `"${l}" ya no est\u00e1 suelta arriba`, nombres(menu)));
+
+// Lo de todos los d\u00edas sigue a un toque: no se escondi\u00f3 nada m\u00e1s.
+['Seleccionar varios', 'Control de stock guiado', 'Cargar costos', 'Modo due\u00f1o']
+  .forEach(l => ok(nombres(menu).indexOf(l) >= 0, `"${l}" sigue arriba`, nombres(menu)));
+
+const puerta = menu.items.find(i => typeof i.submenu === 'function');
+ok(!!puerta, 'hay una opci\u00f3n que abre las de etiquetas', nombres(menu));
+puerta.submenu();
+const sub = HOJAS[HOJAS.length - 1];
+DE_ETIQUETAS.forEach(l => ok(nombres(sub).indexOf(l) >= 0, `adentro est\u00e1 "${l}"`, nombres(sub)));
+
+// Sin salida, un submen\u00fa es una trampa.
+const volver = sub.items.find(i => i.label === 'Volver');
+ok(!!volver && typeof volver.submenu === 'function', 'y se puede volver', nombres(sub));
+volver.submenu();
+ok(HOJAS[HOJAS.length - 1].titulo === 'Inventario', 'volver trae el men\u00fa de afuera',
+   HOJAS[HOJAS.length - 1].titulo);
+
+// La hoja no se cierra para abrir la de adentro: si se cerrara, la otra
+// entrar\u00eda 220 ms despu\u00e9s y se ver\u00eda el salto.
+const uctx = { console, Math, Date, JSON, Number, String, Array, Object, setTimeout: f => f(),
+  document: { getElementById: () => null, querySelectorAll: () => [], body: { appendChild() {} } },
+  localStorage: { getItem: () => null, setItem: () => {} }, requestAnimationFrame: f => f() };
+uctx.globalThis = uctx; uctx.window = uctx;
+vm.createContext(uctx);
+vm.runInContext(fs.readFileSync(DIR + 'utils.js', 'utf8'), uctx, { filename: 'utils.js' });
+let cerro = 0, abrio = 0;
+uctx.closeSheet = () => { cerro++; };
+vm.runInContext('_sheetItems = [{ label: "x", submenu: () => _marca() }]', uctx);
+uctx._marca = () => { abrio++; };
+vm.runInContext('_sheetItemClick(0)', uctx);
+ok(abrio === 1 && cerro === 0, 'tocar un submen\u00fa abre sin cerrar', { abrio, cerro });
+vm.runInContext('_sheetItems = [{ label: "y", onClick: () => _marca() }]', uctx);
+vm.runInContext('_sheetItemClick(0)', uctx);
+ok(cerro === 1, 'y una opci\u00f3n normal sigue cerrando', { cerro });
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
-
 })().catch(e => { console.error('Error:', e); process.exit(1); });

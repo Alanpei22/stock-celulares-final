@@ -547,6 +547,9 @@ function _handleInvScan(codigo) {
 // ══════════════════════════════════════════
 //  MENÚ INVENTARIO (bottom sheet)
 // ══════════════════════════════════════════
+// El menú llegó a doce opciones de un tirón y cinco eran de etiquetas. Esas
+// cinco se fueron adentro de una sola: acá quedan siete, que se leen de una
+// mirada en vez de ponerse a buscar.
 function toggleInvMenu() {
   if (typeof openSheet !== 'function') return;
   openSheet('Inventario', [
@@ -555,6 +558,19 @@ function toggleInvMenu() {
     { divider: true },
     { icon: '☑️', label: 'Seleccionar varios', sub: 'Modificar o eliminar muchos a la vez', onClick: () => { closeInvMenu(); invSelEntrar(); } },
     { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: openInvWizard },
+    { icon: '🏷️', label: 'Etiquetas e impresión', sub: 'Imprimir, códigos de barras, impresora',
+      submenu: invMenuEtiquetas },
+    { icon: '💵', label: 'Cargar costos', sub: 'En dólares, todos en una lista (modo dueño)',
+      onClick: () => { closeInvMenu(); abrirCostosInv(); } },
+    { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },
+  ]);
+}
+
+// Todo lo de etiquetas, junto. Se abre en el mismo lugar, sin cerrar el menú,
+// y "Volver" trae el de afuera.
+function invMenuEtiquetas() {
+  if (typeof openSheet !== 'function') return;
+  openSheet('Etiquetas e impresión', [
     { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: imprimirEtiquetasInv },
     { icon: '🆕', label: 'Etiquetas de lo cargado hoy', sub: 'Al terminar una tanda', onClick: etiquetasDeHoy },
     { icon: '🔢', label: 'Generar códigos de barras', sub: 'A los artículos que no tienen', onClick: generarCodigosInv },
@@ -565,11 +581,11 @@ function toggleInvMenu() {
     { icon: '🖨️', label: 'Impresión directa',
       sub: (typeof qzMenuSub === 'function') ? qzMenuSub() : '',
       onClick: () => { closeInvMenu(); if (typeof configurarImpresoras === 'function') configurarImpresoras(); } },
-    { icon: '💵', label: 'Cargar costos', sub: 'En dólares, todos en una lista (modo dueño)',
-      onClick: () => { closeInvMenu(); abrirCostosInv(); } },
-    { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },
+    { divider: true },
+    { icon: '↩️', label: 'Volver', submenu: toggleInvMenu },
   ]);
 }
+
 function closeInvMenu() { if (typeof closeSheet === 'function') closeSheet(); }
 
 // Deja el formulario listo para el que viene, conservando la categoría (en una
