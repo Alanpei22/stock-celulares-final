@@ -275,6 +275,46 @@ ok(get('_cartSinPrecio()') === false, 'al poner el precio se destraba');
 ok(els['mov-save-btn'].disabled === false, 'y el botón vuelve', els['mov-save-btn'].disabled);
 ok(/Cobrar/.test(els['mov-save-btn'].textContent), 'diciendo cuánto se cobra', els['mov-save-btn'].textContent);
 
+console.log('\n11) Un artículo que no tenés NO entra al inventario');
+// Vender algo suelto (un cable que trajo el cliente, algo de una caja sin
+// cargar) daba de alta un producto con stock 0 y sin código. El inventario se
+// llenaba de fantasmas: aparecen en el buscador de la caja, cuentan en
+// "Productos", y no hay ninguno en el local.
+reset();
+els['mov-fi-desc'].value = 'Cable que trajo el cliente';
+run('_addFreeFromSearch()');
+ok(get('_cart.length') === 1 && get("_cart[0].source") === 'libre', 'se agrega al carrito como suelto',
+   get('JSON.stringify(_cart)'));
+run('_setCartPrice(0, 6000)');
+els['mov-fi-monto'].value = 6000;
+await save();
+
+const altas = WRITES.adds.map(a => a[0]);
+ok(altas.filter(c => c === 'productos').length === 0,
+   'al cobrar NO se da de alta ningún producto', altas);
+ok(altas.filter(c => c === 'caja_movimientos').length === 1,
+   'pero la venta se registra igual', altas);
+
+// Y la venta queda completa: lo vendido tiene que figurar en el movimiento,
+// que es de donde salen el comprobante y la ganancia.
+const m11 = mov();
+ok(m11 && Array.isArray(m11.items) && m11.items.length === 1, 'el artículo queda en la venta', m11 && m11.items);
+ok(m11.items[0].nombre === 'Cable que trajo el cliente' && m11.items[0].source === 'libre',
+   'con su nombre, marcado como suelto', m11.items[0]);
+ok(m11.items[0].id === null, 'y sin id de inventario, porque no existe ahí', m11.items[0].id);
+ok(Number(m11.monto) === 6000, 'por el monto cobrado', m11.monto);
+ok(!TOASTS.some(t => /al inventario/.test(t[1])), 'y el aviso no dice que se agregó nada', TOASTS);
+
+// Lo del inventario sigue descontando stock: esto no toca ese camino.
+reset();
+addCart('FUNDA');
+els['mov-fi-monto'].value = 5000;
+await save();
+ok(WRITES.updates.some(u => u[0] === 'productos' && u[1] === 'p1'),
+   'un artículo del inventario sigue descontando stock', WRITES.updates);
+ok(WRITES.adds.filter(a => a[0] === 'productos').length === 0, 'y tampoco se da de alta de nuevo',
+   WRITES.adds.map(a => a[0]));
+
 console.log(fails ? `\n${fails} FALLARON` : '\nTodo OK');
 process.exit(fails ? 1 : 0);
 })();

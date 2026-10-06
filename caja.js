@@ -3547,7 +3547,6 @@ async function saveMov() {
 
   // ── Carrito de productos (solo en INGRESO y al CREAR, no editar) ──
   let stockUpdates = [];      // un descuento de stock por cada ítem del carrito
-  let nuevosProductos = [];   // productos libres a dar de alta en el inventario
   let equiposVendidos = [];   // equipos del stock a marcar como vendidos
   let repairUpdate = null;
   let _entregaAvisar = false;   // el cliente pidió el WhatsApp de entrega
@@ -3578,8 +3577,11 @@ async function saveMov() {
         // Equipo del stock → se marca como vendido (no descuenta cantidad)
         equiposVendidos.push(it.id);
       } else if (esLibre) {
-        // Producto libre → se da de alta en el inventario (con el costo si se cargó)
-        nuevosProductos.push({ nombre: it.nombre, precioVenta: Number(it.precio) || 0, precioCosto: Number(it.costoARS) || 0 });
+        // Un artículo suelto NO se da de alta en el inventario: se vende y
+        // listo. Queda en `items` del movimiento (y en el comprobante), que es
+        // lo que hace falta para la venta y para la ganancia. Dar de alta algo
+        // que no tenés en el local llenaba el inventario de productos en cero
+        // que despues aparecian en el buscador.
       } else {
         const collection = it.source === 'producto' ? 'productos' : 'repuestos';
         const stockField = it.source === 'producto' ? 'stock' : 'cantidad';
@@ -3786,26 +3788,6 @@ async function saveMov() {
           }
         }
         if (totalU) toastMsg += ` · stock −${totalU} u.`;
-      }
-
-      // Alta en inventario de los productos libres vendidos (stock 0, costo 0; se ajustan luego)
-      if (nuevosProductos.length) {
-        let creados = 0;
-        for (const np of nuevosProductos) {
-          try {
-            await db.collection('productos').add({
-              codigo: '', nombre: np.nombre, categoria: '',
-              precioVenta: np.precioVenta, precioCosto: np.precioCosto || 0,
-              stock: 0, stockMin: 0, activo: true,
-              fechaAlta: firebase.firestore.FieldValue.serverTimestamp(),
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            });
-            creados++;
-          } catch (prodErr) {
-            console.error('Alta producto libre:', prodErr);
-          }
-        }
-        if (creados) toastMsg += ` · ${creados} producto${creados > 1 ? 's' : ''} al inventario`;
       }
 
       toast(toastMsg + (toastMsg === 'Movimiento registrado' ? '' : ''), 'success');
