@@ -44,6 +44,8 @@ vm.createContext(ctx);
 vm.runInContext(inv, ctx, { filename: 'inventario.js' });
 const run = e => vm.runInContext(e, ctx);
 
+(async () => {
+
 console.log('\n1) El costo se carga en la moneda en que compraste');
 ok(run('invMoneda()') === 'ars', 'arranca en pesos: así se compran los accesorios');
 run("invSetMoneda('usd')");
@@ -113,6 +115,50 @@ ok(/if \(typeof _cajaOwnerRenovar === 'function'\) _cajaOwnerRenovar\(\)/.test(i
    'y cada artículo guardado lo renueva');
 ok(/<div class="fg owner-only">/.test(caja), '(el costo sigue siendo solo del dueño)');
 
+console.log('\n4c) Crear categorías sobre la marcha');
+// Eran ocho y fijas. Si mañana entra algo que no entra en ninguna (parlantes,
+// memorias, soportes), no se puede frenar la carga para tocar código.
+const CATS = [];
+ctx.db = { collection: () => ({ doc: () => ({
+  get: async () => ({ exists: true, data: () => ({ lista: ['Parlantes'] }) }),
+  set: async d => { CATS.push(d); },
+}) }) };
+mk('inv-fi-cat'); mk('inv-f-cat');
+run('PRODUCTOS = []');
+run('_invLlenarCats()');
+ok(/Crear categoría…/.test(els['inv-fi-cat'].innerHTML), 'el select trae la opción de crear');
+ok(/value="Cable"/.test(els['inv-fi-cat'].innerHTML), 'con las de fábrica');
+ok(!/Crear categoría/.test(els['inv-f-cat'].innerHTML), 'pero el filtro no: ahí no se crea nada');
+
+// Las propias llegan de Firestore y valen para todos los dispositivos.
+await run('invCargarCategorias()');
+ok(/value="Parlantes"/.test(els['inv-fi-cat'].innerHTML), 'las propias se leen de la base',
+   els['inv-fi-cat'].innerHTML.slice(0, 120));
+
+// Y una categoría que quedó en un producto viejo no desaparece del filtro.
+run("PRODUCTOS = [{ categoria: 'Memorias' }]");
+run('_invLlenarCats()');
+ok(/value="Memorias"/.test(els['inv-f-cat'].innerHTML),
+   'y la que ya usa un producto tampoco se pierde');
+
+// Crear una: queda elegida en el acto y guardada para la próxima.
+ctx.prompt = () => 'Soportes';
+els['inv-fi-cat'].value = '__nueva';
+await run('_invCatElegida()');
+ok(els['inv-fi-cat'].value === 'Soportes', 'al crearla queda elegida, sin tener que buscarla', els['inv-fi-cat'].value);
+ok(CATS.length === 1 && CATS[0].lista.indexOf('Soportes') >= 0, 'y se guarda en la base', CATS);
+// Repetida, no.
+ctx.prompt = () => 'soportes';
+els['inv-fi-cat'].value = '__nueva';
+await run('_invCatElegida()');
+ok(CATS.length === 1, 'la misma dos veces no se duplica (ni cambiando mayúsculas)', CATS.length);
+ok(els['inv-fi-cat'].value === 'Soportes', 'y te deja parado en la que ya existía');
+// Cancelar el cartel no rompe nada.
+ctx.prompt = () => null;
+els['inv-fi-cat'].value = '__nueva';
+await run('_invCatElegida()');
+ok(els['inv-fi-cat'].value === '', 'si cancelás, queda sin categoría y no "__nueva"', els['inv-fi-cat'].value);
+
 console.log('\n5) Las etiquetas de lo cargado hoy');
 const hoy = { fechaAlta: { toDate: () => new Date('2026-10-06T14:00:00-03:00') } };
 const ayer = { fechaAlta: { toDate: () => new Date('2026-10-05T14:00:00-03:00') } };
@@ -130,3 +176,5 @@ ok(/if \(estF === 'hoy'\)\s+lista = lista\.filter\(_invEsDeHoy\)/.test(inv), 'co
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
+
+})().catch(e => { console.error('Error:', e); process.exit(1); });

@@ -64,10 +64,79 @@ let _invEditingId = null;
 let _invScanBuf = '';
 let _invScanTimer = null;
 
+// Las que vienen de fábrica. Las que agregás vos se guardan en Firestore
+// (`config/invCategorias`) y valen para todos los dispositivos: si cargás
+// "Parlantes" en la PC, aparece también en el celular.
 const INV_CATEGORIAS = [
   'Accesorio', 'Vidrio templado / Hidrogel', 'Cable', 'Cargador',
   'Auricular', 'Funda / Cover', 'Repuesto', 'Otro'
 ];
+let INV_CATS_PROPIAS = [];
+
+// La lista completa, sin repetidos. Se suman también las categorías que ya
+// tengan los productos cargados: si alguna se borró de la lista, los artículos
+// que la usaban no se quedan huérfanos en el filtro.
+function invCategorias() {
+  const todas = INV_CATEGORIAS.concat(INV_CATS_PROPIAS);
+  (typeof PRODUCTOS !== 'undefined' ? PRODUCTOS : []).forEach(p => {
+    const c = String(p && p.categoria || '').trim();
+    if (c) todas.push(c);
+  });
+  return todas.filter((c, n) => todas.indexOf(c) === n);
+}
+
+async function invCargarCategorias() {
+  try {
+    const doc = await db.collection('config').doc('invCategorias').get();
+    INV_CATS_PROPIAS = (doc.exists && Array.isArray(doc.data().lista)) ? doc.data().lista : [];
+  } catch (e) { console.warn('[inventario] categorías:', e); }
+  _invLlenarCats();
+}
+
+// Llena el select del formulario y el del filtro. Se vuelve a llamar cada vez
+// que se agrega una, así aparece en los dos sin recargar la página.
+function _invLlenarCats() {
+  const cats = invCategorias();
+  const sel = document.getElementById('inv-fi-cat');
+  if (sel) {
+    const antes = sel.value;
+    sel.innerHTML = '<option value="">Sin categoría</option>' +
+      cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('') +
+      '<option value="__nueva">➕ Crear categoría…</option>';
+    sel.value = antes;
+  }
+  const filtro = document.getElementById('inv-f-cat');
+  if (filtro) {
+    const antes = filtro.value;
+    filtro.innerHTML = '<option value="">Todas las categorías</option>' +
+      cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    filtro.value = antes;
+  }
+}
+
+// Elegir "➕ Crear categoría…" en el select.
+async function _invCatElegida() {
+  const sel = document.getElementById('inv-fi-cat');
+  if (!sel || sel.value !== '__nueva') return;
+  sel.value = '';
+  const nombre = (prompt('Nombre de la categoría nueva:\n(ej: Parlantes, Memorias, Soportes)', '') || '').trim();
+  if (!nombre) return;
+  if (invCategorias().some(c => c.toLowerCase() === nombre.toLowerCase())) {
+    toast('Esa categoría ya existe', 'error');
+    sel.value = invCategorias().find(c => c.toLowerCase() === nombre.toLowerCase());
+    return;
+  }
+  INV_CATS_PROPIAS.push(nombre);
+  _invLlenarCats();
+  sel.value = nombre;            // queda elegida, que es a lo que viniste
+  try {
+    await db.collection('config').doc('invCategorias').set({ lista: INV_CATS_PROPIAS });
+    toast(`Categoría "${nombre}" creada ✅`, 'success');
+  } catch (e) {
+    console.error('[inventario] guardar categoría:', e);
+    toast('Se usa ahora, pero no se pudo guardar para la próxima', 'error');
+  }
+}
 
 // ── Inicializar ─────────────────────────────────────────────
 // opts.soloUI = true → engancha la interfaz pero NO lee la colección de
@@ -96,21 +165,10 @@ function initInventario(opts = {}) {
     if (e.target.id === 'inv-form-modal') closeProductoForm();
   });
 
-  // Llenar select de categorías en el form
-  const catSel = document.getElementById('inv-fi-cat');
-  INV_CATEGORIAS.forEach(c => {
-    const o = document.createElement('option');
-    o.value = c; o.textContent = c;
-    catSel.appendChild(o);
-  });
-
-  // Llenar filtro de categorías
-  const catFilter = document.getElementById('inv-f-cat');
-  INV_CATEGORIAS.forEach(c => {
-    const o = document.createElement('option');
-    o.value = c; o.textContent = c;
-    catFilter.appendChild(o);
-  });
+  // Categorías: las de fábrica ya, las propias cuando llegue Firestore.
+  _invLlenarCats();
+  document.getElementById('inv-fi-cat')?.addEventListener('change', _invCatElegida);
+  invCargarCategorias();
 
   // URL param: ?section=inventario&newProducto=CODIGO
   const urlParams = new URLSearchParams(location.search);
@@ -131,6 +189,7 @@ function _listenProductos() {
     PRODUCTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     PRODUCTOS_MAP.clear();
     PRODUCTOS.forEach(p => { if (p.codigo) PRODUCTOS_MAP.set(String(p.codigo), p); });
+    _invLlenarCats();   // por si algún producto trae una categoría que no está en la lista
     renderInventario();
   }, err => {
     console.error('Inventario Firestore:', err);
