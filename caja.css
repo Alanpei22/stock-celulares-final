@@ -1711,3 +1711,6 @@ body.dark .comprobante-item-imei { color:#eee; }
 body.dark .inv-mon-btn { background: transparent; border-color: #2f343b; color: #c7cdd6; }
 body.dark .inv-mon-btn.inv-mon-on { background: var(--accent); border-color: var(--accent); color: #14161a; }
 .inv-save-seguir { background: var(--accent, #C8965A) !important; }
+
+/* Accesorios → Seleccionar varios: el marcado se ve sin mirar el tilde */
+.inv-item--sel { background: color-mix(in srgb, var(--acc, #C8965A) 14%, transparent); border-radius: 10px; }

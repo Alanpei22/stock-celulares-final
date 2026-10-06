@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-inv-seleccion.js':    'Accesorios: seleccionar varios para modificar o eliminar en masa',
   'test-orden.js':            'N° de orden: corregirlo al editar y arreglar el contador',
   'test-costos-usd.js':       'Costo de accesorios en dólares y carga de costos en lista',
   'test-qz.js':              'Impresión directa con QZ Tray: cada cosa a su impresora, y el diálogo si falla',

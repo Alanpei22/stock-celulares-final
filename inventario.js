@@ -265,13 +265,18 @@ function renderInventario() {
   }
   if (empty) empty.style.display = 'none';
 
+  if (_invSelModo) _invSelBarra();
   el.innerHTML = lista.map(p => {
     const stockOk  = p.stock > 0;
     const stockBaj = p.stockMin > 0 && (p.stock || 0) <= p.stockMin;
     const stockCls = !stockOk ? 'inv-stock-cero' : stockBaj ? 'inv-stock-bajo' : 'inv-stock-ok';
     const inact    = p.activo === false;
-    return `<div class="inv-item${inact ? ' inv-item--inactivo' : ''}">
-      <div class="inv-item-main" onclick="openProductoForm('${esc(p.id)}')">
+    const sel = _invSelModo && _invSel.has(p.id);
+    // En modo selección, tocar el artículo lo marca en vez de abrirlo.
+    const click = _invSelModo ? `_invSelToggle('${esc(p.id)}')` : `openProductoForm('${esc(p.id)}')`;
+    return `<div class="inv-item${inact ? ' inv-item--inactivo' : ''}${sel ? ' inv-item--sel' : ''}">
+      <div class="inv-item-main" onclick="${click}">
+        ${_invSelModo ? `<span class="inv-sel-chk" style="font-size:20px;margin-right:8px">${sel ? '☑️' : '⬜'}</span>` : ''}
         <div class="inv-item-info">
           <span class="inv-item-nombre">${esc(p.nombre)}</span>
           <span class="inv-item-sub">${esc(p.categoria || '')}${p.codigo ? ' · <code>' + esc(p.codigo) + '</code>' : ''}</span>
@@ -548,6 +553,7 @@ function toggleInvMenu() {
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
     { icon: '🔒', label: 'Modo dueño', onClick: openCajaOwnerPin },
     { divider: true },
+    { icon: '☑️', label: 'Seleccionar varios', sub: 'Modificar o eliminar muchos a la vez', onClick: () => { closeInvMenu(); invSelEntrar(); } },
     { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: openInvWizard },
     { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: imprimirEtiquetasInv },
     { icon: '🆕', label: 'Etiquetas de lo cargado hoy', sub: 'Al terminar una tanda', onClick: etiquetasDeHoy },
@@ -895,5 +901,191 @@ async function guardarCostosInv() {
     toast('Error al guardar los costos', 'error');
     if (btn) btn.disabled = false;
   }
+}
+
+// ══════════════════════════════════════════
+//  SELECCIONAR VARIOS — modificar o eliminar en masa
+// ══════════════════════════════════════════
+// Menú → ☑️ Seleccionar varios. Tocar un artículo lo marca; abajo aparece una
+// barra con cuántos van y las acciones. "Todos" marca los de la lista que se
+// está viendo (con la búsqueda y los filtros puestos): así "todas las fundas"
+// es filtrar por Funda / Cover y tocar Todos.
+let _invSelModo = false;
+let _invSel = new Set();
+
+function invSelEntrar() {
+  _invSelModo = true;
+  _invSel = new Set();
+  // Que la barra de abajo no tape el último artículo.
+  const l = document.getElementById('inv-list');
+  if (l) l.style.paddingBottom = '80px';
+  renderInventario();
+  _invSelBarra();
+  toast('Tocá los artículos para marcarlos', 'info');
+}
+
+function invSelSalir() {
+  _invSelModo = false;
+  _invSel = new Set();
+  document.getElementById('inv-sel-barra')?.remove();
+  const l = document.getElementById('inv-list');
+  if (l) l.style.paddingBottom = '';
+  renderInventario();
+}
+
+function _invSelToggle(id) {
+  if (_invSel.has(id)) _invSel.delete(id); else _invSel.add(id);
+  renderInventario();
+}
+
+function invSelTodos() {
+  const ids = _invFiltrados().map(p => p.id);
+  // Si ya estaban todos marcados, el mismo botón los desmarca.
+  const todos = ids.length && ids.every(id => _invSel.has(id));
+  ids.forEach(id => todos ? _invSel.delete(id) : _invSel.add(id));
+  renderInventario();
+}
+
+function _invSelBarra() {
+  let b = document.getElementById('inv-sel-barra');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'inv-sel-barra';
+    b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:900;display:flex;gap:8px;align-items:center;' +
+      'padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--card,#fff);' +
+      'border-top:1px solid var(--bd,#e5e7eb);box-shadow:0 -4px 16px rgba(0,0,0,.12)';
+    document.body.appendChild(b);
+  }
+  const n = _invSel.size;
+  b.innerHTML = `
+    <b style="flex:1;font-size:15px">${n} marcado${n === 1 ? '' : 's'}</b>
+    <button class="btn-secondary" onclick="invSelTodos()">Todos</button>
+    <button class="btn-primary" ${n ? '' : 'disabled'} onclick="invSelAcciones()">Acciones</button>
+    <button class="btn-secondary" onclick="invSelSalir()" title="Salir">✕</button>`;
+}
+
+function _invSelLista() {
+  return PRODUCTOS.filter(p => _invSel.has(p.id));
+}
+
+function invSelAcciones() {
+  const n = _invSel.size;
+  if (!n || typeof openSheet !== 'function') return;
+  openSheet(`${n} artículo${n === 1 ? '' : 's'}`, [
+    { icon: '💲', label: 'Cambiar precio', sub: 'Un precio fijo, o subir/bajar un % (dueño)', onClick: () => { closeInvMenu(); invSelPrecio(); } },
+    { icon: '🗂️', label: 'Cambiar categoría', onClick: () => { closeInvMenu(); invSelCategoria(); } },
+    { icon: '📦', label: 'Cambiar stock', sub: 'Un número fijo, o sumar/restar', onClick: () => { closeInvMenu(); invSelStock(); } },
+    { icon: '⏸️', label: 'Desactivar', sub: 'No se venden ni aparecen en la caja', onClick: () => { closeInvMenu(); invSelActivo(false); } },
+    { icon: '▶️', label: 'Activar', onClick: () => { closeInvMenu(); invSelActivo(true); } },
+    { icon: '🏷️', label: 'Imprimir etiquetas', onClick: () => { closeInvMenu(); printEtiquetasProductos(_invSelLista(), 1); } },
+    { divider: true },
+    { icon: '🗑️', label: 'Eliminar', sub: 'No se puede deshacer (dueño, con PIN)', danger: true, onClick: () => { closeInvMenu(); invSelEliminar(); } },
+  ]);
+}
+
+// "8000" = ese precio · "+10%" / "-5%" = sube o baja ese porcentaje, redondeado
+// a $100 · "+500" / "-500" = suma o resta pesos. Devuelve null si no se entiende.
+function _invNuevoPrecio(txt, actual) {
+  const t = String(txt || '').trim().replace(/\s/g, '').replace(/\$/g, '');
+  if (!t) return null;
+  const pct = t.match(/^([+-])(\d+(?:[.,]\d+)?)%$/);
+  if (pct) {
+    const f = 1 + (pct[1] === '-' ? -1 : 1) * parseFloat(pct[2].replace(',', '.')) / 100;
+    return Math.max(0, Math.round((Number(actual) || 0) * f / 100) * 100);
+  }
+  const rel = t.match(/^([+-])(\d+)$/);
+  if (rel) return Math.max(0, (Number(actual) || 0) + (rel[1] === '-' ? -1 : 1) * parseInt(rel[2], 10));
+  const abs = t.replace(/\./g, '');
+  return /^\d+$/.test(abs) ? parseInt(abs, 10) : null;
+}
+
+// "10" = queda en 10 · "+5" / "-2" = suma o resta (nunca menos de 0).
+function _invNuevoStock(txt, actual) {
+  const t = String(txt || '').trim().replace(/\s/g, '');
+  const rel = t.match(/^([+-])(\d+)$/);
+  if (rel) return Math.max(0, (Number(actual) || 0) + (rel[1] === '-' ? -1 : 1) * parseInt(rel[2], 10));
+  return /^\d+$/.test(t) ? parseInt(t, 10) : null;
+}
+
+// Escribe los cambios en tandas (Firestore acepta hasta 500 por tanda).
+async function _invSelGuardar(cambios, borrar) {
+  for (let i = 0; i < cambios.length; i += 450) {
+    const batch = db.batch();
+    cambios.slice(i, i + 450).forEach(c => {
+      const ref = db.collection('productos').doc(c.id);
+      if (borrar) batch.delete(ref);
+      else batch.update(ref, Object.assign({}, c.data, { updatedAt: firebase.firestore.FieldValue.serverTimestamp() }));
+    });
+    await batch.commit();
+  }
+}
+
+async function _invSelAplicar(cambios, mensaje, borrar) {
+  if (!cambios.length) { toast('No hay nada que cambiar', 'info'); return; }
+  try {
+    await _invSelGuardar(cambios, borrar);
+    toast('✅ ' + mensaje, 'success');
+    invSelSalir();
+  } catch (e) {
+    console.error('selección:', e);
+    toast(e?.code === 'permission-denied' ? 'Sin permiso para hacer eso' : 'Error al guardar los cambios', 'error');
+  }
+}
+
+function invSelPrecio() {
+  if (!_invIsOwner()) { toast('🔒 Cambiar precios en masa es del modo dueño', 'error'); return; }
+  const lista = _invSelLista();
+  const r = prompt(`Precio para ${lista.length} artículo${lista.length === 1 ? '' : 's'}:\n\n` +
+    `• 8000 → todos a $8.000\n• +10% → suben 10% (redondeado a $100)\n• -5% → bajan 5%\n• +500 → $500 más cada uno`, '+10%');
+  if (r === null) return;
+  const cambios = [];
+  for (const p of lista) {
+    const nuevo = _invNuevoPrecio(r, p.precioVenta);
+    if (nuevo === null) { toast('No entendí el precio: probá con 8000, +10% o -500', 'error'); return; }
+    if (nuevo !== (Number(p.precioVenta) || 0)) cambios.push({ id: p.id, data: { precioVenta: nuevo } });
+  }
+  const ej = lista[0];
+  const ejTxt = ej ? `\n\nEj.: ${ej.nombre}: $${_fmtNum(ej.precioVenta || 0)} → $${_fmtNum(_invNuevoPrecio(r, ej.precioVenta))}` : '';
+  if (cambios.length && !confirm(`¿Cambiar el precio de ${cambios.length} artículo${cambios.length === 1 ? '' : 's'}?${ejTxt}`)) return;
+  _invSelAplicar(cambios, `Precio cambiado en ${cambios.length} artículo${cambios.length === 1 ? '' : 's'}`);
+}
+
+function invSelCategoria() {
+  const cats = invCategorias();
+  const r = prompt('Categoría nueva:\n\n' + cats.map((c, i) => `${i + 1}. ${c}`).join('\n') +
+    '\n\nNúmero, o escribí una nueva:', '');
+  if (r === null || !r.trim()) return;
+  const n = parseInt(r.trim(), 10);
+  const cat = (String(n) === r.trim() && cats[n - 1]) ? cats[n - 1] : r.trim();
+  const cambios = _invSelLista().filter(p => p.categoria !== cat).map(p => ({ id: p.id, data: { categoria: cat } }));
+  _invSelAplicar(cambios, `${cambios.length} artículo${cambios.length === 1 ? '' : 's'} pasaron a ${cat}`);
+}
+
+function invSelStock() {
+  const r = prompt('Stock:\n\n• 10 → todos quedan en 10\n• +5 → suma 5 a cada uno\n• -2 → resta 2 (nunca menos de 0)', '');
+  if (r === null) return;
+  const cambios = [];
+  for (const p of _invSelLista()) {
+    const nuevo = _invNuevoStock(r, p.stock);
+    if (nuevo === null) { toast('No entendí: probá con 10, +5 o -2', 'error'); return; }
+    if (nuevo !== (Number(p.stock) || 0)) cambios.push({ id: p.id, data: { stock: nuevo } });
+  }
+  _invSelAplicar(cambios, `Stock cambiado en ${cambios.length} artículo${cambios.length === 1 ? '' : 's'}`);
+}
+
+function invSelActivo(activo) {
+  const cambios = _invSelLista().filter(p => (p.activo !== false) !== activo).map(p => ({ id: p.id, data: { activo } }));
+  _invSelAplicar(cambios, `${cambios.length} artículo${cambios.length === 1 ? '' : 's'} ${activo ? 'activados' : 'desactivados'}`);
+}
+
+function invSelEliminar() {
+  if (!_invIsOwner()) { toast('🔒 Eliminar es del modo dueño', 'error'); return; }
+  const lista = _invSelLista();
+  const muestra = lista.slice(0, 5).map(p => '• ' + p.nombre).join('\n') + (lista.length > 5 ? `\n… y ${lista.length - 5} más` : '');
+  if (!confirm(`¿ELIMINAR ${lista.length} artículo${lista.length === 1 ? '' : 's'}?\n\n${muestra}\n\nNo se puede deshacer. ` +
+               `Si solo no los querés ver en la caja, usá Desactivar.`)) return;
+  _invRequirePin(() => {
+    _invSelAplicar(lista.map(p => ({ id: p.id })), `${lista.length} artículo${lista.length === 1 ? '' : 's'} eliminado${lista.length === 1 ? '' : 's'}`, true);
+  }, `PIN para eliminar ${lista.length} artículos`);
 }
 

@@ -1187,6 +1187,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 function switchCajaTab(tab) {
+  // La barra de "marcados" es de Accesorios: al irse de la pestaña, se sale.
+  if (tab !== 'inventario' && typeof _invSelModo !== 'undefined' && _invSelModo) invSelSalir();
   const tabs = { caja: 'caja-tab', inventario: 'inv-tab', reparaciones: 'rep-tab' };
   const btns = { caja: 'cnav-caja', inventario: 'cnav-inv', reparaciones: 'cnav-rep' };
   const sbs  = { caja: 'sb-caja',   inventario: 'sb-inv',   reparaciones: 'sb-repar' };
