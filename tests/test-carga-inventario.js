@@ -228,6 +228,84 @@ vm.runInContext('_sheetItems = [{ label: "y", onClick: () => _marca() }]', uctx)
 vm.runInContext('_sheetItemClick(0)', uctx);
 ok(cerro === 1, 'y una opci\u00f3n normal sigue cerrando', { cerro });
 
+console.log('\n7) El código de barras sale solo al agregar');
+// Un artículo sin código no se escanea en la caja ni se etiqueta, y la
+// etiqueta es el motivo por el que se carga. Antes guardaba con el código en
+// blanco y había que acordarse de ir al menú a generarlos después.
+['inv-fi-cod', 'inv-fi-nom', 'inv-fi-cat', 'inv-fi-pv', 'inv-fi-stock', 'inv-fi-stockmin',
+ 'inv-fi-activo', 'inv-form-save', 'inv-form-save-otro', 'inv-form-modal',
+ 'inv-form-title', 'inv-form-del', 'inv-form-etq'].forEach(mk);
+
+// El contador de códigos de verdad (el utils.js que ya se cargó arriba),
+// contra una base de mentira.
+ctx.tpReservarCodigos = uctx.tpReservarCodigos;
+ctx.tpMaxCodigoLocal  = uctx.tpMaxCodigoLocal;
+
+let META = null, FALLAR = false;
+const GUARDADO = [];
+ctx.db = {
+  collection: col => ({
+    doc: () => ({
+      get: async () => { if (FALLAR) throw new Error('sin internet'); return { exists: META !== null, data: () => META }; },
+      set: async d => { if (FALLAR) throw new Error('sin internet'); META = Object.assign({}, META, d); },
+      update: async d => { GUARDADO.push({ tipo: 'update', data: d }); },
+    }),
+    add: async d => { GUARDADO.push({ tipo: 'add', data: d }); return { id: 'x' }; },
+  }),
+};
+
+const cargar = (cod, nom) => {
+  els['inv-fi-cod'].value = cod; els['inv-fi-nom'].value = nom;
+  els['inv-fi-cat'].value = 'Cable'; els['inv-fi-pv'].value = '8000';
+  els['inv-fi-costoUSD'].value = '3000'; els['inv-fi-stock'].value = '5';
+  els['inv-fi-stockmin'].value = '2'; els['inv-fi-activo'].checked = true;
+};
+const ultimo = () => GUARDADO[GUARDADO.length - 1];
+
+run('PRODUCTOS = []; PRODUCTOS_MAP = new Map()');
+cargar('', 'Cable USB-C 1m');
+await run('saveProducto()');
+ok(ultimo() && /^TP\d{5}$/.test(ultimo().data.codigo),
+   'guardado sin escribir código, le sale uno interno TP#####', ultimo() && ultimo().data.codigo);
+const primero = ultimo().data.codigo;
+
+// Dos altas seguidas no pueden repetir el número: serían dos etiquetas iguales
+// en la góndola y la caja no sabría cuál es cuál.
+cargar('', 'Cable USB-C 2m');
+await run('saveProducto()');
+ok(ultimo().data.codigo !== primero, 'y el siguiente es otro número',
+   [primero, ultimo().data.codigo]);
+ok(Number(ultimo().data.codigo.slice(2)) === Number(primero.slice(2)) + 1, 'el que sigue, sin saltos',
+   [primero, ultimo().data.codigo]);
+
+// Si escaneás el código del envase, ese manda: es el que lee la caja.
+cargar('7790040123456', 'Funda con código de fábrica');
+await run('saveProducto()');
+ok(ultimo().data.codigo === '7790040123456', 'el código escaneado no se pisa', ultimo().data.codigo);
+
+// El número no se cuenta contra los códigos de fábrica: sigue por TP.
+cargar('', 'Otro cable');
+await run('saveProducto()');
+ok(/^TP\d{5}$/.test(ultimo().data.codigo), 'y el de al lado vuelve a salir TP', ultimo().data.codigo);
+
+// Sin internet se guarda igual: perder la carga del artículo es peor que
+// quedarse sin código, que se puede generar después desde el menú.
+FALLAR = true;
+const grito = [console.warn, console.error];
+console.warn = console.error = () => {};   // el fallo es a proposito
+const antes = GUARDADO.length;
+cargar('', 'Cable sin señal');
+await run('saveProducto()');
+FALLAR = false;
+[console.warn, console.error] = grito;
+ok(GUARDADO.length === antes + 1, 'sin internet el artículo se guarda igual', GUARDADO.length - antes);
+ok(ultimo().data.codigo === '', 'sin código, que queda para "Generar códigos de barras"',
+   ultimo().data.codigo);
+
+// Y el aviso dice cuál le tocó: es el número que hay que pegarle al artículo.
+ok(/toast\('✅ Producto guardado' \+ \(!cod && codigo \? ' · ' \+ codigo : ''\)/.test(inv),
+   'el aviso muestra el código que le tocó');
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
 })().catch(e => { console.error('Error:', e); process.exit(1); });

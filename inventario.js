@@ -402,8 +402,24 @@ async function saveProducto(opts) {
   btn.disabled = true;
 
   try {
+    // Un articulo sin codigo no se puede escanear en la caja ni etiquetar, y
+    // la etiqueta es el motivo por el que se carga. Si no escaneaste el codigo
+    // del envase ni escribiste uno, se le reserva uno interno TP##### ahora,
+    // que es lo que sale impreso. Antes habia que acordarse de ir despues al
+    // menu y correr "Generar codigos de barras" sobre todo lo que faltaba.
+    let codigo = cod;
+    if (!codigo) {
+      try {
+        codigo = (await tpReservarCodigos(db, 1, tpMaxCodigoLocal(PRODUCTOS)))[0] || '';
+      } catch (e) {
+        // Sin internet se guarda igual, sin codigo: frenar la carga por esto
+        // seria peor. Queda para "Generar codigos de barras".
+        console.error('[inventario] reservar codigo:', e);
+      }
+    }
+
     const data = {
-      codigo: cod, nombre: nom, categoria: cat,
+      codigo, nombre: nom, categoria: cat,
       precioVenta: pv, precioCostoUSD: costoUSD,
       stock, stockMin: stmin, activo,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -421,7 +437,7 @@ async function saveProducto(opts) {
     } else {
       data.fechaAlta = firebase.firestore.FieldValue.serverTimestamp();
       await db.collection('productos').add(data);
-      toast('✅ Producto guardado', 'success');
+      toast('✅ Producto guardado' + (!cod && codigo ? ' · ' + codigo : ''), 'success');
     }
     // Cargando una tanda, cerrar el formulario y volver a tocar "escanear" en
     // cada artículo son dos toques de más por artículo. Con "guardar y cargar
