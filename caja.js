@@ -126,7 +126,8 @@ function initApp() {
     _loadYesterdayStats().then(() => renderStats()); // Feature 6: vs ayer
     listenCierresParciales();      // ← turnos/cierres parciales
   }
-  // CUPO: repuestos, stock y reparaciones son para el AUTOCOMPLETE de la venta.
+  // CUPO: accesorios, repuestos, stock y reparaciones son para el AUTOCOMPLETE
+  // de la venta.
   // Antes se leían enteros al abrir la caja, aunque solo vinieras a mirar los
   // números del día. Ahora arrancan la primera vez que se toca el buscador
   // (ver _asegurarDatosVenta), o al abrir el modal de cobro.
@@ -2568,6 +2569,11 @@ function _asegurarDatosVenta() {
   listenCajaRepuestos();
   listenCajaStock();
   listenCajaRepairs();
+  // Los accesorios son lo que más se vende. Vivían en `PRODUCTOS`, que solo
+  // se llenaba al entrar a la pestaña Accesorios: si abrías la caja y cobrabas
+  // sin pasar por ahí, ni el buscador ni el lector los encontraban.
+  // Es el mismo listener, con la misma traba de no duplicarse.
+  if (typeof _listenProductos === 'function') _listenProductos();
 }
 
 function listenCajaRepuestos() {

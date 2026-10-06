@@ -90,6 +90,9 @@ run('_asegurarDatosVenta()');
 const alVender = leidas();
 ok(alVender.includes('repuestos') && alVender.includes('stock') && alVender.includes('repairs'),
    'ahí sí: repuestos, stock y reparaciones', alVender);
+// Y los accesorios, que es lo que más se vende. Sin esto, el buscador y el
+// lector de la caja no encontraban ninguno hasta pasar por la pestaña.
+ok(alVender.includes('productos'), 'y los accesorios del inventario', alVender);
 const st = ATACHES.find(a => a.coleccion === 'stock');
 ok(st && st.filtros.some(f => f.startsWith('vendido')), 'el stock solo trae los NO vendidos', st);
 const rp = ATACHES.find(a => a.coleccion === 'repairs');
@@ -100,10 +103,15 @@ ATACHES.length = 0;
 run('_asegurarDatosVenta(); _asegurarDatosVenta();');
 ok(ATACHES.length === 0, 'llamarlo de nuevo no vuelve a leer nada', ATACHES);
 
-console.log('\n4) Accesorios se lee al entrar a la pestaña');
+console.log('\n4) Accesorios y la venta comparten el mismo listener');
 ATACHES.length = 0;
 run('_listenProductos()');
-ok(leidas().includes('productos'), 'entrar a Accesorios trae los productos', leidas());
+ok(ATACHES.length === 0, 'ya vinieron con la venta: entrar a Accesorios no los relee', ATACHES);
+// Y al revés: si entrás primero a Accesorios, se leen ahí (y una sola vez).
+run('_invListener = null');
+ATACHES.length = 0;
+run('_listenProductos()');
+ok(leidas().includes('productos'), 'entrando primero a Accesorios, se traen ahí', leidas());
 ATACHES.length = 0;
 run('_listenProductos()');
 ok(ATACHES.length === 0, 'volver a entrar no los relee', ATACHES);
