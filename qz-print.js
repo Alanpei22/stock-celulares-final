@@ -27,11 +27,11 @@ const _QZ_KEY = 'qzImpresoras';
 function qzImpresoras() {
   try {
     const c = JSON.parse(localStorage.getItem(_QZ_KEY) || '{}');
-    return { hoja: c.hoja || '', etiqueta: c.etiqueta || '' };
-  } catch { return { hoja: '', etiqueta: '' }; }
+    return { hoja: c.hoja || '', etiqueta: c.etiqueta || '', ticket: c.ticket || '' };
+  } catch { return { hoja: '', etiqueta: '', ticket: '' }; }
 }
 function _qzGuardar(c) {
-  try { localStorage.setItem(_QZ_KEY, JSON.stringify({ hoja: c.hoja || '', etiqueta: c.etiqueta || '' })); } catch {}
+  try { localStorage.setItem(_QZ_KEY, JSON.stringify({ hoja: c.hoja || '', etiqueta: c.etiqueta || '', ticket: c.ticket || '' })); } catch {}
 }
 function qzActivo(tipo) { return !!qzImpresoras()[tipo]; }
 
@@ -111,12 +111,19 @@ async function _qzPaginasPng(html, selector, anchoMm, altoMm, dpi, byn) {
     const ser = new XMLSerializer();
     const estilos = [...d.querySelectorAll('style')].map(s => ser.serializeToString(s)).join('');
     const PX = 96 / 25.4;
-    const wPx = Math.round(anchoMm * PX), hPx = Math.round(altoMm * PX);
+    const wPx = Math.round(anchoMm * PX);
     const escala = dpi / 96;
     const paginas = [];
+    paginas.altos = [];
     for (const el of d.querySelectorAll(selector)) {
+      // alto 'auto': el ticket mide lo que mide su contenido (rollo continuo).
+      const altoEsta = altoMm === 'auto' ? Math.ceil(el.getBoundingClientRect().height / PX) + 2 : altoMm;
+      const hPx = Math.round(altoEsta * PX);
+      paginas.altos.push(altoEsta);
       const xhtml = `<html xmlns="http://www.w3.org/1999/xhtml"><head>${estilos}</head>` +
-        `<body style="margin:0;width:${anchoMm}mm">${ser.serializeToString(el)}</body></html>`;
+        // Sin padding: el margen del papel lo pone QZ (config), y si el body
+        // trae el suyo el contenido se corre y se corta del otro lado.
+        `<body style="margin:0;padding:0;width:${anchoMm}mm">${ser.serializeToString(el)}</body></html>`;
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${wPx}" height="${hPx}">` +
         `<foreignObject x="0" y="0" width="100%" height="100%">${xhtml}</foreignObject></svg>`;
       const img = new Image();
@@ -162,6 +169,9 @@ async function qzImprimir(tipo, html) {
   let pag;
   if (tipo === 'hoja') {
     pag = { selector: '.tk', ancho: 134, alto: 196, papelAncho: 148, papelAlto: 210, margen: 7, dpi: 200, byn: false };
+  } else if (tipo === 'ticket') {
+    // Rollo de 58mm: 48mm útiles y el largo que haga falta.
+    pag = { selector: '.tkt', ancho: 48, alto: 'auto', papelAncho: 58, margen: 0, dpi: 203, byn: true };
   } else {
     if (typeof etqEsA4 === 'function' && etqEsA4()) return false;   // la hoja A4 va por el diálogo
     const parada = typeof etqFormato === 'function' && etqFormato() === '30x40';
@@ -172,14 +182,16 @@ async function qzImprimir(tipo, html) {
     await qzConectar();
     const pngs = await _qzPaginasPng(html, pag.selector, pag.ancho, pag.alto, pag.dpi, pag.byn);
     if (!pngs.length) throw new Error('no se armó ninguna página');
+    const alto = pag.alto === 'auto' ? Math.max(...pngs.altos) : pag.papelAlto;
     const cfg = qz.configs.create(impresora, {
       units: 'mm',
-      size: { width: pag.papelAncho, height: pag.papelAlto },
-      margins: pag.margen,
+      size: { width: pag.papelAncho, height: alto },
+      // El ticket va centrado en el rollo: 5mm a cada lado de los 48 útiles.
+      margins: tipo === 'ticket' ? { top: 0, right: 5, bottom: 0, left: 5 } : pag.margen,
       scaleContent: true,
       colorType: pag.byn ? 'blackwhite' : 'default',
       interpolation: 'nearest-neighbor',
-      jobName: tipo === 'hoja' ? 'TechPoint · hoja' : 'TechPoint · etiqueta',
+      jobName: 'TechPoint · ' + tipo,
     });
     await qz.print(cfg, pngs.map(b64 => ({ type: 'pixel', format: 'image', flavor: 'base64', data: b64 })));
     return true;
@@ -228,11 +240,14 @@ async function configurarImpresoras() {
   if (hoja === null) return;
   const etiqueta = elegir('las ETIQUETAS (XPrinter)', actual.etiqueta);
   if (etiqueta === null) return;
-  _qzGuardar({ hoja, etiqueta });
+  const ticket = elegir('los TICKETS de venta (58mm)', actual.ticket);
+  if (ticket === null) return;
+  _qzGuardar({ hoja, etiqueta, ticket });
   if (typeof toast === 'function') {
-    toast('🖨️ Hojas: ' + (hoja || 'diálogo') + ' · Etiquetas: ' + (etiqueta || 'diálogo'), 'success');
+    toast('🖨️ Hojas: ' + (hoja || 'diálogo') + ' · Etiquetas: ' + (etiqueta || 'diálogo') +
+          ' · Tickets: ' + (ticket || 'diálogo'), 'success');
   }
-  if ((hoja || etiqueta) && confirm('¿Imprimo una prueba en cada impresora elegida?')) qzPrueba();
+  if ((hoja || etiqueta || ticket) && confirm('¿Imprimo una prueba en cada impresora elegida?')) qzPrueba();
 }
 
 // Prueba de punta a punta: lo mismo que sale al ingresar un equipo, con una
@@ -250,12 +265,18 @@ async function qzPrueba() {
     res.push('Etiqueta (' + c.etiqueta + '): ' +
       (await qzImprimir('etiqueta', _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep')) ? 'OK' : 'FALLÓ — ' + _qzUltimoError));
   }
+  if (c.ticket && typeof ticketVentaHtml === 'function') {
+    const mov = { descripcion: 'Prueba de impresión', monto: 1000, metodoPago: 'Efectivo', fecha: '',
+      items: [{ nombre: 'Si esto salió sin diálogo, anda', qty: 1, precioUnit: 1000 }] };
+    res.push('Ticket (' + c.ticket + '): ' +
+      (await qzImprimir('ticket', ticketVentaHtml(mov, 'PRUEBA')) ? 'OK' : 'FALLÓ — ' + _qzUltimoError));
+  }
   alert('Prueba de impresión directa\n\n' + res.join('\n') + '\n\n' + await qzDiagnosticoConfianza());
 }
 
 function qzMenuSub() {
   const c = qzImpresoras();
-  return (c.hoja || c.etiqueta) ? 'Con QZ Tray, sin diálogo' : 'Imprimir sin el diálogo (QZ Tray)';
+  return (c.hoja || c.etiqueta || c.ticket) ? 'Con QZ Tray, sin diálogo' : 'Imprimir sin el diálogo (QZ Tray)';
 }
 
 // ¿Por qué QZ Tray pregunta "¿Permitir?"? Confía sin preguntar solo si la
@@ -291,7 +312,7 @@ async function qzDiagnosticoConfianza() {
 // llega el primer ingreso, la conexión ya está abierta.
 function qzPrecalentar() {
   const c = qzImpresoras();
-  if (!c.hoja && !c.etiqueta) return;
+  if (!c.hoja && !c.etiqueta && !c.ticket) return;
   qzConectar().catch(() => {});   // si QZ Tray no está, ya avisará al imprimir
   // Despierta la función que firma, para que no arranque en frío con el
   // primer ingreso. La respuesta no se usa.

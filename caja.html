@@ -585,6 +585,8 @@
   </div>
 
   <div id="mov-delete-wrap" style="display:none;margin-top:4px">
+    <button class="btn-secondary" id="mov-comprobante-btn" style="margin-bottom:8px;width:100%"
+            onclick="const id = editingMovId; closeMovForm(); ofrecerComprobanteVenta(id)">🧾 Comprobante de esta venta</button>
     <button class="btn-danger" onclick="deleteMov()">🗑 Eliminar</button>
   </div>
 
@@ -1015,6 +1017,7 @@
 <script src="barcode.js"></script>
 <script src="print.js"></script>
 <script src="qz-print.js"></script>
+<script src="comprobante-venta.js"></script>
 <script src="caja_extra.js"></script>
 <script src="clientes.js"></script>
 <script src="escaner.js"></script>

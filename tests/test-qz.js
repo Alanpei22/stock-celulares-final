@@ -89,7 +89,7 @@ const qzs = leer('qz-print.js');
 ok(/toDataURL\(byn \? 'image\/png' : 'image\/jpeg', 0\.9\)/.test(qzs), 'la hoja viaja en JPEG (la mitad de peso); la térmica en PNG blanco y negro');
 ok(/function qzPrecalentar/.test(qzs) && /addEventListener\('load', \(\) => setTimeout\(qzPrecalentar/.test(qzs),
    'al abrir la app se conecta con QZ Tray y despierta al server: la primera impresión no arranca en frío');
-ok(/if \(!c\.hoja && !c\.etiqueta\) return;/.test(qzs.slice(qzs.indexOf('function qzPrecalentar'))), 'solo en la PC que tiene impresoras configuradas');
+ok(/if \(!c\.hoja && !c\.etiqueta && !c\.ticket\) return;/.test(qzs.slice(qzs.indexOf('function qzPrecalentar'))), 'solo en la PC que tiene impresoras configuradas');
 ok(/if \(!_qzCert\)/.test(qzs), 'el certificado se baja una vez por sesión');
 const toc = pr.slice(pr.indexOf('function _imprimirTocando'), pr.indexOf('function _imprimirTocando') + 500);
 ok(/!qzActivo\(tipo\)\) \{ _openPrint\(html, titulo\); return; \}/.test(toc),

@@ -2272,6 +2272,9 @@ function openMovForm(id) {
     const m = MOVIMIENTOS.find(x => x.id === id);
     if (!m) return;
     if (deleteWrap) deleteWrap.style.display = '';
+    // Reimprimir el comprobante: solo ventas
+    const cvBtn = document.getElementById('mov-comprobante-btn');
+    if (cvBtn) cvBtn.style.display = (m.tipo || 'ingreso') === 'ingreso' ? '' : 'none';
     // Limpiar split antes de cargar datos del movimiento existente
     resetSplit();
     _clearSaleItem(false); // vaciar carrito (no toca el texto de descripción)
@@ -3800,6 +3803,10 @@ async function saveMov() {
       }
 
       toast(toastMsg + (toastMsg === 'Movimiento registrado' ? '' : ''), 'success');
+      // Venta → "¿Comprobante?" (imprimir / WhatsApp / no). Ver comprobante-venta.js.
+      if (data.tipo === 'ingreso' && typeof ofrecerComprobanteVenta === 'function') {
+        ofrecerComprobanteVenta(movRef.id, { ...data, id: movRef.id, createdAt: new Date().toISOString() });
+      }
     }
     _clearSaleItem(false);
     _clearRepairItem(false);
