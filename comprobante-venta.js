@@ -195,7 +195,7 @@ function ofrecerComprobanteVenta(movId, movDatos) {
   b.id = 'cv-barra';
   b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:950;' +
     'display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-radius:14px;' +
-    'background:var(--card,#fff);border:1px solid var(--bd,#e5e7eb);box-shadow:0 8px 24px rgba(0,0,0,.18);max-width:520px;margin:0 auto';
+    'background:var(--card,#fff);border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,.18);max-width:520px;margin:0 auto';
   b.innerHTML = `<b style="flex:1 1 100%;font-size:15px">🧾 ¿Comprobante para el cliente?</b>
     <button class="btn-primary" style="flex:1" id="cv-imp">🖨️ Imprimir</button>
     <button class="btn-secondary" style="flex:1" id="cv-wa">🟢 WhatsApp</button>

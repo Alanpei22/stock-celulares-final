@@ -382,7 +382,7 @@ header {
 
 /* ── SEARCH ── */
 .search-wrap { position: relative; }
-#search, #rep-search, #rep2-search {
+#search, #rep-search, #rep2-search, #inv-search, #pl-search {
  width: 100%; padding: 12px 16px 12px 42px;
  border: 2px solid var(--border); border-radius: var(--radius-sm);
  font-size: 15px; font-weight: 500;
@@ -392,8 +392,10 @@ header {
  transition: border-color .2s, box-shadow .2s;
  box-shadow: var(--shadow);
 }
-#search::placeholder, #rep-search::placeholder, #rep2-search::placeholder { color: var(--text3); }
-#search:focus, #rep-search:focus, #rep2-search:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+#search::placeholder, #rep-search::placeholder, #rep2-search::placeholder,
+#inv-search::placeholder, #pl-search::placeholder { color: var(--text3); }
+#search:focus, #rep-search:focus, #rep2-search:focus,
+#inv-search:focus, #pl-search:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
 .search-icon {
  position: absolute; left: 14px; top: 50%;
  transform: translateY(-50%);
@@ -4775,13 +4777,13 @@ body.dark .bulk-table tbody tr:nth-child(even) { background:rgba(255,255,255,.03
 /* ── INVENTARIO DE PRODUCTOS ──────────────────────────────── */
 .inv-scan-wrap {
   display: flex; align-items: center; gap: 8px;
-  background: var(--card); border: 2px solid var(--acc);
+  background: var(--card); border: 2px solid var(--accent);
   border-radius: 12px; padding: 8px 12px; margin: 0 0 8px;
 }
 .inv-scan-ico { font-size: 1.2rem; flex-shrink: 0; }
 .inv-scan-input {
   flex: 1; border: none; background: transparent; outline: none;
-  font-size: .95rem; color: var(--t1); caret-color: var(--acc);
+  font-size: .95rem; color: var(--t1); caret-color: var(--accent);
 }
 .inv-scan-input::placeholder { color: var(--t3); }
 
@@ -4796,16 +4798,16 @@ body.dark .bulk-table tbody tr:nth-child(even) { background:rgba(255,255,255,.03
   display: flex; align-items: center; gap: 10px;
   padding: 12px 14px; cursor: pointer;
 }
-.inv-item-main:active { background: var(--bg); }
+.inv-item-main:active { background: var(--bg1); }
 .inv-item-info { flex: 1; min-width: 0; }
 .inv-item-nombre {
   display: block; font-weight: 700; font-size: .95rem;
   color: var(--t1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .inv-item-sub { font-size: .78rem; color: var(--t3); }
-.inv-item-sub code { background: var(--bg); padding: 1px 4px; border-radius: 4px; font-size: .74rem; }
+.inv-item-sub code { background: var(--bg1); padding: 1px 4px; border-radius: 4px; font-size: .74rem; }
 .inv-item-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
-.inv-item-precio { font-weight: 700; font-size: .95rem; color: var(--acc); }
+.inv-item-precio { font-weight: 700; font-size: .95rem; color: var(--accent); }
 .inv-item-stock { font-size: .78rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
 .inv-stock-ok   { background: #dcfce7; color: #15803d; }
 .inv-stock-bajo { background: #fef9c3; color: #92400e; }
@@ -4817,7 +4819,7 @@ body.dark .bulk-table tbody tr:nth-child(even) { background:rgba(255,255,255,.03
   display: flex; align-items: center; gap: 8px;
   font-size: .9rem; color: var(--t2); cursor: pointer;
 }
-.inv-activo-lbl input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--acc); }
+.inv-activo-lbl input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--accent); }
 
 /* Dark mode inventario */
 body.dark .inv-scan-wrap { background: #1a1d21; border-color: #3b82f6; }

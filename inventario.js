@@ -827,7 +827,7 @@ function abrirCostosInv() {
     <div class="modal-body" style="max-height:65vh;overflow:auto">
       ${lista.map(p => {
         const usd = invCostoUSD(p), viejo = Number(p.precioCosto) || 0;
-        return `<div class="invc-fila" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd, #e5e7eb)">
+        return `<div class="invc-fila" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.nombre || '(sin nombre)')}</div>
             <div style="font-size:12px;color:var(--t3)">${esc(p.codigo || 'sin código')} · venta $${(Number(p.precioVenta) || 0).toLocaleString('es-AR')}${!usd && viejo ? ' · antes $' + viejo.toLocaleString('es-AR') + ' en pesos' : ''}</div>
@@ -953,15 +953,18 @@ function _invSelBarra() {
     b.id = 'inv-sel-barra';
     b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:900;display:flex;gap:8px;align-items:center;' +
       'padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--card,#fff);' +
-      'border-top:1px solid var(--bd,#e5e7eb);box-shadow:0 -4px 16px rgba(0,0,0,.12)';
+      'border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(0,0,0,.12)';
     document.body.appendChild(b);
   }
   const n = _invSel.size;
+  // Compactos a proposito: con el padding normal de los botones, en un
+  // telefono "3 marcados" se parte en dos renglones.
+  const chico = 'padding:9px 13px;font-size:14px;flex-shrink:0';
   b.innerHTML = `
-    <b style="flex:1;font-size:15px">${n} marcado${n === 1 ? '' : 's'}</b>
-    <button class="btn-secondary" onclick="invSelTodos()">Todos</button>
-    <button class="btn-primary" ${n ? '' : 'disabled'} onclick="invSelAcciones()">Acciones</button>
-    <button class="btn-secondary" onclick="invSelSalir()" title="Salir">✕</button>`;
+    <b style="flex:1;min-width:0;font-size:15px;white-space:nowrap">${n} marcado${n === 1 ? '' : 's'}</b>
+    <button class="btn-secondary" style="${chico}" onclick="invSelTodos()">Todos</button>
+    <button class="btn-primary" style="${chico}" ${n ? '' : 'disabled'} onclick="invSelAcciones()">Acciones</button>
+    <button class="btn-secondary" style="${chico}" onclick="invSelSalir()" title="Salir">✕</button>`;
 }
 
 function _invSelLista() {
