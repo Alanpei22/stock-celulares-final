@@ -6218,3 +6218,69 @@ body.chq-trabado #owner-pin-modal { z-index: 100001; }
 /* Un campo de formulario solo-dueño va en bloque, como los demás: con el
    display:inline de arriba quedaba amontonado al lado del anterior. */
 body.owner-mode .fg.owner-only { display: block !important; }
+
+/* ── Artículos en la misma venta (venta-articulos.js) ──
+   El mismo bloque en el cobro de Reparaciones y en la venta de equipo. */
+.va-wrap { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+.va-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.va-titulo { font-size: .85rem; font-weight: 700; color: var(--text); }
+.va-sub { font-size: .72rem; color: var(--text3); }
+.va-buscar-wrap { position: relative; }
+.va-buscar {
+  width: 100%; padding: 10px 12px; font-size: .9rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--card); color: var(--text); outline: none; -webkit-appearance: none;
+}
+.va-buscar:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.va-buscar::placeholder { color: var(--text3); }
+.va-sug {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0,0,0,.18); max-height: 240px; overflow-y: auto;
+}
+.va-sug.hidden { display: none; }
+.va-sug-item {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; width: 100%;
+  padding: 8px 10px; background: none; border: none; border-bottom: 1px solid var(--border);
+  text-align: left; cursor: pointer; font: inherit; color: var(--text);
+}
+.va-sug-item:last-child { border-bottom: none; }
+.va-sug-item:active { background: var(--bg1); }
+.va-sug-nom { font-weight: 600; font-size: .88rem; }
+.va-sug-precio { font-weight: 700; font-size: .88rem; color: var(--accent); text-align: right; }
+.va-sug-meta { font-size: .72rem; color: var(--text3); }
+.va-sug-stock { font-size: .72rem; color: var(--text3); text-align: right; }
+.va-sin-stock { color: #B91C1C; font-weight: 700; }
+.va-sug-vacio { padding: 10px; font-size: .82rem; color: var(--text3); }
+.va-linea { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.va-linea--alerta .va-linea-nom { color: #B91C1C; }
+.va-linea-nom { font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
+.va-aviso { font-size: .72rem; font-weight: 700; color: #B91C1C; margin-left: 6px; }
+.va-linea-ctrl { display: flex; align-items: center; gap: 6px; }
+.va-qty-btn {
+  width: 30px; height: 30px; flex-shrink: 0; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--card); color: var(--text);
+  font-size: 1rem; font-weight: 700; cursor: pointer;
+}
+.va-qty { min-width: 22px; text-align: center; font-weight: 700; font-size: .9rem; }
+.va-precio {
+  flex: 1; min-width: 0; padding: 6px 8px; font-size: .85rem;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card); color: var(--text); outline: none; -webkit-appearance: none;
+}
+.va-precio:focus { border-color: var(--accent); }
+.va-quitar {
+  width: 30px; height: 30px; flex-shrink: 0; border: none; border-radius: 8px;
+  background: none; color: var(--text3); font-size: .9rem; cursor: pointer;
+}
+.va-total-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 8px; font-size: .88rem; color: var(--text2);
+}
+.va-total-row b { font-size: 1rem; color: var(--text); }
+body.dark .va-buscar, body.dark .va-sug, body.dark .va-qty-btn, body.dark .va-precio {
+  background: #1a1d21; border-color: #2a2e34; color: #e8eaed;
+}
+body.dark .va-sug-item { color: #e8eaed; border-bottom-color: #2a2e34; }
+body.dark .va-sug-item:active { background: #222630; }
+body.dark .va-sin-stock, body.dark .va-aviso, body.dark .va-linea--alerta .va-linea-nom { color: #F87171; }

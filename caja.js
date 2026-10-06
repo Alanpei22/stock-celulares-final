@@ -1943,6 +1943,10 @@ function openVentaEqModal(id) {
   const tit = document.getElementById('ventaeq-tit');
   if (tit) tit.textContent = p ? `🧾 Vender ${p.marca || ''} ${p.modelo || ''}`.trim() : '🧾 Venta de equipo';
 
+  // La funda, el vidrio o el cargador que se lleva con el celular
+  // (venta-articulos.js). Van en la misma venta y en el mismo comprobante.
+  if (typeof vaMontar === 'function') vaMontar('ve-articulos');
+
   document.getElementById('ventaeq-overlay')?.classList.remove('hidden');
   document.getElementById('ventaeq-modal')?.classList.remove('hidden');
 }
@@ -1950,6 +1954,7 @@ function openVentaEqModal(id) {
 function closeVentaEqModal() {
   document.getElementById('ventaeq-overlay')?.classList.add('hidden');
   document.getElementById('ventaeq-modal')?.classList.add('hidden');
+  if (typeof vaDesmontar === 'function') vaDesmontar();   // que no quede nada para la próxima
 }
 
 // Junta el formulario en el objeto que entiende printVentaTicket.
@@ -2001,6 +2006,20 @@ async function confirmVentaEquipo() {
     if (!imeiConfirmar(d.imei2, 'IMEI 2')) return;
   }
 
+  // Lo que se lleva junto con el equipo.
+  const arts     = (typeof vaItems === 'function') ? vaItems() : [];
+  const artTotal = (typeof vaTotal === 'function') ? vaTotal() : 0;
+  const artCosto = (typeof vaCostoTotal === 'function') ? vaCostoTotal() : 0;
+  const artStock = (typeof vaStockUpdates === 'function') ? vaStockUpdates() : [];
+  if (arts.length && typeof vaSinPrecio === 'function' && vaSinPrecio()) {
+    toast('Hay un artículo sin precio', 'error'); return;
+  }
+  // El total de la venta: el equipo más lo que se lleve. Es lo que entra a la
+  // caja y lo que sale impreso en el comprobante.
+  const total = d.precio + artTotal;
+  if (arts.length) d.articulos = arts;   // para el comprobante (print.js)
+  d.precioTotal = total;
+
   const equipo  = `${d.marca || ''} ${d.modelo || ''}`.trim();
   const metodo  = _metodoDesdeTexto(d.forma_pago);
   const regCaja = document.getElementById('ve-reg-caja')?.checked !== false;
@@ -2014,8 +2033,9 @@ async function confirmVentaEquipo() {
     if (regCaja) {
       const data = {
         tipo: 'ingreso', categoria: 'Venta equipo',
-        descripcion: `Venta: ${equipo}${d.imei ? ' · IMEI ' + d.imei : ''}`,
-        monto: d.precio, metodoPago: metodo, fecha: currentDate,
+        descripcion: `Venta: ${equipo}${d.imei ? ' · IMEI ' + d.imei : ''}`
+                     + (arts.length ? ' + ' + arts.map(a => a.nombre).join(', ') : ''),
+        monto: total, metodoPago: metodo, fecha: currentDate,
         createdAt: d.fecha_venta,
         comprobanteNro: d.comprobanteNro || null,
         _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
@@ -2024,6 +2044,15 @@ async function confirmVentaEquipo() {
       if (stock && Number(stock.costo) > 0) {
         data.costoARSTotal = Number(stock.costo);
         data.gananciaARS   = d.precio - Number(stock.costo);
+      }
+      // Venta mixta: los mismos campos que usa el cobro de la caja, para que
+      // los informes y el resumen de Telegram la lean igual que cualquier otra.
+      if (arts.length) {
+        data.items           = arts;
+        data.montoEquipo     = d.precio;
+        data.montoProductos  = artTotal;
+        data.costoARSTotal   = (Number(data.costoARSTotal) || 0) + artCosto;
+        if (data.gananciaARS !== undefined) data.gananciaARS += (artTotal - artCosto);
       }
       if (d.clienteNombre) data.clienteNombre = d.clienteNombre;
       if (d.clienteTel)    data.clienteTel    = d.clienteTel;
@@ -2058,9 +2087,25 @@ async function confirmVentaEquipo() {
       upsertCliente({ tlf: d.clienteTel, nombre: d.clienteNombre || '', dni: d.clienteDni || '' }).catch(() => {});
     }
 
-    toast(regCaja ? `✅ Venta registrada — ${fmt(d.precio)}` : '✅ Venta guardada', 'success');
+    // El stock de los artículos se descuenta al final: si fallara, la venta
+    // ya quedó registrada y eso es lo que no se puede perder.
+    let bajaron = 0;
+    for (const su of artStock) {
+      try {
+        await db.collection('productos').doc(su.id)
+          .update({ stock: firebase.firestore.FieldValue.increment(-su.qty) });
+        bajaron += su.qty;
+      } catch (e) {
+        console.error('stock del artículo:', e);
+        toast('Venta registrada, pero falló el descuento de stock de un artículo', 'error');
+      }
+    }
+    toast((regCaja ? `✅ Venta registrada — ${fmt(total)}` : '✅ Venta guardada')
+          + (bajaron ? ` · stock −${bajaron} u.` : ''), 'success');
     if (typeof tgNotify === 'function') {
-      tgNotify(`📱 <b>Equipo vendido — ${tgMonto(d.precio)}</b>\n${esc(equipo)}${d.imei ? '\n🔑 ' + esc(d.imei) : ''}\n💳 ${esc(metodo)}${d.clienteNombre ? ' · 👤 ' + esc(d.clienteNombre) : ''} · 🕐 ${tgHora()}`);
+      tgNotify(`📱 <b>Equipo vendido — ${tgMonto(total)}</b>\n${esc(equipo)}${d.imei ? '\n🔑 ' + esc(d.imei) : ''}`
+        + (arts.length ? `\n🛍️ ${esc(arts.map(a => `${a.nombre} x${a.qty}`).join(', '))} (${tgMonto(artTotal)})` : '')
+        + `\n💳 ${esc(metodo)}${d.clienteNombre ? ' · 👤 ' + esc(d.clienteNombre) : ''} · 🕐 ${tgHora()}`);
     }
 
     closeVentaEqModal();

@@ -2580,15 +2580,32 @@ function openCobroModal(r) {
   // Reset método de pago a Efectivo
   document.querySelectorAll('.cobro-metodo-btn').forEach(b => b.classList.remove('cobro-m-active'));
   document.querySelector('.cobro-metodo-btn[data-m="Efectivo"]')?.classList.add('cobro-m-active'); // HIGH-09: null guard
+  // Artículos que se lleva junto con el equipo (venta-articulos.js). Los
+  // accesorios se piden acá, al abrir el cobro: esta pantalla no los tenía.
+  if (typeof vaMontar === 'function') vaMontar('cobro-articulos', _cobroPintarTotal);
+
   // Abrir overlay (el modal está adentro del overlay ahora)
   document.getElementById('cobro-overlay').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+}
+
+// Lo que se cobra ahora = el saldo de la reparación + lo que se lleve. El
+// número grande del cartel tiene que decir lo que el cliente va a pagar.
+function _cobroTotal() {
+  const saldo = _cobroRepair ? _saldoACobrar(_cobroRepair) : 0;
+  return saldo + ((typeof vaTotal === 'function') ? vaTotal() : 0);
+}
+
+function _cobroPintarTotal() {
+  const el = document.getElementById('cobro-monto-label');
+  if (el) el.textContent = '$ ' + _cobroTotal().toLocaleString('es-AR');
 }
 
 function closeCobroModal() {
   document.getElementById('cobro-overlay').classList.add('hidden');
   document.body.style.overflow = '';
   _cobroRepair = null;
+  if (typeof vaDesmontar === 'function') vaDesmontar();   // que no quede nada para el próximo
 }
 
 function selectCobroMetodo(metodo) {
@@ -2601,31 +2618,52 @@ async function confirmarCobro() {
   // Se relee al confirmar: si mientras el cartel estaba abierto se cobró
   // desde la caja, no se registra de nuevo.
   const r = REPAIRS.find(x => x.id === _cobroRepair.id) || _cobroRepair;
+  // Los artículos se leen ANTES de cerrar: cerrar vacía el bloque.
+  const arts     = (typeof vaItems === 'function') ? vaItems() : [];
+  const artTotal = (typeof vaTotal === 'function') ? vaTotal() : 0;
+  const artCosto = (typeof vaCostoTotal === 'function') ? vaCostoTotal() : 0;
+  const artStock = (typeof vaStockUpdates === 'function') ? vaStockUpdates() : [];
+  if (arts.length && typeof vaSinPrecio === 'function' && vaSinPrecio()) {
+    toast('Hay un artículo sin precio', 'error'); return;
+  }
   closeCobroModal();
   if (r.cobrado) { toast('Ya estaba cobrada: no se registró de nuevo', 'error'); return; }
   try {
     const batch  = db.batch();
     const hoy    = _todayAR();         // ← zona horaria Argentina
     const ahora  = new Date().toISOString();
-    // Se cobra el SALDO: la seña ya entró a la caja cuando se cobró.
-    const monto  = _saldoACobrar(r);
+    // Se cobra el SALDO: la seña ya entró a la caja cuando se cobró. Si además
+    // se lleva algo, entra todo junto en el mismo movimiento.
+    const repAmt = _saldoACobrar(r);
+    const monto  = repAmt + artTotal;
     const costo  = Number(r.costo)  || 0;
 
     // ── Ingreso: cobro al cliente ──────────────────────────
     // Con la seña cubriendo todo no hay nada que ingresar: solo se marca cobrada.
     if (monto > 0) {
       const ingRef = db.collection('caja_movimientos').doc();
-      batch.set(ingRef, {
+      const desc = `N°${r.nOrden} ${r.marca} ${r.modelo} — ${r.arreglo || ''}`.trim();
+      const datos = {
         tipo: 'ingreso',
         categoria: 'Reparación',
-        descripcion: `N°${r.nOrden} ${r.marca} ${r.modelo} — ${r.arreglo || ''}`.trim(),
+        descripcion: arts.length ? `${desc} + ${arts.map(a => a.nombre).join(', ')}` : desc,
         monto,
         metodoPago: metodo,
         fecha: hoy,
         createdAt: ahora,
         repairId: r.id,
         ...(typeof tpFirma === 'function' ? tpFirma() : {}),   // quién lo cobró
-      });
+      };
+      // Venta mixta: los mismos campos que usa la caja, para que los informes
+      // y el resumen de Telegram la lean igual que cualquier otra.
+      if (arts.length) {
+        datos.items            = arts;
+        datos.montoReparacion  = repAmt;
+        datos.montoProductos   = artTotal;
+        datos.costoARSTotal    = artCosto;
+        datos.gananciaARS      = artTotal - artCosto;
+      }
+      batch.set(ingRef, datos);
     }
 
     // ── Egreso: costo del repuesto (si tiene costo cargado) ─
@@ -2653,7 +2691,21 @@ async function confirmarCobro() {
 
     await batch.commit();
     _repPatchLocal(r.id, { cobrado: true, metodoCobro: metodo, fechaCobro: ahora });
-    toast('💰 Cobro registrado en caja', 'success');
+
+    // El stock se descuenta después del commit, igual que en la caja: si
+    // fallara, el cobro ya quedó registrado y eso es lo que no se puede perder.
+    let bajaron = 0;
+    for (const su of artStock) {
+      try {
+        await db.collection('productos').doc(su.id)
+          .update({ stock: firebase.firestore.FieldValue.increment(-su.qty) });
+        bajaron += su.qty;
+      } catch (e) {
+        console.error('stock del artículo:', e);
+        toast('Cobro registrado, pero falló el descuento de stock de un artículo', 'error');
+      }
+    }
+    toast('💰 Cobro registrado en caja' + (bajaron ? ` · stock −${bajaron} u.` : ''), 'success');
   } catch(e) {
     console.error('confirmarCobro:', e);
     toast('Error al registrar en caja', 'error');

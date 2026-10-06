@@ -71,6 +71,7 @@ const QUE_CUBRE = {
   'test-arca.js':             'Conexion con ARCA: firma, entornos y que la fase 1 no emita',
   'test-mp-mail.js':          'Filtro de mails de MercadoPago (script de Gmail)',
   'test-wa-plantillas.js':    'Mensajes de WhatsApp por fase y su editor en la ficha',
+  'test-venta-articulos.js':'Sumar un articulo a la venta de un equipo o al cobro de una reparacion',
   'test-venta-caja.js':       'Vender un equipo desde la caja y su comprobante A5',
   'test-entrega.js':          '"¿Se lleva el equipo?": el cartel al cobrar y al pasar a Listo',
   'test-dolar-bar.js':        'Barra del dólar en la caja: compra, venta y con qué convierte',

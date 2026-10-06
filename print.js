@@ -709,7 +709,10 @@ function _ventaA5Body(d, label) {
       Number(p.cuotas) > 1 ? ` · ${p.cuotas} cuotas` : ''}</td></tr>` : ''}
     ${p.permuta ? `<tr><td class="a">Recibido en parte de pago</td><td>${_pr(p.permuta)}</td></tr>` : ''}
     ${permutaVal > 0 ? `<tr><td class="a">Valor tomado</td><td>− ${_prMoney(permutaVal)}</td></tr>` : ''}
-    <tr class="hl"><td class="a">TOTAL</td><td>${_prMoney(p.precio)}</td></tr>
+    ${Array.isArray(p.articulos) && p.articulos.length ? `
+      <tr><td class="a">${_pr(p.marca)} ${_pr(p.modelo)}</td><td>${_prMoney(p.precio)}</td></tr>
+      ${p.articulos.map(a => `<tr><td class="a">${_pr(a.nombre)}${a.qty > 1 ? ` x${a.qty}` : ''}</td><td>${_prMoney((a.precioUnit || 0) * (a.qty || 1))}</td></tr>`).join('')}` : ''}
+    <tr class="hl"><td class="a">TOTAL</td><td>${_prMoney(p.precioTotal || p.precio)}</td></tr>
     ${saldoAb > 0 ? `<tr class="hl"><td class="a">SALDO ABONADO</td><td>${_prMoney(saldoAb)}</td></tr>` : ''}
   </table>
 
@@ -814,9 +817,14 @@ function printVentaTicket(stockId, extra, formato = 'A5') {
         ${p.imei ? `<div class="prod-line">IMEI: <code>${_pr(p.imei)}</code></div>` : ''}
         ${p.notas ? `<div class="prod-line obs">📝 ${_pr(p.notas)}</div>` : ''}
       </div>
+      ${Array.isArray(p.articulos) && p.articulos.length ? `
+        <div class="arts-box">
+          <div class="arts-fila"><span>${_pr(p.marca)} ${_pr(p.modelo)}</span><b>${_prMoney(p.precio)}</b></div>
+          ${p.articulos.map(a => `<div class="arts-fila"><span>${_pr(a.nombre)}${a.qty > 1 ? ' x' + a.qty : ''}</span><b>${_prMoney((a.precioUnit || 0) * (a.qty || 1))}</b></div>`).join('')}
+        </div>` : ''}
       <div class="precio-box">
-        <span class="precio-lbl">Precio</span>
-        <span class="precio-val">${_prMoney(p.precio)}</span>
+        <span class="precio-lbl">${Array.isArray(p.articulos) && p.articulos.length ? 'Total' : 'Precio'}</span>
+        <span class="precio-val">${_prMoney(p.precioTotal || p.precio)}</span>
       </div>
       ${p.forma_pago ? `<div class="meta"><span>💳 Forma de pago: <b>${_pr(p.forma_pago)}</b></span></div>` : ''}
       ${p.garantiaMeses > 0 ? `
@@ -857,6 +865,8 @@ function printVentaTicket(stockId, extra, formato = 'A5') {
     .prod-line { font-size: 10px; color: #000; margin-bottom: 2px; line-height: 1.45; }
     .prod-line code { background: #000; padding: 1px 4px; border-radius: 3px; font-size: 9px; }
     .prod-line.obs { color: #000; font-style: italic; }
+    .arts-box { border: 1px solid #000; border-radius: 4px; padding: 5px 8px; margin-bottom: 5px; }
+    .arts-fila { display: flex; justify-content: space-between; gap: 10px; font-size: 10px; padding: 1px 0; }
     .precio-box { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #000; color: #fff; border-radius: 4px; margin-bottom: 6px; }
     .precio-lbl { font-size: 10px; opacity: 0.85; }
     .precio-val { font-size: 16px; font-weight: 800; }
