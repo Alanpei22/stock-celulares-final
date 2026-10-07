@@ -997,6 +997,9 @@ function toggleCajaMenu() {
     { icon: '🔎', label: 'Buscar en ventas', sub: 'Producto o reparación en todas las fechas', hide: emp, onClick: openVentasSearch },
     { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', hide: emp, onClick: openReporteModal },
     { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
+    { icon: '💬', label: 'WhatsApp: abrir la app de escritorio',
+      sub: (typeof waAppActiva === 'function' && waAppActiva()) ? '✅ Activado en esta PC · tocá para volver a wa.me' : 'Sin la página intermedia (necesita WhatsApp instalado)',
+      onClick: () => (typeof toggleWaApp === 'function') && toggleWaApp() },
     { divider: true, hide: !isOwner },
     { icon: '⏰', label: 'Chequeo de caja', sub: 'Horarios obligatorios', hide: !isOwner, onClick: openChequeoConfig },
     { icon: '🧾', label: 'Chequeos de hoy', sub: 'Contado vs esperado', hide: !isOwner, onClick: openChequeosHoy },
@@ -4670,6 +4673,8 @@ function openReporteModal() {
   const waBtn = document.getElementById('reporte-wa-btn');
   if (waBtn) {
     waBtn.href = `https://wa.me/${REPORTE_WA}?text=${encodeURIComponent(txt)}`;
+    // Con la app de escritorio activa, el botón la abre directo (ver waAbrir)
+    waBtn.onclick = e => { if (waAppActiva()) { e.preventDefault(); waAbrir(waBtn.href); } };
   }
 
   document.getElementById('reporte-overlay').classList.remove('hidden');

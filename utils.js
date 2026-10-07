@@ -671,3 +671,47 @@ function dolarHora(iso) {
     });
   } catch { return ''; }
 }
+
+// ══════════════════════════════════════════
+//  WHATSAPP — abrir la app de escritorio directo
+// ══════════════════════════════════════════
+// Los enlaces https://wa.me/… pasan por una página de WhatsApp que pregunta
+// si abrir la app o WhatsApp Web: un clic más en cada mensaje. En la PC que
+// tiene WhatsApp de escritorio instalado, se activa "WhatsApp: abrir la app"
+// (menú) y los enlaces van por whatsapp://send, que abre la app directo con
+// el chat y el texto. Es por dispositivo: el celular y las PCs sin la app
+// siguen con wa.me, que en el celular ya abre la app sola.
+//
+// OJO: solo para lo que abre el que está usando la app. Los QR impresos y la
+// página de seguimiento los abre el CLIENTE en su celular: esos siguen con
+// wa.me, que funciona en cualquier lado.
+const _WA_APP_KEY = 'waApp';
+function waAppActiva() {
+  try { return localStorage.getItem(_WA_APP_KEY) === '1'; } catch { return false; }
+}
+function toggleWaApp() {
+  if (typeof closeSheet === 'function') closeSheet();
+  const activar = !waAppActiva();
+  try { localStorage.setItem(_WA_APP_KEY, activar ? '1' : '0'); } catch {}
+  if (typeof toast === 'function') {
+    toast(activar ? '🟢 WhatsApp se abre en la app de escritorio (en esta PC)' : '🟢 WhatsApp vuelve a abrir con wa.me', 'success');
+  }
+}
+// https://wa.me/549…?text=… → whatsapp://send?phone=549…&text=… (si está activo)
+function waConvertir(url) {
+  const u = String(url || '');
+  if (!waAppActiva()) return u;
+  const m = u.match(/^https:\/\/wa\.me\/(\d*)\/?(?:\?(.*))?$/);
+  if (!m) return u;
+  let texto = '';
+  try { texto = new URLSearchParams(m[2] || '').get('text') || ''; } catch {}
+  return 'whatsapp://send?' + (m[1] ? 'phone=' + m[1] + '&' : '') + 'text=' + encodeURIComponent(texto);
+}
+// Abre el enlace. La app de escritorio se abre en la misma pestaña (whatsapp://
+// no navega: solo lanza la app); wa.me, en una pestaña nueva como siempre.
+function waAbrir(url) {
+  const u = waConvertir(url);
+  if (u.startsWith('whatsapp:')) { location.href = u; return null; }
+  return window.open(u, '_blank');
+}
+

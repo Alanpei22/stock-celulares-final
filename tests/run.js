@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-wa-app.js':          'WhatsApp: abrir la app de escritorio directo, sin la página de wa.me',
   'test-comprobante-venta.js': 'Comprobante de venta 58mm: número propio, "no válido como factura", imprimir o WhatsApp',
   'test-inv-seleccion.js':    'Accesorios: seleccionar varios para modificar o eliminar en masa',
   'test-orden.js':            'N° de orden: corregirlo al editar y arreglar el contador',

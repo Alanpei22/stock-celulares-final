@@ -54,6 +54,9 @@ const ctx = {
   requireAuth: () => Promise.resolve(null), showApp: () => {},
 };
 ctx.globalThis = ctx; ctx.self = ctx;
+// waAbrir vive en utils.js (que esta prueba no carga); sin la app de
+// escritorio activada abre wa.me igual que antes.
+ctx.waAbrir = u => (ctx.window && ctx.window.open) ? ctx.window.open(u, '_blank') : null;
 vm.createContext(ctx);
 for (const f of ['tp-fases.js', 'caja.js']) {
   vm.runInContext(fs.readFileSync(DIR + f, 'utf8'), ctx, { filename: f });

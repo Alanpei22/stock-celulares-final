@@ -469,7 +469,7 @@ function tpWaAbrir(r) {
       extra: { nOrden: r.nOrden, fase: tpFaseDe(r) },
     });
   }
-  window.open('https://wa.me/' + tpWaFono(r.tlf) + '?text=' + encodeURIComponent(msg), '_blank');
+  waAbrir('https://wa.me/' + tpWaFono(r.tlf) + '?text=' + encodeURIComponent(msg));
   return true;
 }
 

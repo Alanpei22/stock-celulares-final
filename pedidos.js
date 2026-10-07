@@ -419,8 +419,7 @@ function exportPedidoWhatsApp() {
 }
 
 function _fallbackPedidoWA(texto) {
-  const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
-  window.open(url, '_blank');
+  waAbrir(`https://wa.me/?text=${encodeURIComponent(texto)}`);
 }
 
 function copyPedidoTextoToClipboard() {

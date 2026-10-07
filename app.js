@@ -662,6 +662,9 @@ function toggleRepMenu() {
     { icon: '📊', label: 'Estadísticas', hide: _soloDueno(), onClick: () => document.getElementById('rep-stats-btn')?.click() },
     { icon: '📋', label: 'Actividad reciente', onClick: () => (typeof openActivityFeed === 'function') && openActivityFeed() },
     { icon: '🟢', label: 'WhatsApp pendientes', onClick: () => (typeof sendPendingWA === 'function') && sendPendingWA() },
+    { icon: '💬', label: 'WhatsApp: abrir la app de escritorio',
+      sub: (typeof waAppActiva === 'function' && waAppActiva()) ? '✅ Activado en esta PC · tocá para volver a wa.me' : 'Sin la página intermedia (necesita WhatsApp instalado)',
+      onClick: () => (typeof toggleWaApp === 'function') && toggleWaApp() },
     { icon: '🔢', label: 'Próximo N° de orden', sub: 'Corregir el contador de órdenes', hide: _soloDueno(),
       onClick: () => (typeof corregirContadorOrdenes === 'function') && corregirContadorOrdenes() },
     { divider: true },
@@ -1680,7 +1683,7 @@ function shareWhatsApp(id) {
     .replace(/{estado}/g, p.estado || '')
     .replace(/{precio}/g, precio)
     .replace(/{notas}/g, p.notas || '');
-  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+  waAbrir('https://wa.me/?text=' + encodeURIComponent(msg));
 }
 
 // ── Copiar info ───────────────────────────────────────────

@@ -551,5 +551,5 @@ function listaWaEnviar() {
   if (!txt) return;
   if (txt.length > _LISTA_WA_MAX &&
       !confirm(`La lista es larga (${txt.length} caracteres) y WhatsApp puede cortarla al abrirla por el link.\n\nConviene usar 📋 Copiar y pegarla en el chat.\n\n¿Abrir WhatsApp igual?`)) return;
-  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  waAbrir('https://wa.me/?text=' + encodeURIComponent(txt));
 }

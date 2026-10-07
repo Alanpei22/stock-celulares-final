@@ -2753,7 +2753,7 @@ function repairWhatsApp(id) {
   else if (phone.length === 11 && phone.startsWith('0')) phone = '549' + phone.slice(1); // LOW-08: always add mobile 9
   else if (!phone.startsWith('54'))             phone = '549' + phone;
 
-  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(_repairWaMsg(r)), '_blank');
+  waAbrir('https://wa.me/' + phone + '?text=' + encodeURIComponent(_repairWaMsg(r)));
 }
 
 // ══════════════════════════════════════════
@@ -2833,7 +2833,7 @@ function _garantiaWA(id) {
   const vencStr = venc.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
   const equipo = [r.marca, r.modelo].filter(Boolean).join(' ');
   const msg = `Hola ${nombre}! 👋\nTe recordamos que tu *${equipo}* tiene garantía hasta el *${vencStr}* 🛡️\nCualquier inconveniente escribinos!`;
-  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+  waAbrir('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg));
 }
 
 // ── WhatsApp Presupuesto ──────────────────
@@ -2869,7 +2869,7 @@ function sendPresupuestoWA(id) {
     repairId: id,
     extra: { nOrden: r.nOrden, presupuesto: r.presupuesto }
   });
-  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+  waAbrir('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg));
 }
 
 // ══════════════════════════════════════════
@@ -3016,7 +3016,7 @@ function buildAndSendPendingWA(tipo) {
     msg += `\n\n_Total: ${reparando.length + listos.length} equipos pendientes_`;
   }
 
-  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+  waAbrir('https://wa.me/?text=' + encodeURIComponent(msg));
 }
 
 // ── Eliminar ──────────────────────────────
@@ -4286,7 +4286,7 @@ function triggerWaNotify(tipo, r) {
     msg = `📥 *NUEVO INGRESO*\n📱 ${r.marca} ${r.modelo} (N°${r.nOrden})\n🔧 ${r.arreglo || ''}\n👤 ${r.nombre || '—'}\n💰 $${(r.monto||0).toLocaleString('es-AR')}`;
   }
   const url = `https://wa.me/${waNum.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`;
-  window.open(url, '_blank');
+  waAbrir(url);
 }
 
 function setWaNotifyNumber() {
@@ -4556,7 +4556,7 @@ function repairWhatsAppText(id, msg) {
   if (phone.length === 10)                            phone = '549' + phone;
   else if (phone.length === 11 && phone.startsWith('0')) phone = '549' + phone.slice(1); // LOW-08
   else if (!phone.startsWith('54'))                   phone = '549' + phone;
-  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+  waAbrir('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg));
 }
 
 // ── Gestión de marcas personalizadas ──────

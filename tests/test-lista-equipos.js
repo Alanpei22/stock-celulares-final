@@ -43,6 +43,9 @@ const ctx = {
   todayAR: () => '2026-09-05',
 };
 ctx.globalThis = ctx; ctx.self = ctx;
+// waAbrir vive en utils.js (que esta prueba no carga); sin la app de
+// escritorio activada abre wa.me igual que antes.
+ctx.waAbrir = u => (ctx.window && ctx.window.open) ? ctx.window.open(u, '_blank') : null;
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(DIR + 'stock-extras.js', 'utf8'), ctx, { filename: 'stock-extras.js' });
 // _stockFiltrado vive en app.js: se saca la función real para no reescribir el

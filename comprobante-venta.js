@@ -180,11 +180,14 @@ async function whatsappComprobanteVenta(movId, movDatos) {
   if (!tel.startsWith('54')) tel = '549' + tel;
   // La ventana se abre YA, en el toque, y se le pone la dirección cuando está
   // el número: si se abre después de esperar, el navegador la bloquea.
-  const w = window.open('', '_blank');
+  // Con la app de escritorio no hace falta ventana: se lanza la app.
+  const app = typeof waAppActiva === 'function' && waAppActiva();
+  const w = app ? null : window.open('', '_blank');
   let nro;
   try { nro = await _cvNumero(movId); }
   catch (e) { if (w) w.close(); toast('No se pudo numerar el comprobante (¿sin conexión?)', 'error'); return; }
   const url = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(ticketVentaTexto(mov, nro));
+  if (app) { waAbrir(url); return; }
   if (w) w.location.href = url; else location.href = url;
 }
 

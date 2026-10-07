@@ -14,6 +14,9 @@ const ctx = {
   toast: () => {}, esc: s => String(s == null ? '' : s),
   REPAIRS: [], WA_TEMPLATES: {},
 };
+// waAbrir vive en utils.js (que esta prueba no carga); sin la app de
+// escritorio activada abre wa.me igual que antes.
+ctx.waAbrir = u => (ctx.window && ctx.window.open) ? ctx.window.open(u, '_blank') : null;
 ctx.globalThis = ctx; vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(DIR + 'tp-fases.js', 'utf8'), ctx, { filename: 'tp-fases.js' });
 
@@ -156,6 +159,9 @@ const ctx3 = {
   BIZ_DATA: { dir: 'Urquiza 4741', tel: '1172392511' },
 };
 ctx3.globalThis = ctx3; ctx3.self = ctx3;
+// waAbrir vive en utils.js (que esta prueba no carga); sin la app de
+// escritorio activada abre wa.me igual que antes.
+ctx3.waAbrir = u => (ctx3.window && ctx3.window.open) ? ctx3.window.open(u, '_blank') : null;
 vm.createContext(ctx3);
 vm.runInContext(fs.readFileSync(DIR + 'tp-fases.js', 'utf8'), ctx3, { filename: 'tp-fases.js' });
 vm.runInContext(fs.readFileSync(DIR + 'repairs.js', 'utf8'), ctx3, { filename: 'repairs.js' });
@@ -243,6 +249,9 @@ const ctx2 = {
   localStorage: { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = v; } },
   db: { collection: () => ({ doc: () => ({ get: () => Promise.resolve({ exists: true, data: () => REMOTO }) }) }) },
 };
+// waAbrir vive en utils.js (que esta prueba no carga); sin la app de
+// escritorio activada abre wa.me igual que antes.
+ctx2.waAbrir = u => (ctx2.window && ctx2.window.open) ? ctx2.window.open(u, '_blank') : null;
 ctx2.globalThis = ctx2; vm.createContext(ctx2);
 vm.runInContext(fnSrc[0] + '\nloadWaTemplates();', ctx2);
 setTimeout(() => {

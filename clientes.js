@@ -113,7 +113,7 @@ async function openClienteFicha(tlf) {
         <div class="cli-ficha-tel">📞 ${_cliEsc(cli.telefonoRaw || tlf)}</div>
         ${cli.dni ? `<div class="cli-ficha-dni">DNI: ${_cliEsc(cli.dni)}</div>` : ''}
       </div>
-      <a class="cli-ficha-wa" href="https://wa.me/${_waPhone(cli.telefonoRaw || tlf)}" target="_blank" title="WhatsApp">🟢</a>
+      <a class="cli-ficha-wa" href="https://wa.me/${_waPhone(cli.telefonoRaw || tlf)}" target="_blank" title="WhatsApp" onclick="if (waAppActiva()) { event.preventDefault(); waAbrir(this.href); }">🟢</a>
     </div>
 
     <div class="cli-ficha-stats">
