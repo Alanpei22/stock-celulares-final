@@ -2696,6 +2696,17 @@ function _initMovDescAutocomplete() {
   input.addEventListener('keydown', e => {
     if (e.key === 'Escape') _hideMovSuggestions();
     else if (e.key === 'Enter') {
+      // La pistola lectora tipea el código y manda Enter: primero se busca ESE
+      // código exacto (accesorio, repuesto, equipo, boleta). Antes iba directo
+      // a la búsqueda aproximada: agregaba lo parecido, o un "producto libre"
+      // con el código como nombre.
+      const cod = input.value.trim();
+      if (cod && _movDesdeCodigo(cod, { silencioso: true })) {
+        e.preventDefault();
+        input.value = '';
+        _hideMovSuggestions();
+        return;
+      }
       // Enter confirma el artículo: agrega la primera sugerencia, o lo carga como producto libre
       const drop = document.getElementById('mov-desc-suggest');
       const visible = drop && !drop.classList.contains('hidden');
@@ -2803,7 +2814,7 @@ function _onMovDescInput() {
   if (Array.isArray(CAJA_STOCK)) {
     CAJA_STOCK.forEach(p => {
       if (p.vendido) return;
-      if (searchMatch([p.marca, p.modelo, p.almacenamiento, p.imei], q)) {
+      if (searchMatch([p.marca, p.modelo, p.almacenamiento, p.imei, p.codigo], q)) {
         const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : '', p.estado].filter(Boolean).join(' · ');
         results.push({
           source: 'equipo',
@@ -3016,6 +3027,28 @@ function movEscanear() {
 // Un equipo del stock, al carrito. Es el mismo renglón se haya llegado por el
 // código de la etiqueta o por el IMEI de la caja de fábrica.
 function _addEquipoAlCarrito(eq) {
+  // Un celular se vende por "Venta de equipo": ahí van los datos del cliente,
+  // la garantía y sale el comprobante A5 con el IMEI. Desde el carrito común
+  // se vendía como un artículo más y ese comprobante no aparecía.
+  // Lo que ya estaba en el carrito (funda, vidrio…) pasa a la misma venta.
+  // Si hay una reparación vinculada o algo que no es del inventario, no se
+  // puede pasar: queda como antes, en el carrito.
+  const pasable = !_selectedRepairItem && !editingMovId &&
+    _cart.every(it => it.source === 'producto' && it.id);
+  if (pasable && typeof openVentaEqModal === 'function' && document.getElementById('ventaeq-modal')) {
+    const llevar = _cart.map(it => ({ ...it }));
+    if (typeof cerrarEscaner === 'function') cerrarEscaner();
+    closeMovForm();
+    openVentaEqModal(eq.id);
+    if (llevar.length && typeof VA_ITEMS !== 'undefined' && typeof _vaRender === 'function') {
+      llevar.forEach(it => VA_ITEMS.push({
+        id: it.id, nombre: it.nombre, qty: it.qty || 1, precio: Number(it.precio) || 0,
+        costoUSD: Number(it.costoUSD) || 0, costoARS: Number(it.costoARS) || 0, stock: Number(it.stock) || 0,
+      }));
+      _vaRender();
+    }
+    return;
+  }
   _addToCart({
     source: 'equipo', id: eq.id,
     nombre: `${eq.marca || ''} ${eq.modelo || ''}`.trim() || 'Equipo',
@@ -3026,9 +3059,11 @@ function _addEquipoAlCarrito(eq) {
 }
 
 // Lo que se escaneó, convertido en algo que la caja entiende.
-function _movDesdeCodigo(cod) {
+// Devuelve true si lo encontró. `silencioso`: sin el cartel de "no está"
+// (la pistola lectora, que si no lo encuentra sigue con la búsqueda común).
+function _movDesdeCodigo(cod, opts = {}) {
   const txt = String(cod || '').trim();
-  if (!txt) return;
+  if (!txt) return false;
   const digitos = txt.replace(/\D/g, '');
 
   // 1) Accesorio del inventario, por su código de barras
@@ -3090,7 +3125,8 @@ function _movDesdeCodigo(cod) {
     return;
   }
 
-  toast('Ese código no está en el inventario ni en el stock', 'error');
+  if (!opts.silencioso) toast('Ese código no está en el inventario ni en el stock', 'error');
+  return false;
 }
 
 function _selectMovSuggestion(idx) {
@@ -3104,6 +3140,12 @@ function _selectMovSuggestion(idx) {
   if (r.source === 'repair') {
     _openRepairLinkModal(r.repair);
     return;
+  }
+
+  // ── Equipo del stock → la venta de equipo, con su comprobante ──
+  if (r.source === 'equipo') {
+    const eq = (CAJA_STOCK || []).find(p => p.id === r.id);
+    if (eq) { _addEquipoAlCarrito(eq); return; }
   }
 
   _addToCart(r);

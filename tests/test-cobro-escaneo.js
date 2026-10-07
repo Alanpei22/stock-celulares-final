@@ -107,14 +107,30 @@ ok(/Samsung/.test(cart()[0].nombre) && /A54/.test(cart()[0].nombre),
 ok(cart()[0].costoARS === 60000, 'y el costo convertido del dólar (40 × 1500)', cart()[0].costoARS);
 
 console.log('\n5) Equipo del stock por el IMEI');
-run('_cart = [];');
+// Un celular va a "Venta de equipo" (datos del cliente, garantía y el
+// comprobante A5 con el IMEI), no al carrito común como un artículo más.
+run('_cart = []; _veStockId = null;');
 ESCANEO.cb('356938035643809');
-ok(cart().length === 1 && cart()[0].source === 'equipo', 'entra el equipo', cart()[0]);
-ok(cart()[0].precio === 350000, 'con su precio', cart()[0].precio);
+const eqId = run('_veStockId');
+ok(!!eqId && cart().length === 0, 'abre la venta de equipo con ESE equipo', { eqId, cart: cart() });
 // La etiqueta que imprime la app trae el IMEI en QR: tiene que servir igual
-run('_cart = [];');
+run('_cart = []; _veStockId = null;');
 ESCANEO.cb('35693803564380 9');
-ok(cart().length === 1, 'aunque el código venga con espacios', cart().length);
+ok(run('_veStockId') === eqId, 'aunque el código venga con espacios', run('_veStockId'));
+// Con una reparación vinculada no se puede pasar: queda en el carrito, como antes
+run("_cart = []; _veStockId = null; _selectedRepairItem = { repair: { id: 'r' }, mode: 'cobro' };");
+ESCANEO.cb('356938035643809');
+ok(cart().length === 1 && cart()[0].source === 'equipo' && cart()[0].precio === 350000, 'con una reparación vinculada, va al carrito con su precio', cart()[0]);
+run('_selectedRepairItem = null;');
+
+console.log('\n5b) La pistola lectora (Enter en el buscador) busca el código exacto');
+const cj = fs.readFileSync(DIR + 'caja.js', 'utf8');
+const enter = cj.slice(cj.indexOf("else if (e.key === 'Enter') {"), cj.indexOf("else if (e.key === 'Enter') {") + 1200);
+ok(enter.indexOf('_movDesdeCodigo(cod, { silencioso: true })') >= 0 &&
+   enter.indexOf('_movDesdeCodigo(cod, { silencioso: true })') < enter.indexOf('_addFreeFromSearch()'),
+   'primero el código exacto; solo si no existe, la búsqueda común (antes: "producto libre" con el código como nombre)');
+ok(/searchMatch\(\[p\.marca, p\.modelo, p\.almacenamiento, p\.imei, p\.codigo\], q\)/.test(cj), 'el buscador encuentra el equipo por el código de su etiqueta');
+ok(run("_movDesdeCodigo('NO-EXISTE', { silencioso: true })") === false, 'un código que no existe devuelve false sin cartel');
 
 console.log('\n6) Un equipo ya vendido no se vuelve a vender');
 run('_cart = []; TOASTS = [];');
