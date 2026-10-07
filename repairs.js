@@ -1328,7 +1328,7 @@ function _cardAccionesHtml(r) {
   }
   // Reimprimir la boleta: pasaba seguido y había que abrir la ficha para eso.
   sec.push(chip('chip-boleta', 'card-chip--sec',
-    `event.stopPropagation();reimprimirBoleta('${r.id}')`, '🖨', 'Boleta'));
+    `event.stopPropagation();opcionesBoletaReparacion('${r.id}')`, '🖨', 'Boleta'));
   // Garantía: solo tiene sentido en un equipo YA entregado que volvió. Antes
   // aparecía en casi todas las cards, incluso en las que seguían en el taller.
   if (!r.esGarantia && r.estado === 'entregado') {
@@ -1361,6 +1361,8 @@ function etiquetaReparacion(id) {
   if (typeof printEtiquetasReparaciones !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
   printEtiquetasReparaciones([r]);
 }
+
+let _ultimoIngreso = null;
 
 // Reimprimir la boleta desde la lista, sin abrir la ficha.
 function reimprimirBoleta(id) {
@@ -1667,6 +1669,16 @@ function printPromptEtiqueta() {
   etiquetaReparacion(bar.dataset.repairId);
 }
 
+// Mandar la boleta recién ingresada por WhatsApp (como imagen).
+function printPromptBoletaWa() {
+  const bar = document.getElementById('print-prompt-bar');
+  if (!bar) return;
+  bar.classList.add('hidden');
+  const rep = REPAIRS.find(x => x.id === bar.dataset.repairId) || _ultimoIngreso;
+  if (!rep) { toast('No encontré la reparación', 'error'); return; }
+  whatsappBoletaReparacion(rep);
+}
+
 function printPromptDismiss() {
   const bar = document.getElementById('print-prompt-bar');
   if (bar) bar.classList.add('hidden');
@@ -1958,6 +1970,7 @@ async function saveRepair() {
       // REPAIRS: el onSnapshot todavía no lo trajo. La barra queda para
       // reimprimir si algo salió mal.
       _showPrintPrompt(id);
+      _ultimoIngreso = newDoc;   // para mandarla por WhatsApp antes de que llegue el snapshot
       if (typeof imprimirIngresoReparacion === 'function') imprimirIngresoReparacion(newDoc);
       return;
     }

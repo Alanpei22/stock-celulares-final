@@ -980,6 +980,7 @@
   <span class="print-prompt-txt">✅ Registrada · reimprimir:</span>
   <button class="print-prompt-btn" onclick="printPromptFmt('A5')">📄 Hoja A5</button>
   <button class="print-prompt-btn" onclick="printPromptEtiqueta()">🏷️ Etiqueta</button>
+  <button class="print-prompt-btn" onclick="printPromptBoletaWa()">🟢 WhatsApp</button>
   <button class="print-prompt-close" onclick="printPromptDismiss()">✕</button>
 </div>
 
@@ -1262,6 +1263,8 @@
         </div>
         <div class="rep-print-row">
           <button class="rep-print-btn" onclick="printRepair('A5')">📄 Imprimir A5 B/N</button>
+          <button class="rep-print-btn" onclick="whatsappBoletaReparacion(window._printRep)">🟢 WhatsApp</button>
+          <button class="rep-print-btn" onclick="descargarBoletaReparacion(window._printRep)">⬇️ Descargar</button>
         </div>
         <div class="rep-print-note">La misma hoja se usa al recibir y al entregar: abajo trae el recuadro de entrega y garantía para completar y firmar en el momento del retiro.</div>
       </div>

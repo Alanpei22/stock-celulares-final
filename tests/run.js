@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-boleta-wa.js':        'Boleta de reparación: imprimir, descargar o mandar por WhatsApp como imagen',
   'test-wa-app.js':          'WhatsApp: abrir la app de escritorio directo, sin la página de wa.me',
   'test-comprobante-venta.js': 'Comprobante de venta 58mm: número propio, "no válido como factura", imprimir o WhatsApp',
   'test-inv-seleccion.js':    'Accesorios: seleccionar varios para modificar o eliminar en masa',

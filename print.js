@@ -530,6 +530,117 @@ async function imprimirIngresoReparacion(rep) {
   if (!etqOk) await _imprimirEnIframe(etq);
 }
 
+// ══════════════════════════════════════════════════════════════
+//  BOLETA DE LA REPARACIÓN: imprimir, descargar o mandar por WhatsApp
+// ══════════════════════════════════════════════════════════════
+// A veces el cliente no se lleva el papel: se la mandás por WhatsApp. La
+// imagen es la MISMA hoja A5 que sale por la impresora (con el QR de
+// seguimiento), dibujada con qz-print.js.
+async function _boletaImagen(rep) {
+  if (typeof _qzPaginasPng !== 'function') throw new Error('falta qz-print.js');
+  if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);  // que el QR ande
+  const pags = await _qzPaginasPng(_buildA5(rep), '.tk', 134, 196, 200, false);
+  if (!pags.length) throw new Error('no se armó la hoja');
+  const bin = atob(pags[0]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: 'image/jpeg' });
+}
+function _boletaNombre(rep) { return `Orden-${rep.nOrden || 'sin-numero'}.jpg`; }
+
+function _boletaRep(idOrRep) {
+  if (idOrRep && typeof idOrRep === 'object') return idOrRep;
+  const lista = (typeof REPAIRS !== 'undefined' ? REPAIRS : []);
+  return lista.find(r => r.id === idOrRep) || window._printRep || null;
+}
+
+function imprimirBoletaReparacion(idOrRep) {
+  const rep = _boletaRep(idOrRep);
+  if (!rep) { if (typeof toast === 'function') toast('No encontré esa reparación', 'error'); return; }
+  window._printRep = rep;
+  printRepair('A5');
+}
+
+async function descargarBoletaReparacion(idOrRep) {
+  const rep = _boletaRep(idOrRep);
+  if (!rep) return;
+  try {
+    const blob = await _boletaImagen(rep);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = _boletaNombre(rep);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    if (typeof toast === 'function') toast('⬇️ ' + _boletaNombre(rep) + ' descargada', 'success');
+  } catch (e) {
+    console.error('boleta:', e);
+    if (typeof toast === 'function') toast('No se pudo armar la imagen de la boleta', 'error');
+  }
+}
+
+async function whatsappBoletaReparacion(idOrRep) {
+  const rep = _boletaRep(idOrRep);
+  if (!rep) return;
+  const nombre = String(rep.nombre || '').trim().split(' ')[0];
+  const texto = `Hola${nombre ? ' ' + nombre : ''}! Te mando el comprobante de tu orden N° ${rep.nOrden || ''}` +
+    ` (${[rep.marca, rep.modelo].filter(Boolean).join(' ')}). Con el QR podés ver cómo va la reparación.`;
+  let blob;
+  try { blob = await _boletaImagen(rep); }
+  catch (e) { console.error('boleta:', e); if (typeof toast === 'function') toast('No se pudo armar la imagen de la boleta', 'error'); return; }
+
+  // Celular: se comparte el archivo directo (el menú de compartir del
+  // teléfono deja elegir WhatsApp y el chat, con la imagen adjunta).
+  const archivo = new File([blob], _boletaNombre(rep), { type: 'image/jpeg' });
+  const esCompu = typeof _waEsCompu === 'function' ? _waEsCompu() : true;
+  if (!esCompu && navigator.canShare && navigator.canShare({ files: [archivo] })) {
+    try { await navigator.share({ files: [archivo], text: texto }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+
+  // PC: la imagen se copia ANTES de abrir WhatsApp (después Chrome no deja
+  // copiar) y en el chat se pega con Ctrl+V. Si no se puede copiar, se
+  // descarga y se adjunta a mano.
+  let copiada = false;
+  try {
+    if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+      const png = await _imgAPng(blob);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+      copiada = true;
+    }
+  } catch (e) { console.error('portapapeles:', e); }
+  if (!copiada) await descargarBoletaReparacion(rep);
+
+  const fono = (typeof tpWaFono === 'function') ? tpWaFono(rep.tlf) : String(rep.tlf || '').replace(/\D/g, '');
+  const url = 'https://wa.me/' + fono + '?text=' + encodeURIComponent(texto);
+  if (typeof waAbrir === 'function') waAbrir(url); else window.open(url, '_blank');
+  if (typeof toast === 'function') {
+    toast(copiada ? '📋 Boleta copiada: en el chat apretá Ctrl+V y Enviar'
+                  : '⬇️ Boleta descargada: adjuntala en el chat (📎)', 'success');
+  }
+}
+
+// El portapapeles solo acepta PNG: la hoja (JPEG) pasa por un canvas.
+async function _imgAPng(blob) {
+  const img = await createImageBitmap(blob);
+  const c = document.createElement('canvas');
+  c.width = img.width; c.height = img.height;
+  c.getContext('2d').drawImage(img, 0, 0);
+  return new Promise(ok => c.toBlob(ok, 'image/png'));
+}
+
+// El menú: qué hacer con la boleta.
+function opcionesBoletaReparacion(id) {
+  const rep = _boletaRep(id);
+  if (!rep) return;
+  if (typeof openSheet !== 'function') { imprimirBoletaReparacion(rep); return; }
+  openSheet(`Boleta N° ${rep.nOrden || ''}`, [
+    { icon: '🖨️', label: 'Imprimir', onClick: () => { closeSheet(); imprimirBoletaReparacion(rep); } },
+    { icon: '🟢', label: 'Mandar por WhatsApp', sub: rep.tlf ? 'A ' + (rep.nombre || rep.tlf) + ', como imagen' : 'No tiene teléfono cargado',
+      onClick: () => { closeSheet(); whatsappBoletaReparacion(rep); } },
+    { icon: '⬇️', label: 'Descargar imagen', sub: _boletaNombre(rep), onClick: () => { closeSheet(); descargarBoletaReparacion(rep); } },
+  ]);
+}
+
 // Con QZ Tray configurado en esta PC (qz-print.js), sale directo a su
 // impresora, sin diálogo. Devuelve false si no hay QZ o falló.
 function _imprimirDirecto(tipo, html) {
