@@ -8,7 +8,8 @@ const leer = f => fs.readFileSync(DIR + f, 'utf8');
 const store = {}, ABIERTO = [];
 const ctx = { console, URLSearchParams, encodeURIComponent, decodeURIComponent, String, RegExp,
   localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
-  location: { href: '' }, window: { open: (u, t) => { ABIERTO.push(u); return {}; } },
+  location: { href: '' }, window: { open: (u, t) => { ABIERTO.push(u); return {}; }, addEventListener() {}, removeEventListener() {} },
+  document: { addEventListener() {}, removeEventListener() {} }, setTimeout: () => 0,
   toast: () => {}, closeSheet: () => {} };
 ctx.globalThis = ctx;
 vm.createContext(ctx);
@@ -42,6 +43,15 @@ ok(ctx.location.href.startsWith('whatsapp://send') && ABIERTO.length === 0, 'abr
 run('toggleWaApp()');
 ok(store.waApp === '0' && run('waConvertir(_u)') === URL1, 'y se puede volver a wa.me');
 
+console.log('\n2b) Sin elegir: en la compu va por la app, en el celular no');
+delete store.waApp;
+ctx.navigator = { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130' };
+ok(run('waAppActiva()') === true, 'Windows: app de escritorio, sin pestañas de wa.me');
+ctx.navigator = { userAgent: 'Mozilla/5.0 (Linux; Android 14) Mobile Chrome/130' };
+ok(run('waAppActiva()') === false, 'celular: wa.me (ya abre la app sola)');
+ctx.navigator = { userAgent: 'Windows' };
+store.waApp = '0';
+ok(run('waAppActiva()') === false, 'si en una compu se apagó, queda apagado');
 console.log('\n3) Todo lo que abre el que usa la app pasa por waAbrir');
 ['repairs.js', 'tp-fases.js', 'app.js', 'pedidos.js', 'stock-extras.js'].forEach(f => {
   ok(!/window\.open\([^)]*wa\.me/.test(leer(f)) && !/window\.open\(url, '_blank'\)/.test(leer(f).replace(/[\s\S]*?(?=wa\.me)/, '')),

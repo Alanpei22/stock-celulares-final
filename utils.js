@@ -686,8 +686,21 @@ function dolarHora(iso) {
 // página de seguimiento los abre el CLIENTE en su celular: esos siguen con
 // wa.me, que funciona en cualquier lado.
 const _WA_APP_KEY = 'waApp';
+// Sin elegir nada, en una COMPUTADORA va por la app de escritorio (es lo que
+// se quiere en el local: sin pestañas de wa.me que quedan abiertas). En el
+// celular no hace falta: ahí wa.me ya abre la app sola.
+function _waEsCompu() {
+  try {
+    const ua = navigator.userAgent || '';
+    return !/Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  } catch { return false; }
+}
 function waAppActiva() {
-  try { return localStorage.getItem(_WA_APP_KEY) === '1'; } catch { return false; }
+  let v = null;
+  try { v = localStorage.getItem(_WA_APP_KEY); } catch {}
+  if (v === '1') return true;
+  if (v === '0') return false;
+  return _waEsCompu();
 }
 function toggleWaApp() {
   if (typeof closeSheet === 'function') closeSheet();
@@ -711,7 +724,24 @@ function waConvertir(url) {
 // no navega: solo lanza la app); wa.me, en una pestaña nueva como siempre.
 function waAbrir(url) {
   const u = waConvertir(url);
-  if (u.startsWith('whatsapp:')) { location.href = u; return null; }
+  if (u.startsWith('whatsapp:')) {
+    // Si la app se abre, la ventana pierde el foco. Si a los 4 segundos sigue
+    // acá, lo más probable es que esta PC no tenga WhatsApp de escritorio: se
+    // avisa cómo volver a wa.me en vez de dejar el botón "sin hacer nada".
+    let salio = false;
+    const marcar = () => { salio = true; };
+    window.addEventListener('blur', marcar, { once: true });
+    document.addEventListener('visibilitychange', marcar, { once: true });
+    location.href = u;
+    setTimeout(() => {
+      window.removeEventListener('blur', marcar);
+      document.removeEventListener('visibilitychange', marcar);
+      if (!salio && typeof toast === 'function') {
+        toast('¿No se abrió WhatsApp? Si esta PC no lo tiene instalado, en el menú tocá "💬 WhatsApp: abrir la app" para volver a wa.me', 'info');
+      }
+    }, 4000);
+    return null;
+  }
   return window.open(u, '_blank');
 }
 
