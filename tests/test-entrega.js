@@ -166,6 +166,9 @@ ok(Array.isArray(patch.faseHist) && patch.faseHist.length === 3 && patch.faseHis
    'y queda en el historial de fases', patch.faseHist);
 
 console.log('\n6) Cobrar desde la caja y entregar: una sola escritura, completa');
+// En el cartel de vincular ya se eligió "SÍ — Cobrar y entregar": cobrando
+// todo el saldo no se vuelve a preguntar "¿se lo lleva?" (era el mismo sí dos
+// veces). Cobrando menos, el cartel de entrega sí aparece (secciones 7 y 8).
 function nuevoCobro(monto) {
   TOASTS = []; W.adds = []; W.updates = [];
   run(`_cart = []; _selectedRepairItem = null; editingMovId = null; _splitActive = false; _movTipo = 'ingreso';
@@ -181,8 +184,7 @@ function nuevoCobro(monto) {
 }
 let save = nuevoCobro(40000);
 await tick();
-ok(!els['tpent-modal'].classList.contains('hidden'), 'al cobrar pregunta si se lo lleva');
-get('tpEntregaSi()');
+ok(els['tpent-modal'].classList.contains('hidden'), 'cobrando todo el saldo no vuelve a preguntar si se lo lleva');
 await save;
 const upd = W.updates.find(u => u[0] === 'repairs');
 ok(!!upd, 'actualiza la reparación', W.updates);
@@ -199,7 +201,10 @@ ok(!!ctx.__SEG && ctx.__SEG.estado === 'entregado', 'republica el seguimiento de
 ok(!!ctx.__PUSH && ctx.__PUSH.estado === 'entregado', 'avisa a los otros dispositivos');
 
 console.log('\n7) "No, queda en el local": se cobra pero NO se entrega');
-save = nuevoCobro(40000);
+// Cobrando menos que el saldo (queda debiendo) el cartel de entrega aparece.
+save = nuevoCobro(30000);
+await tick();
+ok(!els['tpent-modal'].classList.contains('hidden'), 'si queda debiendo, pregunta si se lo lleva');
 await tick(); get('tpEntregaNo()');
 await save;
 const upd7 = W.updates.find(u => u[0] === 'repairs');
@@ -210,7 +215,7 @@ ok(W.adds.some(a => a[0] === 'caja_movimientos'), 'el movimiento entra igual');
 console.log('\n8) "Volver": no se cobra NADA  ← esto antes no se podía');
 // Con el confirm() viejo, apretar Cancelar igual registraba el cobro: lo
 // único que hacía era no marcar entregado.
-save = nuevoCobro(40000);
+save = nuevoCobro(30000);
 await tick(); get('tpEntregaCancelar()');
 await save;
 ok(W.adds.length === 0, 'no entra ningún movimiento en la caja', W.adds);

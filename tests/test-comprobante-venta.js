@@ -76,6 +76,25 @@ const url = ABIERTO.pop().location.href || '';
 ok(/^https:\/\/wa\.me\/5491155551234\?text=/.test(url), 'WhatsApp al número que se cargó, con 549 adelante', url);
 ok(/N%C2%B0%20000002/.test(url) && /no%20v%C3%A1lido%20como%20factura/.test(url), 'con el número y la leyenda');
 
+console.log('\n3b) En la PC (app de escritorio): el ticket va como imagen para pegar');
+const WA = [];
+ctx.waAppActiva = () => true;
+ctx.waAbrir = u => WA.push(u);
+ctx._cvCopiarImagen = async () => true;
+TEL = '1155551234';
+await run("whatsappComprobanteVenta('m1', _m)");
+let txt = decodeURIComponent((WA.pop() || '').split('text=')[1] || '');
+ok(/Te mando el comprobante de tu compra \(N° 000001\)/.test(txt) && !/TOTAL|Funda/.test(txt),
+   'con la imagen copiada, el mensaje es corto (el detalle va en la imagen)', txt);
+ok(ABIERTO.length === 0, 'sin abrir pestañas');
+ctx._cvCopiarImagen = async () => false;
+await run("whatsappComprobanteVenta('m1', _m)");
+txt = decodeURIComponent((WA.pop() || '').split('text=')[1] || '');
+ok(/Funda A15/.test(txt) && /no válido como factura/.test(txt), 'si no se pudo copiar la imagen, va el comprobante en texto como antes', txt);
+const cv = fs.readFileSync(DIR + 'comprobante-venta.js', 'utf8');
+ok(cv.indexOf('await _cvCopiarImagen(mov, nro)') < cv.indexOf("waAbrir('https://wa.me/' + tel"), 'la imagen se copia ANTES de abrir WhatsApp (después Chrome no deja)');
+ctx.waAppActiva = () => false;
+
 console.log('\n4) Enganchado');
 const caja = fs.readFileSync(DIR + 'caja.js', 'utf8');
 ok(/if \(data\.tipo === 'ingreso' && typeof ofrecerComprobanteVenta === 'function'\)/.test(caja), 'después de cobrar una venta se pregunta (los gastos no)');

@@ -186,9 +186,56 @@ async function whatsappComprobanteVenta(movId, movDatos) {
   let nro;
   try { nro = await _cvNumero(movId); }
   catch (e) { if (w) w.close(); toast('No se pudo numerar el comprobante (¿sin conexión?)', 'error'); return; }
+  if (app) {
+    // En la PC: el ticket va como IMAGEN. Se copia al portapapeles antes de
+    // abrir WhatsApp (después la ventana pierde el foco y Chrome no deja
+    // copiar), y en el chat se pega con Ctrl+V. El texto que acompaña es
+    // corto: el detalle está en la imagen.
+    const copiada = await _cvCopiarImagen(mov, nro);
+    const texto = copiada
+      ? `Hola! Te mando el comprobante de tu compra (N° ${nro}). ¡Gracias!`
+      : ticketVentaTexto(mov, nro);
+    waAbrir('https://wa.me/' + tel + '?text=' + encodeURIComponent(texto));
+    if (copiada && typeof toast === 'function') toast('📋 Comprobante copiado: en el chat apretá Ctrl+V y Enviar', 'success');
+    return;
+  }
   const url = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(ticketVentaTexto(mov, nro));
-  if (app) { waAbrir(url); return; }
   if (w) w.location.href = url; else location.href = url;
+}
+
+// El ticket dibujado como imagen (el mismo que sale por la impresora) y
+// copiado al portapapeles. Devuelve false si no se pudo (navegador viejo, sin
+// permiso): ahí el comprobante va como texto, como antes.
+async function _cvCopiarImagen(mov, nro) {
+  try {
+    if (typeof _qzPaginasPng !== 'function' || !navigator.clipboard || typeof ClipboardItem === 'undefined') return false;
+    // A más resolución que la térmica: se mira en una pantalla, no en el rollo.
+    const pngs = await _qzPaginasPng(ticketVentaHtml(mov, nro), '.tkt', 48, 'auto', 300, false);
+    if (!pngs.length) return false;
+    const bin = atob(pngs[0]);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    // _qzPaginasPng da JPEG cuando no es blanco y negro; el portapapeles solo
+    // acepta PNG, así que se pasa por un canvas.
+    const blob = await _cvAPng(new Blob([bytes], { type: 'image/jpeg' }));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    return true;
+  } catch (e) {
+    console.error('comprobante como imagen:', e);
+    return false;
+  }
+}
+
+async function _cvAPng(blob) {
+  const img = await createImageBitmap(blob);
+  const c = document.createElement('canvas');
+  // Un margen blanco alrededor: pegado en el chat, el ticket no queda pegado al borde.
+  const m = 24;
+  c.width = img.width + m * 2; c.height = img.height + m * 2;
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+  x.drawImage(img, m, m);
+  return new Promise(ok => c.toBlob(ok, 'image/png'));
 }
 
 // ── La pregunta, después de cobrar ──────────────────────────

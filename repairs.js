@@ -2455,14 +2455,18 @@ async function _doChangeRepairStatus(id, newStatus, r, extra = {}, opts = {}) {
 
 // Pregunta si avisar al cliente por WhatsApp que su equipo está listo.
 // Si el usuario marca "no preguntar más", recordamos la preferencia.
+// Sin elegir nada, al pasar a Listo se abre WhatsApp con el mensaje ya
+// escrito: solo hay que tocar Enviar (antes salía primero un cartel para
+// confirmar). Quien eligió "preguntar" en Configuración lo sigue teniendo.
+const WA_LISTO_DEF = 'auto';
 function _ofrecerAvisoListo(id, r) {
-  const pref = localStorage.getItem('waListoPref') || 'ask';
+  const pref = localStorage.getItem('waListoPref') || WA_LISTO_DEF;
   if (pref === 'never') return;
   if (pref === 'auto') {
     // Refrescar la copia local con el estado actualizado para que sendWA use el template correcto
     const r2 = REPAIRS.find(x => x.id === id) || r;
     if (typeof repairWhatsApp === 'function') repairWhatsApp(id);
-    if (r2 && typeof toast === 'function') toast('📤 WhatsApp enviado a ' + (r2.nombre || r2.tlf), 'success');
+    if (r2 && typeof toast === 'function') toast('🟢 WhatsApp listo para ' + (r2.nombre || r2.tlf) + ' — tocá Enviar', 'success');
     return;
   }
   // pref === 'ask' → cartel propio, con el mensaje a la vista
@@ -2541,7 +2545,7 @@ function setWaListoPref(pref, silencioso) {
 // Deja el selector de Configuración mostrando lo que hay guardado.
 function _syncWaListoPref() {
   const sel = document.getElementById('wa-listo-pref');
-  if (sel) sel.value = localStorage.getItem('waListoPref') || 'ask';
+  if (sel) sel.value = localStorage.getItem('waListoPref') || WA_LISTO_DEF;
 }
 
 // ── Registrar cobro en caja ─────────────────────────────

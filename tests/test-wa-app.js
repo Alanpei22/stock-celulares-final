@@ -59,12 +59,18 @@ console.log('\n3) Todo lo que abre el que usa la app pasa por waAbrir');
 });
 ok(/waAppActiva\(\)\) \{ e\.preventDefault\(\); waAbrir\(waBtn\.href\)/.test(leer('caja.js')), 'reporte del día');
 ok(/onclick="if \(waAppActiva\(\)\) \{ event\.preventDefault\(\); waAbrir\(this\.href\); \}"/.test(leer('clientes.js')), 'ficha del cliente');
-ok(/if \(app\) \{ waAbrir\(url\); return; \}/.test(leer('comprobante-venta.js')), 'comprobante de venta');
+ok(/waAbrir\('https:\/\/wa\.me\/' \+ tel/.test(leer('comprobante-venta.js')), 'comprobante de venta');
 console.log('\n4) Lo que abre el CLIENTE sigue con wa.me');
 ok(/https:\/\/wa\.me\//.test(leer('estado.html')) && !/waAbrir/.test(leer('estado.html')), 'la página de seguimiento');
 ok((leer('print.js').match(/https:\/\/wa\.me\//g) || []).length >= 2, 'los QR impresos');
 ok((leer('app.js').match(/label: 'WhatsApp: abrir la app de escritorio'/g) || []).length === 1 &&
    /label: 'WhatsApp: abrir la app de escritorio'/.test(leer('caja.js')), 'la opción está en el menú de Reparaciones y en el de la caja');
+
+console.log('\n5) Al pasar a Listo se abre WhatsApp con el mensaje escrito (sin cartel antes)');
+const rep = leer('repairs.js');
+ok(/const WA_LISTO_DEF = 'auto';/.test(rep) && /localStorage\.getItem\('waListoPref'\) \|\| WA_LISTO_DEF/.test(rep),
+   'sin elegir nada, abre WhatsApp directo (quien eligió "preguntar" lo sigue teniendo)');
+ok(!/toast\('📤 WhatsApp enviado a/.test(rep) && /WhatsApp listo para .* tocá Enviar/.test(rep), 'y el aviso no dice "enviado": falta tocar Enviar');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

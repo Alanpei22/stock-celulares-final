@@ -3692,7 +3692,15 @@ async function saveMov() {
       // "volver" de verdad cancela el cobro. Con el confirm() viejo, apretar
       // Cancelar igual cobraba y solo se salteaba la entrega.
       if (repair.estado !== 'entregado') {
-        const res = (typeof tpEntregaModal === 'function')
+        // En el cartel de vincular ya se contestó "SÍ — el cliente lo retira":
+        // si además se cobra todo el saldo, volver a preguntar "¿se lleva el
+        // equipo?" era el mismo sí dos veces. Si queda debiendo, el cartel de
+        // entrega sí aparece, porque ahí se ve cuánto queda.
+        const yaDijoQueSeLoLleva = _selectedRepairItem?.mode === 'cobro' && repAmt >= saldoPendiente
+          && typeof tpEntregaPatch === 'function';
+        const res = yaDijoQueSeLoLleva
+          ? { entregado: true, avisar: false }
+          : (typeof tpEntregaModal === 'function')
           ? await tpEntregaModal(repair, { contexto: 'cobro', cobra: repAmt })
           : { entregado: false, avisar: false };
         if (!res) return;                       // volvió atrás: no se cobra nada
