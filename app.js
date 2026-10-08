@@ -223,10 +223,15 @@ function requireOwnerPin(onSuccess, mensaje) {
   _ownerPinCallback = onSuccess;
   _ownerPinBuf = '';
   _updateOwnerDots();
-  document.getElementById('owner-pin-error').textContent = '';
+  const err = document.getElementById('owner-pin-error');
+  if (err) err.textContent = '';
+  // Si falta un pedazo del cartel, igual se abre: antes un null acá cortaba
+  // todo en silencio y "Próximo N° de orden" o el backup no hacían nada.
   const sub = document.getElementById('owner-pin-sub');
-  sub.textContent = mensaje || 'Ingresá el PIN de dueño para continuar';
-  sub.style.color = '#f59e0b';
+  if (sub) {
+    sub.textContent = mensaje || 'Ingresá el PIN de dueño para continuar';
+    sub.style.color = '#f59e0b';
+  }
   document.getElementById('owner-pin-overlay').classList.remove('hidden');
   document.getElementById('owner-pin-modal').classList.remove('hidden');
 }

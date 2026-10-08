@@ -97,6 +97,13 @@ ok(/ordenInputVal > sugerido \+ 100/.test(src), 'un número tipeado muy lejos de
 const app = fs.readFileSync(DIR + 'app.js', 'utf8');
 ok(/label: 'Próximo N° de orden'[^\n]*hide: _soloDueno\(\)/.test(app), 'en el menú de Reparaciones, solo para el dueño');
 
+// Pasó: el menú no hacía NADA. requireOwnerPin buscaba #owner-pin-sub, que no
+// existía en index.html, y el null cortaba antes de mostrar el teclado del PIN.
+const html = fs.readFileSync(DIR + 'index.html', 'utf8');
+const rop = app.slice(app.indexOf('function requireOwnerPin'), app.indexOf('function toggleOwnerLock'));
+const ids = [...rop.matchAll(/getElementById\('([^']+)'\)/g)].map(m => m[1]);
+const faltan = ids.filter(id => !html.includes(`id="${id}"`));
+ok(ids.length >= 4 && faltan.length === 0, 'el cartel del PIN de dueño tiene en index.html todo lo que usa', faltan);
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
 })().catch(e => { console.error('Error:', e); process.exit(1); });
