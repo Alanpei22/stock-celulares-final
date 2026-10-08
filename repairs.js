@@ -300,11 +300,20 @@ async function _pendReintentar() {
 async function _numeroDeOrden(ordenInputVal) {
   const metaRef = db.collection('config').doc('repairsMeta');
   try {
+    // El contador puede apuntar a un número ya usado (se lo bajó desde el menú
+    // y hay órdenes más altas): se busca el primero libre desde ahí.
+    let leido = 0, libre = 0;
+    if (!(ordenInputVal > 0)) {
+      const m = await metaRef.get();
+      leido = m.exists ? (m.data().nextOrderNum || 7100) : 7100;
+      libre = await _primeroLibre(leido);
+    }
     let nOrden;
     await db.runTransaction(async t => {
       const meta = await t.get(metaRef);
       const next = meta.exists ? (meta.data().nextOrderNum || 7100) : 7100;
-      nOrden = ordenInputVal > 0 ? ordenInputVal : next;
+      // Si otro dispositivo tomó un número mientras tanto, va el del contador
+      nOrden = ordenInputVal > 0 ? ordenInputVal : (next === leido ? libre : next);
       if (nOrden >= next) t.set(metaRef, { nextOrderNum: nOrden + 1 }, { merge: true });
     });
     return { nOrden, provisorio: false };
@@ -313,6 +322,22 @@ async function _numeroDeOrden(ordenInputVal) {
     const maxLocal = REPAIRS.reduce((m, r) => Math.max(m, Number(r.nOrden) || 0), 7099);
     return { nOrden: ordenInputVal > 0 ? ordenInputVal : maxLocal + 1, provisorio: true };
   }
+}
+
+// Primer N° de orden sin reparación, desde `n`. Mira lo cargado en el celu y
+// pregunta a la base de a tandas de 50. Si la base no responde, usa lo local.
+async function _primeroLibre(n) {
+  n = Number(n) || 0;
+  for (let vuelta = 0; vuelta < 20; vuelta++) {
+    const usados = new Set(REPAIRS.map(r => Number(r.nOrden) || 0));
+    try {
+      const snap = await db.collection('repairs').where('nOrden', '>=', n).where('nOrden', '<', n + 50).get();
+      snap.docs.forEach(d => usados.add(Number(d.data().nOrden) || 0));
+    } catch (e) { console.error('buscando N° libre:', e); }
+    for (let k = n; k < n + 50; k++) if (!usados.has(k)) return k;
+    n += 50;
+  }
+  return n;
 }
 
 // El último "próximo N°" que se leyó de la base (para avisar si se tipea uno
@@ -373,12 +398,16 @@ async function corregirContadorOrdenes() {
     const n = parseInt(String(resp).trim(), 10);
     if (!(n > 0)) { toast('Poné un número', 'error'); return; }
     if (n <= mayor) {
-      // Si la más alta es un número mal cargado, primero hay que corregir esa
-      // orden (editarla); si no, el próximo ingreso choca con ella.
-      alert(`No puede ser ${n}: ya existe la orden N°${mayor}.\n\n` +
-            `Si la N°${mayor} es un número mal cargado, primero abrí esa reparación, ` +
-            `corregile el N° y después volvé acá.`);
-      return;
+      // Antes no dejaba ponerlo detrás de la orden más alta, y con una sola
+      // orden mal numerada (o órdenes viejas importadas) no había forma de
+      // volver. Ahora alcanza con que ESE número esté libre: al numerar se
+      // saltean los que ya existen.
+      if (await _ordenOcupado(n, null)) {
+        alert(`No puede ser ${n}: ya existe una reparación con el N°${n}.`);
+        return;
+      }
+      if (!confirm(`Ya hay órdenes más altas (la más alta es la N°${mayor}).\n\n` +
+                   `Las próximas van a salir desde ${n}, salteando los números que ya estén usados.\n\n¿Seguir?`)) return;
     }
     try {
       await ref.set({ nextOrderNum: n }, { merge: true });
@@ -1595,8 +1624,9 @@ function openRepairForm(id) {
     ordenInput.style.background = '';
     ordenInput.style.color      = '';
     // Fetch suggested nOrden asynchronously
-    db.collection('config').doc('repairsMeta').get().then(snap => {
-      const suggested = snap.exists ? (snap.data().nextOrderNum || 7100) : 7100;
+    db.collection('config').doc('repairsMeta').get().then(async snap => {
+      const contador = snap.exists ? (snap.data().nextOrderNum || 7100) : 7100;
+      const suggested = await _primeroLibre(contador);   // salteando los ya usados
       _ultimoContadorVisto = suggested;
       if (!ordenInput.value) ordenInput.value = suggested;
     }).catch(() => {});

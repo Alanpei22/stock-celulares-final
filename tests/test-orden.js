@@ -21,6 +21,7 @@ const db = {
       set: async v => { Object.assign(META, v); },
     }),
     where: (campo, op, v) => ({
+      where: (c2, op2, v2) => ({ get: async () => ({ docs: DOCS.filter(d => d.nOrden >= v && d.nOrden < v2).map(d => ({ id: d.id, data: () => d })) }) }),
       limit: () => ({ get: async () => ({ docs: DOCS.filter(d => op === '==' ? d.nOrden === v : d.nOrden > v).map(d => ({ id: d.id, data: () => d })) }) }),
       orderBy: () => ({ limit: () => ({ get: async () => {
         const top = DOCS.slice().sort((x, y) => y.nOrden - x.nOrden)[0];
@@ -30,14 +31,16 @@ const db = {
   }),
   runTransaction: async fn => fn({ get: async () => ({ exists: true, data: () => META }), set: (r, v) => Object.assign(META, v) }),
 };
-const ALERTS = [], TOASTS = [];
+const ALERTS = [], TOASTS = [], CONFIRMS = [];
+let CONFIRM = true;
 let RESP = null;
 const ctx = { console, Math, Number, String, Array, Object, JSON, Promise, db, REPAIRS: [],
   toast: (m, t) => TOASTS.push([t, m]), alert: m => ALERTS.push(m), prompt: () => RESP,
+  confirm: m => { CONFIRMS.push(m); return CONFIRM; },
   requireOwnerPin: cb => cb(), logActivity: () => {} };
 ctx.globalThis = ctx;
 vm.createContext(ctx);
-vm.runInContext(trozo('let _ultimoContadorVisto', '// ── Init'), ctx);
+vm.runInContext(trozo('async function _numeroDeOrden', '// ── Init'), ctx);
 
 console.log('\n1) Corregir una orden');
 ok(await vm.runInContext("_ordenOcupado(75000, 'x')", ctx) === true, 'un número que tiene otra reparación está ocupado');
@@ -54,11 +57,29 @@ ok(META.nextOrderNum === 7600, 'y si pasa al contador, el contador lo sigue (si 
 console.log('\n3) Bajar el contador desde el menú');
 META = { nextOrderNum: 75001 };
 DOCS = [{ id: 'a', nOrden: 7499 }, { id: 'b', nOrden: 75000 }];
-RESP = '7500';
+RESP = '7499';
 await vm.runInContext('corregirContadorOrdenes()', ctx); await new Promise(r => setTimeout(r, 10));
-ok(META.nextOrderNum === 75001 && /ya existe la orden N°75000/.test(ALERTS.pop() || ''),
-   'no deja ponerlo detrás de una orden que existe: primero hay que corregir la N°75000');
-DOCS[1].nOrden = 7500;   // se corrigió la orden mal cargada
+ok(META.nextOrderNum === 75001 && /ya existe una reparación con el N°7499/.test(ALERTS.pop() || ''),
+   'un número que ya tiene reparación no se puede poner');
+CONFIRM = false; RESP = '7500';
+await vm.runInContext('corregirContadorOrdenes()', ctx); await new Promise(r => setTimeout(r, 10));
+ok(META.nextOrderNum === 75001 && /la más alta es la N°75000/.test(CONFIRMS.pop() || ''),
+   'detrás de órdenes más altas avisa, y si dice que no, no toca nada');
+CONFIRM = true;
+await vm.runInContext('corregirContadorOrdenes()', ctx); await new Promise(r => setTimeout(r, 10));
+ok(META.nextOrderNum === 7500, 'si dice que sí, el contador vuelve a 7500 aunque exista la 75000 (el caso de "no entra")', META);
+
+console.log('\n3b) Al numerar se saltean los usados');
+DOCS = [{ id: 'a', nOrden: 8410 }, { id: 'b', nOrden: 8411 }, { id: 'c', nOrden: 8413 }, { id: 'd', nOrden: 9000 }];
+ok(await vm.runInContext('_primeroLibre(8410)', ctx) === 8412, 'desde 8410 con 8410 y 8411 usadas → 8412');
+ok(await vm.runInContext('_primeroLibre(8414)', ctx) === 8414, 'uno libre se usa tal cual');
+META = { nextOrderNum: 8410 };
+let r = await vm.runInContext('_numeroDeOrden(0)', ctx);
+ok(r.nOrden === 8412 && META.nextOrderNum === 8413, 'el ingreso nuevo toma 8412 y el contador queda en 8413', [r, META]);
+r = await vm.runInContext('_numeroDeOrden(0)', ctx);
+ok(r.nOrden === 8414 && META.nextOrderNum === 8415, 'y el siguiente saltea la 8413', [r, META]);
+DOCS = [{ id: 'a', nOrden: 7499 }, { id: 'b', nOrden: 7500 }];
+META = { nextOrderNum: 7501 };
 RESP = '7501';
 await vm.runInContext('corregirContadorOrdenes()', ctx); await new Promise(r => setTimeout(r, 10));
 ok(META.nextOrderNum === 7501, 'corregida la orden, el contador vuelve a 7501', META);
