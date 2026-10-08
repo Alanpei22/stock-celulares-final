@@ -203,6 +203,54 @@ ${data.text || ''}`;
     }
   }
 
+  // ── leerTicket: foto del ticket de un gasto → proveedor, productos y total ──
+  // Si no se puede leer, el cliente igual guarda la foto adjunta al gasto: acá
+  // nunca se inventa un número para "completar".
+  if (action === 'leerTicket') {
+    const img = String(data.imageBase64 || '');
+    if (!img) return json({ error: 'Falta la foto' }, 400);
+    if (img.length > 6_000_000) return json({ error: 'Foto demasiado grande' }, 413);
+    const rubros = Array.isArray(data.rubros) ? data.rubros.map(String).slice(0, 12) : [];
+    const prompt =
+`Esta es la foto de un ticket, factura o remito de una COMPRA que hizo un local de reparación y venta de celulares en Argentina.
+Leé lo que dice y respondé ÚNICAMENTE con este JSON (sin texto antes ni después, sin markdown):
+{"legible":true,"proveedor":"","fecha":"","items":[{"nombre":"","cantidad":1,"precio":0}],"total":0,"rubro":""}
+Reglas:
+- legible: false si la foto no es un ticket o no se puede leer; en ese caso dejá todo lo demás vacío o en 0.
+- proveedor: nombre del comercio que vendió (vacío si no figura).
+- fecha: AAAA-MM-DD si figura, sino vacío.
+- items: cada producto o servicio comprado. nombre corto y claro, cantidad entera, precio = importe TOTAL de esa línea en pesos (número, sin símbolos; la coma es decimal, el punto separa miles).
+- total: el TOTAL final pagado en pesos, como número. Si no figura, la suma de los items.
+- Si un dato no se lee bien, dejalo vacío o en 0: no lo inventes.
+- rubro: ${rubros.length ? `el que mejor corresponda de: ${rubros.map(r => `"${r}"`).join(', ')}.` : 'vacío.'} Repuestos, módulos, pantallas, baterías o accesorios para vender → el de compra de repuestos.`;
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-opus-5-5',
+          max_tokens: 2000,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: data.imageMediaType || 'image/jpeg', data: img } },
+              { type: 'text', text: prompt }
+            ]
+          }]
+        })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error?.message || 'Error de API');
+      if (result.stop_reason === 'refusal') return json({ error: 'No se pudo leer el ticket' }, 422);
+      const texto = (result.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      const ticket = parsearTicket(texto);
+      if (!ticket) return json({ error: 'No se pudo leer el ticket' }, 422);
+      return json({ ticket });
+    } catch (err) {
+      return json({ error: err.message }, 500);
+    }
+  }
+
   if (!prompts[action]) {
     return new Response(JSON.stringify({ error: 'Acción no válida' }), {
       status: 400, headers: { 'content-type': 'application/json' }
@@ -247,4 +295,44 @@ ${data.text || ''}`;
       status: 500, headers: { 'content-type': 'application/json' }
     });
   }
+}
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
+}
+
+// La respuesta del modelo → un ticket con tipos sanos. Los montos se aceptan
+// como número o como texto argentino ("$ 12.500,50"). Si algo no cierra,
+// devuelve null y el gasto queda solo con la foto.
+export function parsearTicket(texto) {
+  const m = String(texto || '').match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  let o;
+  try { o = JSON.parse(m[0]); } catch { return null; }
+  if (!o || typeof o !== 'object') return null;
+  const num = v => {
+    if (typeof v === 'number') return isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : 0;
+    let s = String(v || '').replace(/[^\d.,-]/g, '');
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+    const n = parseFloat(s);
+    return isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0;
+  };
+  const items = (Array.isArray(o.items) ? o.items : [])
+    .map(it => ({
+      nombre: String(it?.nombre || '').trim().slice(0, 80),
+      cantidad: Math.max(1, Math.round(Number(it?.cantidad) || 1)),
+      precio: num(it?.precio),
+    }))
+    .filter(it => it.nombre)
+    .slice(0, 40);
+  const sumaItems = items.reduce((s, it) => s + it.precio, 0);
+  const total = num(o.total) || sumaItems;
+  if (o.legible === false || (!items.length && !total)) return null;
+  return {
+    proveedor: String(o.proveedor || '').trim().slice(0, 60),
+    fecha: /^\d{4}-\d{2}-\d{2}$/.test(o.fecha || '') ? o.fecha : '',
+    items, total,
+    rubro: String(o.rubro || '').trim().slice(0, 40),
+  };
 }

@@ -1726,3 +1726,30 @@ body.dark .inv-mon-btn.inv-mon-on { background: var(--accent); border-color: var
 .caja-montos-ocultos #qb-neto::after { content: 'BOBO 😜'; }
 .caja-montos-ocultos .caja-stat-num::after,
 .caja-montos-ocultos .desglose-num::after { content: '🤫'; font-size: 18px; }
+
+/* ── Foto del ticket en los gastos (ticket-gasto.js) ── */
+.mov-tk-wrap { margin-top: 8px; }
+.mov-tk-btn {
+  width: 100%; padding: 10px; border-radius: 10px; cursor: pointer;
+  border: 1.5px dashed var(--border, #ccc); background: transparent;
+  color: inherit; font-weight: 700; font-size: 14px;
+}
+.mov-tk-info {
+  display: flex; gap: 10px; align-items: flex-start; margin-top: 8px;
+  padding: 8px; border-radius: 10px; background: rgba(200,150,90,.08);
+}
+.mov-tk-thumb { width: 56px; height: 72px; object-fit: cover; border-radius: 6px; cursor: zoom-in; flex-shrink: 0; }
+.mov-tk-ver { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border, #ccc); background: transparent; color: inherit; cursor: pointer; flex-shrink: 0; }
+.mov-tk-cuerpo { flex: 1; min-width: 0; font-size: 13px; }
+.mov-tk-estado { opacity: .75; }
+.mov-tk-items { list-style: none; margin: 4px 0 0; padding: 0; }
+.mov-tk-items li { display: flex; justify-content: space-between; gap: 8px; }
+.mov-tk-items li span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mov-tk-x { border: none; background: transparent; color: inherit; font-size: 16px; cursor: pointer; padding: 2px 6px; }
+.mov-tk-ico { cursor: zoom-in; }
+.tk-visor {
+  position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.88);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.tk-visor img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+.tk-visor-x { position: absolute; top: 12px; right: 12px; font-size: 22px; background: #fff; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; }

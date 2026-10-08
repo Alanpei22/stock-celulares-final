@@ -955,7 +955,7 @@ function renderMovimientos() {
       <div class="mov-card mov-${esc(m.tipo)}" onclick="openMovForm('${esc(m.id)}')">
         <div class="caja-card-left">
           <span class="caja-cat">${esc(m.categoria || '')}</span>
-          <span class="caja-desc">${esc(m.descripcion || '—')}</span>
+          <span class="caja-desc">${m.ticketFotoId ? `<span class="mov-tk-ico" title="Tiene foto del ticket" onclick="event.stopPropagation();tkVer('${esc(m.ticketFotoId)}')">🧾</span> ` : ''}${esc(m.descripcion || '—')}</span>
           <span class="caja-meta">${_metodoBadges(m)}${hora ? `<span class="mov-hora">${hora}</span>` : ''}</span>
         </div>
         <div class="caja-card-right">
@@ -2370,6 +2370,7 @@ function openMovForm(id) {
       updateSplitRemainder();
     }
     _resetClienteFields(m);
+    if (typeof tkReset === 'function') tkReset(m);
   } else {
     if (deleteWrap) deleteWrap.style.display = 'none';
     resetSplit();
@@ -2381,6 +2382,7 @@ function openMovForm(id) {
     _repairAmt = 0;
     _clearSaleItem();
     _resetClienteFields(null);
+    if (typeof tkReset === 'function') tkReset(null);
   }
 
   // Clear any previous error highlights
@@ -2453,6 +2455,8 @@ function setMovTipo(tipo) {
   // Captura de cliente solo tiene sentido en ventas (ingreso)
   const cliSec = document.getElementById('mov-cliente-section');
   if (cliSec) cliSec.style.display = (tipo === 'ingreso') ? '' : 'none';
+  // La foto del ticket es de los gastos (ticket-gasto.js)
+  if (typeof tkMostrarSegunTipo === 'function') tkMostrarSegunTipo(tipo);
   // Productos y reparaciones son ventas: al pasar a egreso se desvinculan
   if (tipo === 'egreso') {
     if (_cart.length) _clearSaleItem(false);
@@ -3630,6 +3634,10 @@ async function saveMov() {
   const descFinal = descripcion || categoria;
 
   const data = { tipo, categoria, descripcion: descFinal, monto, metodoPago, fecha: currentDate };
+  // Gasto con foto del ticket: la foto va aparte y acá queda su id + lo leído
+  if (tipo === 'egreso' && typeof tkCamposParaGuardar === 'function') {
+    Object.assign(data, await tkCamposParaGuardar(tipo));
+  }
   if (_splitActive && metodo2 && splitAmt > 0) {
     data.metodoPago2 = metodo2;
     data.monto2 = splitAmt;

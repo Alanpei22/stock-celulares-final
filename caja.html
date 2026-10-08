@@ -488,6 +488,13 @@
       <!-- Item seleccionado (cantidad + stock) -->
       <div id="mov-sale-item-info" class="mov-sale-item-info hidden"></div>
     </div>
+    <!-- Foto del ticket (solo gastos): la IA lo lee y completa; si no puede,
+         la foto queda adjunta igual (ticket-gasto.js) -->
+    <div id="mov-tk-wrap" class="mov-tk-wrap" style="display:none">
+      <input type="file" id="mov-tk-input" accept="image/*" capture="environment" hidden onchange="tkFotoElegida(this)">
+      <button type="button" class="mov-tk-btn" id="mov-tk-btn" onclick="tkSacarFoto()">🧾 Foto del ticket</button>
+      <div id="mov-tk-info" class="mov-tk-info hidden"></div>
+    </div>
   </div>
 
   <!-- ── Categoría ── -->
@@ -1013,6 +1020,7 @@
 <script src="tp-fases.js"></script>
 <script src="seguimiento.js"></script>
 <script src="caja.js"></script>
+<script src="ticket-gasto.js"></script>
 <!-- Comprobante de venta A5: el mismo que usa Stock. qr.js va antes porque
      print.js le pide el QR de WhatsApp. -->
 <script src="qr.js"></script>

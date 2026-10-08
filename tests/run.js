@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-ticket-gasto.js': 'Foto del ticket en los gastos: la IA lee productos y total; si no, queda la foto adjunta',
   'test-boleta-wa.js':        'Boleta de reparación: imprimir, descargar o mandar por WhatsApp como imagen',
   'test-wa-app.js':          'WhatsApp: abrir la app de escritorio directo, sin la página de wa.me',
   'test-comprobante-venta.js': 'Comprobante de venta 58mm: número propio, "no válido como factura", imprimir o WhatsApp',
