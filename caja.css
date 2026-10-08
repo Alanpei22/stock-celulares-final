@@ -1714,3 +1714,9 @@ body.dark .inv-mon-btn.inv-mon-on { background: var(--accent); border-color: var
 
 /* Accesorios → Seleccionar varios: el marcado se ve sin mirar el tilde */
 .inv-item--sel { background: color-mix(in srgb, var(--acc, #C8965A) 14%, transparent); border-radius: 10px; }
+
+/* Caja → 👁️: montos tapados (efectivo, neto y el detalle) */
+.cqb-ojo { background: none; border: 0; font-size: 18px; cursor: pointer; padding: 4px 6px; line-height: 1; }
+.caja-montos-ocultos .cqb-num,
+.caja-montos-ocultos .caja-stat-num,
+.caja-montos-ocultos .desglose-num { filter: blur(8px); user-select: none; }

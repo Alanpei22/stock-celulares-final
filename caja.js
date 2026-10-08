@@ -744,6 +744,29 @@ function _renderVsYesterday(todayNeto) {
 // de la quickbar. Los datos ya se actualizan en renderStats().)
 
 // Panel de detalle de caja (stats + desglose) — colapsable, recuerda preferencia
+// ── Ocultar los montos de la caja ──────────────────────────
+// Para que el que está del otro lado del mostrador no vea cuánto hay ni cuánto
+// se vendió. Se guarda por dispositivo; los montos siguen calculándose, solo
+// se tapan (el 👁️ los vuelve a mostrar). Tapa el efectivo en caja, el neto del
+// día y el detalle (ingresos, egresos, desglose).
+const _MONTOS_KEY = 'cajaOcultarMontos';
+function _montosOcultos() {
+  try { return localStorage.getItem(_MONTOS_KEY) === '1'; } catch { return false; }
+}
+function _aplicarMontosOcultos() {
+  const ocultos = _montosOcultos();
+  document.body.classList.toggle('caja-montos-ocultos', ocultos);
+  const ojo = document.getElementById('cqb-ojo');
+  if (ojo) { ojo.textContent = ocultos ? '🙈' : '👁️'; ojo.title = ocultos ? 'Mostrar montos' : 'Ocultar montos'; }
+}
+function toggleMontosCaja() {
+  try { localStorage.setItem(_MONTOS_KEY, _montosOcultos() ? '0' : '1'); } catch {}
+  _aplicarMontosOcultos();
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('DOMContentLoaded', _aplicarMontosOcultos);
+}
+
 function toggleCajaDetail() {
   const panel = document.getElementById('caja-detail-panel');
   const chevron = document.getElementById('cqb-chevron');
