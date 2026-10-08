@@ -85,7 +85,25 @@ ok((await run('tkCamposParaGuardar("egreso")')).ticketFotoId === 'tk1', 'sin int
 run('tkReset(null)');
 ok(Object.keys(await run('tkCamposParaGuardar("egreso")')).length === 0, 'sin foto no agrega nada');
 
-console.log('\n4) Enganchado en la caja');
+console.log('\n4) En la compu, la webcam; en el celular, la cámara del input');
+let CLICK = 0, ABRIO = 0;
+el('mov-tk-input').click = () => CLICK++;
+vm.runInContext('_tkAbrirWebcam = () => { _abrio(); }', ctx);
+ctx._abrio = () => ABRIO++;
+ctx.navigator = { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130', mediaDevices: { getUserMedia() {} } };
+run('tkSacarFoto()');
+ok(ABRIO === 1 && CLICK === 0, 'compu con cámara → abre la webcam, no el explorador de archivos');
+ctx.navigator = { userAgent: 'Mozilla/5.0 (Linux; Android 14) Mobile', mediaDevices: { getUserMedia() {} } };
+run('tkSacarFoto()');
+ok(ABRIO === 1 && CLICK === 1, 'celular → el input con capture (abre la cámara nativa)');
+ctx.navigator = { userAgent: 'Mozilla/5.0 (Windows NT 10.0)' };
+run('tkSacarFoto()');
+ok(ABRIO === 1 && CLICK === 2, 'compu sin getUserMedia → elegir archivo');
+const tg = leer('ticket-gasto.js');
+ok(/getTracks\(\)\.forEach\(t => t\.stop\(\)\)/.test(tg), 'al cerrar se apaga la cámara (no queda la lucecita prendida)');
+ok(/tk-cam-archivo/.test(tg) && /NotAllowed/.test(tg), 'sin permiso o sin cámara, explica y deja elegir un archivo');
+
+console.log('\n5) Enganchado en la caja');
 const cj = leer('caja.js'), html = leer('caja.html');
 ok(/tkCamposParaGuardar\(tipo\)/.test(cj.slice(cj.indexOf('async function saveMov'))), 'saveMov adjunta la foto');
 ok(/tkMostrarSegunTipo\(tipo\)/.test(cj) && (cj.match(/tkReset\(/g) || []).length >= 2, 'se muestra en egresos y se limpia al abrir');

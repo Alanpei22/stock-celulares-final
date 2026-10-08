@@ -21,29 +21,32 @@ const TK_MAX_BYTES = 700 * 1024;   // margen holgado bajo el 1 MB de Firestore
 function _tkEl(id) { return document.getElementById(id); }
 
 // Achica la foto hasta que entre cómoda en un documento de Firestore.
+// `img` es cualquier cosa dibujable (una <img> o el <video> de la webcam).
+function _tkAJpeg(img, ancho, alto) {
+  let lado = TK_MAX_LADO, q = 0.72, url = '';
+  for (let i = 0; i < 6; i++) {
+    let w = ancho, h = alto;
+    const k = Math.min(1, lado / Math.max(w, h));
+    w = Math.round(w * k); h = Math.round(h * k);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    url = c.toDataURL('image/jpeg', q);
+    if (url.length * 0.75 <= TK_MAX_BYTES) break;
+    lado = Math.round(lado * 0.8); q = Math.max(0.5, q - 0.06);
+  }
+  return url;
+}
+
 function _tkComprimir(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
       const img = new Image();
-      img.onload = () => {
-        let lado = TK_MAX_LADO, q = 0.72, url = '';
-        for (let i = 0; i < 6; i++) {
-          let w = img.width, h = img.height;
-          const k = Math.min(1, lado / Math.max(w, h));
-          w = Math.round(w * k); h = Math.round(h * k);
-          const c = document.createElement('canvas');
-          c.width = w; c.height = h;
-          const ctx = c.getContext('2d');
-          ctx.fillStyle = '#fff';
-          ctx.fillRect(0, 0, w, h);
-          ctx.drawImage(img, 0, 0, w, h);
-          url = c.toDataURL('image/jpeg', q);
-          if (url.length * 0.75 <= TK_MAX_BYTES) break;
-          lado = Math.round(lado * 0.8); q = Math.max(0.5, q - 0.06);
-        }
-        resolve(url);
-      };
+      img.onload = () => resolve(_tkAJpeg(img, img.width, img.height));
       img.onerror = () => reject(new Error('No se pudo abrir la foto'));
       img.src = e.target.result;
     };
@@ -70,7 +73,79 @@ function tkMostrarSegunTipo(tipo) {
   if (tipo !== 'egreso' && _tkFoto) { _tkFoto = null; _tkLeido = null; _tkLeyendo++; _tkPintar(null); }
 }
 
-function tkSacarFoto() { _tkEl('mov-tk-input')?.click(); }
+// En el celular, el <input capture> abre la cámara directo. En la compu ese
+// mismo input abre el explorador de archivos, así que ahí se usa la webcam
+// con getUserMedia (y "Elegir archivo" queda como alternativa).
+function _tkEsCompu() {
+  if (typeof _waEsCompu === 'function') return _waEsCompu();
+  try { return !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || ''); } catch { return false; }
+}
+
+function tkSacarFoto() {
+  const hayCam = !!(typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  if (_tkEsCompu() && hayCam) { _tkAbrirWebcam(); return; }
+  _tkEl('mov-tk-input')?.click();
+}
+
+let _tkStream = null;
+
+function _tkCerrarWebcam() {
+  if (_tkStream) { _tkStream.getTracks().forEach(t => t.stop()); _tkStream = null; }
+  document.getElementById('tk-cam')?.remove();
+}
+
+async function _tkAbrirWebcam() {
+  _tkCerrarWebcam();
+  const ov = document.createElement('div');
+  ov.id = 'tk-cam';
+  ov.className = 'tk-visor tk-cam';
+  ov.innerHTML = `
+    <div class="tk-cam-caja">
+      <video id="tk-cam-video" autoplay playsinline muted></video>
+      <p class="tk-cam-msg" id="tk-cam-msg">Abriendo la cámara…</p>
+      <div class="tk-cam-btns">
+        <button type="button" class="tk-cam-sacar" id="tk-cam-sacar" disabled>📸 Sacar foto</button>
+        <button type="button" class="tk-cam-sec" id="tk-cam-archivo">📁 Elegir archivo</button>
+        <button type="button" class="tk-cam-sec" id="tk-cam-cancelar">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const video = ov.querySelector('#tk-cam-video');
+  const msg = ov.querySelector('#tk-cam-msg');
+  const sacar = ov.querySelector('#tk-cam-sacar');
+  ov.querySelector('#tk-cam-cancelar').onclick = _tkCerrarWebcam;
+  ov.querySelector('#tk-cam-archivo').onclick = () => { _tkCerrarWebcam(); _tkEl('mov-tk-input')?.click(); };
+  // Escape cierra, Enter/Espacio saca la foto (en la compu es lo más cómodo)
+  ov.tabIndex = -1;
+  ov.onkeydown = e => {
+    if (e.key === 'Escape') _tkCerrarWebcam();
+    else if ((e.key === 'Enter' || e.key === ' ') && !sacar.disabled) { e.preventDefault(); sacar.click(); }
+  };
+  try {
+    _tkStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    });
+  } catch (e) {
+    console.warn('[ticket] webcam:', e);
+    msg.textContent = /NotAllowed|Permission/i.test(e?.name || '')
+      ? 'El navegador no dio permiso para la cámara. Habilitala en el candado de la barra de direcciones, o elegí un archivo.'
+      : 'No se encontró una cámara en esta compu. Podés elegir un archivo.';
+    return;
+  }
+  if (!document.getElementById('tk-cam')) { _tkCerrarWebcam(); return; }   // se canceló mientras pedía permiso
+  video.srcObject = _tkStream;
+  msg.textContent = 'Poné el ticket bien derecho y con luz';
+  sacar.disabled = false;
+  ov.focus();
+  sacar.onclick = () => {
+    const w = video.videoWidth, h = video.videoHeight;
+    if (!w || !h) { toast('La cámara todavía no arrancó', 'info'); return; }
+    const url = _tkAJpeg(video, w, h);
+    _tkCerrarWebcam();
+    _tkProcesar(url);
+  };
+}
 
 async function tkFotoElegida(input) {
   const file = input?.files?.[0];
@@ -78,6 +153,11 @@ async function tkFotoElegida(input) {
   let url;
   try { url = await _tkComprimir(file); }
   catch (e) { toast(e.message, 'error'); return; }
+  return _tkProcesar(url);
+}
+
+// La foto ya comprimida (de archivo, del celular o de la webcam) → leerla.
+async function _tkProcesar(url) {
   _tkFoto = url;
   _tkLeido = null;
   _tkPintar(null, 'leyendo');
