@@ -325,10 +325,13 @@ async function submitOwnerPin() {
       return;
     }
     if (result.ok) {
+      // Se agarra ANTES de cerrar: closeOwnerPinModal() borra el callback (así
+      // cancelar con ✕ no deja nada pendiente), y cerrar primero hacía que el
+      // PIN correcto no hiciera nada ("Próximo N° de orden", backup…).
+      const cb = _ownerPinCallback;
+      _ownerPinCallback = null;
       closeOwnerPinModal();
-      if (_ownerPinCallback) {
-        const cb = _ownerPinCallback;
-        _ownerPinCallback = null;
+      if (cb) {
         cb();
       } else {
         unlockOwnerMode();

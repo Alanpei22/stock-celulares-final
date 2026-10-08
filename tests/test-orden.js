@@ -104,6 +104,28 @@ const rop = app.slice(app.indexOf('function requireOwnerPin'), app.indexOf('func
 const ids = [...rop.matchAll(/getElementById\('([^']+)'\)/g)].map(m => m[1]);
 const faltan = ids.filter(id => !html.includes(`id="${id}"`));
 ok(ids.length >= 4 && faltan.length === 0, 'el cartel del PIN de dueño tiene en index.html todo lo que usa', faltan);
+// Y después: con el PIN bien no pasaba nada. Se cerraba el cartel (que borra
+// el callback) antes de leer el callback.
+{
+  const H = {};
+  const nodo = id => H[id] || (H[id] = { textContent: '', style: {}, classList: { add() {}, remove() {}, toggle() {} } });
+  const c2 = { console, Promise, Error, JSON,
+    document: { getElementById: nodo, querySelectorAll: () => [] },
+    tpFrenarEmpleado: () => false, verifyOwnerPin: async () => ({ ok: true }), db: {}, toast() {} };
+  vm.createContext(c2);
+  const pin = app.slice(app.indexOf('let OWNER_MODE'), app.indexOf('function unlockOwnerMode'));
+  vm.runInContext(pin + '\nunlockOwnerMode = () => { this.SE_DESBLOQUEO = true; };', c2);
+  let corrio = 0;
+  c2.cb = () => corrio++;
+  vm.runInContext("requireOwnerPin(cb, 'x'); _ownerPinBuf = '1234';", c2);
+  await vm.runInContext('submitOwnerPin()', c2);
+  ok(corrio === 1, 'con el PIN correcto, se hace lo que se pidió (cambiar el N° de orden)', corrio);
+  ok(!c2.SE_DESBLOQUEO, 'y no se queda en modo dueño por eso');
+  corrio = 0;
+  vm.runInContext("requireOwnerPin(cb, 'x'); closeOwnerPinModal(); _ownerPinBuf = '1234';", c2);
+  await vm.runInContext('submitOwnerPin()', c2);
+  ok(corrio === 0, 'si se cerró el cartel con ✕, no queda pendiente');
+}
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
 })().catch(e => { console.error('Error:', e); process.exit(1); });
