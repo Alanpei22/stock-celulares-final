@@ -1717,6 +1717,12 @@ body.dark .inv-mon-btn.inv-mon-on { background: var(--accent); border-color: var
 
 /* Caja → 👁️: montos tapados (efectivo, neto y el detalle) */
 .cqb-ojo { background: none; border: 0; font-size: 18px; cursor: pointer; padding: 4px 6px; line-height: 1; }
+/* El número no se dibuja (font-size 0) y en su lugar va el cartelito. */
 .caja-montos-ocultos .cqb-num,
 .caja-montos-ocultos .caja-stat-num,
-.caja-montos-ocultos .desglose-num { filter: blur(8px); user-select: none; }
+.caja-montos-ocultos .desglose-num { font-size: 0 !important; user-select: none; }
+.caja-montos-ocultos .cqb-num::after { font-size: 17px; font-weight: 900; letter-spacing: .3px; white-space: nowrap; }
+.caja-montos-ocultos #qb-efectivo::after { content: '¿QUÉ MIRÁS?'; }
+.caja-montos-ocultos #qb-neto::after { content: 'BOBO 😜'; }
+.caja-montos-ocultos .caja-stat-num::after,
+.caja-montos-ocultos .desglose-num::after { content: '🤫'; font-size: 18px; }
