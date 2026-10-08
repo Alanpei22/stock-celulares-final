@@ -67,18 +67,20 @@ function ticketVentaHtml(mov, nro) {
 @page{size:58mm 200mm;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;color:#000;background:#fff;width:58mm;padding:0 5mm}
-.tkt{width:48mm;padding:2mm 0 6mm;font-size:10px;line-height:1.3}
+/* Letra grande y en negrita: en térmica la letra fina sale clara y chiquita,
+   y el ticket quedaba apretado en pocos centímetros de papel. */
+.tkt{width:48mm;padding:3mm 0 8mm;font-size:13px;line-height:1.4;font-weight:600}
 .c{text-align:center}
-.biz{font-size:15px;font-weight:800;letter-spacing:.3px}
-.sm{font-size:9px}
-.sep{border-top:1px dashed #000;margin:1.6mm 0}
-.tit{font-weight:800;font-size:10.5px;margin-top:1mm}
-.nofis{font-size:8.5px;font-weight:700;margin-top:.5mm}
-.r{display:flex;justify-content:space-between;gap:1.5mm}
+.biz{font-size:21px;font-weight:900;letter-spacing:.5px;line-height:1.15}
+.sm{font-size:11.5px}
+.sep{border-top:1.5px dashed #000;margin:2.6mm 0}
+.tit{font-weight:900;font-size:13.5px;margin-top:1mm;line-height:1.3}
+.nofis{font-size:10.5px;font-weight:800;margin-top:1mm}
+.r{display:flex;justify-content:space-between;gap:2mm;margin:1mm 0}
 .r span:first-child{flex:1;min-width:0;word-break:break-word}
-.r span:last-child{white-space:nowrap}
-.qty{font-size:9px}
-.tot{font-size:14px;font-weight:800}
+.r span:last-child{white-space:nowrap;font-weight:800}
+.qty{font-size:11.5px;margin:-.6mm 0 1.2mm}
+.tot{font-size:19px;font-weight:900;margin:1.5mm 0}
 </style></head><body>
 <div class="tkt">
   <div class="c biz">${_cvEsc(String(biz).toUpperCase())}</div>
