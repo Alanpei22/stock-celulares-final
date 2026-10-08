@@ -1503,7 +1503,10 @@ function openRepairForm(id) {
   editingRepairId = id || null;
   const COMMON_ARREGLOS = [
     'Módulo / Pantalla','Ficha de carga','Batería','Módulo + Templado',
-    'Sistemas / Software','Conector','Revisión','Placa','Cámara','Altavoz / Micrófono'
+    'Sistemas / Software','Conector','Revisión','Placa','Cámara',
+    // Separados: son repuestos y precios distintos. 'Altavoz / Micrófono' queda
+    // en la lista para que las reparaciones viejas no figuren como "otro".
+    'Altavoz','Micrófono','Altavoz / Micrófono'
   ];
 
   if (id) {
