@@ -1399,7 +1399,8 @@ async function etiquetaDe(id) {
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
   if (typeof printEtiquetas !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
-  await asegurarCodigosStock([p]);
+  // printEtiquetas le asigna el código si le falta, sin perder el toque (si se
+  // esperaba acá, el navegador bloqueaba la ventana de impresión)
   printEtiquetas([p]);
 }
 

@@ -170,10 +170,14 @@ const appSrc0 = fs.readFileSync(DIR + 'app.js', 'utf8');
 ok(/async function asegurarCodigosStock/.test(appSrc0), 'hay quien lo asigna');
 ok(/tpReservarCodigos\(db, sin\.length, tpMaxCodigoLocal\(STOCK\)\)/.test(appSrc0),
    'pidiendo al mismo contador que accesorios y repuestos (si no, dos cosas con el mismo código)');
-ok(/await asegurarCodigosStock\(\[p\]\);[\s\S]{0,60}printEtiquetas/.test(appSrc0),
-   'antes de imprimir desde la ficha');
-ok(/asegurarCodigosStock\(docs\)[\s\S]{0,60}printEtiquetas\(docs\)/.test(fs.readFileSync(DIR + 'lote.js', 'utf8')),
-   'y antes de imprimir las del lote');
+// Lo asigna printEtiquetas, sin esperar ANTES de abrir la impresión: si se
+// esperaba la base primero, sin QZ el navegador bloqueaba la ventana.
+ok(!/await asegurarCodigosStock\(\[p\]\)/.test(appSrc0) && /printEtiquetas\(\[p\]\)/.test(appSrc0),
+   'desde la ficha: imprime directo (el código lo pone printEtiquetas)');
+const loteSrc = fs.readFileSync(DIR + 'lote.js', 'utf8');
+ok(/tpReservarCodigos\(db, _lote\.filas\.length/.test(loteSrc) && /codigo: codigos\[i\]/.test(loteSrc),
+   'los del lote nacen con su código (no con el IMEI en la etiqueta)');
+ok(!/await asegurarCodigosStock\(docs\)/.test(loteSrc), 'y el lote no espera la base antes de imprimir');
 
 console.log('\n5) Etiqueta de artículo');
 const pr = imprimir('printEtiquetasProductos', [
@@ -422,6 +426,24 @@ ok(!/Clave:/.test(sinClave) && !/class="etqr-patron"/.test(sinClave) && !/class=
    'sin clave ni patrón (o un patrón de un solo punto) queda como antes');
 ok(!/_patronEtqSvg|etqr-clave/.test(printSrc.slice(printSrc.indexOf('function _a5Body'), printSrc.indexOf('function _a5Body') + 3000)),
    'la boleta A5 que se lleva el cliente sigue sin clave');
+
+console.log('\n8b) Equipo sin código: se le asigna al imprimir, sin perder la ventana');
+{
+  let abrio = 0, asignados = null, resolver;
+  pCtx.window.open = () => { abrio++; return null; };   // null = "como si hubiera QZ" no: sin ventana cae al diálogo
+  pCtx.asegurarCodigosStock = lista => { asignados = lista.map(p => p.id); return new Promise(r => { resolver = () => { lista.forEach(p => { p.codigo = 'TP00777'; }); r(); }; }); };
+  IMPRESO = null;
+  pCtx.__D = [{ id: 'e1', marca: 'Samsung', modelo: 'A15', imei: '356938035643809' }, { id: 'e2', marca: 'iPhone', modelo: '13', codigo: 'TP00001' }];
+  vm.runInContext('printEtiquetas(__D, 1)', pCtx);
+  ok(abrio === 1 && !IMPRESO, 'la ventana se abre EN el toque, antes de ir a la base');
+  ok(JSON.stringify(asignados) === '["e1"]', 'solo al que no tenía código', asignados);
+  resolver(); await new Promise(r => setTimeout(r, 10));
+  const barrasDe = v => vm.runInContext(`_barrasEtq('${v}', _etqAncho(), 11, false)`, pCtx);
+  ok(IMPRESO && IMPRESO.html.includes(barrasDe('TP00777')) && !IMPRESO.html.includes(barrasDe('356938035643809')),
+     'y la etiqueta sale con las barras del código corto, no las del IMEI');
+  delete pCtx.asegurarCodigosStock;
+  pCtx.window.open = () => null;
+}
 
 console.log('\n9) Códigos largos y la etiquetadora de 203 dpi');
 {

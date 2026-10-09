@@ -285,11 +285,20 @@ async function loteGuardar() {
   if (usd && !cot) { toast('Sin cotización no puedo convertir el lote', 'error'); if (btn) btn.disabled = false; return; }
 
   try {
+    // Cada equipo nace con su código corto (TP#####): es lo que lleva la
+    // etiqueta, y es mucho más fácil de leer que el IMEI de 15 dígitos. Si no
+    // hay internet para reservarlos, se asignan al imprimir.
+    let codigos = [];
+    if (typeof tpReservarCodigos === 'function') {
+      try { codigos = await tpReservarCodigos(db, _lote.filas.length, (typeof tpMaxCodigoLocal === 'function') ? tpMaxCodigoLocal(STOCK) : 0); }
+      catch (e) { console.warn('[lote] reservar códigos:', e); }
+    }
     const batch = db.batch();
-    const docs = _lote.filas.map(f => {
+    const docs = _lote.filas.map((f, i) => {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const doc = {
         id,
+        ...(codigos[i] ? { codigo: codigos[i] } : {}),
         marca: String(f.marca).trim(),
         modelo: String(f.modelo).trim(),
         estado: comun.estado || 'Nuevo',
@@ -327,7 +336,6 @@ async function loteGuardar() {
     // Los equipos van al cajón: sin etiqueta hay que buscar el precio en la app
     if (typeof printEtiquetas === 'function' &&
         confirm(`✅ ${n} equipos cargados.\n\n¿Imprimo las etiquetas?`)) {
-      if (typeof asegurarCodigosStock === 'function') await asegurarCodigosStock(docs);
       printEtiquetas(docs);
     }
     _lote = _loteVacio();

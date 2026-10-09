@@ -462,9 +462,31 @@ function _repetir(items, copias) {
 }
 
 function printEtiquetas(lista, copias) {
-  const equipos = _repetir((Array.isArray(lista) ? lista : [lista]).filter(Boolean), copias);
+  const base = (Array.isArray(lista) ? lista : [lista]).filter(Boolean);
+  const equipos = _repetir(base, copias);
   if (!equipos.length) { if (typeof toast === 'function') toast('No hay equipos para etiquetar', 'error'); return; }
-  _imprimirTocando('etiqueta', _hojaEtiquetas(equipos, _etiquetaHtml), 'Etiquetas');
+  const armar = () => _hojaEtiquetas(equipos, _etiquetaHtml);
+  // Equipos sin código corto (los de un lote recién cargado, o viejos): sin él
+  // la etiqueta lleva el IMEI (15 dígitos, el código más largo que imprimimos)
+  // o, sin IMEI, no lleva barras. Se les asigna antes de imprimir.
+  const faltan = base.filter(p => p.id && !String(p.codigo || '').trim());
+  if (!faltan.length || typeof asegurarCodigosStock !== 'function') { _imprimirTocando('etiqueta', armar(), 'Etiquetas'); return; }
+  _imprimirDespuesDe(asegurarCodigosStock(faltan), armar);
+}
+
+// Imprime lo que arme `armar()` cuando termine `promesa` (algo que va a la
+// base). Sin QZ el navegador solo deja abrir la ventana EN el toque: se abre ya
+// con "Preparando…" y se llena después. Antes se esperaba y la ventana salía
+// bloqueada.
+function _imprimirDespuesDe(promesa, armar) {
+  const conQz = typeof qzActivo === 'function' && qzActivo('etiqueta');
+  const w = conQz ? null : window.open('', '_blank', 'width=520,height=720,scrollbars=yes');
+  if (w) w.document.write('<p style="font:16px sans-serif;padding:20px">Preparando etiquetas…</p>');
+  Promise.resolve(promesa).catch(e => console.error('antes de imprimir:', e)).then(() => {
+    if (!w) { _imprimirTocando('etiqueta', armar(), 'Etiquetas'); return; }
+    w.document.open(); w.document.write(armar()); w.document.close();
+    w.addEventListener('load', () => { w.focus(); setTimeout(() => w.print(), 350); });
+  });
 }
 
 function printEtiquetasProductos(lista, copias) {
@@ -483,15 +505,8 @@ function printEtiquetasProductos(lista, copias) {
   // Hay códigos de fábrica que no entran: primero se les reserva uno corto.
   // Eso va a la base (tarda), y sin QZ el navegador solo deja abrir la ventana
   // en el mismo toque: se abre ya y se llena cuando están los códigos.
-  const w = (typeof qzActivo === 'function' && qzActivo('etiqueta')) ? null
-          : window.open('', '_blank', 'width=520,height=720,scrollbars=yes');
-  if (w) w.document.write('<p style="font:16px sans-serif;padding:20px">Preparando etiquetas…</p>');
-  _asegurarCodigosCortos(faltan).then(() => {
-    // Las copias apuntan a los mismos objetos: ya tienen el corto
-    if (!w) { _imprimirTocando('etiqueta', armar(), 'Etiquetas'); return; }
-    w.document.open(); w.document.write(armar()); w.document.close();
-    w.addEventListener('load', () => { w.focus(); setTimeout(() => w.print(), 350); });
-  });
+  // (las copias apuntan a los mismos objetos: salen con el corto)
+  _imprimirDespuesDe(_asegurarCodigosCortos(faltan), armar);
 }
 
 // Artículos cuyo código de fábrica no entra legible en la etiqueta y todavía
