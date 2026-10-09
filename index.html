@@ -45,16 +45,6 @@
 
 <div id="app" class="app-hidden">
 
-  <div id="install-banner" class="install-banner">
-    <span>📲 Instalá esta app en tu pantalla de inicio</span>
-    <button id="install-btn">Instalar</button>
-    <button class="banner-close" onclick="document.getElementById('install-banner').classList.remove('show')">✕</button>
-  </div>
-  <div id="ios-tip" class="install-banner">
-    <span>📲 Tocá <strong>Compartir</strong> ↑ luego <strong>"Agregar a inicio"</strong></span>
-    <button class="banner-close" onclick="document.getElementById('ios-tip').classList.remove('show')">✕</button>
-  </div>
-
   <!-- ── SECCIÓN STOCK ── -->
   <section id="stock-section" class="main-section">
     <header>
@@ -2258,6 +2248,7 @@
 <script defer src="stock-extras.js"></script>
 <script defer src="catalogo-stock.js"></script>
 <script defer src="usuarios.js"></script>
+<script defer src="instalar.js"></script>
 <script defer src="barcode.js"></script>
 <script defer src="print.js"></script>
 <script defer src="venta-articulos.js"></script>

@@ -2641,19 +2641,12 @@ function updateBizPreview() {
 // ── Toast ─────────────────────────────────────────────────
 
 // ── PWA ───────────────────────────────────────────────────
+// El ofrecimiento de anclar la app vive en instalar.js, que es el mismo para
+// el login, esta pantalla y la caja. Antes estaba acá y por eso el login --
+// que es donde el empleado abre el link por primera vez -- no lo ofrecia.
 function initPWA() {
-  if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
-  let deferredPrompt = null;
-  const banner = document.getElementById('install-banner');
-  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; banner.classList.add('show'); });
-  document.getElementById('install-btn').addEventListener('click', () => {
-    banner.classList.remove('show');
-    if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt = null; }
-  });
-  window.addEventListener('appinstalled', () => banner.classList.remove('show'));
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = window.navigator.standalone === true;
-  if (isIOS && !isStandalone) { document.getElementById('ios-tip').classList.add('show'); }
+  if (typeof tpOfrecerInstalar === 'function') tpOfrecerInstalar();
+  else if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
 // ── URL action handler (?action=nueva-reparacion desde el shortcut de la app) ──

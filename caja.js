@@ -160,6 +160,9 @@ function initApp() {
   // alguien cuente el efectivo. Va para todos, dueño y empleados.
   if (typeof initChequeoCaja === 'function') initChequeoCaja();
 
+  // Ofrecer anclar la app, igual que en el login y en la pantalla principal.
+  if (typeof tpOfrecerInstalar === 'function') tpOfrecerInstalar();
+
   // ── URL action handler (?action=cierre desde notifs/banners) ──
   _handleUrlAction();
   // (Antes acá se miraba si había una venta pendiente dejada por

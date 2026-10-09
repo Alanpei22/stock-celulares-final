@@ -182,10 +182,10 @@
       }
     });
   </script>
-  <script>
-    // PWA: registrar service worker desde el login (instalación + push)
-    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(() => {}); }
-  </script>
+  <!-- Anclar la app al celular. Acá es donde el empleado abre el link por
+       primera vez, así que se explica aunque el navegador no avise solo. -->
+  <script src="instalar.js"></script>
+  <script>tpOfrecerInstalar({ insistir: true });</script>
 
 </body>
 </html>
