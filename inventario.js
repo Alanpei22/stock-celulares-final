@@ -295,6 +295,7 @@ const _fmtNum = fmtNum;
 
 // ── Formulario producto ─────────────────────────────────────
 function openProductoForm(id, precodigo) {
+  if (typeof tpFrenar === 'function' && tpFrenar('inventario', 'cargar o editar productos')) return;
   _invEditingId = id || null;
   const title = document.getElementById('inv-form-title');
   const delBtn = document.getElementById('inv-form-del');
@@ -369,6 +370,7 @@ function _clearProductoForm() {
 }
 
 async function saveProducto(opts) {
+  if (typeof tpFrenar === 'function' && tpFrenar('inventario', 'cargar o editar productos')) return;
   const cod    = document.getElementById('inv-fi-cod').value.trim();
   const nom    = document.getElementById('inv-fi-nom').value.trim();
   const cat    = document.getElementById('inv-fi-cat').value;
@@ -463,10 +465,14 @@ function _invRequirePin(cb, msg) {
   else cb();
 }
 
+// Empleado con permiso de borrar: no necesita el modo ni el PIN de dueño
+function _invBorraEmpleado() { return typeof tpEmpleadoPuede === 'function' && tpEmpleadoPuede('borrar'); }
+
 async function deleteProducto(id) {
   if (!id) { toast('Error: ID de producto no válido', 'error'); return; }
-  if (!_invIsOwner()) { toast('Requiere modo dueño', 'error'); return; }
-  _invRequirePin(async () => {
+  if (!_invIsOwner() && !_invBorraEmpleado()) { toast('Requiere modo dueño', 'error'); return; }
+  const pedir = _invBorraEmpleado() ? ((cb) => { if (confirm('¿Eliminar este producto?')) cb(); }) : _invRequirePin;
+  pedir(async () => {
     try {
       await db.collection('productos').doc(id).delete();
       closeProductoForm();
@@ -1114,12 +1120,12 @@ function invSelActivo(activo) {
 }
 
 function invSelEliminar() {
-  if (!_invIsOwner()) { toast('🔒 Eliminar es del modo dueño', 'error'); return; }
+  if (!_invIsOwner() && !_invBorraEmpleado()) { toast('🔒 Eliminar es del modo dueño', 'error'); return; }
   const lista = _invSelLista();
   const muestra = lista.slice(0, 5).map(p => '• ' + p.nombre).join('\n') + (lista.length > 5 ? `\n… y ${lista.length - 5} más` : '');
   if (!confirm(`¿ELIMINAR ${lista.length} artículo${lista.length === 1 ? '' : 's'}?\n\n${muestra}\n\nNo se puede deshacer. ` +
                `Si solo no los querés ver en la caja, usá Desactivar.`)) return;
-  _invRequirePin(() => {
+  (_invBorraEmpleado() ? (cb => cb()) : _invRequirePin)(() => {
     _invSelAplicar(lista.map(p => ({ id: p.id })), `${lista.length} artículo${lista.length === 1 ? '' : 's'} eliminado${lista.length === 1 ? '' : 's'}`, true);
   }, `PIN para eliminar ${lista.length} artículos`);
 }

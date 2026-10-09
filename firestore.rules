@@ -43,6 +43,25 @@ service cloud.firestore {
 
     function isAllowed() { return esDueno() || esEmpleado(); }
 
+    // ── Permisos de cada empleado (👥 Empleados → 🔐) ──
+    // Van en la marca de su cuenta (`perms`), que solo pone el servidor
+    // (api/usuarios.js). Si nunca se tocaron, tiene los de siempre: la misma
+    // lista que los `def: true` de TP_PERMISOS en roles.js.
+    function permisos() {
+      return request.auth.token.get('perms', ['caja', 'gastos', 'stock', 'reparaciones', 'inventario']);
+    }
+    function puede(p) { return esDueno() || (esEmpleado() && p in permisos()); }
+
+    // Escribir en la caja: con permiso de caja (y los gastos, con el de
+    // gastos). La seña que entra al tomar una reparación la puede anotar
+    // quien toma reparaciones aunque no use la caja.
+    function puedeEscribir(col) {
+      return col != 'caja_movimientos'
+        || (puede('caja') && (request.resource.data.get('tipo', '') != 'egreso' || puede('gastos')))
+        || (puede('reparaciones') && request.resource.data.get('tipo', '') == 'ingreso'
+            && request.resource.data.get('esSena', false) == true);
+    }
+
     // ══════════════════════════════════════════════════════════
     //  ⚠️ CÓMO SE LEE ESTE ARCHIVO — la trampa que casi me como
     //  ─────────────────────────────────────────────────────────
@@ -72,10 +91,11 @@ service cloud.firestore {
     // ── Todas las colecciones del trabajo diario ──
     // (stock, repairs, repuestos, productos, precios_reparaciones, placas,
     //  pedidos, clientes, planes, actividad, caja_movimientos…)
-    // El empleado trabaja normalmente; borrar es del dueño.
+    // El empleado trabaja normalmente; borrar, solo con ese permiso.
     match /{col}/{doc=**} {
-      allow read, create, update: if isAllowed() && !sensible(col);
-      allow delete: if esDueno() && !sensible(col);
+      allow read: if isAllowed() && !sensible(col);
+      allow create, update: if isAllowed() && !sensible(col) && puedeEscribir(col);
+      allow delete: if puede('borrar') && !sensible(col);
     }
 
     // ── config/owner: PIN de dueño (hasheado con PBKDF2) ──
@@ -117,11 +137,21 @@ service cloud.firestore {
     }
 
     // ── La plata del día ──
-    // Apertura, cierre, cierres de turno y la caja del dueño: el empleado ni
-    // los lee. Es lo que pidió el negocio: que trabaje sin ver cuánto entró.
-    match /caja_arqueos/{doc}           { allow read, write: if esDueno(); }
-    match /caja_cierres/{doc}           { allow read, write: if esDueno(); }
-    match /caja_cierres_parciales/{doc} { allow read, write: if esDueno(); }
+    // Apertura, cierre y cierres de turno: el empleado ni los lee, salvo que
+    // el dueño le haya dado permiso de ver la plata o de abrir/cerrar la caja.
+    // La caja del dueño, nunca.
+    match /caja_arqueos/{doc} {
+      allow read: if puede('totales') || puede('cierre');
+      allow write: if puede('cierre');
+    }
+    match /caja_cierres/{doc} {
+      allow read: if puede('totales') || puede('cierre');
+      allow write: if puede('cierre');
+    }
+    match /caja_cierres_parciales/{doc} {
+      allow read: if puede('totales') || puede('cierre');
+      allow write: if puede('cierre');
+    }
     match /caja_dueno_movimientos/{doc} { allow read, write: if esDueno(); }
 
     // ── Chequeo de caja obligatorio ──

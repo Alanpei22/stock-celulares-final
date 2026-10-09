@@ -1529,6 +1529,7 @@ function _repwizBack() {
 }
 
 function openRepairForm(id) {
+  if (typeof tpFrenar === 'function' && tpFrenar('reparaciones', id ? 'editar reparaciones' : 'tomar reparaciones')) return;
   editingRepairId = id || null;
   const COMMON_ARREGLOS = [
     'Módulo / Pantalla','Ficha de carga','Batería','Módulo + Templado',
@@ -1788,6 +1789,7 @@ function _stripUndefined(obj) {
 }
 
 async function saveRepair() {
+  if (typeof tpFrenar === 'function' && tpFrenar('reparaciones', 'tomar o editar reparaciones')) return;
   const marca    = document.getElementById('rep-fi-marca').value.trim();
   const modelo   = document.getElementById('rep-fi-modelo').value.trim();
   // Si quedó texto escrito en "Otro" sin haberle dado Enter, se toma igual:
@@ -3120,6 +3122,7 @@ function buildAndSendPendingWA(tipo) {
 
 // ── Eliminar ──────────────────────────────
 async function deleteRepair(id) {
+  if (typeof tpFrenar === 'function' && tpFrenar('borrar', 'borrar reparaciones')) return;
   const r = REPAIRS.find(x => x.id === id);
   if (!r) return;
   if (!confirm(`¿Eliminar N°${r.nOrden} — ${r.nombre || (r.marca + ' ' + r.modelo)}?`)) return;

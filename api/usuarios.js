@@ -15,10 +15,19 @@
 //   activo      { uid, activo }        → desactivar corta la sesión ya
 //   clave       { uid, clave }
 //   nombre      { uid, nombre }
+//   permisos    { uid, perms: ['caja', ...] }   (lo que puede hacer)
 
 import { verificarSesion, esDuenoUid, getAdmin } from './_auth.js';
 
 const DOMINIO = 'techpoint.local';   // "nacho" → nacho@techpoint.local
+
+// Las mismas claves que TP_PERMISOS en roles.js (tests/test-permisos.js).
+// Lo que no esté acá no se guarda: nadie puede inventarse un permiso.
+export const PERMISOS = ['caja', 'gastos', 'totales', 'cierre', 'reporte', 'stock', 'reparaciones', 'inventario', 'borrar'];
+export function limpiarPermisos(lista) {
+  if (!Array.isArray(lista)) return null;
+  return PERMISOS.filter(p => lista.includes(p));
+}
 
 export function aMail(usuario) {
   const u = String(usuario || '').trim().toLowerCase();
@@ -51,6 +60,8 @@ function ficha(u) {
     nombre: c.nombre || u.displayName || (u.email || '').split('@')[0],
     usuario: (u.email || '').endsWith('@' + DOMINIO) ? u.email.split('@')[0] : (u.email || ''),
     activo: !u.disabled,
+    // null = nunca se tocaron (tiene los de siempre, ver roles.js)
+    perms: Array.isArray(c.perms) ? c.perms : null,
     creado: u.metadata?.creationTime || null,
     ultimoIngreso: u.metadata?.lastSignInTime || null,
   };
@@ -102,8 +113,11 @@ export default async function handler(req, res) {
           if (e.code === 'auth/email-already-exists') return res.status(409).json({ error: 'Ya existe una cuenta con ese usuario' });
           throw e;
         }
-        await auth.setCustomUserClaims(u.uid, { rol: 'empleado', nombre });
-        return res.status(200).json({ empleado: ficha({ ...u, customClaims: { rol: 'empleado', nombre } }), email });
+        const claims = { rol: 'empleado', nombre };
+        const perms = limpiarPermisos(b.perms);
+        if (perms) claims.perms = perms;
+        await auth.setCustomUserClaims(u.uid, claims);
+        return res.status(200).json({ empleado: ficha({ ...u, customClaims: claims }), email });
       }
 
       case 'activo': {
@@ -135,6 +149,16 @@ export default async function handler(req, res) {
         await auth.setCustomUserClaims(u.uid, { ...(u.customClaims || {}), rol: 'empleado', nombre });
         await auth.updateUser(u.uid, { displayName: nombre });
         return res.status(200).json({ ok: true });
+      }
+
+      case 'permisos': {
+        const u = await empleado(b.uid);
+        if (!u) return res.status(404).json({ error: 'No es una cuenta de empleado' });
+        const perms = limpiarPermisos(b.perms);
+        if (!perms) return res.status(400).json({ error: 'Lista de permisos inválida' });
+        // Se mantiene el resto de la marca (rol, nombre): solo cambia perms
+        await auth.setCustomUserClaims(u.uid, { ...(u.customClaims || {}), rol: 'empleado', perms });
+        return res.status(200).json({ ok: true, perms });
       }
 
       default:

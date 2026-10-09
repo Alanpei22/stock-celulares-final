@@ -211,6 +211,8 @@ async function autoBackup() {
 //     propio celular cuando hay un cliente al lado.
 // `hide:` en los menús espera true cuando hay que esconder.
 function _soloDueno() { return typeof tpEsEmpleado === 'function' && tpEsEmpleado(); }
+// Permiso del empleado (👥 Empleados → 🔐). Sin roles.js, como antes: todo.
+function _puede(p) { return typeof tpPuede !== 'function' || tpPuede(p); }
 
 let OWNER_MODE = false;
 let _ownerPinBuf = '';
@@ -654,7 +656,7 @@ function toggleHdrMenu() {
       onClick: () => (typeof configurarImpresoras === 'function') && configurarImpresoras() },
     { icon: '👥', label: 'Empleados', sub: 'Crear cuentas, cambiar contraseñas, desactivar', hide: _soloDueno(),
       onClick: () => (typeof abrirEmpleados === 'function') && abrirEmpleados() },
-    { icon: '📊', label: 'Estadísticas', hide: _soloDueno(), onClick: () => document.getElementById('stats-btn')?.click() },
+    { icon: '📊', label: 'Estadísticas', hide: !_puede('reporte'), onClick: () => document.getElementById('stats-btn')?.click() },
     { icon: '⚙️', label: 'Configuración', hide: _soloDueno(), onClick: () => document.getElementById('settings-btn')?.click() },
     { icon: '💾', label: 'Exportar stock', hide: _soloDueno(), onClick: () => document.getElementById('export-btn')?.click() },
     { icon: '🛟', label: 'Descargar backup', hide: _soloDueno(), onClick: downloadBackup },
@@ -671,7 +673,7 @@ function toggleRepMenu() {
     { divider: true },
     { icon: '🔬', label: 'Diagnóstico de placa', sub: 'Mediciones, pasos y base de conocimiento', onClick: () => location.href = 'placas.html' },
     { icon: '👥', label: 'Personal técnico', onClick: () => (typeof openPersonalModal === 'function') && openPersonalModal() },
-    { icon: '📊', label: 'Estadísticas', hide: _soloDueno(), onClick: () => document.getElementById('rep-stats-btn')?.click() },
+    { icon: '📊', label: 'Estadísticas', hide: !_puede('reporte'), onClick: () => document.getElementById('rep-stats-btn')?.click() },
     { icon: '📋', label: 'Actividad reciente', onClick: () => (typeof openActivityFeed === 'function') && openActivityFeed() },
     { icon: '🟢', label: 'WhatsApp pendientes', onClick: () => (typeof sendPendingWA === 'function') && sendPendingWA() },
     { icon: '💬', label: 'WhatsApp: abrir la app de escritorio',
@@ -728,7 +730,7 @@ function toggleDashMenu() {
 function switchSection(section) {
   // El dashboard es ganancia neta, ventas del período y top de productos:
   // entero es plata. Un empleado cae en Equipos.
-  if (section === 'dash' && typeof tpEsEmpleado === 'function' && tpEsEmpleado()) section = 'stock';
+  if (section === 'dash' && !_puede('reporte')) section = 'stock';
   ['dash', 'stock', 'repairs', 'repuestos'].forEach(s => {
     const sec = document.getElementById(s + '-section');
     const btn = document.getElementById('nav-' + s);
@@ -1317,6 +1319,7 @@ function esc(s) {
 
 // ── Formulario ────────────────────────────────────────────
 function openForm(id) {
+  if (typeof tpFrenar === 'function' && tpFrenar('stock', id ? 'editar equipos' : 'cargar equipos')) return;
   editingId = id || null;
   const t = document.getElementById('form-title');
   const btnM = document.getElementById('btn-moneda');
@@ -1411,6 +1414,7 @@ function closeForm() {
 }
 
 async function savePhone() {
+  if (typeof tpFrenar === 'function' && tpFrenar('stock', 'cargar o editar equipos')) return;
   // Conversión USD→ARS si corresponde
   if (monedaMode === 'usd') {
     const usdVal = parseFloat(document.getElementById('fi-precio').value) || 0;
@@ -1762,6 +1766,7 @@ async function markUnsold(id) {
 }
 
 async function deletePhone(id) {
+  if (typeof tpFrenar === 'function' && tpFrenar('borrar', 'borrar equipos')) return;
   const p = STOCK.find(x => x.id === id);
   if (!p) return;
   if (!confirm('¿Eliminar ' + p.marca + ' ' + p.modelo + '?')) return;

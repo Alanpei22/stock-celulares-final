@@ -99,13 +99,15 @@ ok(run('tpFrenarEmpleado("El modo dueño")') === false, 'al dueño no lo frena')
 
 console.log('\n5) La plata del día no está en la pantalla del empleado');
 // Efectivo en caja y neto del día son justo lo que no tiene que ver.
-ok(/id="caja-quickbar"[^>]*solo-dueno|class="caja-quickbar solo-dueno"/.test(cajaHtml),
-   'efectivo en caja / neto del día');
-ok(/id="caja-detail-panel"[^>]*solo-dueno/.test(cajaHtml), 'apertura, ingresos, egresos y desglose');
-ok(/class="caja-date-nav solo-dueno"/.test(cajaHtml), 'y los otros días (que son los totales de otros días)');
-ok(/id="nav-dash"[^>]*solo-dueno|class="nav-btn solo-dueno" id="nav-dash"/.test(idxHtml),
-   'el dashboard, que es ganancia neta y top de productos, no se abre');
-ok(/section === 'dash' && typeof tpEsEmpleado === 'function' && tpEsEmpleado\(\)/.test(appJs),
+// Ahora depende del permiso "Ver la plata del día" (req-totales): sin él,
+// no se ve. Ver tests/test-permisos.js.
+ok(/class="caja-quickbar req-totales" id="caja-quickbar"/.test(cajaHtml),
+   'efectivo en caja / neto del día (sin el permiso de ver la plata)');
+ok(/id="caja-detail-panel"[^>]*req-totales/.test(cajaHtml), 'apertura, ingresos, egresos y desglose');
+ok(/class="caja-date-nav req-totales"/.test(cajaHtml), 'y los otros días (que son los totales de otros días)');
+ok(/class="nav-btn req-reporte" id="nav-dash"/.test(idxHtml),
+   'el dashboard, que es ganancia neta y top de productos, no se abre (sin permiso de reportes)');
+ok(/section === 'dash' && !_puede\('reporte'\)/.test(appJs),
    'ni por atajo: cae en Equipos');
 // La lista de movimientos SÍ se ve: sirve para no cargar dos veces la misma venta.
 ok(!/id="caja-list"[^>]*solo-dueno/.test(cajaHtml),
@@ -115,21 +117,22 @@ console.log('\n6) Lo que ni siquiera se lee');
 // Además de esconderlo: son lecturas de Firestore que no se van a usar, y el
 // cupo gratis es de 50.000 por día.
 const trozoInit = cajaJs.slice(cajaJs.indexOf('function initApp'), cajaJs.indexOf('function initApp') + 2500);
-ok(/if \(typeof tpEsEmpleado !== 'function' \|\| !tpEsEmpleado\(\)\) \{[\s\S]{0,400}loadArqueo\(\)/.test(trozoInit),
-   'apertura, cierre, "vs ayer" y turnos no se piden con cuenta de empleado');
+ok(/const _verPlata = typeof tpPuede !== 'function' \|\| tpPuede\('totales'\) \|\| tpPuede\('cierre'\);\s*if \(_verPlata\) \{[\s\S]{0,100}loadArqueo\(\)/.test(trozoInit),
+   'apertura, cierre, "vs ayer" y turnos no se piden sin permiso de ver la plata o de cerrar');
 ['loadCierre()', '_loadYesterdayStats()', 'listenCierresParciales()'].forEach(f =>
-  ok(trozoInit.indexOf(f) > trozoInit.indexOf('!tpEsEmpleado()'), `${f} queda adentro del if`));
+  ok(trozoInit.indexOf(f) > trozoInit.indexOf('if (_verPlata)'), `${f} queda adentro del if`));
 // El backup diario lee todo el stock vendido y escribe la copia: las reglas se
 // lo niegan al empleado, y el celular de él no tiene por qué gastar el cupo.
 const trozoBk = appJs.slice(appJs.indexOf('async function autoBackup()'), appJs.indexOf('async function autoBackup()') + 400);
 ok(/tpEsEmpleado\(\)\) return;/.test(trozoBk), 'el backup diario no lo intenta el celular del empleado');
 
 console.log('\n7) Los menús');
-['Arqueo de caja', 'Cierre de turno', 'Buscar en ventas', 'Reporte del día'].forEach(lbl => {
+[['Arqueo de caja', 'cierre'], ['Cierre de turno', 'cierre'], ['Buscar en ventas', 'reporte'], ['Reporte del día', 'reporte']].forEach(([lbl, perm]) => {
   const i = cajaJs.indexOf(`label: '${lbl}'`);
-  ok(i > 0 && /hide: emp/.test(cajaJs.slice(i, i + 260)), `caja: "${lbl}" no aparece`);
+  ok(i > 0 && new RegExp(`hide: no\\('${perm}'\\)`).test(cajaJs.slice(i, i + 260)), `caja: "${lbl}" solo con permiso de ${perm}`);
 });
-['Estadísticas', 'Configuración', 'Exportar stock', 'Descargar backup'].forEach(lbl => {
+ok(/hide: !_puede\('reporte'\), onClick: \(\) => document\.getElementById\('stats-btn'\)/.test(appJs), 'inicio: "Estadísticas" solo con permiso de reportes');
+['Configuración', 'Exportar stock', 'Descargar backup'].forEach(lbl => {
   const i = appJs.indexOf(`label: '${lbl}'`);
   ok(i > 0 && /hide: _soloDueno\(\)/.test(appJs.slice(i, i + 200)), `inicio: "${lbl}" no aparece`);
 });
@@ -138,7 +141,7 @@ console.log('\n8) Las puertas de atrás (URL ?action=, teclado)');
 ['openArqueoModal', 'reopenArqueo', 'openCierreModal', 'openCierreParcialModal',
  'openReporteModal', 'openVentasSearch'].forEach(fn => {
   const i = cajaJs.indexOf('function ' + fn + '(');
-  ok(i > 0 && /tpFrenarEmpleado/.test(cajaJs.slice(i, i + 300)), `${fn}() frena al empleado`);
+  ok(i > 0 && /tpFrenar(Empleado)?\(/.test(cajaJs.slice(i, i + 300)), `${fn}() frena al empleado (sin el permiso)`);
 });
 
 console.log('\n9) Las reglas de Firestore: lo que de verdad frena');
@@ -149,20 +152,23 @@ const reglasVivas = rules.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n'
 ok(/function esDueno\(\)/.test(rules) && /function esEmpleado\(\)/.test(rules), 'hay dos roles');
 ok(/function isAllowed\(\) \{ return esDueno\(\) \|\| esEmpleado\(\); \}/.test(rules),
    'y los dos pueden entrar a la base');
-[['caja_arqueos', 'la apertura'], ['caja_cierres', 'el cierre'],
- ['caja_cierres_parciales', 'los turnos'], ['caja_dueno_movimientos', 'la caja del dueño']].forEach(([col, que]) => {
-  const re = new RegExp('match /' + col + "/\\{doc\\}\\s*\\{ allow read, write: if esDueno\\(\\); \\}");
-  ok(re.test(rules), `${que} (${col}) es solo del dueño`);
+[['caja_arqueos', 'la apertura'], ['caja_cierres', 'el cierre'], ['caja_cierres_parciales', 'los turnos']].forEach(([col, que]) => {
+  const re = new RegExp('match /' + col + "/\\{doc\\} \\{\\s*allow read: if puede\\('totales'\\) \\|\\| puede\\('cierre'\\);\\s*allow write: if puede\\('cierre'\\);\\s*\\}");
+  ok(re.test(rules), `${que} (${col}): solo el dueño o un empleado con permiso`);
 });
+ok(/match \/caja_dueno_movimientos\/\{doc\} \{ allow read, write: if esDueno\(\); \}/.test(rules), 'la caja del dueño, solo el dueño');
+ok(/function puede\(p\) \{ return esDueno\(\) \|\| \(esEmpleado\(\) && p in permisos\(\)\); \}/.test(rules), 'puede(): el dueño todo, el empleado lo que tenga');
 ok(/match \/config\/owner \{[\s\S]{0,200}allow read: if esDueno\(\);/.test(rules),
    'el PIN de dueño no se puede ni leer desde una cuenta de empleado');
 // Los movimientos de caja son trabajo diario: entran por la regla general,
 // que deja cargar y corregir pero no borrar.
-ok(!/'caja_movimientos'/.test(reglasVivas), 'los movimientos no estan cerrados: el empleado carga ventas y gastos');
+ok(!/'caja_movimientos'/.test(reglasVivas.slice(reglasVivas.indexOf('function sensible('), reglasVivas.indexOf(']', reglasVivas.indexOf('function sensible(')))),
+   'los movimientos no estan cerrados: el empleado con permiso de caja carga ventas y gastos');
 const resto = rules.slice(rules.indexOf('match /{col}/{doc=**}'));
-ok(/allow read, create, update: if isAllowed\(\) && !sensible\(col\);/.test(resto) &&
-   /allow delete: if esDueno\(\) && !sensible\(col\);/.test(resto),
-   'y en el resto (stock, repairs, productos…) tampoco borra');
+ok(/allow read: if isAllowed\(\) && !sensible\(col\);/.test(resto) &&
+   /allow create, update: if isAllowed\(\) && !sensible\(col\) && puedeEscribir\(col\);/.test(resto) &&
+   /allow delete: if puede\('borrar'\) && !sensible\(col\);/.test(resto),
+   'y en el resto (stock, repairs, productos…) borra solo con permiso de borrar');
 
 // ── La trampa de las reglas de Firestore ──
 // Matchean TODAS las que aplican y pasa si CUALQUIERA dice que si: no gana la

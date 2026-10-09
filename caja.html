@@ -39,7 +39,7 @@
   <button class="sb-item" id="sb-caja"      onclick="switchCajaTab('caja')"><span class="sb-ico">▤</span>Caja del día</button>
   <button class="sb-item" id="sb-inv"       onclick="switchCajaTab('inventario')"><span class="sb-ico">◈</span>Accesorios</button>
   <button class="sb-item" id="sb-repar"     onclick="switchCajaTab('reparaciones')"><span class="sb-ico">✧</span>Precios reparación</button>
-  <button class="sb-item solo-dueno" onclick="openReporteModal()"><span class="sb-ico">▦</span>Reporte del día</button>
+  <button class="sb-item req-reporte" onclick="openReporteModal()"><span class="sb-ico">▦</span>Reporte del día</button>
 </aside>
 
 <!-- APP -->
@@ -77,14 +77,14 @@
   <div id="notif-banners" class="notif-banners hidden"></div>
 
   <!-- Date navigation -->
-  <div class="caja-date-nav solo-dueno">
+  <div class="caja-date-nav req-totales">
     <button class="date-nav-btn" onclick="prevDay()">◀</button>
     <span id="caja-date-label">Hoy</span>
     <button class="date-nav-btn" id="next-day-btn" onclick="nextDay()">▶</button>
   </div>
 
   <!-- Quick bar: siempre visible, compacta. Tap para desplegar el detalle -->
-  <div class="caja-quickbar solo-dueno" id="caja-quickbar" onclick="toggleCajaDetail()">
+  <div class="caja-quickbar req-totales" id="caja-quickbar" onclick="toggleCajaDetail()">
     <div class="cqb-item">
       <span class="cqb-num cqb-num--ef" id="qb-efectivo">$0</span>
       <span class="cqb-lbl">💵 Efectivo en caja</span>
@@ -100,7 +100,7 @@
   </div>
 
   <!-- Detalle colapsable: stats completas + desglose -->
-  <div id="caja-detail-panel" class="caja-detail-panel hidden solo-dueno">
+  <div id="caja-detail-panel" class="caja-detail-panel hidden req-totales">
     <div class="caja-stats">
       <div class="caja-stat"><span class="caja-stat-num" id="stat-apertura">$0</span><span class="caja-stat-lbl">Apertura</span></div>
       <div class="caja-stat caja-stat--ing"><span class="caja-stat-num" id="stat-ingresos">$0</span><span class="caja-stat-lbl">Ingresos</span></div>
@@ -448,7 +448,7 @@
   <!-- Tipo toggle header -->
   <div class="mov-tipo-hdr">
     <button id="mov-btn-ingreso" class="mov-tipo-btn mov-tipo-btn--ing tipo-active" onclick="setMovTipo('ingreso')">+ Ingreso</button>
-    <button id="mov-btn-egreso" class="mov-tipo-btn mov-tipo-btn--eg" onclick="setMovTipo('egreso')">− Egreso</button>
+    <button id="mov-btn-egreso" class="mov-tipo-btn mov-tipo-btn--eg req-gastos" onclick="setMovTipo('egreso')">− Egreso</button>
     <button class="mov-close-btn" onclick="closeMovForm()">✕</button>
   </div>
 

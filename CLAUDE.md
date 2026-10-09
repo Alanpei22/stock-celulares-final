@@ -48,6 +48,9 @@ usa la app en el mostrador, no un programador.
   `api/usuarios.js`) con la marca `rol: 'empleado'` en la cuenta; entran con
   usuario corto (`nacho` = `nacho@techpoint.local`). Esconder un botón no
   protege: lo que frena son las reglas. Ver `EMPLEADOS.md`.
+- **Permisos por empleado** (`TP_PERMISOS` en `roles.js`): `tpPuede(p)` /
+  `tpFrenar(p, 'qué')` en el código y `.req-<permiso>` en el HTML. La misma
+  lista en `api/usuarios.js` y en `firestore.rules` (`permisos()`, `puede()`).
 - **Impresión**: QZ Tray imprime directo (`qz-print.js`, firma en
   `api/qz-sign.js`); si no está, sale el diálogo de Chrome. Sin QZ, la ventana
   de impresión tiene que abrirse EN el toque: si se espera algo (Firestore)

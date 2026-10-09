@@ -42,7 +42,7 @@ function abrirEmpleados() {
     ov.className = 'emp-ov';
     ov.innerHTML = `<div class="emp-caja" role="dialog" aria-label="Empleados">
         <div class="emp-cab"><h3>👥 Empleados</h3><button type="button" class="emp-x" onclick="_empCerrar()">✕</button></div>
-        <p class="emp-ayuda">Cada empleado entra con su usuario desde su celu. Ve y carga el trabajo del día, pero no la plata ni los costos, y no puede borrar.</p>
+        <p class="emp-ayuda">Cada empleado entra con su usuario desde su celu. Con 🔐 elegís qué puede hacer cada uno.</p>
         <div id="emp-lista" class="emp-lista"><p class="emp-vacio">Cargando…</p></div>
         <form id="emp-form" class="emp-form" autocomplete="off" onsubmit="event.preventDefault(); empCrear()">
           <h4>＋ Nuevo empleado</h4>
@@ -51,6 +51,7 @@ function abrirEmpleados() {
           <label>Contraseña provisoria
             <span class="emp-clave"><input id="emp-clave" class="fi" maxlength="64"><button type="button" class="btn-secondary" onclick="document.getElementById('emp-clave').value = empClaveSugerida()" title="Otra">🎲</button></span>
           </label>
+          <details class="emp-perm-det"><summary>🔐 Qué puede hacer</summary><div id="emp-perm-nuevo" class="emp-perms"></div></details>
           <button type="submit" class="btn-primary" id="emp-crear">Crear cuenta</button>
         </form>
         <div id="emp-listo" class="emp-listo hidden"></div>
@@ -58,6 +59,7 @@ function abrirEmpleados() {
     ov.addEventListener('click', e => { if (e.target === ov) _empCerrar(); });
     document.body.appendChild(ov);
     document.getElementById('emp-clave').value = empClaveSugerida();
+    _empPintarCasillas('emp-perm-nuevo', null);
     empCargar();
   };
   if (typeof requireOwnerPin === 'function') requireOwnerPin(abrir, 'PIN de dueño para administrar empleados');
@@ -103,8 +105,11 @@ function _empPintar() {
       <div class="emp-datos">
         <b>${_empEsc(e.nombre)}</b>${e.activo ? '' : ' <span class="emp-tag">Desactivado</span>'}
         <small>usuario <code>${_empEsc(e.usuario)}</code> · ${_empEsc(_empFecha(e.ultimoIngreso))}</small>
+        <small class="emp-perm-res">${_empEsc(_empResumenPermisos(e.perms))}</small>
       </div>
+      <div class="emp-perm-edit hidden" id="emp-perm-${_empEsc(e.uid)}"></div>
       <div class="emp-acc">
+        <button type="button" class="btn-secondary" onclick="empPermisos('${_empEsc(e.uid)}')" title="Qué puede hacer">🔐</button>
         <button type="button" class="btn-secondary" onclick="empClave('${_empEsc(e.uid)}')" title="Cambiar contraseña">🔑</button>
         <button type="button" class="btn-secondary" onclick="empRenombrar('${_empEsc(e.uid)}')" title="Cambiar nombre">✏️</button>
         <button type="button" class="btn-secondary" onclick="empActivo('${_empEsc(e.uid)}', ${!e.activo})">${e.activo ? '⛔ Desactivar' : '✅ Activar'}</button>
@@ -145,7 +150,7 @@ async function empCrear() {
   const btn = document.getElementById('emp-crear');
   btn.disabled = true; btn.textContent = 'Creando…';
   try {
-    await _empApi({ accion: 'crear', nombre, usuario, clave });
+    await _empApi({ accion: 'crear', nombre, usuario, clave, perms: _empLeerCasillas('emp-perm-nuevo') });
     toast(`✅ Cuenta de ${nombre} creada`, 'success');
     _empMostrarDatos('✅ Cuenta creada', nombre, usuario, clave);
     document.getElementById('emp-nombre').value = '';
@@ -193,5 +198,64 @@ async function empActivo(uid, activo) {
     await _empApi({ accion: 'activo', uid, activo });
     toast(activo ? `✅ ${e.nombre} puede entrar de nuevo` : `⛔ ${e.nombre} desactivado`, 'success');
     empCargar();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ── 🔐 Permisos ──────────────────────────────────────────────
+// El catálogo está en roles.js (TP_PERMISOS). null = nunca se tocaron:
+// tiene los de siempre (los `def`).
+function _empPermsEfectivos(perms) {
+  if (Array.isArray(perms)) return perms;
+  return (typeof TP_PERMISOS_DEF !== 'undefined') ? TP_PERMISOS_DEF : [];
+}
+
+function _empResumenPermisos(perms) {
+  if (typeof TP_PERMISOS === 'undefined') return '';
+  const tiene = _empPermsEfectivos(perms);
+  if (!tiene.length) return 'Sin permisos: solo puede mirar';
+  return 'Puede: ' + TP_PERMISOS.filter(p => tiene.includes(p.k)).map(p => p.nombre.toLowerCase()).join(', ');
+}
+
+function _empPintarCasillas(idCaja, perms) {
+  const box = document.getElementById(idCaja);
+  if (!box || typeof TP_PERMISOS === 'undefined') return;
+  const tiene = _empPermsEfectivos(perms);
+  box.innerHTML = TP_PERMISOS.map(p => `<label class="emp-perm">
+      <input type="checkbox" value="${p.k}" ${tiene.includes(p.k) ? 'checked' : ''}>
+      <span><b>${_empEsc(p.nombre)}</b><small>${_empEsc(p.desc)}</small></span>
+    </label>`).join('');
+}
+
+function _empLeerCasillas(idCaja) {
+  const box = document.getElementById(idCaja);
+  if (!box) return null;
+  return [...box.querySelectorAll('input[type=checkbox]')].filter(c => c.checked).map(c => c.value);
+}
+
+// Abre/cierra las casillas de ese empleado, con botón Guardar
+function empPermisos(uid) {
+  const e = _empLista.find(x => x.uid === uid);
+  const box = document.getElementById('emp-perm-' + uid);
+  if (!e || !box) return;
+  if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+  box.innerHTML = `<div id="emp-perm-c-${_empEsc(uid)}" class="emp-perms"></div>
+    <div class="emp-perm-btns">
+      <button type="button" class="btn-secondary" onclick="document.getElementById('emp-perm-${_empEsc(uid)}').classList.add('hidden')">Cancelar</button>
+      <button type="button" class="btn-primary" onclick="empGuardarPermisos('${_empEsc(uid)}')">Guardar permisos</button>
+    </div>
+    <small class="emp-perm-nota">Le cambian la próxima vez que abra la app.</small>`;
+  _empPintarCasillas('emp-perm-c-' + uid, e.perms);
+  box.classList.remove('hidden');
+}
+
+async function empGuardarPermisos(uid) {
+  const e = _empLista.find(x => x.uid === uid);
+  const perms = _empLeerCasillas('emp-perm-c-' + uid);
+  if (!e || !perms) return;
+  try {
+    await _empApi({ accion: 'permisos', uid, perms });
+    e.perms = perms;
+    toast(`🔐 Permisos de ${e.nombre} guardados`, 'success');
+    _empPintar();
   } catch (err) { toast(err.message, 'error'); }
 }

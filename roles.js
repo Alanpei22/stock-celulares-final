@@ -41,6 +41,28 @@ const TP_USUARIOS = {
   // 'UID_DEL_EMPLEADO': { nombre: 'Nombre', rol: 'empleado' },
 };
 
+// ── Permisos de cada empleado ────────────────────────────────
+// El dueño elige qué puede hacer cada empleado (👥 Empleados → 🔐).
+// Viajan en la marca de su cuenta (`perms`, la pone api/usuarios.js) y los
+// frenan DOS lados: la pantalla (esconde y avisa) y las reglas de Firebase
+// en lo que importa (la caja, la plata del día, los cierres y borrar).
+// `def`: lo que tiene un empleado al que nunca se le tocaron los permisos
+// (= lo que podía hacer antes de que existiera esto).
+// ⚠️ La misma lista de claves está en api/usuarios.js y en firestore.rules
+//    (los `def`). tests/test-permisos.js falla si se separan.
+const TP_PERMISOS = [
+  { k: 'caja',         nombre: 'Usar la caja',               desc: 'Cobrar ventas y reparaciones',                    def: true },
+  { k: 'gastos',       nombre: 'Cargar gastos',              desc: 'Egresos de la caja',                              def: true },
+  { k: 'totales',      nombre: 'Ver la plata del día',       desc: 'Efectivo en caja, neto, apertura y otros días',  def: false },
+  { k: 'cierre',       nombre: 'Abrir y cerrar la caja',     desc: 'Apertura, arqueo, cierre de turno y del día',    def: false },
+  { k: 'reporte',      nombre: 'Reportes y estadísticas',    desc: 'Reporte del día, dashboard, buscar en ventas',   def: false },
+  { k: 'stock',        nombre: 'Cargar y editar equipos',    desc: 'Stock de celulares en venta',                     def: true },
+  { k: 'reparaciones', nombre: 'Tomar y editar reparaciones', desc: 'Ingresos, estados y fichas de reparación',       def: true },
+  { k: 'inventario',   nombre: 'Accesorios y repuestos',     desc: 'Cargar y editar productos',                       def: true },
+  { k: 'borrar',       nombre: 'Borrar cosas',               desc: 'Movimientos, equipos, reparaciones, productos',   def: false },
+];
+const TP_PERMISOS_DEF = TP_PERMISOS.filter(p => p.def).map(p => p.k);
+
 // Empleados creados desde la app (👥 Empleados): el nombre viene en la marca
 // de la cuenta (custom claim). Se lee una vez y queda guardado por UID para
 // que la próxima vez esté al instante.
@@ -51,11 +73,47 @@ function tpLeerMarca() {
   try {
     const u = (typeof currentUser === 'function') ? currentUser() : null;
     if (!u || TP_USUARIOS[u.uid] || !u.getIdTokenResult) return;
-    u.getIdTokenResult().then(r => {
-      const n = r && r.claims && r.claims.nombre;
-      if (n) try { localStorage.setItem('tpNombre_' + u.uid, String(n)); } catch {}
+    // `true` = pedir el token de nuevo: si el dueño le cambió los permisos,
+    // valen desde que abre la app (y las reglas de Firebase ven los nuevos).
+    u.getIdTokenResult(true).then(r => {
+      const c = (r && r.claims) || {};
+      if (c.nombre) try { localStorage.setItem('tpNombre_' + u.uid, String(c.nombre)); } catch {}
+      // JSON: null = nunca se tocaron (van los de siempre); [] = ninguno
+      const nuevos = JSON.stringify(Array.isArray(c.perms) ? c.perms.slice().sort() : null);
+      let viejos = null;
+      try { viejos = localStorage.getItem('tpPerms_' + u.uid); localStorage.setItem('tpPerms_' + u.uid, nuevos); } catch {}
+      // Cambiaron desde la última vez: se recarga para que la pantalla los use
+      // (solo una vez: la próxima ya coinciden).
+      if (viejos !== null && viejos !== nuevos && typeof location !== 'undefined') location.reload();
+      else if (viejos === null) aplicarRol();
     }).catch(() => {});
   } catch {}
+}
+
+// Los permisos del empleado logueado (los guardados de su marca; si nunca se
+// tocaron, los de siempre).
+function tpPermisos() {
+  const u = tpUsuario();
+  if (!u) return [];
+  if (u.rol === 'dueno') return TP_PERMISOS.map(p => p.k);
+  let guardado = null;
+  try { guardado = localStorage.getItem('tpPerms_' + u.uid); } catch {}
+  let lista = null;
+  try { lista = JSON.parse(guardado); } catch {}
+  return Array.isArray(lista) ? lista : TP_PERMISOS_DEF.slice();
+}
+
+// ¿Puede hacer esto? El dueño, todo.
+function tpPuede(perm) { return tpEsDueno() || tpPermisos().indexOf(perm) >= 0; }
+// Empleado al que el dueño le dio este permiso (para saltear el PIN de dueño
+// en lo que antes era solo del dueño, como borrar).
+function tpEmpleadoPuede(perm) { return tpEsEmpleado() && tpPermisos().indexOf(perm) >= 0; }
+
+// Freno para una acción con permiso: true = no puede (y avisa).
+function tpFrenar(perm, queEs) {
+  if (tpPuede(perm)) return false;
+  try { if (typeof toast === 'function') toast(`No tenés permiso para ${queEs || 'eso'}. Pedíselo al dueño.`, 'error'); } catch {}
+  return true;
 }
 
 // Cuenta logueada. Una cuenta que NO esté en la lista se trata como empleado:
@@ -93,6 +151,9 @@ function aplicarRol() {
   try {
     document.body.classList.toggle('rol-empleado', emp);
     document.body.classList.toggle('rol-dueno', !emp);
+    // Una clase por permiso: `.req-totales` se ve solo con `body.p-totales`
+    const tiene = tpPermisos();
+    TP_PERMISOS.forEach(p => document.body.classList.toggle('p-' + p.k, tiene.indexOf(p.k) >= 0));
   } catch {}
   // Un empleado no entra a modo dueño aunque adivine el PIN: la cuenta no lo tiene.
   if (emp) {

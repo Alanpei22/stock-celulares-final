@@ -428,6 +428,7 @@ function changeQty(id, delta) {
 
 // ── Formulario ────────────────────────────
 function openRepuestoForm(id) {
+  if (typeof tpFrenar === 'function' && tpFrenar('inventario', 'cargar o editar repuestos')) return;
   editingRepuestoId = id || null;
   const title = document.getElementById('rep2-form-title');
   const delWrap = document.getElementById('rep2-delete-wrap');
@@ -556,6 +557,7 @@ function closeRepuestoForm() {
 }
 
 function saveRepuesto() {
+  if (typeof tpFrenar === 'function' && tpFrenar('inventario', 'cargar o editar repuestos')) return;
   const nombre         = document.getElementById('rep2-fi-nombre').value.trim();
   const marca          = document.getElementById('rep2-fi-marca').value.trim();
   const modelo         = document.getElementById('rep2-fi-modelo').value.trim();
@@ -598,6 +600,7 @@ function saveRepuesto() {
 
 function deleteRepuesto(id) {
   if (!id) return;
+  if (typeof tpFrenar === 'function' && tpFrenar('borrar', 'borrar repuestos')) return;
   if (!confirm('¿Eliminar este repuesto del sistema?')) return;
   db.collection('repuestos').doc(id).delete()
     .then(() => { toast('Repuesto eliminado', 'success'); closeRepuestoForm(); })

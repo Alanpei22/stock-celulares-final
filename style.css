@@ -6341,3 +6341,27 @@ body.dark .va-sin-stock, body.dark .va-aviso, body.dark .va-linea--alerta .va-li
 .emp-listo-btns { display: flex; gap: 8px; } .emp-listo-btns button { flex: 1; }
 /* Con qué pagó la seña (ingreso de reparación) */
 .rep-sena-metodo { margin-top: 6px; }
+
+/* Permisos de cada empleado (roles.js · TP_PERMISOS): `.req-X` se ve
+   solo si el empleado tiene el permiso X. Al dueño no le cambia nada. */
+body.rol-empleado:not(.p-caja) .req-caja { display: none !important; }
+body.rol-empleado:not(.p-gastos) .req-gastos { display: none !important; }
+body.rol-empleado:not(.p-totales) .req-totales { display: none !important; }
+body.rol-empleado:not(.p-cierre) .req-cierre { display: none !important; }
+body.rol-empleado:not(.p-reporte) .req-reporte { display: none !important; }
+body.rol-empleado:not(.p-stock) .req-stock { display: none !important; }
+body.rol-empleado:not(.p-reparaciones) .req-reparaciones { display: none !important; }
+body.rol-empleado:not(.p-inventario) .req-inventario { display: none !important; }
+body.rol-empleado:not(.p-borrar) .req-borrar { display: none !important; }
+/* 🔐 Permisos de cada empleado (usuarios.js) */
+.emp-perm-res { color: var(--text2, #555); font-size: 12px; margin-top: 2px; }
+.emp-perm-edit { flex-basis: 100%; border-top: 1px solid var(--border, #e5e7eb); margin-top: 8px; padding-top: 8px; }
+.emp-perms { display: flex; flex-direction: column; gap: 6px; }
+.emp-perm { display: flex; gap: 10px; align-items: flex-start; font-weight: 400 !important; flex-direction: row !important; cursor: pointer; }
+.emp-perm input { width: 20px; height: 20px; margin-top: 1px; flex-shrink: 0; }
+.emp-perm span { display: flex; flex-direction: column; }
+.emp-perm small { color: var(--text3, #666); font-size: 12px; }
+.emp-perm-btns { display: flex; gap: 8px; margin-top: 10px; } .emp-perm-btns button { flex: 1; }
+.emp-perm-nota { display: block; color: var(--text3, #666); font-size: 12px; margin-top: 6px; }
+.emp-perm-det summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 4px 0; }
+.emp-perm-det .emp-perms { margin-top: 6px; }

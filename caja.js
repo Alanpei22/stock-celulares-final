@@ -99,6 +99,12 @@ function showApp() {
   document.getElementById('app').classList.remove('app-hidden');
   // Quién entró decide qué se ve. Antes de pintar nada. (roles.js)
   if (typeof aplicarRol === 'function') aplicarRol();
+  // Empleado sin permiso de caja: no tiene nada que hacer acá
+  if (typeof tpPuede === 'function' && !tpPuede('caja')) {
+    if (typeof toast === 'function') toast('No tenés permiso para usar la caja. Pedíselo al dueño.', 'error');
+    setTimeout(() => location.replace('index.html'), 1500);
+    return;
+  }
   // Sidebar (pantalla grande): activarlo y marcar el tab inicial
   document.body.classList.add('has-sidebar');
   document.getElementById('sb-caja')?.classList.add('active');
@@ -120,7 +126,10 @@ function initApp() {
   // Apertura, cierre, comparación con ayer y turnos son la plata del día:
   // con una cuenta de empleado ni se piden. Son lecturas que no se van a
   // mostrar, y las reglas de Firestore las niegan igual.
-  if (typeof tpEsEmpleado !== 'function' || !tpEsEmpleado()) {
+  // Con permiso de ver la plata o de abrir/cerrar (👥 Empleados → 🔐)
+  // el empleado también las carga.
+  const _verPlata = typeof tpPuede !== 'function' || tpPuede('totales') || tpPuede('cierre');
+  if (_verPlata) {
     loadArqueo();
     loadCierre();
     _loadYesterdayStats().then(() => renderStats()); // Feature 6: vs ayer
@@ -394,7 +403,7 @@ async function loadArqueo() {
 }
 
 function openArqueoModal(cajaChicaPreset = 0) {
-  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('La apertura de caja')) return;
+  if (typeof tpFrenar === 'function' && tpFrenar('cierre', 'abrir la caja')) return;
   document.getElementById('arqueo-billetes').innerHTML = renderArqueoRows();
   updateArqueoTotal();
 
@@ -509,7 +518,7 @@ function closeArqueoModal() {
 }
 
 function reopenArqueo() {
-  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El arqueo')) return;
+  if (typeof tpFrenar === 'function' && tpFrenar('cierre', 'hacer el arqueo')) return;
   if (!document.getElementById('arqueo-billetes')) return;
   // Pre-llenar nombre guardado
   const inputVend = document.getElementById('arqueo-vendedor-input');
@@ -1010,15 +1019,17 @@ function toggleCajaMenu() {
   // Con cuenta de empleado: nada de apertura, cierre, turnos, reporte ni
   // búsqueda histórica. `hide:` espera true cuando hay que esconder.
   const emp = (typeof tpEsEmpleado === 'function') && tpEsEmpleado();
+  // Lo que se esconde depende de los permisos del empleado (roles.js)
+  const no = p => (typeof tpPuede === 'function') ? !tpPuede(p) : emp;
   openSheet('Caja', [
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
     { icon: '🔒', label: 'Modo dueño', hide: emp, onClick: openCajaOwnerPin },
     { divider: true, hide: emp },
-    { icon: '🧾', label: 'Arqueo de caja', hide: emp, onClick: reopenArqueo },
-    { icon: '🔄', label: 'Cierre de turno', sub: 'Cambio de cajero', hide: emp, onClick: openCierreParcialModal },
-    { icon: '🔐', label: CIERRE ? 'Cierre registrado' : 'Cerrar caja del día', sub: CIERRE ? `Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}` : null, hide: emp, onClick: openCierreModal },
-    { icon: '🔎', label: 'Buscar en ventas', sub: 'Producto o reparación en todas las fechas', hide: emp, onClick: openVentasSearch },
-    { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', hide: emp, onClick: openReporteModal },
+    { icon: '🧾', label: 'Arqueo de caja', hide: no('cierre'), onClick: reopenArqueo },
+    { icon: '🔄', label: 'Cierre de turno', sub: 'Cambio de cajero', hide: no('cierre'), onClick: openCierreParcialModal },
+    { icon: '🔐', label: CIERRE ? 'Cierre registrado' : 'Cerrar caja del día', sub: CIERRE ? `Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}` : null, hide: no('cierre'), onClick: openCierreModal },
+    { icon: '🔎', label: 'Buscar en ventas', sub: 'Producto o reparación en todas las fechas', hide: no('reporte'), onClick: openVentasSearch },
+    { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', hide: no('reporte'), onClick: openReporteModal },
     { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
     { icon: '💬', label: 'WhatsApp: abrir la app de escritorio',
       sub: (typeof waAppActiva === 'function' && waAppActiva()) ? '✅ Activado en esta PC · tocá para volver a wa.me' : 'Sin la página intermedia (necesita WhatsApp instalado)',
@@ -1053,7 +1064,7 @@ let _vsTipo = 'todos';  // todos | ingreso | egreso
 function _vsInvalidar() { _vsCache = {}; }
 
 function openVentasSearch() {
-  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('La búsqueda en ventas')) return;
+  if (typeof tpFrenar === 'function' && tpFrenar('reporte', 'buscar en las ventas')) return;
   const inp = document.getElementById('vsearch-input');
   if (inp) inp.value = '';
   _vsTipo = 'todos';
@@ -2331,6 +2342,7 @@ function _resetClienteFields(mov) {
 }
 
 function openMovForm(id) {
+  if (typeof tpFrenar === 'function' && tpFrenar('caja', 'usar la caja')) return;
   closeFabMenu();
   // Si se abre el modal de cobro es porque se va a vender: acá ya hacen falta
   // los productos y equipos para el buscador.
@@ -2442,6 +2454,8 @@ function closeMovForm() {
 }
 
 function setMovTipo(tipo) {
+  // Sin permiso de gastos, la caja solo cobra
+  if (tipo === 'egreso' && typeof tpPuede === 'function' && !tpPuede('gastos')) tipo = 'ingreso';
   _movTipo = tipo; // HIGH-02: keep module variable in sync
   const btnIng = document.getElementById('mov-btn-ingreso');
   const btnEg  = document.getElementById('mov-btn-egreso');
@@ -3565,6 +3579,9 @@ function _clearRepairItem(clearText = true) {
 }
 
 async function saveMov() {
+  if (typeof tpFrenar === 'function' && tpFrenar('caja', 'usar la caja')) return;
+  if (!document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') &&
+      typeof tpFrenar === 'function' && tpFrenar('gastos', 'cargar gastos')) return;
   const montoInput = document.getElementById('mov-fi-monto');
   const descInput  = document.getElementById('mov-fi-desc');
   const catWrap    = document.querySelector('#mov-categorias')?.closest('.fg');
@@ -3943,7 +3960,13 @@ async function saveMov() {
 function deleteMov() {
   if (!editingMovId) return;
   const id = editingMovId;
-  requireCajaOwnerPin(async () => {
+  // Empleado con permiso de borrar (👥 Empleados → 🔐): confirma y listo, sin
+  // PIN de dueño. Sin permiso, se le dice por qué. El dueño, con su PIN.
+  if (typeof tpEsEmpleado === 'function' && tpEsEmpleado() && typeof tpFrenar === 'function' && tpFrenar('borrar', 'borrar movimientos')) return;
+  const pedir = (typeof tpEmpleadoPuede === 'function' && tpEmpleadoPuede('borrar'))
+    ? (cb => { if (confirm('¿Borrar este movimiento de la caja?')) cb(); })
+    : requireCajaOwnerPin;
+  pedir(async () => {
     try {
       // Capturar data antes de borrar (para undo + revertir stock)
       const docSnap = await db.collection('caja_movimientos').doc(id).get();
@@ -4157,7 +4180,7 @@ function renderCierreStatus() {
 }
 
 function openCierreModal() {
-  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El cierre de caja')) return;
+  if (typeof tpFrenar === 'function' && tpFrenar('cierre', 'cerrar la caja')) return;
   document.getElementById('cierre-billetes').innerHTML = renderCierreArqueoRows();
   if (CIERRE && CIERRE.billetes) {
     DENOMINACIONES.forEach(d => {
@@ -4534,7 +4557,7 @@ function _calcPeriodoStats(desdeISO) {
 }
 
 function openCierreParcialModal() {
-  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El cierre de turno')) return;
+  if (typeof tpFrenar === 'function' && tpFrenar('cierre', 'cerrar el turno')) return;
   closeCajaMenu();
   const desdeISO  = _getPeriodoDesde();
   const desdeHora = new Date(desdeISO).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' });
@@ -4750,7 +4773,7 @@ function _buildReporteText() {
 }
 
 function openReporteModal() {
-  if (typeof tpFrenarEmpleado === 'function' && tpFrenarEmpleado('El reporte del día')) return;
+  if (typeof tpFrenar === 'function' && tpFrenar('reporte', 'ver el reporte del día')) return;
   const txt = _buildReporteText();
   const pre = document.getElementById('reporte-texto');
   if (pre) pre.textContent = txt;

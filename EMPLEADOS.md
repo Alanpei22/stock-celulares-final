@@ -4,7 +4,20 @@ Cada empleado entra con **su** cuenta desde su celular. Así queda registrado
 quién cargó cada venta y cada reparación, y se le puede sacar el acceso a uno
 solo sin tocar el resto.
 
-## Qué ve un empleado
+## Qué puede hacer cada uno — 🔐 Permisos
+
+En **👥 Empleados**, cada empleado tiene su botón **🔐**: casillas con lo que
+puede hacer (usar la caja, cargar gastos, ver la plata del día, abrir/cerrar la
+caja, reportes, equipos, reparaciones, accesorios, borrar). Al crear uno nuevo
+también se eligen. Los cambios le llegan la próxima vez que abre la app.
+
+Un empleado al que nunca se le tocaron los permisos tiene los de siempre (la
+tabla de abajo). La lista vive en `roles.js` (`TP_PERMISOS`), en
+`api/usuarios.js` y en `firestore.rules`; `tests/test-permisos.js` controla que
+digan lo mismo. La plata del día, los cierres, la caja y borrar los frenan
+también las reglas de Firebase, no solo la pantalla.
+
+## Qué ve un empleado (permisos de siempre)
 
 | Puede | No puede |
 |---|---|
