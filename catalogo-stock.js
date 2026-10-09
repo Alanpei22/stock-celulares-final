@@ -152,3 +152,37 @@ async function catAbrirPagina() {
   catch { toast(CAT_URL, 'info'); }
   window.open(CAT_URL, '_blank', 'noopener');
 }
+
+// Selección múltiple del stock → 🌐 Publicar / 🚫 Sacar de la página.
+// Los vendidos no se publican (saldrían directo como "Sin stock").
+async function batchPublicar(publicar) {
+  const sel = (typeof _batchSelected !== 'undefined') ? Array.from(_batchSelected) : [];
+  if (!sel.length) { toast('Seleccioná al menos un equipo', 'info'); return; }
+  const equipos = sel.map(id => (typeof STOCK !== 'undefined' ? STOCK.find(x => x.id === id) : null)).filter(Boolean);
+  const vendidos = publicar ? equipos.filter(p => p.vendido).length : 0;
+  const cambiar = equipos.filter(p => (publicar ? !p.vendido : true) && !!p.publicar !== publicar);
+  if (!cambiar.length) {
+    toast(publicar ? (vendidos ? 'Esos equipos ya están vendidos' : 'Ya estaban todos en la página')
+                   : 'Ninguno estaba en la página', 'info');
+    return;
+  }
+  try {
+    // Firestore acepta hasta 500 cambios por tanda
+    for (let i = 0; i < cambiar.length; i += 450) {
+      const b = db.batch();
+      cambiar.slice(i, i + 450).forEach(p => b.update(db.collection('stock').doc(p.id), { publicar }));
+      await b.commit();
+    }
+    cambiar.forEach(p => { p.publicar = publicar; });
+    const n = cambiar.length, s = n === 1 ? '' : 's';
+    let msg = publicar ? `🌐 ${n} equipo${s} publicado${s} en la página` : `🚫 ${n} equipo${s} sacado${s} de la página`;
+    if (vendidos) msg += ` · ${vendidos} vendido${vendidos === 1 ? '' : 's'} quedó afuera`;
+    const sinFoto = publicar ? cambiar.filter(p => !(p.fotos || []).length).length : 0;
+    if (sinFoto) msg += ` · ${sinFoto} sin fotos`;
+    toast(msg, 'success');
+    if (typeof exitBatchMode === 'function') exitBatchMode();
+  } catch (e) {
+    console.error('batchPublicar:', e);
+    toast('No se pudo actualizar la página', 'error');
+  }
+}

@@ -546,8 +546,10 @@ header {
 .bg-sold { background: var(--bg2); color: var(--text3); }
 .bg-reservado { background: #FEF3C7; color: #92400E; font-weight: 800; }
 .bg-garantia { background: #DCFCE7; color: #166534; }
+.bg-publicado { background: #E6EDF8; color: #0f2b52; }
 body.dark .bg-reservado { background: rgba(245,158,11,0.18); color: #FBBF24; }
 body.dark .bg-garantia { background: rgba(16,185,129,0.18); color: #6EE7B7; }
+body.dark .bg-publicado { background: rgba(122,167,230,0.18); color: #a9c7f2; }
 
 .card-bottom {
  display: flex; align-items: center; justify-content: space-between;

@@ -108,6 +108,33 @@ vm.createContext(c2); vm.runInContext(cat, c2);
 const campos = vm.runInContext('catFormCampos()', c2);
 ok(campos.publicar === true && campos.color === 'Azul' && campos.detallesPublicos === 'Con caja' && campos.ocultarPrecio === false, 'catFormCampos', campos);
 
+console.log('\n4) Publicar varios desde la selección múltiple');
+{
+  const COMMITS = [], TOASTS = [];
+  let salio = 0;
+  const STOCK = [
+    { id: '1', marca: 'A', fotos: ['https://x'] }, { id: '2', marca: 'B' },
+    { id: '3', marca: 'C', vendido: true }, { id: '4', marca: 'D', publicar: true },
+  ];
+  const c3 = { console, Array, Set, STOCK, _batchSelected: new Set(['1', '2', '3', '4']),
+    toast: (m, t) => TOASTS.push(m), exitBatchMode: () => salio++,
+    db: { batch: () => { const ops = []; return { update: (ref, d) => ops.push([ref.id, d]), commit: async () => COMMITS.push(ops) }; },
+          collection: () => ({ doc: id => ({ id }) }) },
+    document: { getElementById: () => null } };
+  vm.createContext(c3); vm.runInContext(cat, c3);
+  await vm.runInContext('batchPublicar(true)', c3);
+  const hechos = COMMITS.flat().map(x => x[0]).join();
+  ok(hechos === '1,2' && COMMITS.flat().every(x => x[1].publicar === true), 'publica los elegidos (no los vendidos, ni repite los que ya estaban)', hechos);
+  ok(/2 equipos publicados/.test(TOASTS[0]) && /1 vendido quedó afuera/.test(TOASTS[0]) && /1 sin fotos/.test(TOASTS[0]), 'avisa cuántos, vendidos afuera y sin fotos', TOASTS[0]);
+  ok(salio === 1 && STOCK[0].publicar === true, 'sale de la selección y se ve al toque');
+  COMMITS.length = 0; TOASTS.length = 0;
+  c3._batchSelected = new Set(['1', '4', '2']);
+  await vm.runInContext('batchPublicar(false)', c3);
+  ok(COMMITS.flat().map(x => x[0]).join() === '1,4,2' && COMMITS.flat().every(x => x[1].publicar === false), 'sacar de la página');
+  ok(/batchPublicar\(true\)/.test(ix) && /batchPublicar\(false\)/.test(ix), 'los botones están en la barra de selección múltiple');
+  ok(/bg-publicado/.test(app), 'la tarjeta del stock muestra "🌐 En la página"');
+}
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
 })().catch(e => { console.error('Error:', e); process.exit(1); });

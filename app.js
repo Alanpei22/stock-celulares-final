@@ -1286,6 +1286,7 @@ function render() {
             ${p.vendido ? '<span class="badge bg-sold">VENDIDO</span>' : ''}
             ${p.reservado && !p.vendido ? '<span class="badge bg-reservado">⏳ RESERVADO</span>' : ''}
             ${p.garantiaMeses > 0 && !p.vendido ? `<span class="badge bg-garantia">🛡️ ${p.garantiaMeses}m</span>` : ''}
+            ${p.publicar && !p.vendido ? '<span class="badge bg-publicado" title="Se ve en la página de equipos">🌐 En la página</span>' : ''}
           </div>
         </div>
         <div class="card-bottom">
