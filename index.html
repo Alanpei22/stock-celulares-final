@@ -1118,8 +1118,15 @@
           <input id="rep-fi-monto" class="fi" type="number" placeholder="28000" min="0" inputmode="numeric">
         </div>
         <div class="fg">
-          <label class="fl">Seña / Anticipo ($)</label>
+          <label class="fl">Seña / Anticipo ($) <small style="color:var(--t2);font-weight:400">— entra a la caja</small></label>
           <input id="rep-fi-sena" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
+          <select id="rep-fi-sena-metodo" class="fs rep-sena-metodo" title="Con qué pagó la seña">
+            <option value="Efectivo">💵 Efectivo</option>
+            <option value="Transferencia">🏦 Transferencia</option>
+            <option value="MercadoPago">MercadoPago</option>
+            <option value="Tarjeta débito">💳 Débito</option>
+            <option value="Tarjeta crédito">💳 Crédito</option>
+          </select>
         </div>
 
         <div class="fg fg--full">

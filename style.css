@@ -6339,3 +6339,5 @@ body.dark .va-sin-stock, body.dark .va-aviso, body.dark .va-linea--alerta .va-li
 .emp-listo { margin-top: 14px; border: 2px solid #16a34a; border-radius: 12px; padding: 12px; }
 .emp-listo pre { white-space: pre-wrap; font-size: 13px; background: var(--bg2, #f3f4f6); padding: 10px; border-radius: 8px; user-select: all; }
 .emp-listo-btns { display: flex; gap: 8px; } .emp-listo-btns button { flex: 1; }
+/* Con qué pagó la seña (ingreso de reparación) */
+.rep-sena-metodo { margin-top: 6px; }

@@ -400,7 +400,7 @@ ok(/_rep2Filtrados\(\)/.test(rep2.slice(rep2.indexOf('function renderRepuestos')
    'la lista y las etiquetas comparten el filtro');
 
 console.log('\n12) Al ingresar un equipo salen solas la hoja y la etiqueta');
-const save = rep.slice(rep.indexOf('async function saveRepair('), rep.indexOf('async function saveRepair(') + 12000);
+const save = rep.slice(rep.indexOf('async function saveRepair('), rep.indexOf('function _senaAlIngresoACaja'));   // la función entera
 ok(/imprimirIngresoReparacion\(newDoc\)/.test(save), 'saveRepair imprime con el doc recién creado (REPAIRS todavía no lo tiene)');
 const fnIng = printSrc.slice(printSrc.indexOf('async function imprimirIngresoReparacion'), printSrc.indexOf('async function imprimirIngresoReparacion') + 1200);
 ok(fnIng.indexOf('_buildA5') >= 0 && fnIng.indexOf('_buildA5') < fnIng.indexOf('_etiquetaRepHtml'), 'primero la hoja A5, después la etiqueta');

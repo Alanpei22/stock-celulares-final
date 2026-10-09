@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-sena-ingreso.js': 'La seña cobrada al ingresar una reparación entra a la caja, vinculada a la reparación',
   'test-usuarios.js': 'Cuentas de empleado desde la app: solo el dueño, marca rol=empleado, reglas y login con usuario',
   'test-catalogo.js': 'Página pública /equipos desde el stock: nada privado, estados, fotos y formulario',
   'test-ticket-gasto.js': 'Foto del ticket en los gastos: la IA lee productos y total; si no, queda la foto adjunta',

@@ -1557,6 +1557,7 @@ function openRepairForm(id) {
 
     const isCustom = r.arreglo && !COMMON_ARREGLOS.includes(r.arreglo);
     // El select vuelve a "+ Agregar reparación..."; lo cargado va a la lista.
+    { const sm = document.getElementById('rep-fi-sena-metodo'); if (sm) sm.value = 'Efectivo'; }
     document.getElementById('rep-fi-arreglo').value = '';
     document.getElementById('rep-fi-arreglo-custom').style.display = 'none';
     document.getElementById('rep-fi-arreglo-custom').value = '';
@@ -1874,6 +1875,14 @@ async function saveRepair() {
       }
       await db.collection('repairs').doc(editingRepairId).set(_stripUndefined(updateData));
       _repPatchLocal(editingRepairId, _stripUndefined(updateData));
+      // Si al editar se SUBE la seña, la diferencia es plata que entró ahora:
+      // a la caja. Si se baja, no se toca la caja (eso se corrige allá).
+      const senaAntes = Number(existing.sena) || 0;
+      if (sena > senaAntes) {
+        _senaAlIngresoACaja({ ...updateData, id: editingRepairId, sena: sena - senaAntes });
+      } else if (sena < senaAntes) {
+        toast('Bajaste la seña: si ya estaba en la caja, corregí ese movimiento allá', 'info');
+      }
       // Seguimiento público (QR): si cambió el modelo, el IMEI o la fecha
       // estimada, el cliente tiene que verlo al escanear.
       if (typeof upsertSeguimientoPublico === 'function') {
@@ -1955,6 +1964,11 @@ async function saveRepair() {
       // Sin await: el mostrador no espera a Firebase. Si no se puede subir
       // ahora, queda en cola (la de Firestore y la nuestra) y sube sola.
       _guardarRepairSinBloquear(newDoc);
+      // La seña es plata que entra HOY: va a la caja como cualquier seña
+      // cobrada desde ahí (vinculada a la reparación, así el cobro final
+      // descuenta lo ya pagado y si se borra el movimiento se revierte).
+      // Antes quedaba anotada solo en la reparación y la caja no cerraba.
+      if (sena > 0) _senaAlIngresoACaja(newDoc);
       toast(provisorio
         ? `Reparación N°${nOrden} guardada en el celu — se sube cuando Firebase vuelva (el N° puede cambiar)`
         : 'Reparación N°' + nOrden + ' registrada', 'success');
@@ -2021,6 +2035,41 @@ async function saveRepair() {
   } finally {
     btn.disabled = false;
   }
+}
+
+// Movimiento de caja por la seña que se cobró al tomar el equipo. Sin await,
+// como el ingreso: si no hay internet queda en la cola de Firestore.
+function _senaAlIngresoACaja(rep) {
+  const metodo = document.getElementById('rep-fi-sena-metodo')?.value || 'Efectivo';
+  const sena = Number(rep.sena) || 0;
+  if (!(sena > 0)) return null;
+  const mov = {
+    tipo: 'ingreso',
+    categoria: 'Seña',
+    descripcion: `Seña reparación N°${rep.nOrden} — ${[rep.marca, rep.modelo].filter(Boolean).join(' ')}${rep.nombre ? ' · ' + rep.nombre : ''}`,
+    monto: sena,
+    metodoPago: metodo,
+    fecha: (typeof todayAR === 'function') ? todayAR() : new Date().toISOString().slice(0, 10),
+    createdAt: new Date().toISOString(),
+    repairId: rep.id,
+    repairNOrden: rep.nOrden || null,
+    repairMode: 'sena',
+    esSena: true,
+    senaAlIngreso: true,
+    _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
+    ...(typeof tpFirma === 'function' ? tpFirma() : {}),
+  };
+  try {
+    const vend = localStorage.getItem('cajaVendedor');
+    if (vend) mov.vendedor = vend;
+  } catch {}
+  const p = db.collection('caja_movimientos').add(mov);
+  p.then(() => toast(`💵 Seña de $${sena.toLocaleString('es-AR')} anotada en la caja`, 'success'))
+   .catch(e => {
+     console.error('seña a caja:', e);
+     toast('⚠️ La seña NO se pudo anotar en la caja: cargala a mano', 'error');
+   });
+  return p;
 }
 
 // ── Detalle ───────────────────────────────
