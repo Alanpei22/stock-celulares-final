@@ -126,13 +126,17 @@
       errEl.classList.remove('show'); okEl.classList.remove('show');
     }
 
+    // A dónde volver después de entrar (ej: la pantalla de fotos del celu).
+    // Sólo rutas relativas: evita open redirect a dominios externos.
+    function destino() {
+      const raw = new URLSearchParams(location.search).get('next') || '';
+      return raw && /^[a-zA-Z0-9_\-./]+\.html(\?[a-zA-Z0-9_\-=&%.]*)?$/.test(raw) && !raw.includes('//') ? raw : 'index.html';
+    }
+
     // Si ya hay sesión activa, ir directo a la app.
     waitForAuth().then(user => {
       if (!user) return;
-      const raw  = new URLSearchParams(location.search).get('next') || '';
-      // Sólo aceptar rutas relativas (evita open redirect a dominios externos)
-      const next = raw && /^[a-zA-Z0-9_\-./]+\.html(\?.*)?$/.test(raw) ? raw : 'index.html';
-      location.replace(next);
+      location.replace(destino());
     });
 
     form.addEventListener('submit', async e => {
@@ -142,7 +146,7 @@
       btn.textContent = 'Ingresando...';
       try {
         await signIn(emailEl.value, passEl.value);
-        location.replace('index.html');
+        location.replace(destino());
       } catch (err) {
         let msg = 'Error al iniciar sesión';
         const code = err?.code || '';

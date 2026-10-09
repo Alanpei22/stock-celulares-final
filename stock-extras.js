@@ -242,7 +242,10 @@ function buildPhotoGalleryHTML(p) {
       <input type="file" accept="image/*" multiple data-stock-id="${id}" onchange="_onStockPhotoFileChange(event)" style="display:none">
       <span>📷</span>
       <span class="photo-add-lbl">Agregar foto${fotos.length > 0 ? 's' : ''}</span>
-    </label>`;
+    </label>
+    <button type="button" class="photo-add photo-celu" onclick="window._catQrDesdeFicha='${id}';catQrCelu('${id}')">
+      <span>📱</span><span class="photo-add-lbl">Desde el celu</span>
+    </button>`;
   }
   html += '</div>';
   return html;

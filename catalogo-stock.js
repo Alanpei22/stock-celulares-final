@@ -68,7 +68,68 @@ function _catPintarFotos() {
   box.innerHTML = ya + pend + `<label class="photo-add">
       <input type="file" accept="image/*" multiple style="display:none" onchange="catElegirFotos(this)">
       <span>📷</span><span class="photo-add-lbl">Agregar fotos</span>
-    </label>`;
+    </label>
+    <button type="button" class="photo-add photo-celu" onclick="catQrCelu(_catId)">
+      <span>📱</span><span class="photo-add-lbl">Desde el celu</span>
+    </button>`;
+}
+
+// ── 📱 Fotos desde el celu ──
+// La compu muestra un QR; el celu lo escanea, abre fotos-celu.html y sube las
+// fotos de ESE equipo. Mientras el QR está abierto se escucha el equipo: las
+// fotos aparecen acá solas a medida que llegan.
+let _catQrUnsub = null;
+
+function catUrlCelu(id) {
+  const base = (typeof location !== 'undefined' && /^https?:/.test(location.origin)) ? location.origin : 'https://stock-celulares-final.vercel.app';
+  return `${base}/fotos-celu.html?id=${encodeURIComponent(id)}`;
+}
+
+function catQrCelu(id) {
+  if (!id) { toast('Primero guardá el equipo, después le sacás las fotos desde el celu', 'info'); return; }
+  catQrCerrar();
+  const p = (typeof STOCK !== 'undefined') ? STOCK.find(x => x.id === id) : null;
+  const url = catUrlCelu(id);
+  const ov = document.createElement('div');
+  ov.id = 'cat-qr';
+  ov.className = 'cat-qr-ov';
+  ov.innerHTML = `<div class="cat-qr-caja">
+      <button type="button" class="cat-qr-x" onclick="catQrCerrar()">✕</button>
+      <h3>📱 Fotos desde el celu</h3>
+      <p class="cat-qr-eq">${esc([p?.marca, p?.modelo].filter(Boolean).join(' ') || 'Equipo')}</p>
+      <div class="cat-qr-img">${typeof qrSvg === 'function' ? qrSvg(url, 52) : ''}</div>
+      <p class="cat-qr-paso">Abrí la cámara del celu y apuntá al código.<br>Sacá las fotos y van a ir apareciendo acá.</p>
+      <div class="cat-qr-fotos" id="cat-qr-fotos"></div>
+      <p class="cat-qr-link"><input readonly value="${esc(url)}" onclick="this.select()"></p>
+      <button type="button" class="btn-primary cat-qr-listo" onclick="catQrCerrar()">Listo</button>
+    </div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) catQrCerrar(); });
+  document.body.appendChild(ov);
+  let antes = null;
+  _catQrUnsub = db.collection('stock').doc(id).onSnapshot(d => {
+    const fotos = (d.exists && Array.isArray(d.data().fotos)) ? d.data().fotos : [];
+    const box = document.getElementById('cat-qr-fotos');
+    if (box) {
+      box.innerHTML = fotos.length
+        ? `<b>${fotos.length} foto${fotos.length === 1 ? '' : 's'}</b><div>${fotos.map(u => `<img src="${esc(u)}" alt="">`).join('')}</div>`
+        : '<span>Esperando fotos…</span>';
+    }
+    if (antes !== null && fotos.length > antes) toast('📷 Llegó una foto del celu', 'success');
+    antes = fotos.length;
+    // Si el formulario de ese equipo está abierto, se actualiza su galería
+    if (_catId === id) { _catFotos = fotos.slice(); _catPintarFotos(); }
+    const sp = (typeof STOCK !== 'undefined') ? STOCK.find(x => x.id === id) : null;
+    if (sp) sp.fotos = fotos.slice();
+  }, e => console.error('qr celu:', e));
+}
+
+function catQrCerrar() {
+  if (_catQrUnsub) { _catQrUnsub(); _catQrUnsub = null; }
+  document.getElementById('cat-qr')?.remove();
+  // Si se abrió desde la ficha del equipo, que muestre las fotos nuevas
+  const det = document.getElementById('detail-modal');
+  if (det && !det.classList.contains('hidden') && typeof openDetail === 'function' && window._catQrDesdeFicha) openDetail(window._catQrDesdeFicha);
+  window._catQrDesdeFicha = null;
 }
 
 function catElegirFotos(input) {

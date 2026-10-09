@@ -135,6 +135,27 @@ console.log('\n4) Publicar varios desde la selección múltiple');
   ok(/bg-publicado/.test(app), 'la tarjeta del stock muestra "🌐 En la página"');
 }
 
+console.log('\n5) Fotos desde el celu (QR)');
+{
+  const fc = leer('fotos-celu.js'), fh = leer('fotos-celu.html'), lg = leer('login.html');
+  ok(/requireAuth\('login\.html\?next=' \+ encodeURIComponent\(volver\)\)/.test(fc), 'pide sesión; si el celu no estaba logueado, el login lo devuelve a la misma pantalla');
+  ok(/FieldValue\.arrayUnion\(url\)/.test(fc), 'cada foto se SUMA al equipo (no pisa lo que haga la compu al mismo tiempo)');
+  ok(/achicar\(file, max = 1000, q = 0\.7\)/.test(fc) && /stock-photos\/\$\{ID\}\//.test(fc), 'achicada a 1000 px / JPG 70%, en la carpeta del equipo');
+  ok(/\^\[A-Za-z0-9_-\]\{4,60\}\$/.test(fc), 'un id raro en el link no se usa');
+  ok(/capture="environment"/.test(fh) && /firebase-storage-compat/.test(fh) && /noindex/.test(fh), 'abre la cámara trasera; no aparece en Google');
+  ok(/catQrCelu\(_catId\)/.test(cat) && /catQrCelu\('\$\{id\}'\)/.test(sx), 'botón "Desde el celu" en el formulario y en la ficha del equipo');
+  ok(/onSnapshot/.test(cat.slice(cat.indexOf('function catQrCelu'))) && /_catQrUnsub\(\)/.test(cat), 'con el QR abierto las fotos aparecen solas, y al cerrar se deja de escuchar');
+  // el ?next del login: solo páginas propias
+  const m = lg.match(/function destino\(\) \{[\s\S]*?\n    \}/);
+  ok(!!m, 'el login vuelve a donde se pidió (también después de escribir la contraseña)');
+  const cl = { URLSearchParams, location: { search: '' } };
+  vm.createContext(cl); vm.runInContext(m[0], cl);
+  const dest = q => { cl.location.search = '?next=' + encodeURIComponent(q); return vm.runInContext('destino()', cl); };
+  ok(dest('fotos-celu.html?id=abc123') === 'fotos-celu.html?id=abc123', 'acepta la pantalla de fotos');
+  ok(dest('https://malo.com/x.html') === 'index.html' && dest('//malo.com/x.html') === 'index.html' && dest('x.html?a=<script>') === 'index.html',
+     'no manda a otro sitio (open redirect)');
+}
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
 })().catch(e => { console.error('Error:', e); process.exit(1); });
