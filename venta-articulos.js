@@ -115,7 +115,7 @@ function _vaBuscar() {
 
   const lista = vaLista().filter(p => p.activo !== false);
   const match = (typeof searchMatch === 'function')
-    ? (p => searchMatch([p.nombre, p.codigo, p.categoria], q))
+    ? (p => searchMatch([p.nombre, p.codigo, p.codigoCorto, p.categoria], q))
     : (p => String(p.nombre || '').toLowerCase().includes(q.toLowerCase()));
   const res = lista.filter(match).slice(0, 6);
 

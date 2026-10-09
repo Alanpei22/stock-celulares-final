@@ -295,7 +295,7 @@ function _rep2Filtrados() {
     if (fMarca && r.marca !== fMarca) return false;
     // El código entra en la búsqueda: si está impreso en la etiqueta, tiene que
     // servir para encontrar el repuesto tecleándolo.
-    if (q && !searchMatch([r.nombre, r.marca, r.modelo, r.tipo, r.proveedor, r.codigo], q)) return false;
+    if (q && !searchMatch([r.nombre, r.marca, r.modelo, r.tipo, r.proveedor, r.codigo, r.codigoCorto], q)) return false;
     return true;
   });
 }

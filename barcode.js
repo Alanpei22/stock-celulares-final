@@ -106,7 +106,9 @@ function code128Svg(txt, opts) {
   if (!bits) return '';
   const modulo = Number(o.modulo) || 0.33;
   const alto   = Number(o.alto) || 9;
-  const quiet  = 10;                                  // zona muda obligatoria
+  // Zona muda: 10 módulos es lo de la norma; en la etiqueta de 40mm se baja a
+  // 6 solo cuando no entra de otra forma (los lectores lo bancan).
+  const quiet  = Number(o.quiet) || 10;
   const leyenda = o.leyenda === false ? '' : code128Limpio(txt);
   const th     = leyenda ? 2.6 : 0;                   // lugar para el texto
   const w      = (bits.length + quiet * 2) * modulo;

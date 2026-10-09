@@ -196,7 +196,7 @@ medirBarras(pr, '7790895000997', 'el código del artículo');
 ok((pr.match(/<svg/g) || []).length === 1, 'el que no tiene código sale sin barras', (pr.match(/<svg/g) || []).length);
 ok(/SIN CÓDIGO/.test(pr), 'y el que no tiene lo dice en la cara, para no pegarla y descubrirlo después');
 ok(TOASTS.some(t => /sin código/.test(t[1])), 'avisando cuántos fueron', TOASTS);
-ok(/PRODUCTOS/.test(caja) && /String\(p\.codigo \|\| ''\)\.trim\(\) === txt/.test(caja),
+ok(/PRODUCTOS/.test(caja) && /String\(x\.codigo \|\| ''\)\.trim\(\) === txt/.test(caja) && /\.find\(p => p\.activo !== false && esSuyo\(p\)\)/.test(caja),
    'y la caja busca el artículo por ese mismo código');
 
 console.log('\n5b) Etiqueta de repuesto');
@@ -384,10 +384,10 @@ ok(/const codigo = \(document\.getElementById\('rep2-fi-codigo'\)\?\.value \|\| 
    'se guarda en mayúsculas');
 ok(/precioCostoUSD, precioVenta, precioCompra, codigo,/.test(rep2), 'y va al documento');
 ok(/codEl\.value = r\.codigo \|\| ''/.test(rep2), 'y se vuelve a cargar al editar');
-ok(/r\.proveedor, r\.codigo\]/.test(rep2),
+ok(/r\.proveedor, r\.codigo, r\.codigoCorto\]/.test(rep2),
    'el buscador lo encuentra por el código (si está impreso, tiene que servir para buscarlo)');
 const buscaRepu = caja.slice(caja.indexOf('const repu = '), caja.indexOf('const repu = ') + 200);
-ok(/CAJA_REPUESTOS/.test(buscaRepu) && /String\(r\.codigo \|\| ''\)\.trim\(\) === txt/.test(buscaRepu),
+ok(/CAJA_REPUESTOS/.test(buscaRepu) && /\.find\(esSuyo\)/.test(buscaRepu),
    'y la caja lo encuentra al escanear ese código', buscaRepu.slice(0, 120));
 ok(/onclick="imprimirEtiquetaRepuesto\(\)"/.test(idx), 'con su botón de etiqueta en la ficha');
 ok(/label: 'Imprimir etiquetas'/.test(fs.readFileSync(DIR + 'app.js', 'utf8')),
@@ -422,6 +422,83 @@ ok(!/Clave:/.test(sinClave) && !/class="etqr-patron"/.test(sinClave) && !/class=
    'sin clave ni patrón (o un patrón de un solo punto) queda como antes');
 ok(!/_patronEtqSvg|etqr-clave/.test(printSrc.slice(printSrc.indexOf('function _a5Body'), printSrc.indexOf('function _a5Body') + 3000)),
    'la boleta A5 que se lleva el cliente sigue sin clave');
+
+console.log('\n9) Códigos largos y la etiquetadora de 203 dpi');
+{
+  // La etiquetadora imprime puntos de 0,125mm. Se "imprime" el SVG punto por
+  // punto (un punto sale negro si la barra lo tapa en más de la mitad) y se
+  // miran las barras que quedan.
+  const PUNTO = 25.4 / 203;
+  const rasterizar = (b, modMm) => {
+    const fila = [];
+    const total = Math.ceil(b.length * modMm / PUNTO);
+    for (let d = 0; d < total; d++) {
+      const a = d * PUNTO, z = a + PUNTO;
+      let negro = 0;
+      for (let i = Math.floor(a / modMm); i <= Math.floor(z / modMm) && i < b.length; i++) {
+        if (b[i] === '1') negro += Math.max(0, Math.min(z, (i + 1) * modMm) - Math.max(a, i * modMm));
+      }
+      fila.push(negro / PUNTO >= 0.5 ? 1 : 0);
+    }
+    return fila;
+  };
+  // ¿Cada barra/espacio impreso mide exactamente (módulos × puntos por módulo)?
+  const parejo = (b, modMm) => {
+    const k = Math.round(modMm / PUNTO);
+    if (Math.abs(modMm - k * PUNTO) > 1e-9) return false;
+    const fila = rasterizar(b, modMm).join('');
+    const esperado = b.split('').map(c => (c === '1' ? '1' : '0').repeat(k)).join('');
+    return fila === esperado;
+  };
+  const medida = (v, a) => { pCtx._v = v; pCtx._a = a; return vm.runInContext('etqMedidaBarras(_v, _a)', pCtx); };
+  for (const [cod, que] of [['7790895000997', 'EAN de 13'], ['TP00042', 'código interno'], ['356938035643809', 'IMEI'], ['ACC-12345', 'con letras, 9']]) {
+    const m = medida(cod, 38.4);
+    ok(m && Math.abs(m.modulo / PUNTO - Math.round(m.modulo / PUNTO)) < 1e-9 && m.modulo >= 0.25 - 1e-9,
+       `${que}: la barra es una cantidad ENTERA de puntos (${m && Math.round(m.modulo / PUNTO)}) y no baja de 0,25mm`, m);
+    ok(m && parejo(bits(cod), m.modulo), `${que}: impreso, todas las barras salen parejas`);
+    ok(m && (bits(cod).length + m.quiet * 2) * m.modulo <= 38.4 + 1e-9, `${que}: entra en los 38,4mm`);
+  }
+  // Cómo era antes: 0,27mm por barra = 2,16 puntos → al imprimir unas salen de 2 y otras de 3
+  ok(!parejo(bits('7790895000997'), 38.4 / (bits('7790895000997').length + 20)), 'antes (barra de 0,27mm): impresa salía despareja');
+  const largo = 'SAM-EP-TA800-BLK-25W';
+  ok(medida(largo, 38.4) === null, `un código de fábrica largo (${largo}) NO entra legible`);
+  ok(medida('6941059612345678', 38.4) !== null, 'uno de 16 números sí (modo C: dos por barra)');
+
+  // Al imprimir: se le reserva uno corto, se guarda, y la etiqueta lleva ese
+  const GUARDADO = [];
+  pCtx.tpReservarCodigos = async (db, n) => Array.from({ length: n }, (_, i) => 'TP0090' + i);
+  pCtx.tpMaxCodigoLocal = () => 0;
+  pCtx.db = { batch: () => ({ update: (ref, d) => GUARDADO.push([ref.col, ref.id, d]), commit: async () => {} }),
+              collection: col => ({ doc: id => ({ col, id }) }) };
+  const art = { id: 'p1', nombre: 'Cargador Samsung 25W', precioVenta: 15000, codigo: largo };
+  IMPRESO = null; TOASTS.length = 0;
+  pCtx.__D = [art, { id: 'p2', nombre: 'Funda', codigo: '7790895000997' }];
+  vm.runInContext('printEtiquetasProductos(__D, 1)', pCtx);
+  await new Promise(r => setTimeout(r, 20));
+  ok(GUARDADO.length === 1 && GUARDADO[0][0] === 'productos' && GUARDADO[0][1] === 'p1' && GUARDADO[0][2].codigoCorto === 'TP00900',
+     'el de código largo recibe uno corto y se guarda en el artículo (el otro no lo necesita)', GUARDADO);
+  const html = IMPRESO ? IMPRESO.html : '';
+  ok(/class="etq-cod">TP00900</.test(html), 'la etiqueta muestra el corto (el que se puede teclear si no lee)');
+  ok(TOASTS.some(t => /muy largo/.test(t[1])), 'y avisa por qué');
+  const svgCorto = html.slice(html.indexOf('<svg'));
+  ok(!/etq-bc--largo/.test(html), 'las barras entran enteras');
+  ok(await leerConZxing(imagen(bits('TP00900'))) === 'TP00900', 'y el corto se lee con la ZXing');
+  // Segunda vez: ya lo tiene, no se reserva otro
+  GUARDADO.length = 0;
+  pCtx.__D = [art];
+  vm.runInContext('printEtiquetasProductos(__D, 2)', pCtx);
+  await new Promise(r => setTimeout(r, 20));
+  ok(GUARDADO.length === 0 && /TP00900/.test(IMPRESO ? IMPRESO.html : ''), 'la segunda vez usa el mismo, no reserva otro');
+  // Repuestos: se guarda en su colección
+  GUARDADO.length = 0;
+  const rep = { id: 'r1', tipo: 'Pantalla', nombre: 'A10', codigo: 'PANT-SAMSUNG-A10-OLED' };
+  pCtx.__D = [rep];
+  vm.runInContext('printEtiquetasRepuestos(__D, 1)', pCtx);
+  await new Promise(r => setTimeout(r, 20));
+  ok(GUARDADO.length === 1 && GUARDADO[0][0] === 'repuestos' && rep.codigoCorto, 'en repuestos también (en su colección)', GUARDADO);
+  ok(/const esSuyo = x => String\(x\.codigo \|\| ''\)\.trim\(\) === txt \|\| String\(x\.codigoCorto \|\| ''\)\.trim\(\) === txt/.test(caja),
+     'la caja encuentra el artículo por cualquiera de los dos códigos');
+}
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

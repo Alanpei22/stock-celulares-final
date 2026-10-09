@@ -223,7 +223,7 @@ function _invFiltrados() {
   const estF   = document.getElementById('inv-f-estado')?.value || '';
 
   let lista = PRODUCTOS;
-  if (search) lista = lista.filter(p => searchMatch([p.nombre, p.codigo, p.categoria], search));
+  if (search) lista = lista.filter(p => searchMatch([p.nombre, p.codigo, p.codigoCorto, p.categoria], search));
   if (catF)  lista = lista.filter(p => p.categoria === catF);
   if (estF === 'activo')    lista = lista.filter(p => p.activo !== false);
   if (estF === 'inactivo')  lista = lista.filter(p => p.activo === false);

@@ -3093,9 +3093,13 @@ function _movDesdeCodigo(cod, opts = {}) {
   if (!txt) return false;
   const digitos = txt.replace(/\D/g, '');
 
+  // El código de fábrica o el corto que lleva la etiqueta cuando el de
+  // fábrica es muy largo para imprimirlo legible (print.js)
+  const esSuyo = x => String(x.codigo || '').trim() === txt || String(x.codigoCorto || '').trim() === txt;
+
   // 1) Accesorio del inventario, por su código de barras
   const prod = (typeof PRODUCTOS !== 'undefined' ? PRODUCTOS : [])
-    .find(p => p.activo !== false && String(p.codigo || '').trim() === txt);
+    .find(p => p.activo !== false && esSuyo(p));
   if (prod) {
     _addToCart({
       source: 'producto', id: prod.id, nombre: prod.nombre || '(sin nombre)',
@@ -3109,7 +3113,7 @@ function _movDesdeCodigo(cod, opts = {}) {
 
   // 2) Repuesto
   const repu = (typeof CAJA_REPUESTOS !== 'undefined' ? CAJA_REPUESTOS : [])
-    .find(r => String(r.codigo || '').trim() === txt);
+    .find(esSuyo);
   if (repu) {
     const dolar = (typeof getCurrentDolar === 'function' ? getCurrentDolar() : 0) || 0;
     const costoUSD = Number(repu.precioCostoUSD) || 0;

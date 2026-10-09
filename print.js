@@ -199,20 +199,40 @@ function etqEsA4() { return etqFormato() === 'a4'; }
 // El código de barras, estirado hasta llenar el ancho que le toca.
 //
 // El ancho de la barra más fina es lo que decide si el lector lee o no: abajo
-// de 0,25mm empieza a fallar, y en una etiqueta de 40mm un IMEI de 15 dígitos
-// entra JUSTO en ese mínimo (154 módulos × 0,25 = 38,5mm). Por eso el módulo
-// se calcula en vez de fijarse: los códigos cortos salen con barras gruesas y
-// los largos se achican solo hasta el piso, nunca por debajo.
-const _ETQ_MODULO_MIN = 0.25;
+// de 0,25mm empieza a fallar. Y la etiquetadora imprime de a PUNTOS de
+// 0,125mm (203 dpi): una barra de 0,27mm son 2,13 puntos, y al pasar a blanco
+// y negro unas salen de 2 y otras de 3 — el código queda desparejo y no lee.
+// Por eso el módulo es siempre una cantidad ENTERA de puntos: 2 (0,25mm),
+// 3 o 4, el más grueso que entre.
+//
+// Lo que entra en 38mm: ~8 caracteres con letras o ~16 números. Si un código
+// es más largo (los de fábrica de algunos accesorios), la etiqueta lleva un
+// código corto interno (ver _asegurarCodigosCortos), que la caja también lee.
+const ETQ_PUNTO = 25.4 / 203;
+const _ETQ_MODULO_MIN = 2 * ETQ_PUNTO;   // 0,25mm
+
+// { modulo, quiet } o null si ese código no entra legible en ese ancho
+function etqMedidaBarras(valor, anchoMm) {
+  const v = String(valor == null ? '' : valor).trim();
+  if (!v || typeof code128Bits !== 'function') return null;
+  const bits = code128Bits(v).length;
+  const ancho = Number(anchoMm) || _etqAncho();
+  for (const quiet of [10, 6]) {
+    const puntos = Math.min(4, Math.floor(ancho / ((bits + quiet * 2) * ETQ_PUNTO)));
+    if (puntos >= 2) return { modulo: puntos * ETQ_PUNTO, quiet };
+  }
+  return null;
+}
+function etqCodigoEntra(valor, anchoMm) { return !!etqMedidaBarras(valor, anchoMm); }
 
 function _barrasEtq(valor, anchoMm, altoMm, leyenda) {
   const v = String(valor == null ? '' : valor).trim();
   if (!v || typeof code128Svg !== 'function' || typeof code128Bits !== 'function') return '';
-  const modulos = code128Bits(v).length + 20;          // +20 = las dos zonas mudas
-  const ancho = Number(anchoMm) || 36;
-  const modulo = Math.max(_ETQ_MODULO_MIN, Math.min(0.5, ancho / modulos));
-  return `<div class="etq-bc">${code128Svg(v, {
-    modulo, alto: Number(altoMm) || 8, leyenda: leyenda === false ? false : true,
+  // Si no entra, se dibuja igual al mínimo legible y se avisa: achicarlo para
+  // que entre lo haría ilegible, que es peor que no tenerlo.
+  const m = etqMedidaBarras(v, anchoMm) || { modulo: _ETQ_MODULO_MIN, quiet: 6, noEntra: true };
+  return `<div class="etq-bc${m.noEntra ? ' etq-bc--largo' : ''}">${code128Svg(v, {
+    modulo: m.modulo, quiet: m.quiet, alto: Number(altoMm) || 8, leyenda: leyenda === false ? false : true,
   })}</div>`;
 }
 
@@ -236,7 +256,9 @@ function _precioClave(n) {
 function _etiquetaProdHtml(p) {
   const precio = Number(p.precioVenta ?? p.precio) || 0;
   const clave = _precioClave(precio);
-  const cod = String(p.codigo || '').trim();
+  // Código de fábrica largo: va el corto interno (la caja lee los dos)
+  const largo = String(p.codigo || '').trim();
+  const cod = (largo && !etqCodigoEntra(largo) && p.codigoCorto) ? String(p.codigoCorto).trim() : largo;
   const sub = [p.marca, p.modelo].filter(Boolean).join(' ') || p.categoria || p.tipo || '';
   return `<div class="etq">
     <div class="etq-eq etq-eq--prod">${_escEtq(p.nombre || 'Producto')}</div>
@@ -446,7 +468,8 @@ function printEtiquetas(lista, copias) {
 }
 
 function printEtiquetasProductos(lista, copias) {
-  const prods = _repetir((Array.isArray(lista) ? lista : [lista]).filter(Boolean), copias);
+  const base = (Array.isArray(lista) ? lista : [lista]).filter(Boolean);
+  const prods = _repetir(base, copias);
   if (!prods.length) { if (typeof toast === 'function') toast('No hay artículos para etiquetar', 'error'); return; }
   // Sin código no hay barras: la etiqueta sale igual (nombre y precio) pero se
   // avisa, porque esa no se va a poder escanear en la caja.
@@ -454,7 +477,58 @@ function printEtiquetasProductos(lista, copias) {
   if (sinCod && typeof toast === 'function') {
     toast(`${sinCod} sin código de barras: cargáselo o generalo desde el menú`, 'info');
   }
-  _imprimirTocando('etiqueta', _hojaEtiquetas(prods, _etiquetaProdHtml), 'Etiquetas');
+  const armar = () => _hojaEtiquetas(prods, _etiquetaProdHtml);
+  const faltan = _faltanCodigosCortos(base);
+  if (!faltan.length) { _imprimirTocando('etiqueta', armar(), 'Etiquetas'); return; }
+  // Hay códigos de fábrica que no entran: primero se les reserva uno corto.
+  // Eso va a la base (tarda), y sin QZ el navegador solo deja abrir la ventana
+  // en el mismo toque: se abre ya y se llena cuando están los códigos.
+  const w = (typeof qzActivo === 'function' && qzActivo('etiqueta')) ? null
+          : window.open('', '_blank', 'width=520,height=720,scrollbars=yes');
+  if (w) w.document.write('<p style="font:16px sans-serif;padding:20px">Preparando etiquetas…</p>');
+  _asegurarCodigosCortos(faltan).then(() => {
+    // Las copias apuntan a los mismos objetos: ya tienen el corto
+    if (!w) { _imprimirTocando('etiqueta', armar(), 'Etiquetas'); return; }
+    w.document.open(); w.document.write(armar()); w.document.close();
+    w.addEventListener('load', () => { w.focus(); setTimeout(() => w.print(), 350); });
+  });
+}
+
+// Artículos cuyo código de fábrica no entra legible en la etiqueta y todavía
+// no tienen uno corto.
+function _faltanCodigosCortos(lista) {
+  return lista.filter(p => {
+    const c = String(p.codigo || '').trim();
+    return c && !String(p.codigoCorto || '').trim() && !etqCodigoEntra(c) && (p.id || p._orig);
+  });
+}
+
+// Les reserva un código corto (el mismo contador TP##### de "Generar códigos")
+// y lo guarda en el artículo como `codigoCorto`: la caja lo encuentra por ese
+// o por el de fábrica. Si no hay internet, sale con el largo y se avisa.
+async function _asegurarCodigosCortos(lista) {
+  if (!lista.length || typeof tpReservarCodigos !== 'function' || typeof db === 'undefined' || !db) return;
+  try {
+    const todos = [
+      ...((typeof PRODUCTOS !== 'undefined' && Array.isArray(PRODUCTOS)) ? PRODUCTOS : []),
+      ...((typeof REPUESTOS !== 'undefined' && Array.isArray(REPUESTOS)) ? REPUESTOS : []),
+    ];
+    const maxLocal = (typeof tpMaxCodigoLocal === 'function')
+      ? Math.max(tpMaxCodigoLocal(todos), tpMaxCodigoLocal(todos.map(x => ({ codigo: x.codigoCorto })))) : 0;
+    const cods = await tpReservarCodigos(db, lista.length, maxLocal);
+    const batch = db.batch();
+    lista.forEach((p, i) => {
+      const destino = p._orig || p;
+      const col = p._col || 'productos';
+      p.codigoCorto = destino.codigoCorto = cods[i];
+      batch.update(db.collection(col).doc(destino.id || p.id), { codigoCorto: cods[i] });
+    });
+    await batch.commit();
+    if (typeof toast === 'function') toast(`🏷️ ${lista.length} código${lista.length === 1 ? '' : 's'} de fábrica muy largo${lista.length === 1 ? '' : 's'} para la etiqueta: se imprime uno corto (la caja lee los dos)`, 'info');
+  } catch (e) {
+    console.error('códigos cortos:', e);
+    if (typeof toast === 'function') toast('No se pudo asignar el código corto: esas etiquetas pueden no leerse', 'error');
+  }
 }
 
 // Repuestos: "Módulo" solo no dice nada, así que el nombre es el tipo con la
@@ -466,6 +540,8 @@ function printEtiquetasRepuestos(lista, copias) {
     marca: r.marca, modelo: r.modelo,
     precioVenta: Number(r.precioVenta) || 0,
     codigo: r.codigo,
+    codigoCorto: r.codigoCorto,
+    _col: 'repuestos', _orig: r,
   }));
   printEtiquetasProductos(reps, copias);
 }
