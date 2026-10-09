@@ -53,7 +53,18 @@ const endpoints = fs.readdirSync(raiz('api'))
 
 ok(endpoints.length >= 7, 'se encontraron los endpoints de /api', endpoints);
 
-endpoints.forEach(f => {
+// Públicos A PROPÓSITO (sin sesión). Cada uno tiene que ser de solo lectura y
+// devolver datos armados por lista blanca. Sumar uno acá es una decisión.
+const PUBLICOS = {
+  'equipos.js': 'catálogo /equipos: lista blanca de campos del stock, solo GET',
+};
+Object.keys(PUBLICOS).forEach(f => {
+  const src = sinComentarios(leer(path.join('api', f)));
+  ok(/req\.method !== 'GET'/.test(src) && !/\.(set|update|add|delete)\(/.test(src),
+     `/api/${f.replace('.js','')} es pública a propósito (${PUBLICOS[f]}) y no escribe nada`);
+});
+
+endpoints.filter(f => !PUBLICOS[f]).forEach(f => {
   const src = sinComentarios(leer(path.join('api', f)));
   const guardado = FORMAS_VALIDAS.some(re => re.test(src));
   ok(guardado, `/api/${f.replace('.js','')} exige alguna autenticación`, f);
@@ -170,7 +181,9 @@ const run = code => vm.runInContext(code, ctx);
   console.log('\n  ── El resto de la app ──');
 
   const delCliente = fs.readdirSync(raiz('.'))
-    .filter(f => f.endsWith('.js') && !f.startsWith('sw.'));
+    .filter(f => f.endsWith('.js') && !f.startsWith('sw.'))
+    // la página pública /equipos no tiene sesión: lee el endpoint público
+    .filter(f => f !== 'equipos.js');
   delCliente.forEach(f => {
     const src = leer(f);
     const pelado = /fetch\(\s*['"`]\/api\//.test(src);

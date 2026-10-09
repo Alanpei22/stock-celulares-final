@@ -644,6 +644,8 @@ function toggleHdrMenu() {
     { icon: '🔒', label: 'Modo dueño', hide: _soloDueno(), onClick: toggleOwnerLock },
     { divider: true },
     { icon: '☑️', label: 'Selección múltiple', sub: 'Editar varios equipos a la vez', onClick: enterBatchMode },
+    { icon: '🌐', label: 'Página de equipos', sub: 'Ver la página y copiar el link para Instagram / WhatsApp',
+      onClick: () => (typeof catAbrirPagina === 'function') && catAbrirPagina() },
     { icon: '📐', label: 'Sentido de la etiqueta',
       sub: (typeof etqFormato === 'function' && typeof ETQ_FORMATO_NOMBRE === 'object') ? ETQ_FORMATO_NOMBRE[etqFormato()] : '',
       onClick: elegirFormatoEtiqueta },
@@ -1331,6 +1333,7 @@ function openForm(id) {
     if (document.getElementById('fi-costo'))    document.getElementById('fi-costo').value    = p.costo || '';
     if (document.getElementById('fi-garantia')) document.getElementById('fi-garantia').value = p.garantiaMeses || '0';
     _updateBateriaVisibility(p.marca || '');
+    if (typeof catFormCargar === 'function') catFormCargar(p);
     // Restaurar modo USD si el equipo fue cargado en dólares
     if (p.moneda === 'usd' && p.precioUSD) {
       monedaMode = 'usd';
@@ -1353,6 +1356,7 @@ function openForm(id) {
     if (document.getElementById('fi-costo'))    document.getElementById('fi-costo').value = '';
     if (document.getElementById('fi-garantia')) document.getElementById('fi-garantia').value = '0';
     _updateBateriaVisibility('');
+    if (typeof catFormCargar === 'function') catFormCargar(null);
     if (btnM) { btnM.textContent = 'ARS $'; btnM.classList.remove('btn-moneda--usd'); }
     if (helper) helper.textContent = '';
   }
@@ -1458,8 +1462,11 @@ async function savePhone() {
       // Costo y garantía
       if (costo > 0) upd.costo = costo; else delete upd.costo;
       if (garantiaMeses > 0) upd.garantiaMeses = garantiaMeses; else delete upd.garantiaMeses;
+      // Página pública: publicar, color, detalles, "consultar precio"
+      if (typeof catFormCampos === 'function') Object.assign(upd, catFormCampos());
       // BUG-FIX: await + try/catch
       await db.collection('stock').doc(editingId).set(upd);
+      if (typeof catSubirPendientes === 'function') catSubirPendientes(editingId);
       toast('Equipo actualizado ✅', 'success');
     } else {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1474,7 +1481,9 @@ async function savePhone() {
       if (esUSD) { newDoc.precioUSD = precioUSD; newDoc.moneda = 'usd'; }
       if (costo > 0) newDoc.costo = costo;
       if (garantiaMeses > 0) newDoc.garantiaMeses = garantiaMeses;
+      if (typeof catFormCampos === 'function') Object.assign(newDoc, catFormCampos());
       await db.collection('stock').doc(id).set(newDoc);
+      if (typeof catSubirPendientes === 'function') catSubirPendientes(id);
       toast('Equipo agregado al stock ✅', 'success');
       // 📨 Aviso Telegram: equipo cargado para la venta
       if (typeof tgNotify === 'function') {
@@ -1766,6 +1775,8 @@ async function deletePhone(id) {
       }
     }
     await db.collection('stock').doc(id).delete();
+    // Las fotos del equipo se borran de Storage con él
+    if (typeof catBorrarFotosDe === 'function') catBorrarFotosDe(p);
     closeDetail();
     toast(revertedCaja ? 'Eliminado · caja revertida' : 'Equipo eliminado', 'info');
   } catch (e) {

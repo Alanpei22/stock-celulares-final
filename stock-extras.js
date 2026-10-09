@@ -129,7 +129,8 @@ function _getStorage() {
   try { return firebase.storage(); } catch { return null; }
 }
 
-async function _compressImage(file, maxSize = 1200, quality = 0.82) {
+// 1000 px y JPG al 70%: así sale en la página /equipos sin que pese.
+async function _compressImage(file, maxSize = 1000, quality = 0.7) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -229,10 +230,11 @@ function buildPhotoGalleryHTML(p) {
   const fotos = p.fotos || [];
   const id = p.id;
   let html = '<div class="photo-gallery">';
-  fotos.forEach(url => {
+  fotos.forEach((url, i) => {
     html += `<div class="photo-thumb">
       <img src="${url}" alt="" onclick="viewPhotoFullscreen('${url}')">
       <button class="photo-del" onclick="deleteStockPhoto('${id}', '${url}')">🗑</button>
+      ${i === 0 ? '<span class="photo-portada">Portada</span>' : `<button class="photo-star" title="Usar de portada" onclick="catPortada('${id}', '${url}')">⭐</button>`}
     </div>`;
   });
   if (!p.vendido) {

@@ -573,8 +573,30 @@
           </select>
         </div>
         <div class="fg fg--full">
-          <label class="fl">Notas</label>
+          <label class="fl">Notas <small style="color:var(--t3);font-weight:400">— internas, no salen en la página</small></label>
           <textarea id="fi-notas" class="fi fi-area" placeholder="Accesorios, detalles, color…" rows="2"></textarea>
+        </div>
+        <!-- Página pública /equipos (catalogo-stock.js) -->
+        <div class="fg fg--full pub-sec">
+          <label class="pub-toggle"><input type="checkbox" id="fi-publicar" onchange="catPubToggle()"> 🌐 Mostrar en la página de equipos</label>
+          <div id="fi-pub-campos" class="pub-campos hidden">
+            <div class="pub-fila">
+              <div class="fg">
+                <label class="fl">Color</label>
+                <input id="fi-color" class="fi" type="text" placeholder="Azul, Negro…" maxlength="30" list="dl-color" autocomplete="off">
+                <datalist id="dl-color"><option value="Negro"><option value="Blanco"><option value="Azul"><option value="Verde"><option value="Rojo"><option value="Rosa"><option value="Lila"><option value="Dorado"><option value="Plateado"><option value="Gris"><option value="Titanio natural"></datalist>
+              </div>
+              <label class="pub-check"><input type="checkbox" id="fi-ocultar-precio"> Mostrar "Consultar precio"</label>
+            </div>
+            <div class="fg">
+              <label class="fl">Detalles para el cliente</label>
+              <textarea id="fi-detalles-pub" class="fi fi-area" placeholder="Libre de fábrica, con caja y cable…" rows="2" maxlength="300"></textarea>
+            </div>
+            <div class="fg">
+              <label class="fl">📷 Fotos <small style="color:var(--t3);font-weight:400">— la primera es la portada</small></label>
+              <div id="fi-fotos" class="photo-gallery"></div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="form-actions">
@@ -2224,6 +2246,7 @@
 <script defer src="avisos.js"></script>
 <script defer src="app.js"></script>
 <script defer src="stock-extras.js"></script>
+<script defer src="catalogo-stock.js"></script>
 <script defer src="barcode.js"></script>
 <script defer src="print.js"></script>
 <script defer src="venta-articulos.js"></script>

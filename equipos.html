@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Equipos en venta · TechPoint Caseros</title>
+<meta name="description" content="Celulares nuevos y usados con garantía en TechPoint, Urquiza 4741, Caseros. Mirá fotos, precios y consultanos por WhatsApp.">
+<meta name="theme-color" content="#0f2b52">
+<link rel="canonical" href="https://stock-celulares-final.vercel.app/equipos">
+<!-- Vista previa al compartir el link (WhatsApp, Instagram, Facebook) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TechPoint · Servicio técnico">
+<meta property="og:title" content="Equipos en venta · TechPoint Caseros">
+<meta property="og:description" content="Celulares nuevos y usados con garantía. Tomamos tu usado. Consultanos por WhatsApp.">
+<meta property="og:url" content="https://stock-celulares-final.vercel.app/equipos">
+<meta property="og:image" content="https://stock-celulares-final.vercel.app/equipos-og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="es_AR">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,600..800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="equipos.css">
+</head>
+<body>
+<header class="cab">
+  <h1>TechPoint <span>Servicio técnico · Equipos</span></h1>
+  <p class="cab-dato">📍 Urquiza 4741, Local 22, Caseros</p>
+  <p class="cab-dato">🕘 Lunes a sábado · <span class="mono">9:30 a 19:30</span></p>
+  <a class="btn-wa" id="cab-wa" target="_blank" rel="noopener">💬 Consultar por WhatsApp</a>
+</header>
+
+<section class="filtros" aria-label="Filtros">
+  <div class="seg" role="tablist" id="f-cond">
+    <button type="button" data-c="" class="on">Todos</button>
+    <button type="button" data-c="nuevo">Nuevos</button>
+    <button type="button" data-c="usado">Usados</button>
+  </div>
+  <div class="chips" id="f-marcas"></div>
+  <input class="buscar" id="f-buscar" type="search" placeholder="🔍 Buscá modelo, color o capacidad" autocomplete="off" enterkeyhint="search">
+</section>
+
+<main class="grilla" id="grilla" aria-live="polite">
+  <div class="ficha esqueleto"></div><div class="ficha esqueleto"></div>
+</main>
+
+<footer class="pie">
+  <p class="pie-lbl">Contacto</p>
+  <p>WhatsApp <b class="mono sel">11 7239-2511</b></p>
+  <p>Urquiza 4741, Local 22, Caseros · Lunes a sábado de 9:30 a 19:30</p>
+  <p class="pie-lbl">Formas de pago</p>
+  <p>Efectivo · Transferencia · Débito · Crédito en cuotas · Mercado Pago</p>
+  <p><b>Tomamos tu usado como parte de pago.</b></p>
+  <p class="pie-acceso"><a href="index.html">Acceso del local</a></p>
+</footer>
+
+<div class="visor hidden" id="visor" role="dialog" aria-label="Foto ampliada">
+  <div class="visor-pista" id="visor-pista"></div>
+  <span class="visor-cont mono" id="visor-cont"></span>
+  <button type="button" class="visor-x" id="visor-x" aria-label="Cerrar">✕</button>
+</div>
+
+<script src="equipos.js"></script>
+</body>
+</html>

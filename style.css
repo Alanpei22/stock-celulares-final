@@ -6284,3 +6284,16 @@ body.dark .va-buscar, body.dark .va-sug, body.dark .va-qty-btn, body.dark .va-pr
 body.dark .va-sug-item { color: #e8eaed; border-bottom-color: #2a2e34; }
 body.dark .va-sug-item:active { background: #222630; }
 body.dark .va-sin-stock, body.dark .va-aviso, body.dark .va-linea--alerta .va-linea-nom { color: #F87171; }
+
+/* ── Página de equipos (catalogo-stock.js) ── */
+.pub-sec { border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 10px 12px; }
+.pub-toggle { display: flex; align-items: center; gap: 8px; font-weight: 700; cursor: pointer; }
+.pub-toggle input, .pub-check input { width: 18px; height: 18px; }
+.pub-campos { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.pub-fila { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.pub-fila .fg { flex: 1; min-width: 140px; }
+.pub-check { display: flex; align-items: center; gap: 6px; font-size: 13px; padding-bottom: 10px; cursor: pointer; }
+.photo-star { position: absolute; left: 4px; bottom: 4px; border: none; border-radius: 6px; background: rgba(0,0,0,.6); color: #fff; font-size: 13px; padding: 2px 5px; cursor: pointer; }
+.photo-portada { position: absolute; left: 4px; bottom: 4px; border-radius: 6px; background: #0f2b52; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; }
+.photo-pend img { opacity: .7; }
+.photo-pend-lbl { position: absolute; left: 0; right: 0; top: 4px; text-align: center; font-size: 9px; color: #fff; text-shadow: 0 1px 2px #000; }
