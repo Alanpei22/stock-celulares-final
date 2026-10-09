@@ -14,8 +14,9 @@ service cloud.firestore {
     //   · empleado — trabaja (reparaciones, equipos, ventas, gastos,
     //                inventario) pero NO ve la plata del día ni borra nada.
     //
-    //  ⚠️ Estas dos listas tienen que decir lo mismo que `TP_USUARIOS` en
-    //     roles.js. tests/test-roles.js falla si se separan.
+    //  ⚠️ Las listas de UIDs tienen que decir lo mismo que `TP_USUARIOS` en
+    //     roles.js. tests/test-roles.js falla si se separan. Los empleados
+    //     nuevos NO van acá: se crean desde la app y entran por la marca.
     //     Esconder cosas en la pantalla es comodidad; lo que de verdad frena
     //     es este archivo, y este archivo NO viaja con el git push:
     //     firebase deploy --only firestore:rules --project stockcelustech
@@ -26,10 +27,18 @@ service cloud.firestore {
       ];
     }
 
+    // Empleados: los que el dueño crea desde la app (👥 Empleados) llevan la
+    // marca rol=empleado en la cuenta. Esa marca la pone SOLO el servidor
+    // (api/usuarios.js, con la clave de administrador): nadie se la puede
+    // poner solo registrándose. Por eso sumar un empleado ya no es tocar este
+    // archivo. La lista de UIDs queda para alguno cargado a mano.
     function esEmpleado() {
-      return request.auth != null && request.auth.uid in [
-        'PONER_ACA_EL_UID_DEL_EMPLEADO'  // placeholder: no es el UID de nadie
-      ];
+      return request.auth != null && (
+        request.auth.token.rol == 'empleado' ||
+        request.auth.uid in [
+          'PONER_ACA_EL_UID_DEL_EMPLEADO'  // placeholder: no es el UID de nadie
+        ]
+      );
     }
 
     function isAllowed() { return esDueno() || esEmpleado(); }

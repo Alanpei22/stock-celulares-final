@@ -82,8 +82,8 @@
     <div class="subtitle">Ingresá a tu cuenta</div>
 
     <div class="field">
-      <label for="email">Email</label>
-      <input id="email" type="email" autocomplete="username" required placeholder="tu@email.com">
+      <label for="email">Usuario o email</label>
+      <input id="email" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" required placeholder="nacho  ·  o tu@email.com">
     </div>
 
     <div class="field">
@@ -153,7 +153,8 @@
         if (code === 'auth/invalid-email')           msg = 'Email inválido';
         else if (code === 'auth/user-not-found')     msg = 'Usuario no encontrado';
         else if (code === 'auth/wrong-password')     msg = 'Contraseña incorrecta';
-        else if (code === 'auth/invalid-credential') msg = 'Email o contraseña incorrectos';
+        else if (code === 'auth/invalid-credential') msg = 'Usuario o contraseña incorrectos';
+        else if (code === 'auth/user-disabled')      msg = 'Esta cuenta está desactivada. Hablá con el dueño.';
         else if (code === 'auth/too-many-requests')  msg = 'Demasiados intentos. Esperá unos minutos.';
         else if (code === 'auth/network-request-failed') msg = 'Sin conexión a internet';
         showErr(msg);
@@ -167,6 +168,12 @@
       clearMsg();
       const email = emailEl.value.trim();
       if (!email) { showErr('Ingresá tu email arriba primero'); return; }
+      // Las cuentas de empleado no tienen mail de verdad: la clave se la
+      // cambia el dueño desde 👥 Empleados.
+      if (!email.includes('@') || /@techpoint\.local$/i.test(email)) {
+        showErr('Pedile al dueño que te cambie la contraseña desde 👥 Empleados.');
+        return;
+      }
       try {
         await sendPasswordReset(email);
         showOk('Te mandamos un email para restablecer la contraseña. Revisá tu bandeja.');

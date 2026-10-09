@@ -33,7 +33,7 @@ export async function verificarSesionEdge(req) {
   if (!idToken) return { ok: false, motivo: 'sin token' };
 
   const key = process.env.FIREBASE_API_KEY || FIREBASE_API_KEY_POR_DEFECTO;
-  let uid = null;
+  let uid = null, rolMarcado = null;
   try {
     const r = await fetch(
       'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' + key,
@@ -45,7 +45,12 @@ export async function verificarSesionEdge(req) {
     );
     if (!r.ok) return { ok: false, motivo: 'token inválido' };
     const data = await r.json();
-    uid = data && data.users && data.users[0] && data.users[0].localId;
+    const u = data && data.users && data.users[0];
+    uid = u && u.localId;
+    // Empleado creado desde la app: la marca va en customAttributes (JSON)
+    if (uid && !u.disabled) {
+      try { rolMarcado = JSON.parse(u.customAttributes || '{}').rol || null; } catch { rolMarcado = null; }
+    }
   } catch (e) {
     // Si Google no contesta preferimos cortar: mejor que la IA no ande un rato
     // a dejar la puerta abierta.
@@ -53,7 +58,7 @@ export async function verificarSesionEdge(req) {
   }
 
   if (!uid) return { ok: false, motivo: 'token inválido' };
-  if (!uidsPermitidos().includes(uid)) return { ok: false, motivo: 'cuenta no autorizada' };
+  if (!uidsPermitidos().includes(uid) && rolMarcado !== 'empleado') return { ok: false, motivo: 'cuenta no autorizada' };
   return { ok: true, uid };
 }
 

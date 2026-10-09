@@ -22,60 +22,50 @@ solo sin tocar el resto.
 La lista de movimientos del día **sí** se ve: es lo que evita cargar dos veces
 la misma venta. Los totales, no.
 
-## Agregar un empleado — 3 pasos
+## Agregar un empleado — desde la app
 
-### 1. Crearle la cuenta
-Firebase Console → **Authentication** → *Agregar usuario*:
-https://console.firebase.google.com/project/stockcelustech/authentication/users
+**☰ (Inicio o Stock) → 👥 Empleados** (solo el dueño, pide el PIN).
 
-Poné su mail y una contraseña provisoria (que después la cambie con
-"olvidé mi contraseña"). Copiá el **UID** que aparece en la fila.
+1. Nombre, usuario (ej: `nacho`) y una contraseña provisoria (el 🎲 sugiere una).
+2. **Crear cuenta** → aparecen los datos para pasarle, con botón de WhatsApp.
+3. El empleado entra en `login.html` con **usuario y contraseña** (no necesita mail).
 
-### 2. Anotarlo en los TRES lugares
+Desde la misma pantalla: 🔑 cambiar la contraseña, ✏️ el nombre (es el que
+firma las ventas y reparaciones) y ⛔ **Desactivar** (no entra más; la sesión
+que tenga abierta se corta en menos de una hora). Lo que cargó queda igual.
 
-**`roles.js`**, en `TP_USUARIOS`:
-```js
-'EL-UID-QUE-COPIASTE': { nombre: 'Nacho', rol: 'empleado' },
-```
+### Cómo funciona por adentro
+La cuenta se crea en `/api/usuarios` (solo el dueño puede llamarlo) con la
+marca `rol: 'empleado'` (custom claim de Firebase Auth). Esa marca solo la
+puede poner el servidor, con la clave de administrador: registrarse en Firebase
+no alcanza. `firestore.rules`, `storage.rules` y `/api` aceptan esa marca, así
+que **sumar un empleado ya no es tocar código ni publicar reglas**.
 
-**`firestore.rules`**, en la lista de `esEmpleado()`:
-```
-'EL-UID-QUE-COPIASTE'   // nacho@...
-```
-
-**`api/_auth.js`**, en `EMPLEADOS`:
-```js
-'EL-UID-QUE-COPIASTE',   // nacho@...
-```
-Sin este tercero, desde su celular no salen los avisos de Telegram ni los push:
-las funciones de `/api` tienen su propia allowlist.
-
-Los tres tienen que decir lo mismo. Si se separan, `npm test` falla
-(`tests/test-roles.js`).
-
-### 3. Publicar — son dos cosas distintas
+### Una sola vez: publicar las reglas
+Las reglas que aceptan la marca hay que publicarlas una vez (no viajan con el
+git push):
 
 ```bash
-npm test && git push
+firebase deploy --only firestore:rules,storage --project stockcelustech
 ```
-Eso sube la **app**: lo que se ve y lo que no.
 
-```bash
-firebase deploy --only firestore:rules --project stockcelustech
-```
-Eso sube las **reglas**: lo que de verdad se puede hacer contra la base.
-**No viajan con el git push.** Sin este paso el empleado no puede ni entrar
-(la base le niega todo), y las pantallas escondidas son solo cosmética.
-
-Si no tenés el CLI: se pueden pegar a mano en
-https://console.firebase.google.com/project/stockcelustech/firestore/rules
-y tocar *Publicar*.
+O a mano: copiar `firestore.rules` en
+https://console.firebase.google.com/project/stockcelustech/firestore/rules y
+`storage.rules` en
+https://console.firebase.google.com/project/stockcelustech/storage/rules →
+*Publicar* en cada una.
 
 ## Sacarle el acceso a alguien
 
-Borralo de las dos listas y volvé a hacer los dos deploys. Si es urgente y no
-estás en la PC: Firebase Console → Authentication → deshabilitar la cuenta.
-Eso corta el acceso al instante sin tocar código.
+👥 Empleados → ⛔ Desactivar. Si no tenés la app a mano: Firebase Console →
+Authentication → deshabilitar la cuenta.
+
+## Cargado a mano (la forma vieja)
+
+Sigue andando para cuentas que ya existían: anotar el UID en `roles.js`
+(`TP_USUARIOS`), `firestore.rules` (`esEmpleado`) y `api/_auth.js`
+(`EMPLEADOS`), y publicar las reglas. `tests/test-roles.js` controla que las
+tres listas coincidan.
 
 ## Lo que NO es esto
 

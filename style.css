@@ -6314,3 +6314,28 @@ body.dark .va-sin-stock, body.dark .va-aviso, body.dark .va-linea--alerta .va-li
 .cat-qr-link input { width: 100%; font-size: 11px; padding: 6px 8px; border: 1px solid var(--border, #ddd); border-radius: 8px; background: transparent; color: inherit; }
 .cat-qr-x { position: absolute; top: 10px; right: 10px; border: none; background: transparent; font-size: 18px; cursor: pointer; color: inherit; }
 .cat-qr-listo { width: 100%; margin-top: 6px; }
+/* 👥 Empleados (usuarios.js) */
+.emp-ov { position: fixed; inset: 0; z-index: 1200; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; justify-content: center; }
+@media (min-width: 640px) { .emp-ov { align-items: center; padding: 16px; } }
+.emp-caja { background: var(--card, #fff); color: var(--text, #111); width: min(520px, 100%); max-height: 92vh; overflow: auto; border-radius: 18px 18px 0 0; padding: 16px 16px 24px; }
+@media (min-width: 640px) { .emp-caja { border-radius: 18px; } }
+.emp-cab { display: flex; align-items: center; justify-content: space-between; }
+.emp-cab h3 { margin: 0; }
+.emp-x { border: none; background: transparent; font-size: 20px; cursor: pointer; color: inherit; }
+.emp-ayuda { font-size: 13px; color: var(--text3, #666); margin: 6px 0 12px; }
+.emp-lista { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.emp-vacio { color: var(--text3, #666); font-size: 14px; text-align: center; padding: 10px; }
+.emp-fila { display: flex; align-items: center; gap: 8px; justify-content: space-between; border: 1px solid var(--border, #e5e7eb); border-radius: 12px; padding: 10px; flex-wrap: wrap; }
+.emp-fila.emp-off { opacity: .6; }
+.emp-datos { display: flex; flex-direction: column; min-width: 0; }
+.emp-datos small { color: var(--text3, #666); font-size: 12px; }
+.emp-tag { font-size: 11px; background: #fee2e2; color: #991b1b; border-radius: 6px; padding: 1px 6px; }
+.emp-acc { display: flex; gap: 6px; }
+.emp-acc button { padding: 6px 10px; font-size: 13px; }
+.emp-form { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border, #e5e7eb); padding-top: 12px; }
+.emp-form h4, .emp-listo h4 { margin: 0 0 4px; }
+.emp-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+.emp-clave { display: flex; gap: 6px; } .emp-clave .fi { flex: 1; }
+.emp-listo { margin-top: 14px; border: 2px solid #16a34a; border-radius: 12px; padding: 12px; }
+.emp-listo pre { white-space: pre-wrap; font-size: 13px; background: var(--bg2, #f3f4f6); padding: 10px; border-radius: 8px; user-select: all; }
+.emp-listo-btns { display: flex; gap: 8px; } .emp-listo-btns button { flex: 1; }

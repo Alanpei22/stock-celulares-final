@@ -31,7 +31,11 @@ export function uidsPermitidos() {
   return desdeEnv.length ? desdeEnv : UIDS_POR_DEFECTO;
 }
 
-function getAdmin() {
+// ¿Este UID es el del dueño? (para lo que solo hace el dueño, como crear
+// cuentas de empleado en /api/usuarios)
+export function esDuenoUid(uid) { return DUENOS.includes(uid); }
+
+export function getAdmin() {
   if (admin.apps.length) return admin;
   const sa = process.env.FIREBASE_SERVICE_ACCOUNT
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
@@ -64,10 +68,19 @@ export async function verificarSesion(req) {
     // Vencido, firmado por otro proyecto, manoteado: todo cae acá.
     return { ok: false, motivo: 'token inválido' };
   }
-  if (!uidsPermitidos().includes(decoded.uid)) {
-    return { ok: false, motivo: 'cuenta no autorizada' };
+  if (uidsPermitidos().includes(decoded.uid)) return { ok: true, uid: decoded.uid };
+  // Empleados creados desde la app (👥 Empleados → /api/usuarios): llevan la
+  // marca rol=empleado en la cuenta. Acá sí se pregunta si la cuenta fue
+  // desactivada (checkRevoked): al desactivar se revocan sus sesiones.
+  if (decoded.rol === 'empleado') {
+    try {
+      await getAdmin().auth().verifyIdToken(token, true);
+      return { ok: true, uid: decoded.uid, rol: 'empleado' };
+    } catch (e) {
+      return { ok: false, motivo: 'cuenta desactivada' };
+    }
   }
-  return { ok: true, uid: decoded.uid };
+  return { ok: false, motivo: 'cuenta no autorizada' };
 }
 
 // Atajo para los handlers: corta con 401 si no pasa. Devuelve true si siguió.

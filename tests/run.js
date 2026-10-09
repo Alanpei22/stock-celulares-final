@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-usuarios.js': 'Cuentas de empleado desde la app: solo el dueño, marca rol=empleado, reglas y login con usuario',
   'test-catalogo.js': 'Página pública /equipos desde el stock: nada privado, estados, fotos y formulario',
   'test-ticket-gasto.js': 'Foto del ticket en los gastos: la IA lee productos y total; si no, queda la foto adjunta',
   'test-boleta-wa.js':        'Boleta de reparación: imprimir, descargar o mandar por WhatsApp como imagen',

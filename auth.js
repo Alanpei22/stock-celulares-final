@@ -25,10 +25,18 @@ function waitForAuth() {
 }
 
 // ── Login ─────────────────────────────────────────────────
+// Los empleados entran con un usuario corto ("nacho"): por adentro es
+// nacho@techpoint.local (lo crea el dueño en 👥 Empleados, api/usuarios.js).
+const TP_DOMINIO_EMPLEADOS = 'techpoint.local';
+function tpMailDeUsuario(usuario) {
+  const u = String(usuario || '').trim().toLowerCase();
+  return !u || u.includes('@') ? u : `${u}@${TP_DOMINIO_EMPLEADOS}`;
+}
+
 async function signIn(email, password) {
-  if (!email || !password) throw new Error('Email y contraseña requeridos');
+  if (!email || !password) throw new Error('Usuario y contraseña requeridos');
   const cred = await _a().signInWithEmailAndPassword(
-    String(email).trim().toLowerCase(),
+    tpMailDeUsuario(email),
     String(password)
   );
   return cred.user;

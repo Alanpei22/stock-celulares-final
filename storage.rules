@@ -2,14 +2,26 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
+    // Las mismas cuentas que firestore.rules: el dueño y los empleados
+    // (creados desde la app, con la marca rol=empleado).
+    function esDelNegocio() {
+      return request.auth != null && (
+        request.auth.uid in ['G9jAIYy86MZ1qTjRmMFyK9yO93e2'] ||
+        request.auth.token.rol == 'empleado'
+      );
+    }
+
     // Fotos de equipos del stock
     match /stock-photos/{stockId}/{filename} {
       // Lectura: cualquiera con la URL (las fotos se muestran en la app
       // y en fichas; no son datos sensibles). Si querés cerrarlo a solo
       // autenticados, cambiá `if true` por `if request.auth != null`.
       allow read: if true;
-      // Escritura: solo autenticados, solo imágenes, máx 5 MB.
-      allow write: if request.auth != null
+      // Escritura: solo imágenes, máx 5 MB.
+      // Solo las cuentas del negocio (el registro de Firebase está abierto:
+      // "estar logueado" no alcanza). Al borrar no hay resource nuevo.
+      allow delete: if esDelNegocio();
+      allow create, update: if esDelNegocio()
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
     }

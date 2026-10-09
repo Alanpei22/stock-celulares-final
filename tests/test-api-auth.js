@@ -43,6 +43,7 @@ console.log('\n  ── Los endpoints de /api ──');
 // estas formas. Si mañana aparece un archivo nuevo en /api sin ninguna, falla.
 const FORMAS_VALIDAS = [
   /exigirSesion\s*\(/,                    // sesión de Firebase (node)
+  /verificarSesion\s*\([\s\S]*esDuenoUid\s*\(/,   // sesión + solo el dueño (api/usuarios)
   /corteSiNoAutorizadoEdge\s*\(/,         // sesión de Firebase (edge)
   /CRON_SECRET/,                          // cron del server
   /x-telegram-bot-api-secret-token/,      // webhook de Telegram

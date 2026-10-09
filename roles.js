@@ -18,7 +18,11 @@
 //  ⚠️ Esta lista y la de `firestore.rules` tienen que decir lo mismo.
 //     tests/test-roles.js falla si se separan.
 //
-//  ── Agregar un empleado (3 pasos) ────────────────────────────
+//  ── Agregar un empleado ──────────────────────────────────────
+//  Desde la app: ☰ → 👥 Empleados (usuarios.js + api/usuarios.js). La cuenta
+//  queda con la marca rol=empleado y entra sola, sin tocar este archivo.
+//  Lo de abajo es la forma vieja, a mano (sigue andando):
+//  ── A mano (3 pasos) ─────────────────────────────────────────
 //  1. Firebase Console → Authentication → "Agregar usuario" con su mail y
 //     una contraseña provisoria. Copiá el UID que queda en la lista.
 //  2. Agregalo acá abajo Y en `firestore.rules` (lista de `esEmpleado`).
@@ -37,6 +41,23 @@ const TP_USUARIOS = {
   // 'UID_DEL_EMPLEADO': { nombre: 'Nombre', rol: 'empleado' },
 };
 
+// Empleados creados desde la app (👥 Empleados): el nombre viene en la marca
+// de la cuenta (custom claim). Se lee una vez y queda guardado por UID para
+// que la próxima vez esté al instante.
+function _tpNombreGuardado(uid) {
+  try { return localStorage.getItem('tpNombre_' + uid) || ''; } catch { return ''; }
+}
+function tpLeerMarca() {
+  try {
+    const u = (typeof currentUser === 'function') ? currentUser() : null;
+    if (!u || TP_USUARIOS[u.uid] || !u.getIdTokenResult) return;
+    u.getIdTokenResult().then(r => {
+      const n = r && r.claims && r.claims.nombre;
+      if (n) try { localStorage.setItem('tpNombre_' + u.uid, String(n)); } catch {}
+    }).catch(() => {});
+  } catch {}
+}
+
 // Cuenta logueada. Una cuenta que NO esté en la lista se trata como empleado:
 // si me olvidé de sumarla, que vea de menos y no de más.
 function tpUsuario() {
@@ -45,7 +66,8 @@ function tpUsuario() {
   if (!u) return null;
   const ficha = TP_USUARIOS[u.uid];
   if (ficha) return { uid: u.uid, nombre: ficha.nombre, rol: ficha.rol };
-  return { uid: u.uid, nombre: (u.email || 'Usuario').split('@')[0], rol: 'empleado', desconocido: true };
+  const nombre = _tpNombreGuardado(u.uid) || u.displayName || (u.email || 'Usuario').split('@')[0];
+  return { uid: u.uid, nombre, rol: 'empleado', desconocido: !_tpNombreGuardado(u.uid) && !u.displayName };
 }
 
 function tpRol()        { const u = tpUsuario(); return u ? u.rol : 'empleado'; }
@@ -66,6 +88,7 @@ function tpFirma() {
 // `body.rol-empleado` + la clase `.solo-dueno` en el HTML hacen el trabajo.
 // Para el dueño no cambia absolutamente nada.
 function aplicarRol() {
+  tpLeerMarca();   // nombre del empleado (si lo creó el dueño desde la app)
   const emp = tpEsEmpleado();
   try {
     document.body.classList.toggle('rol-empleado', emp);
