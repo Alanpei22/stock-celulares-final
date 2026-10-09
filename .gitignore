@@ -28,3 +28,7 @@ npm-debug.log*
 .env
 
 .vercel
+
+# Claves de QZ Tray (la privada vive en Vercel, nunca en el repo)
+.qz-entrega/
+*private-key*.pem
