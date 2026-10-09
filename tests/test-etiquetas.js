@@ -80,13 +80,18 @@ ok((html.match(/<svg/g) || []).length === 2, 'barras en los que tienen código',
 ctx.__COD = 'TP00123';
 const modsCod  = get('code128Bits(__COD)').length + 20;
 const modsImei = get("code128Bits('356938035643809')").length + 20;
-ctx.__MOD = Math.max(0.25, Math.min(0.5, 38.4 / modsCod));          // la misma cuenta que print.js
-const esperado = get('code128Svg(__COD, { modulo: __MOD, alto: 11, leyenda: false })');
+// La misma cuenta que print.js: barra de puntos enteros de la etiquetadora
+ctx.__M = get('etqMedidaBarras(__COD, 38.4)');
+const esperado = get('code128Svg(__COD, { modulo: __M.modulo, quiet: __M.quiet, alto: 11, leyenda: false })');
 ok(html.includes(esperado), 'son las del código del equipo, no las del IMEI');
 ok(modsCod < modsImei * 0.8,
    `el código corto son ${modsCod} módulos contra ${modsImei} del IMEI`, [modsCod, modsImei]);
-ok(ctx.__MOD >= 0.3, `así cada barra mide ${ctx.__MOD.toFixed(2)}mm en vez de 0,25 — la cámara las ve`,
-   ctx.__MOD.toFixed(3));
+// La barra es una cantidad ENTERA de puntos de la etiquetadora (203 dpi). Una
+// de 0,32mm son 2,56 puntos: al imprimir unas salen de 2 y otras de 3, y
+// desparejas leen peor que parejas de 0,25.
+const puntos = ctx.__M.modulo / (25.4 / 203);
+ok(Math.abs(puntos - Math.round(puntos)) < 1e-9 && puntos >= 2,
+   `cada barra son ${Math.round(puntos)} puntos enteros de la etiquetadora (${ctx.__M.modulo.toFixed(2)}mm): salen parejas`, puntos);
 // Y las barras más altas: sin el precio ni el IMEI escritos sobra lugar, y una
 // barra alta le da al lector más chances de cruzarla derecho.
 ok(/height="11"/.test(html) || /height="1[0-9]/.test(html), 'y más altas que antes (7,5mm)',
