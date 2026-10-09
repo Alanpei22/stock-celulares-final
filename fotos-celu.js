@@ -36,54 +36,53 @@
       + (pendientes || []).map(u => `<div class="subiendo"><img src="${u}" alt=""></div>`).join('');
   }
 
-  function achicar(file, max = 1000, q = 0.7) {
-    return new Promise((ok, mal) => {
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        let w = img.width, h = img.height;
-        const k = Math.min(1, max / Math.max(w, h));
-        w = Math.round(w * k); h = Math.round(h * k);
-        const c = document.createElement('canvas');
-        c.width = w; c.height = h;
-        const ctx = c.getContext('2d');
-        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        URL.revokeObjectURL(url);
-        c.toBlob(b => b ? ok(b) : mal(new Error('No se pudo achicar la foto')), 'image/jpeg', q);
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('No se pudo abrir la foto')); };
-      img.src = url;
-    });
+  // Varias tandas pueden estar subiendo a la vez (sacás una foto, y otra
+  // mientras sube la primera): el progreso suma todas.
+  const tandas = new Set();
+  function progreso() {
+    let hechas = 0, total = 0, pctSum = 0;
+    tandas.forEach(t => { hechas += t.hechas; total += t.total; pctSum += t.pct * t.total; });
+    const barra = $('barra');
+    if (!total) { barra.classList.add('hidden'); return; }
+    barra.classList.remove('hidden');
+    $('barra-i').style.width = Math.round(pctSum / total) + '%';
+    estado(`📤 Subiendo ${hechas + 1 > total ? total : hechas + 1} de ${total}…`);
   }
 
   async function subir(files) {
     files = Array.from(files || []);
     if (!files.length) return;
     const previas = files.map(f => URL.createObjectURL(f));
+    const t = { hechas: 0, total: files.length, pct: 0, previas };
+    tandas.add(t);
     subiendo += files.length;
-    pintar(previas);
-    estado(`Subiendo ${files.length} foto${files.length === 1 ? '' : 's'}…`);
-    const ref = firebase.firestore().collection('stock').doc(ID);
-    let bien = 0;
-    for (let i = 0; i < files.length; i++) {
-      try {
-        const blob = await achicar(files[i]);
-        const nombre = `${Date.now()}_${i}.jpg`;
-        const snap = await firebase.storage().ref(`stock-photos/${ID}/${nombre}`).put(blob, { contentType: 'image/jpeg' });
-        const url = await snap.ref.getDownloadURL();
-        await ref.update({ fotos: firebase.firestore.FieldValue.arrayUnion(url) });
-        bien++;
-      } catch (e) {
-        console.error('subir foto:', e);
-      }
-    }
-    previas.forEach(u => URL.revokeObjectURL(u));
+    pintarTodo();
+    progreso();
+    let r = { urls: [], fallas: files.length };
+    try {
+      r = await fotosSubir(ID, files, {
+        alProgreso: p => { t.hechas = p.hechas; t.pct = p.pct; progreso(); },
+        // Cada foto que queda anotada deja de mostrarse como "subiendo"
+        alSubir: (url, i) => { if (previas[i]) { URL.revokeObjectURL(previas[i]); previas[i] = null; } pintarTodo(); },
+      });
+    } catch (e) { console.error('subir fotos:', e); }
+    previas.forEach(u => u && URL.revokeObjectURL(u));
+    tandas.delete(t);
     subiendo -= files.length;
-    if (!subiendo) pintar();   // saca los ⏳: quedan las fotos ya subidas
-    if (bien === files.length) estado(`✅ ${bien} foto${bien === 1 ? '' : 's'} subida${bien === 1 ? '' : 's'} · ya está${bien === 1 ? '' : 'n'} en la compu`, 'ok');
-    else estado(`⚠️ Subieron ${bien} de ${files.length}. Revisá la conexión y probá de nuevo.`, 'err');
+    pintarTodo();
+    progreso();
+    const bien = r.urls.length, n = files.length;
+    if (subiendo) return;   // hay otra tanda en curso: su mensaje manda
+    if (bien === n) estado(`✅ ${bien} foto${bien === 1 ? '' : 's'} subida${bien === 1 ? '' : 's'} · ya está${bien === 1 ? '' : 'n'} en la compu`, 'ok');
+    else estado(`⚠️ Subieron ${bien} de ${n}. Revisá la conexión y probá de nuevo.`, 'err');
     if (navigator.vibrate) try { navigator.vibrate(60); } catch {}
+  }
+
+  // Las ya subidas + las que están subiendo (con ⏳)
+  function pintarTodo() {
+    const pend = [];
+    tandas.forEach(t => t.previas.forEach(u => u && pend.push(u)));
+    pintar(pend);
   }
 
   async function iniciar() {
@@ -103,7 +102,7 @@
       $('nombre').textContent = [repite ? '' : p.marca, p.modelo].filter(Boolean).join(' ') || 'Equipo';
       $('detalle').textContent = [p.almacenamiento, p.color, p.estado, p.imei ? '…' + String(p.imei).slice(-4) : ''].filter(Boolean).join(' · ');
       fotos = Array.isArray(p.fotos) ? p.fotos : [];
-      if (!subiendo) pintar();
+      pintarTodo();
       $('cargando').classList.add('hidden');
       $('app').classList.remove('hidden');
     }, e => {

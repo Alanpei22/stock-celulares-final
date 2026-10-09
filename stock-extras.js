@@ -129,61 +129,34 @@ function _getStorage() {
   try { return firebase.storage(); } catch { return null; }
 }
 
-// 1000 px y JPG al 70%: así sale en la página /equipos sin que pese.
-async function _compressImage(file, maxSize = 1000, quality = 0.7) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let w = img.width, h = img.height;
-        if (w > h && w > maxSize) { h = Math.round(h * maxSize / w); w = maxSize; }
-        else if (h > maxSize) { w = Math.round(w * maxSize / h); h = maxSize; }
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', quality);
-      };
-      img.onerror = () => reject(new Error('img load'));
-      img.src = e.target.result;
-    };
-    reader.onerror = () => reject(new Error('FileReader'));
-    reader.readAsDataURL(file);
-  });
-}
-
+// La subida (achicar, en paralelo, en orden, con progreso) está en
+// fotos-subir.js: la usan esta pantalla y la del celu (fotos-celu.html).
 async function uploadStockPhotos(stockId, files) {
   const storage = _getStorage();
-  if (!storage) {
+  if (!storage || typeof fotosSubir !== 'function') {
     toast('Firebase Storage no disponible (revisá setup)', 'error');
     return [];
   }
-  const uploaded = [];
-  toast(`Subiendo ${files.length} foto(s)...`, 'info');
-  for (let i = 0; i < files.length; i++) {
-    try {
-      const blob = await _compressImage(files[i]);
-      const filename = `${Date.now()}_${i}.jpg`;
-      const ref = storage.ref(`stock-photos/${stockId}/${filename}`);
-      const snap = await ref.put(blob, { contentType: 'image/jpeg' });
-      const url = await snap.ref.getDownloadURL();
-      uploaded.push(url);
-    } catch (e) {
-      console.error('uploadStockPhotos:', e);
-    }
+  files = Array.from(files || []);
+  const n = files.length;
+  try {
+    const { urls, fallas } = await fotosSubir(stockId, files, {
+      storage, db,
+      alProgreso: ({ hechas, total, pct }) => {
+        if (pct < 100) toast(`📤 Subiendo fotos… ${hechas}/${total} · ${pct}%`, 'info');
+      },
+    });
+    const p = (typeof STOCK !== 'undefined') ? STOCK.find(x => x.id === stockId) : null;
+    if (p && urls.length) p.fotos = [...(p.fotos || []), ...urls.filter(u => !(p.fotos || []).includes(u))];
+    if (!urls.length) toast('No se pudo subir ninguna foto', 'error');
+    else if (fallas) toast(`⚠️ Subieron ${urls.length} de ${n} fotos. Probá de nuevo con las que faltan.`, 'error');
+    else toast(`✅ ${urls.length} foto${urls.length === 1 ? '' : 's'} subida${urls.length === 1 ? '' : 's'}`, 'success');
+    return urls;
+  } catch (e) {
+    console.error('uploadStockPhotos:', e);
+    toast('No se pudo subir las fotos', 'error');
+    return [];
   }
-  if (uploaded.length) {
-    const p = STOCK.find(x => x.id === stockId);
-    const fotos = [...(p?.fotos || []), ...uploaded];
-    await db.collection('stock').doc(stockId).update({ fotos });
-    toast(`✅ ${uploaded.length} foto(s) subida(s)`, 'success');
-  } else {
-    toast('No se pudo subir ninguna foto', 'error');
-  }
-  return uploaded;
 }
 
 async function deleteStockPhoto(stockId, photoUrl) {

@@ -24,6 +24,8 @@
   .estado { text-align: center; font-size: 14px; color: var(--mut); min-height: 20px; margin: 6px 0 14px; }
   .estado.ok { color: var(--ok); font-weight: 700; }
   .estado.err { color: var(--err); font-weight: 700; }
+  .barra { height: 8px; background: var(--line); border-radius: 9px; overflow: hidden; margin: 4px 0 6px; }
+  .barra i { display: block; height: 100%; width: 0; background: var(--ok); border-radius: 9px; transition: width .2s; }
   .grilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .grilla div { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--line); }
   .grilla img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -47,6 +49,7 @@
   <input type="file" id="in-gal" accept="image/*" multiple hidden>
   <button type="button" class="btn btn-cam" id="b-cam">📸 Sacar foto</button>
   <button type="button" class="btn btn-gal" id="b-gal">🖼️ Elegir de la galería</button>
+  <div class="barra hidden" id="barra"><i id="barra-i"></i></div>
   <div class="estado" id="estado"></div>
 
   <div class="grilla" id="grilla"></div>
@@ -62,6 +65,7 @@
 <script src="utils.js"></script>
 <script src="firebase-config.js"></script>
 <script src="auth.js"></script>
+<script src="fotos-subir.js"></script>
 <script src="fotos-celu.js"></script>
 </body>
 </html>

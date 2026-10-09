@@ -101,7 +101,8 @@ ok((app.match(/catFormCampos\(\)/g) || []).length === 2 && (app.match(/catSubirP
 ok((app.match(/catFormCargar\(/g) || []).length === 2, 'se cargan al abrir (nuevo y editar)');
 ok(/catBorrarFotosDe\(p\)/.test(app.slice(app.indexOf('async function deletePhone'))), 'al borrar un equipo se borran sus fotos');
 ok(/refFromURL\(url\)\.delete\(\)/.test(cat), 'al quitar una foto se borra el archivo');
-ok(/_compressImage\(file, maxSize = 1000, quality = 0\.7\)/.test(sx), 'las fotos se achican a 1000 px, JPG al 70%');
+ok(/fotosSubir\(stockId, files/.test(sx) && ix.indexOf('src="fotos-subir.js"') > 0 && ix.indexOf('src="fotos-subir.js"') < ix.indexOf('src="stock-extras.js"'),
+   'la compu sube con fotos-subir.js (el mismo que el celu)');
 ok(/catPortada\(/.test(sx) && /fotos\.unshift\(url\)/.test(cat), 'se puede cambiar la portada (la primera foto)');
 const c2 = { document: { getElementById: id => ({ 'fi-publicar': { checked: true }, 'fi-color': { value: ' Azul ' }, 'fi-detalles-pub': { value: 'Con caja ' }, 'fi-ocultar-precio': { checked: false } })[id] } };
 vm.createContext(c2); vm.runInContext(cat, c2);
@@ -139,8 +140,7 @@ console.log('\n5) Fotos desde el celu (QR)');
 {
   const fc = leer('fotos-celu.js'), fh = leer('fotos-celu.html'), lg = leer('login.html');
   ok(/requireAuth\('login\.html\?next=' \+ encodeURIComponent\(volver\)\)/.test(fc), 'pide sesión; si el celu no estaba logueado, el login lo devuelve a la misma pantalla');
-  ok(/FieldValue\.arrayUnion\(url\)/.test(fc), 'cada foto se SUMA al equipo (no pisa lo que haga la compu al mismo tiempo)');
-  ok(/achicar\(file, max = 1000, q = 0\.7\)/.test(fc) && /stock-photos\/\$\{ID\}\//.test(fc), 'achicada a 1000 px / JPG 70%, en la carpeta del equipo');
+  ok(/fotosSubir\(ID, files/.test(fc) && fh.indexOf('fotos-subir.js') < fh.indexOf('fotos-celu.js'), 'el celu sube con fotos-subir.js');
   ok(/\^\[A-Za-z0-9_-\]\{4,60\}\$/.test(fc), 'un id raro en el link no se usa');
   ok(/capture="environment"/.test(fh) && /firebase-storage-compat/.test(fh) && /noindex/.test(fh), 'abre la cámara trasera; no aparece en Google');
   ok(/catQrCelu\(_catId\)/.test(cat) && /catQrCelu\('\$\{id\}'\)/.test(sx), 'botón "Desde el celu" en el formulario y en la ficha del equipo');
@@ -154,6 +154,53 @@ console.log('\n5) Fotos desde el celu (QR)');
   ok(dest('fotos-celu.html?id=abc123') === 'fotos-celu.html?id=abc123', 'acepta la pantalla de fotos');
   ok(dest('https://malo.com/x.html') === 'index.html' && dest('//malo.com/x.html') === 'index.html' && dest('x.html?a=<script>') === 'index.html',
      'no manda a otro sitio (open redirect)');
+}
+
+console.log('\n6) La subida de fotos (fotos-subir.js)');
+{
+  const fsu = leer('fotos-subir.js');
+  ok(/FOTO_MAX = 1000/.test(fsu) && /FOTO_CALIDAD = 0\.7/.test(fsu), '1000 px, calidad 70%');
+  ok(/'image\/webp'/.test(fsu) && /b\.type === 'image\/webp'/.test(fsu) && /'image\/jpeg'/.test(fsu), 'WebP si el navegador lo sabe hacer; si no, JPG');
+  ok(/imageOrientation: 'from-image'/.test(fsu), 'respeta la rotación de la foto del celu');
+  ok(/cacheControl: FOTO_CACHE/.test(fsu) && /max-age=31536000, immutable/.test(fsu), 'las fotos se guardan con caché larga (la página no las vuelve a bajar)');
+  // Simulación: 5 fotos, Storage que termina en desorden. Se tienen que anotar en orden.
+  const ANOTADAS = [], PUTS = [];
+  let activas = 0, maxActivas = 0, n = 0;
+  const cc = { console, Math, Array, Promise, Date, setTimeout, Error,
+    firebase: { firestore: { FieldValue: { arrayUnion: (...v) => ({ u: v }) } } },
+    document: { createElement: () => ({ getContext: () => ({ fillRect() {}, drawImage() {} }), toBlob: (cb, tipo) => cb({ type: tipo, size: 1000 }) }) },
+    createImageBitmap: async f => ({ width: 4000, height: 3000, close() {} }) };
+  vm.createContext(cc); vm.runInContext(fsu, cc);
+  const demora = [300, 50, 200, 10, 120];
+  const storage = { ref: path => ({ put: (blob, meta) => {
+    activas++; maxActivas = Math.max(maxActivas, activas); PUTS.push([path, meta]);
+    const i = Number(path.split('_')[1]);
+    const snap = { ref: { getDownloadURL: async () => 'u' + i } };
+    return { snapshot: snap, on: (ev, prog, err, fin) => setTimeout(() => { prog({ bytesTransferred: 1000 }); activas--; fin(); }, demora[i]) };
+  } }) };
+  const dbm = { collection: () => ({ doc: () => ({ update: async d => { ANOTADAS.push(d.fotos.u[0]); } }) }) };
+  const PROG = [];
+  const r = await cc.fotosSubir('eq1', [1, 2, 3, 4, 5].map(i => ({ size: 3e6 })), { storage, db: dbm, alProgreso: p => PROG.push(p) });
+  ok(ANOTADAS.join() === 'u0,u1,u2,u3,u4', 'aunque terminen desordenadas, se anotan en el orden elegido (la portada es la primera)', ANOTADAS);
+  ok(maxActivas === 3, 'de a 3 en paralelo', maxActivas);
+  ok(r.urls.length === 5 && r.fallas === 0, 'devuelve las 5', r);
+  ok(PUTS.every(([p, m]) => /^stock-photos\/eq1\/.+\.webp$/.test(p) && m.contentType === 'image/webp'), 'en la carpeta del equipo, en WebP', PUTS[0]);
+  ok(PROG.length > 3 && PROG[PROG.length - 1].pct === 100 && PROG[PROG.length - 1].hechas === 5, 'avisa el progreso hasta el 100%');
+  // Un corte: la foto 2 falla una vez y se reintenta sola
+  ANOTADAS.length = 0;
+  let falloUna = false;
+  const storage2 = { ref: path => ({ put: () => {
+    if (/_1_0\./.test(path) && !falloUna) { falloUna = true; return { snapshot: {}, on: (e, p, err) => setTimeout(() => err(new Error('corte')), 5) }; }
+    const i = Number(path.split('_')[1]);
+    return { snapshot: { ref: { getDownloadURL: async () => 'v' + i } }, on: (e, p, err, fin) => setTimeout(fin, 5) };
+  } }) };
+  const r2 = await cc.fotosSubir('eq1', [{}, {}, {}], { storage: storage2, db: dbm });
+  ok(falloUna && r2.urls.length === 3 && ANOTADAS.join() === 'v0,v1,v2', 'si se corta, reintenta sola y no se pierde la foto', ANOTADAS);
+  // Safari viejo: pide WebP y devuelve PNG → JPG
+  const c4 = { ...cc, document: { createElement: () => ({ getContext: () => ({ fillRect() {}, drawImage() {} }), toBlob: (cb, tipo) => cb({ type: tipo === 'image/webp' ? 'image/png' : tipo, size: 1 }) }) } };
+  vm.createContext(c4); vm.runInContext(fsu, c4);
+  const a = await c4.fotoAchicar({});
+  ok(a.tipo === 'image/jpeg' && a.ext === 'jpg', 'si no sabe hacer WebP, sale JPG', a);
 }
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
