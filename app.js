@@ -708,6 +708,8 @@ function toggleRep2Menu() {
     { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: () => (typeof openStockWizard === 'function') && openStockWizard() },
     sheetGrupo(toggleRep2Menu, 'Etiquetas e impresión', '🏷️', 'Etiquetas e impresión', 'Imprimir, códigos de barras, impresora', [
       { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: () => (typeof imprimirEtiquetasRep2 === 'function') && imprimirEtiquetasRep2() },
+      { icon: '🆕', label: 'Etiquetas de lo cargado hoy', sub: 'Al terminar una tanda',
+        onClick: () => (typeof etiquetasDeHoyRep2 === 'function') && etiquetasDeHoyRep2() },
       { icon: '🔢', label: 'Generar códigos de barras', sub: 'A los repuestos que no tienen', onClick: () => (typeof generarCodigosRep2 === 'function') && generarCodigosRep2() },
       { icon: '📐', label: 'Sentido de la etiqueta',
         sub: (typeof etqFormato === 'function' && typeof ETQ_FORMATO_NOMBRE === 'object') ? ETQ_FORMATO_NOMBRE[etqFormato()] : '',

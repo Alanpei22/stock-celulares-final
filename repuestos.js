@@ -218,6 +218,7 @@ function initRepuestos() {
   });
   document.getElementById('rep2-f-tipo').addEventListener('change', renderRepuestos);
   document.getElementById('rep2-f-marca').addEventListener('change', renderRepuestos);
+  document.getElementById('rep2-f-alta')?.addEventListener('change', renderRepuestos);
   document.getElementById('rep2-form-close').addEventListener('click', closeRepuestoForm);
   document.getElementById('rep2-form-cancel').addEventListener('click', closeRepuestoForm);
   document.getElementById('rep2-form-save').addEventListener('click', () => saveRepuesto());
@@ -288,11 +289,25 @@ function selectCatalogItem(marca, nombre, precio, notas) {
 // Los repuestos que están a la vista con los filtros puestos. Lo usan la lista
 // y la impresión de etiquetas: si imprimieran cosas distintas de lo que se ve,
 // nadie entendería qué salió.
+// ¿Se cargó hoy? `fechaAlta` se guarda al dar de alta (una por una o por
+// carga masiva). Los repuestos viejos no la tienen y no cuentan como de hoy,
+// que es lo correcto: son de antes de que existiera el campo.
+function _repuEsDeHoy(r) {
+  if (!r || !r.fechaAlta) return false;
+  const d = new Date(r.fechaAlta);
+  if (isNaN(d)) return false;
+  const hoy = (typeof _todayAR === 'function') ? _todayAR()
+            : new Date().toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10);
+  return d.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' }).slice(0, 10) === hoy;
+}
+
 function _rep2Filtrados() {
   const q      = (document.getElementById('rep2-search')?.value || '').trim().toLowerCase();
   const fTipo  = document.getElementById('rep2-f-tipo')?.value || '';
   const fMarca = document.getElementById('rep2-f-marca')?.value || '';
+  const fAlta  = document.getElementById('rep2-f-alta')?.value || '';
   return REPUESTOS.filter(r => {
+    if (fAlta === 'hoy' && !_repuEsDeHoy(r)) return false;
     if (fTipo  && r.tipo  !== fTipo)  return false;
     if (fMarca && r.marca !== fMarca) return false;
     // El código entra en la búsqueda: si está impreso en la etiqueta, tiene que
@@ -306,6 +321,7 @@ function renderRepuestos() {
   const q      = (document.getElementById('rep2-search').value || '').trim().toLowerCase();
   const fTipo  = document.getElementById('rep2-f-tipo').value;
   const fMarca = document.getElementById('rep2-f-marca').value;
+  const fAlta  = document.getElementById('rep2-f-alta')?.value || '';
 
   // Reconstruir select de marcas
   const marcas = [...new Set(REPUESTOS.map(r => r.marca).filter(Boolean))].sort();
@@ -679,6 +695,18 @@ function imprimirEtiquetasRep2() {
   const copias = prompt(`${lista.length} repuesto${lista.length > 1 ? 's' : ''} a la vista.\n¿Cuántas etiquetas de cada uno?`, '1');
   if (copias === null) return;
   printEtiquetasRepuestos(lista, Number(copias) || 1);
+}
+
+// Al terminar una tanda: las etiquetas de todo lo que cargaste hoy, sin
+// acordarte cuáles fueron. Es el momento en que se etiqueta la mercadería
+// recién llegada, que es para lo que se carga.
+function etiquetasDeHoyRep2() {
+  const hoy = REPUESTOS.filter(_repuEsDeHoy);
+  if (!hoy.length) { toast('No cargaste repuestos hoy', 'info'); return; }
+  if (typeof printEtiquetasRepuestos !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
+  const copias = prompt(`${hoy.length} repuesto${hoy.length > 1 ? 's' : ''} cargado${hoy.length > 1 ? 's' : ''} hoy.\n¿Cuántas etiquetas de cada uno?`, '1');
+  if (copias === null) return;
+  printEtiquetasRepuestos(hoy, Number(copias) || 1);
 }
 
 // Una sola, desde la ficha.

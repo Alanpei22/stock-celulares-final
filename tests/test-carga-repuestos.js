@@ -176,6 +176,48 @@ els['rep2-fi-nombre'].value = '';
 await run('saveRepuesto()');
 ok(TOASTS.some(t => /Ingresá el nombre/.test(t[1])), 'sin nombre no guarda', TOASTS[TOASTS.length - 1]);
 
+console.log('\n5) Las etiquetas de lo cargado hoy');
+// Al terminar una tanda hay que etiquetar lo que llegó. Antes había que
+// acordarse cuáles eran, o imprimir la lista entera.
+const HOY = run('_todayAR()');
+const AYER = new Date(new Date(HOY + 'T12:00:00Z').getTime() - 86400000).toISOString().slice(0, 10);
+ctx.__R = { fechaAlta: HOY + 'T14:00:00-03:00' };
+ok(run('_repuEsDeHoy(__R)') === true, 'uno de hoy, sí');
+ctx.__R = { fechaAlta: AYER + 'T14:00:00-03:00' };
+ok(run('_repuEsDeHoy(__R)') === false, 'uno de ayer, no');
+// 21:30 de acá ya es el día siguiente en Londres: igual es de hoy.
+ctx.__R = { fechaAlta: HOY + 'T21:30:00-03:00' };
+ok(run('_repuEsDeHoy(__R)') === true, 'y uno de las 21:30 sigue siendo de hoy');
+ctx.__R = {};
+ok(run('_repuEsDeHoy(__R)') === false, 'uno viejo sin fecha, no');
+
+// Imprime justo esos, y nada más.
+const IMPRESOS = [];
+ctx.__IMP = (lista, copias) => IMPRESOS.push({ nombres: lista.map(x => x.nombre), copias });
+ctx.__PROMPT = () => '2';
+run('printEtiquetasRepuestos = (l, c) => __IMP(l, c); prompt = () => __PROMPT();');
+run(`REPUESTOS = [
+  { id:'a', nombre:'Pantalla nueva', fechaAlta: '${HOY}T10:00:00-03:00' },
+  { id:'b', nombre:'Pantalla vieja', fechaAlta: '${AYER}T10:00:00-03:00' },
+  { id:'c', nombre:'Sin fecha' }
+];`);
+run('etiquetasDeHoyRep2()');
+ok(IMPRESOS.length === 1 && IMPRESOS[0].nombres.join(',') === 'Pantalla nueva',
+   'saca las de hoy y solo esas', IMPRESOS);
+ok(IMPRESOS[0].copias === 2, 'con las copias que pediste', IMPRESOS[0].copias);
+
+run(`REPUESTOS = [{ id:'b', nombre:'Vieja', fechaAlta: '${AYER}T10:00:00-03:00' }]`);
+IMPRESOS.length = 0;
+run('etiquetasDeHoyRep2()');
+ok(IMPRESOS.length === 0, 'sin nada cargado hoy no imprime una hoja en blanco');
+ok(TOASTS.some(t => /No cargaste repuestos hoy/.test(t[1])), 'y lo dice', TOASTS[TOASTS.length - 1]);
+
+// También como filtro de la lista, igual que en Accesorios.
+ok(/id="rep2-f-alta"/.test(leer('index.html')), 'hay un filtro "Cargados hoy" en la lista');
+ok(/Etiquetas de lo cargado hoy/.test(leer('app.js')), 'y la opción en el menú de etiquetas');
+ok(/if \(fAlta === 'hoy' && !_repuEsDeHoy\(r\)\) return false;/.test(leer('repuestos.js')),
+   'el filtro usa la misma cuenta que las etiquetas');
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
 
