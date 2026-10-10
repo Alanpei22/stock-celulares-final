@@ -6366,3 +6366,6 @@ body.rol-empleado:not(.p-borrar) .req-borrar { display: none !important; }
   background: none; color: var(--text3); font-size: .8rem; cursor: pointer;
 }
 body.dark .tp-inst { background: #1a1d21; border-color: #2a2e34; color: #e8eaed; }
+
+/* Repuesto marcado en "seleccionar varios" (repuestos.js) */
+.rep2-card--sel { background: color-mix(in srgb, var(--accent) 14%, transparent); }

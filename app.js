@@ -695,6 +695,8 @@ function toggleRep2Menu() {
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
     { icon: '🔒', label: 'Modo dueño', onClick: toggleOwnerLock },
     { divider: true },
+    { icon: '☑️', label: 'Seleccionar varios', sub: 'Imprimir o eliminar muchos a la vez',
+      onClick: () => (typeof repuSelEntrar === 'function') && repuSelEntrar() },
     { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: () => (typeof openStockWizard === 'function') && openStockWizard() },
     { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: () => (typeof imprimirEtiquetasRep2 === 'function') && imprimirEtiquetasRep2() },
     { icon: '🔢', label: 'Generar códigos de barras', sub: 'A los repuestos que no tienen', onClick: () => (typeof generarCodigosRep2 === 'function') && generarCodigosRep2() },
@@ -745,6 +747,9 @@ function switchSection(section) {
   // CUPO: los repuestos son una colección entera; se leen recién cuando se
   // entra a la sección, no en cada apertura de la app.
   if (section === 'repuestos' && typeof listenRepuestos === 'function') listenRepuestos();
+  // La barra de "seleccionar varios" está fija abajo: si se cambia de sección
+  // sin salir del modo, queda flotando encima de Equipos o Reparaciones.
+  if (section !== 'repuestos' && typeof _repuSelModo !== 'undefined' && _repuSelModo) repuSelSalir();
 }
 
 // ── Dashboard ──────────────────────────────────────────────

@@ -387,11 +387,14 @@ function renderRepuestos() {
     else if (costoARS > 0) priceParts.push(`<span class="rep2-price-cost">$${costoARS.toLocaleString('es-AR')}</span>`);
     if (venta > 0) priceParts.push(`<span class="rep2-price-venta">→ $${venta.toLocaleString('es-AR')}</span>`);
 
+    // En modo selección tocar la tarjeta la marca en vez de abrirla.
+    const sel = _repuSelModo && _repuSel.has(r.id);
+    const click = _repuSelModo ? `_repuSelToggle('${r.id}')` : `openRepuestoForm('${r.id}')`;
     return `
-      <div class="card rep2-card${lowCls}" onclick="openRepuestoForm('${r.id}')">
+      <div class="card rep2-card${lowCls}${sel ? ' rep2-card--sel' : ''}" onclick="${click}">
         <div class="card-top">
           <div class="card-info">
-            <span class="card-marca">🔩 ${esc(r.marca || '—')}${r.modelo ? ' · ' + esc(r.modelo) : ''}</span>
+            <span class="card-marca">${_repuSelModo ? (sel ? '☑️ ' : '⬜ ') : '🔩 '}${esc(r.marca || '—')}${r.modelo ? ' · ' + esc(r.modelo) : ''}</span>
             <span class="card-modelo">${esc(r.nombre)}</span>
             <span class="card-specs">${esc(r.tipo || '')}${r.proveedor ? ' · ' + esc(r.proveedor) : ''}</span>
           </div>
@@ -402,10 +405,12 @@ function renderRepuestos() {
           </div>
         </div>
         <div class="card-bottom">
-          <div class="rep2-qty-display" onclick="event.stopPropagation()">
-            <button class="rep2-qty-btn rep2-qty-minus" onclick="changeQty('${r.id}',-1)">−</button>
-            <span class="rep2-qty-num${isLow ? ' rep2-qty-num--low' : ''}">${r.cantidad ?? 0}</span>
-            <button class="rep2-qty-btn rep2-qty-plus" onclick="changeQty('${r.id}',+1)">＋</button>
+          <div class="rep2-qty-display"${_repuSelModo ? '' : ' onclick="event.stopPropagation()"'}>
+            ${_repuSelModo
+              ? `<span class="rep2-qty-num${isLow ? ' rep2-qty-num--low' : ''}">${r.cantidad ?? 0}</span>`
+              : `<button class="rep2-qty-btn rep2-qty-minus" onclick="changeQty('${r.id}',-1)">−</button>
+                 <span class="rep2-qty-num${isLow ? ' rep2-qty-num--low' : ''}">${r.cantidad ?? 0}</span>
+                 <button class="rep2-qty-btn rep2-qty-plus" onclick="changeQty('${r.id}',+1)">＋</button>`}
           </div>
           <div class="card-meta">
             <span class="card-date owner-only">${priceParts.join(' ') || '—'}</span>
@@ -510,6 +515,135 @@ function _updateCostoARSHint() {
   } else {
     hintEl.textContent = '';
   }
+}
+
+// ══════════════════════════════════════════
+//  SELECCIONAR VARIOS — imprimir o eliminar en masa
+// ══════════════════════════════════════════
+// Menú → ☑️ Seleccionar varios. Tocar una tarjeta la marca; abajo aparece una
+// barra con cuántos van. "Todos" marca los de la lista que estás viendo, con
+// la búsqueda y los filtros puestos: para "todas las pantallas Samsung" se
+// filtra y se toca Todos. Rehacer la lista entera era ir de a uno por el
+// botón de cada ficha, o borrar la colección desde la consola de Firebase.
+let _repuSelModo = false;
+let _repuSel = new Set();
+
+function repuSelEntrar() {
+  _repuSelModo = true;
+  _repuSel = new Set();
+  const l = document.getElementById('rep2-list');
+  if (l) l.style.paddingBottom = '80px';   // que la barra no tape el último
+  renderRepuestos();
+  _repuSelBarra();
+  toast('Tocá los repuestos para marcarlos', 'info');
+}
+
+function repuSelSalir() {
+  _repuSelModo = false;
+  _repuSel = new Set();
+  document.getElementById('rep2-sel-barra')?.remove();
+  const l = document.getElementById('rep2-list');
+  if (l) l.style.paddingBottom = '';
+  renderRepuestos();
+}
+
+function _repuSelToggle(id) {
+  if (_repuSel.has(id)) _repuSel.delete(id); else _repuSel.add(id);
+  renderRepuestos();
+  _repuSelBarra();
+}
+
+function repuSelTodos() {
+  const ids = _rep2Filtrados().map(r => r.id);
+  // Si ya estaban todos marcados, el mismo botón los desmarca.
+  const todos = ids.length && ids.every(id => _repuSel.has(id));
+  ids.forEach(id => todos ? _repuSel.delete(id) : _repuSel.add(id));
+  renderRepuestos();
+  _repuSelBarra();
+}
+
+function _repuSelBarra() {
+  if (!_repuSelModo) return;
+  let b = document.getElementById('rep2-sel-barra');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'rep2-sel-barra';
+    b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:900;display:flex;gap:8px;align-items:center;' +
+      'padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--card,#fff);' +
+      'border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(0,0,0,.12)';
+    document.body.appendChild(b);
+  }
+  const n = _repuSel.size;
+  // Compactos a propósito: con el padding normal, en un teléfono "3 marcados"
+  // se parte en dos renglones.
+  const chico = 'padding:9px 13px;font-size:14px;flex-shrink:0';
+  b.innerHTML = `
+    <b style="flex:1;min-width:0;font-size:15px;white-space:nowrap">${n} marcado${n === 1 ? '' : 's'}</b>
+    <button class="btn-secondary" style="${chico}" onclick="repuSelTodos()">Todos</button>
+    <button class="btn-primary" style="${chico}" ${n ? '' : 'disabled'} onclick="repuSelAcciones()">Acciones</button>
+    <button class="btn-secondary" style="${chico}" onclick="repuSelSalir()" title="Salir">✕</button>`;
+}
+
+function _repuSelLista() {
+  return REPUESTOS.filter(r => _repuSel.has(r.id));
+}
+
+function repuSelAcciones() {
+  const n = _repuSel.size;
+  if (!n || typeof openSheet !== 'function') return;
+  openSheet(`${n} repuesto${n === 1 ? '' : 's'}`, [
+    { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de los marcados',
+      onClick: () => { closeSheet(); repuSelEtiquetas(); } },
+    { divider: true },
+    { icon: '🗑️', label: 'Eliminar', sub: 'No se puede deshacer (dueño, con PIN)', danger: true,
+      onClick: () => { closeSheet(); repuSelEliminar(); } },
+  ]);
+}
+
+function repuSelEtiquetas() {
+  const lista = _repuSelLista();
+  if (!lista.length) return;
+  if (typeof printEtiquetasRepuestos !== 'function') { toast('No se puede imprimir desde acá', 'error'); return; }
+  const copias = prompt(`${lista.length} repuesto${lista.length > 1 ? 's' : ''} marcado${lista.length > 1 ? 's' : ''}.\n¿Cuántas etiquetas de cada uno?`, '1');
+  if (copias === null) return;
+  printEtiquetasRepuestos(lista, Number(copias) || 1);
+}
+
+// Firestore acepta hasta 500 escrituras por tanda: rehacer la lista entera
+// son cientos de repuestos, así que va de a 450.
+async function _repuSelBorrar(lista) {
+  for (let i = 0; i < lista.length; i += 450) {
+    const batch = db.batch();
+    lista.slice(i, i + 450).forEach(r => batch.delete(db.collection('repuestos').doc(r.id)));
+    await batch.commit();
+  }
+}
+
+function repuSelEliminar() {
+  if (typeof tpFrenar === 'function' && tpFrenar('borrar', 'borrar repuestos')) return;
+  const lista = _repuSelLista();
+  if (!lista.length) return;
+  const muestra = lista.slice(0, 5).map(r => '• ' + (r.nombre || '(sin nombre)')).join('\n') +
+                  (lista.length > 5 ? `\n… y ${lista.length - 5} más` : '');
+  if (!confirm(`¿ELIMINAR ${lista.length} repuesto${lista.length === 1 ? '' : 's'}?\n\n${muestra}\n\n` +
+               `No se puede deshacer. Bajate el Excel antes (⋮ → Exportar / Importar).`)) return;
+
+  const hacer = async () => {
+    try {
+      await _repuSelBorrar(lista);
+      toast(`🗑️ ${lista.length} repuesto${lista.length === 1 ? '' : 's'} eliminado${lista.length === 1 ? '' : 's'}`, 'success');
+      repuSelSalir();
+    } catch (e) {
+      console.error('[repuestos] eliminar en masa:', e);
+      toast(e?.code === 'permission-denied' ? 'Sin permiso para borrar' : 'Error al eliminar', 'error');
+    }
+  };
+  // Un empleado con permiso de borrar ya pasó el freno de arriba; al dueño se
+  // le pide el PIN, que es el mismo que para borrar uno solo.
+  const empleadoPuede = typeof tpEmpleadoPuede === 'function' && tpEmpleadoPuede('borrar');
+  if (!empleadoPuede && typeof requireOwnerPin === 'function') {
+    requireOwnerPin(hacer, `PIN de dueño para eliminar ${lista.length} repuestos`);
+  } else hacer();
 }
 
 // ══════════════════════════════════════════

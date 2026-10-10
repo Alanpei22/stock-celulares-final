@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-repu-seleccion.js': 'Seleccionar varios repuestos para imprimir o eliminar en masa',
   'test-carga-repuestos.js':'Cargar repuestos de cero: codigo de barras solo y alta en cadena',
   'test-filtros-reparaciones.js':'Los filtros de Reparaciones quedan como los dejaste',
   'test-instalar.js':       'Ofrecer anclar la app al celular, en el login y en la app',
