@@ -425,6 +425,63 @@ async function corregirContadorOrdenes() {
   else correr();
 }
 
+// ══════════════════════════════════════════
+//  LOS FILTROS QUEDAN COMO LOS DEJASTE
+// ══════════════════════════════════════════
+// Estado, marca, fecha y orden se borraban al recargar o al volver de otra
+// pantalla, así que había que volver a ponerlos todo el tiempo. El alcance
+// (30 días / todo) ya se guardaba; estos cuatro no.
+//
+// Se guarda lo que de verdad quedó aplicado, venga de donde venga: también
+// cuando el filtro lo pone la app sola (tocar "Demorados" en estadísticas).
+// El texto del buscador NO se guarda: eso se escribe para una búsqueda
+// puntual, y volver y encontrar la lista filtrada por algo que escribiste
+// ayer confunde más de lo que ayuda.
+const _REP_FILTROS_KEY = 'repFiltros';
+let _repMarcaPend = null;    // la marca guardada espera a que existan sus opciones
+let _repFiltrosUlt = '';     // para no escribir en cada dibujo
+
+function _repFiltrosGuardados() {
+  try { return JSON.parse(localStorage.getItem(_REP_FILTROS_KEY) || '{}') || {}; }
+  catch { return {}; }
+}
+
+function _repReponerFiltros() {
+  const f = _repFiltrosGuardados();
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+  set('rep-f-estado', f.estado);
+  set('rep-f-fecha',  f.fecha);
+  set('rep-sort',     f.sort);
+  // La lista de marcas se arma con los equipos que hay, y todavía no llegaron:
+  // la marca se aplica en el primer dibujo (ver renderRepairs).
+  _repMarcaPend = f.marca || null;
+}
+
+function _repGuardarFiltros() {
+  const v = id => document.getElementById(id)?.value || '';
+  const s = JSON.stringify({ estado: v('rep-f-estado'), marca: v('rep-f-marca'),
+                             fecha: v('rep-f-fecha'),   sort: v('rep-sort') });
+  if (s === _repFiltrosUlt) return;
+  _repFiltrosUlt = s;
+  try { localStorage.setItem(_REP_FILTROS_KEY, s); } catch {}
+}
+
+// Para el cartel de "no hay nada": distinguir una lista vacía de verdad de
+// una lista tapada por un filtro que quedó puesto de antes.
+function _repHayFiltro() {
+  const v = id => document.getElementById(id)?.value || '';
+  return !!(v('rep-f-estado') || v('rep-f-marca') || v('rep-f-fecha'));
+}
+
+function repLimpiarFiltros() {
+  ['rep-f-estado', 'rep-f-marca', 'rep-f-fecha'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const b = document.getElementById('rep-search'); if (b) b.value = '';
+  _repMarcaPend = null;
+  renderRepairs();
+}
+
 // ── Init ──────────────────────────────────
 function initRepairs() {
   document.getElementById('rep-add-btn').addEventListener('click', () => openRepairForm());
@@ -443,6 +500,9 @@ function initRepairs() {
   document.getElementById('rep-f-marca').addEventListener('change', renderRepairs);
   document.getElementById('rep-f-fecha').addEventListener('change', renderRepairs);
   document.getElementById('rep-sort').addEventListener('change', renderRepairs);
+
+  // Como los dejaste la última vez.
+  _repReponerFiltros();
 
   document.getElementById('rep-form-close').addEventListener('click', closeRepairForm);
   document.getElementById('rep-form-cancel').addEventListener('click', closeRepairForm);
@@ -561,7 +621,7 @@ function _diaAR(d) {
 function renderRepairs() {
   const q       = (document.getElementById('rep-search').value || '').trim().toLowerCase();
   const fEstado = document.getElementById('rep-f-estado').value;
-  const fMarca  = document.getElementById('rep-f-marca').value;
+  let   fMarca  = document.getElementById('rep-f-marca').value;
   const fFecha  = document.getElementById('rep-f-fecha').value;
   const fSort   = document.getElementById('rep-sort').value;
 
@@ -575,6 +635,13 @@ function renderRepairs() {
     o.value = m; o.textContent = m; selM.appendChild(o);
   });
   selM.value = prev;
+  // La marca que quedó elegida la última vez: recién ahora se sabe qué marcas
+  // hay, así que recién ahora puede existir su opción.
+  if (_repMarcaPend) {
+    if (marcas.includes(_repMarcaPend)) { selM.value = _repMarcaPend; fMarca = _repMarcaPend; }
+    if (marcas.length) _repMarcaPend = null;   // ya hay datos: no se reintenta
+  }
+  _repGuardarFiltros();
 
   // Date filter refs
   // "Hoy" y "este mes" se comparan con el día ARGENTINO de ingreso. Antes se
@@ -668,6 +735,15 @@ function renderRepairs() {
       // Aún esperando la primera respuesta de Firestore
       emptyEl.style.display = 'none';
       listEl.innerHTML = '<div class="list-loading"><span class="list-loading__spinner"></span>Cargando reparaciones…</div>';
+    } else if (_repHayFiltro() || q) {
+      // Ahora que los filtros quedan puestos, "no hay reparaciones
+      // registradas" mentiría: están, tapadas por un filtro de antes.
+      emptyEl.style.display = 'none';
+      listEl.innerHTML = `<div class="rep-alcance-pie">
+        <b>Ningún equipo con los filtros puestos.</b><br>
+        Quedaron de la última vez que los cambiaste.
+        <button type="button" class="rep-alcance-btn" onclick="repLimpiarFiltros()">Limpiar filtros</button>
+      </div>` + _repAlcancePie(false);
     } else {
       listEl.innerHTML = _repAlcancePie(true);
       emptyEl.style.display = listEl.innerHTML ? 'none' : '';
