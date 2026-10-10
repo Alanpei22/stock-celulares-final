@@ -220,7 +220,9 @@ function initRepuestos() {
   document.getElementById('rep2-f-marca').addEventListener('change', renderRepuestos);
   document.getElementById('rep2-form-close').addEventListener('click', closeRepuestoForm);
   document.getElementById('rep2-form-cancel').addEventListener('click', closeRepuestoForm);
-  document.getElementById('rep2-form-save').addEventListener('click', saveRepuesto);
+  document.getElementById('rep2-form-save').addEventListener('click', () => saveRepuesto());
+  document.getElementById('rep2-form-save-otro')
+    ?.addEventListener('click', () => saveRepuesto({ seguir: true }));
   document.getElementById('rep2-delete-btn').addEventListener('click', () => deleteRepuesto(editingRepuestoId));
   document.getElementById('rep2-form-modal').addEventListener('click', e => {
     if (e.target.id === 'rep2-form-modal') closeRepuestoForm();
@@ -436,6 +438,9 @@ function openRepuestoForm(id) {
   // no tiene código ni precio.
   const etqBtn = document.getElementById('rep2-form-etq');
   if (etqBtn) etqBtn.style.display = id ? '' : 'none';
+  // "Cargar otro" solo tiene sentido dando de alta, no editando uno viejo.
+  const otroBtn = document.getElementById('rep2-form-save-otro');
+  if (otroBtn) otroBtn.style.display = id ? 'none' : '';
 
   if (id) {
     const r = REPUESTOS.find(x => x.id === id);
@@ -457,11 +462,13 @@ function openRepuestoForm(id) {
   } else {
     title.textContent = '🔩 Nuevo Repuesto';
     delWrap.style.display = 'none';
-    ['rep2-fi-nombre','rep2-fi-marca','rep2-fi-modelo',
+    // El código también: sin esto, abrir uno viejo y después "nuevo" dejaba
+    // el código del anterior en el campo y se guardaba repetido.
+    ['rep2-fi-nombre','rep2-fi-marca','rep2-fi-modelo','rep2-fi-codigo',
      'rep2-fi-cantidad','rep2-fi-stockmin',
      'rep2-fi-costoUSD','rep2-fi-precioVenta',
      'rep2-fi-proveedor','rep2-fi-notas'].forEach(i => {
-       document.getElementById(i).value = '';
+       const el = document.getElementById(i); if (el) el.value = '';
     });
     document.getElementById('rep2-fi-tipo').value = '';
   }
@@ -556,7 +563,7 @@ function closeRepuestoForm() {
   editingRepuestoId = null;
 }
 
-function saveRepuesto() {
+function saveRepuesto(opts) {
   if (typeof tpFrenar === 'function' && tpFrenar('inventario', 'cargar o editar repuestos')) return;
   const nombre         = document.getElementById('rep2-fi-nombre').value.trim();
   const marca          = document.getElementById('rep2-fi-marca').value.trim();
@@ -586,16 +593,64 @@ function saveRepuesto() {
                  precioCostoUSD, precioVenta, precioCompra, codigo,
                  proveedor, notas };
 
-  if (editingRepuestoId) {
-    db.collection('repuestos').doc(editingRepuestoId).set(data, { merge: true })
-      .then(() => { toast('Repuesto actualizado ✅', 'success'); closeRepuestoForm(); })
-      .catch(() => toast('Error al guardar', 'error'));
-  } else {
-    const ref = db.collection('repuestos').doc();
-    ref.set({ id: ref.id, ...data, fechaAlta: new Date().toISOString() })
-      .then(() => { toast('Repuesto agregado ✅', 'success'); closeRepuestoForm(); })
-      .catch(() => toast('Error al guardar', 'error'));
+  // Devuelve la promesa: el guardado es asíncrono (reserva el código).
+  return _guardarRepuesto(data, !!codigo, opts);
+}
+
+// El campo del código dice "Vacío = se genera uno (TP…)" desde que existe, pero
+// no lo generaba nadie: se guardaba en blanco. Sin código no hay etiqueta ni
+// se escanea en la caja, que es justo para lo que se carga el repuesto.
+async function _guardarRepuesto(data, teniaCodigo, opts) {
+  const seguir = !!(opts && opts.seguir);
+  const btn = document.getElementById(seguir ? 'rep2-form-save-otro' : 'rep2-form-save');
+  if (btn) btn.disabled = true;
+  try {
+    if (!data.codigo && typeof tpReservarCodigos === 'function') {
+      try {
+        const maxLocal = (typeof tpMaxCodigoLocal === 'function') ? tpMaxCodigoLocal(REPUESTOS) : 0;
+        data.codigo = (await tpReservarCodigos(db, 1, maxLocal))[0] || '';
+      } catch (e) {
+        // Sin internet se guarda igual, sin código: frenar la carga sería peor.
+        // Queda para "Generar códigos de barras" del menú.
+        console.error('[repuestos] reservar código:', e);
+      }
+    }
+    if (editingRepuestoId) {
+      await db.collection('repuestos').doc(editingRepuestoId).set(data, { merge: true });
+      toast('Repuesto actualizado ✅', 'success');
+    } else {
+      const ref = db.collection('repuestos').doc();
+      await ref.set({ id: ref.id, ...data, fechaAlta: new Date().toISOString() });
+      toast('Repuesto agregado ✅' + (!teniaCodigo && data.codigo ? ' · ' + data.codigo : ''), 'success');
+    }
+    if (seguir) _repuSiguiente(data);
+    else closeRepuestoForm();
+  } catch (e) {
+    console.error('[repuestos] guardar:', e);
+    toast('Error al guardar', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
+}
+
+// Deja el formulario listo para el que viene. Se conservan tipo, marca,
+// proveedor y stock mínimo: en una tanda suelen repetirse, y volver a
+// escribirlos en cada repuesto es tiempo perdido.
+function _repuSiguiente(data) {
+  editingRepuestoId = null;
+  const t = document.getElementById('rep2-form-title');
+  if (t) t.textContent = '🔩 Nuevo Repuesto';
+  ['rep2-fi-nombre', 'rep2-fi-modelo', 'rep2-fi-codigo', 'rep2-fi-cantidad',
+   'rep2-fi-costoUSD', 'rep2-fi-precioVenta', 'rep2-fi-notas'].forEach(i => {
+    const el = document.getElementById(i); if (el) el.value = '';
+  });
+  const etq = document.getElementById('rep2-form-etq');
+  if (etq) etq.style.display = 'none';
+  const del = document.getElementById('rep2-delete-wrap');
+  if (del) del.style.display = 'none';
+  _updateCostoARSHint();
+  const nom = document.getElementById('rep2-fi-nombre');
+  if (nom) setTimeout(() => nom.focus(), 60);
 }
 
 function deleteRepuesto(id) {
