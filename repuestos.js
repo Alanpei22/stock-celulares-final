@@ -228,8 +228,8 @@ function initRepuestos() {
   document.getElementById('rep2-form-modal').addEventListener('click', e => {
     if (e.target.id === 'rep2-form-modal') closeRepuestoForm();
   });
-  // Hint dinámico del costo en pesos al lado del campo USD
-  document.getElementById('rep2-fi-costoUSD')?.addEventListener('input', _updateCostoARSHint);
+  // Al lado del costo en pesos se ve a cuántos dólares equivale hoy
+  document.getElementById('rep2-fi-costoARS')?.addEventListener('input', _updateCostoARSHint);
   initCatalogAutocomplete();
   // CUPO: el listener de repuestos (colección completa) arranca recién al
   // entrar a la sección Repuestos — ver switchSection() en app.js.
@@ -477,7 +477,16 @@ function openRepuestoForm(id) {
     document.getElementById('rep2-fi-tipo').value        = r.tipo            || '';
     document.getElementById('rep2-fi-cantidad').value    = r.cantidad        ?? '';
     document.getElementById('rep2-fi-stockmin').value    = r.stockMin        ?? '';
-    document.getElementById('rep2-fi-costoUSD').value    = r.precioCostoUSD  ?? '';
+    // El costo se muestra en pesos: lo que se pagó (precioCompra) o, en los
+    // viejos cargados en dólares, lo que vale hoy. Se recuerda el valor que
+    // se mostró: si no se toca, al guardar NO se recalcula el dólar (si no,
+    // abrir y guardar un repuesto le cambiaba el costo cada vez que sube).
+    const costoEl = document.getElementById('rep2-fi-costoARS');
+    const dHoy = _dolarHoy();
+    const arsMostrar = Number(r.precioCompra) > 0 ? Math.round(r.precioCompra)
+                     : (Number(r.precioCostoUSD) > 0 && dHoy > 0 ? Math.round(r.precioCostoUSD * dHoy) : '');
+    costoEl.value = arsMostrar;
+    costoEl.dataset.original = String(arsMostrar);
     document.getElementById('rep2-fi-precioVenta').value = r.precioVenta     ?? '';
     const codEl = document.getElementById('rep2-fi-codigo');
     if (codEl) codEl.value = r.codigo || '';
@@ -490,14 +499,16 @@ function openRepuestoForm(id) {
     // el código del anterior en el campo y se guardaba repetido.
     ['rep2-fi-nombre','rep2-fi-marca','rep2-fi-modelo','rep2-fi-codigo',
      'rep2-fi-cantidad','rep2-fi-stockmin',
-     'rep2-fi-costoUSD','rep2-fi-precioVenta',
+     'rep2-fi-costoARS','rep2-fi-precioVenta',
      'rep2-fi-proveedor','rep2-fi-notas'].forEach(i => {
        const el = document.getElementById(i); if (el) el.value = '';
     });
     document.getElementById('rep2-fi-tipo').value = '';
+    const cEl = document.getElementById('rep2-fi-costoARS');
+    if (cEl) delete cEl.dataset.original;
   }
 
-  // Hint del costo en pesos al lado del costo USD
+  // A cuántos dólares equivale el costo
   _updateCostoARSHint();
   _bindRepuestoEnter();
 
@@ -520,17 +531,32 @@ function _bindRepuestoEnter() {
   });
 }
 
-// Actualiza el hint "= $X.XXX" al costado del input de Costo USD
+// El costo se carga en PESOS (lo que dice la factura del proveedor) y se
+// guarda también en dólares con la cotización del día: así el costo no se
+// queda atrás cuando sube el dólar (el resto de la app lo recalcula desde
+// precioCostoUSD con el dólar de cada día).
+function _dolarHoy() {
+  return (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue : 0;
+}
+
+// Pesos → dólares, con 2 decimales
+function repCostoUSD(ars, dolar) {
+  const a = Number(ars) || 0, d = Number(dolar) || 0;
+  return a > 0 && d > 0 ? Math.round((a / d) * 100) / 100 : 0;
+}
+
+// Al costado del costo en pesos: "≈ U$S 25,40 (dólar $1.230)"
 function _updateCostoARSHint() {
-  const usdEl  = document.getElementById('rep2-fi-costoUSD');
-  const hintEl = document.getElementById('rep2-fi-costoARS-hint');
-  if (!usdEl || !hintEl) return;
-  const usd = parseFloat(usdEl.value) || 0;
-  const dolar = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue : 0;
-  if (usd > 0 && dolar > 0) {
-    hintEl.textContent = ` ≈ $${Math.round(usd * dolar).toLocaleString('es-AR')}`;
-  } else if (usd > 0 && !dolar) {
-    hintEl.textContent = ' (cargá el dólar en Configuración)';
+  const arsEl  = document.getElementById('rep2-fi-costoARS');
+  const hintEl = document.getElementById('rep2-fi-costoUSD-hint');
+  if (!arsEl || !hintEl) return;
+  const ars = parseFloat(arsEl.value) || 0;
+  const dolar = _dolarHoy();
+  if (ars > 0 && dolar > 0) {
+    const usd = repCostoUSD(ars, dolar);
+    hintEl.textContent = ` ≈ U$S ${usd.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (dólar $${dolar.toLocaleString('es-AR')})`;
+  } else if (ars > 0 && !dolar) {
+    hintEl.textContent = ' (sin cotización: se guarda en pesos)';
   } else {
     hintEl.textContent = '';
   }
@@ -754,7 +780,8 @@ function saveRepuesto(opts) {
   const tipo           = document.getElementById('rep2-fi-tipo').value;
   const cantidad       = parseInt(document.getElementById('rep2-fi-cantidad').value) || 0;
   const stockMin       = parseInt(document.getElementById('rep2-fi-stockmin').value) || 0;
-  const precioCostoUSD = parseFloat(document.getElementById('rep2-fi-costoUSD').value)    || 0;
+  const costoEl        = document.getElementById('rep2-fi-costoARS');
+  const costoARS       = Math.round(parseFloat(costoEl.value) || 0);
   const precioVenta    = parseFloat(document.getElementById('rep2-fi-precioVenta').value) || 0;
   // Campo NUEVO: los repuestos que ya están guardados no lo tienen y siguen
   // funcionando igual. La caja ya buscaba por acá (`CAJA_REPUESTOS.codigo`),
@@ -767,14 +794,26 @@ function saveRepuesto(opts) {
   if (!marca)  { toast('Ingresá la marca', 'error'); return; }
   if (!tipo)   { toast('Seleccioná el tipo', 'error'); return; }
 
-  // precioCompra (legacy) = costo en pesos al momento del guardado, para reportes/back-compat.
-  // El canónico es precioCostoUSD; se recalcula dinámicamente con dolarBlue actual.
-  const dolar = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue : 0;
-  const precioCompra = precioCostoUSD > 0 && dolar > 0 ? Math.round(precioCostoUSD * dolar) : 0;
+  // Se carga en pesos (precioCompra) y se pasa a dólares con el dólar de HOY
+  // (precioCostoUSD, el que usa el resto de la app). Si al editar no se tocó
+  // el costo, queda el dólar con el que se cargó: abrir y guardar no lo cambia.
+  const dolar = _dolarHoy();
+  const previo = editingRepuestoId ? REPUESTOS.find(x => x.id === editingRepuestoId) : null;
+  const sinTocar = previo && costoEl.dataset.original !== undefined && String(costoARS || '') === String(costoEl.dataset.original || '');
+  let precioCostoUSD, precioCompra = costoARS, dolarCosto = dolar || null;
+  if (sinTocar) {
+    precioCostoUSD = Number(previo.precioCostoUSD) || 0;
+    precioCompra = Number(previo.precioCompra) || costoARS;
+    dolarCosto = previo.dolarCosto || null;
+  } else {
+    precioCostoUSD = repCostoUSD(costoARS, dolar);
+    if (costoARS > 0 && !dolar) toast('Sin cotización del dólar: el costo se guardó en pesos', 'info');
+  }
 
   const data = { nombre, marca, modelo, tipo, cantidad, stockMin,
                  precioCostoUSD, precioVenta, precioCompra, codigo,
                  proveedor, notas };
+  if (dolarCosto) data.dolarCosto = dolarCosto;
 
   // Devuelve la promesa: el guardado es asíncrono (reserva el código).
   return _guardarRepuesto(data, !!codigo, opts);
@@ -824,7 +863,7 @@ function _repuSiguiente(data) {
   const t = document.getElementById('rep2-form-title');
   if (t) t.textContent = '🔩 Nuevo Repuesto';
   ['rep2-fi-nombre', 'rep2-fi-modelo', 'rep2-fi-codigo', 'rep2-fi-cantidad',
-   'rep2-fi-costoUSD', 'rep2-fi-precioVenta', 'rep2-fi-notas'].forEach(i => {
+   'rep2-fi-costoARS', 'rep2-fi-precioVenta', 'rep2-fi-notas'].forEach(i => {
     const el = document.getElementById(i); if (el) el.value = '';
   });
   const etq = document.getElementById('rep2-form-etq');

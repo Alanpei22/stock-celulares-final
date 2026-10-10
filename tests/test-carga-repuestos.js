@@ -27,10 +27,10 @@ const el = id => els[id] = {
   querySelector: () => null, querySelectorAll: () => [], closest: () => null, appendChild() {},
 };
 ['rep2-fi-nombre', 'rep2-fi-marca', 'rep2-fi-modelo', 'rep2-fi-tipo', 'rep2-fi-cantidad',
- 'rep2-fi-stockmin', 'rep2-fi-costoUSD', 'rep2-fi-precioVenta', 'rep2-fi-codigo',
+ 'rep2-fi-stockmin', 'rep2-fi-costoARS', 'rep2-fi-precioVenta', 'rep2-fi-codigo',
  'rep2-fi-proveedor', 'rep2-fi-notas', 'rep2-form-save', 'rep2-form-save-otro',
  'rep2-form-title', 'rep2-form-etq', 'rep2-delete-wrap', 'rep2-form-modal',
- 'rep2-fi-costoARS-hint'].forEach(el);
+ 'rep2-fi-costoUSD-hint'].forEach(el);
 
 const TOASTS = [];
 const GUARDADO = [];
@@ -82,7 +82,7 @@ const cargar = (nombre, codigo = '') => {
   els['rep2-fi-tipo'].value = 'Pantalla';
   els['rep2-fi-cantidad'].value = '3';
   els['rep2-fi-stockmin'].value = '2';
-  els['rep2-fi-costoUSD'].value = '25';
+  els['rep2-fi-costoARS'].value = '30000';
   els['rep2-fi-precioVenta'].value = '60000';
   els['rep2-fi-codigo'].value = codigo;
   els['rep2-fi-proveedor'].value = 'Mayorista';
@@ -154,7 +154,7 @@ await run('saveRepuesto({ seguir: true })');
 ok(els['rep2-fi-codigo'].value === '',
    'también cuando el código lo escribiste vos: dos repuestos con la misma etiqueta sería peor',
    els['rep2-fi-codigo'].value);
-ok(els['rep2-fi-precioVenta'].value === '' && els['rep2-fi-costoUSD'].value === '',
+ok(els['rep2-fi-precioVenta'].value === '' && els['rep2-fi-costoARS'].value === '',
    'los precios también: cada repuesto tiene el suyo');
 
 console.log('\n3) Abrir uno viejo y después uno nuevo no arrastra el código');
@@ -217,6 +217,48 @@ ok(/id="rep2-f-alta"/.test(leer('index.html')), 'hay un filtro "Cargados hoy" en
 ok(/Etiquetas de lo cargado hoy/.test(leer('app.js')), 'y la opción en el menú de etiquetas');
 ok(/if \(fAlta === 'hoy' && !_repuEsDeHoy\(r\)\) return false;/.test(leer('repuestos.js')),
    'el filtro usa la misma cuenta que las etiquetas');
+
+
+console.log('\n6) El costo se carga en pesos y pasa solo al dólar de hoy');
+// Alan quiere poner lo que dice la factura del proveedor (pesos). Antes el
+// campo era en dólares y había que hacer la cuenta a mano.
+ok(/id="rep2-fi-costoARS"/.test(leer('index.html')), 'el campo del costo es en pesos');
+run('dolarBlue = 1200; editingRepuestoId = null');
+cargar('Pantalla en pesos');
+await run('saveRepuesto()');
+ok(ultimo().precioCompra === 30000, 'se guarda lo que pagaste en pesos', ultimo().precioCompra);
+ok(ultimo().precioCostoUSD === 25, 'y en dólares con el dólar de hoy: 30.000 / 1.200 = 25', ultimo().precioCostoUSD);
+ok(ultimo().dolarCosto === 1200, 'y con qué dólar se hizo la cuenta', ultimo().dolarCosto);
+ok(run('repCostoUSD(10000, 1230)') === 8.13, 'redondea a centavos de dólar', run('repCostoUSD(10000, 1230)'));
+
+// Editar sin tocar el costo no lo recalcula: si no, cada vez que sube el
+// dólar, abrir y guardar un repuesto le bajaba el costo en dólares.
+run("REPUESTOS = [{ id:'r9', nombre:'Bat', marca:'Apple', modelo:'11', tipo:'Batería', precioCompra: 24000, precioCostoUSD: 24, dolarCosto: 1000, cantidad: 1 }]");
+run("openRepuestoForm('r9')");
+ok(els['rep2-fi-costoARS'].value === 24000, 'al editar se ve el costo en pesos', els['rep2-fi-costoARS'].value);
+run('dolarBlue = 1500');
+await run('saveRepuesto()');
+ok(ultimo().precioCostoUSD === 24 && ultimo().dolarCosto === 1000,
+   'guardar sin tocar el costo deja los dólares como estaban', ultimo());
+// Si lo cambiás, se pasa con el dólar de hoy
+run("openRepuestoForm('r9')");
+els['rep2-fi-costoARS'].value = '30000';
+await run('saveRepuesto()');
+ok(ultimo().precioCostoUSD === 20 && ultimo().precioCompra === 30000,
+   'si lo cambiás, va con el dólar de hoy (30.000 / 1.500 = 20)', ultimo());
+
+// Uno viejo cargado solo en dólares se muestra en pesos de hoy
+run("REPUESTOS = [{ id:'r8', nombre:'Viejo', marca:'Moto', modelo:'G', tipo:'Pantalla', precioCostoUSD: 10, cantidad: 1 }]");
+run("openRepuestoForm('r8')");
+ok(els['rep2-fi-costoARS'].value === 15000, 'uno viejo en dólares se ve en pesos de hoy', els['rep2-fi-costoARS'].value);
+
+// Sin cotización no se pierde: queda en pesos y avisa
+run('dolarBlue = 0; editingRepuestoId = null');
+cargar('Sin dolar');
+await run('saveRepuesto()');
+ok(ultimo().precioCompra === 30000 && ultimo().precioCostoUSD === 0, 'sin dólar se guarda en pesos', ultimo());
+ok(TOASTS.some(t => /Sin cotización del dólar/.test(t[1])), 'y avisa');
+run('dolarBlue = 1200');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
