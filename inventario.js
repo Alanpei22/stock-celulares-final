@@ -582,8 +582,8 @@ function toggleInvMenu() {
     { divider: true },
     { icon: '☑️', label: 'Seleccionar varios', sub: 'Modificar o eliminar muchos a la vez', onClick: () => { closeInvMenu(); invSelEntrar(); } },
     { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: openInvWizard },
-    { icon: '🏷️', label: 'Etiquetas e impresión', sub: 'Imprimir, códigos de barras, impresora',
-      submenu: invMenuEtiquetas },
+    sheetGrupo(toggleInvMenu, 'Etiquetas e impresión', '🏷️', 'Etiquetas e impresión',
+      'Imprimir, códigos de barras, impresora', _invItemsEtiquetas()),
     { icon: '📉', label: 'Roturas del mes', sub: 'Lo que se rompió o vino roto',
       onClick: () => { closeInvMenu(); abrirRoturas(); } },
     { icon: '💵', label: 'Cargar costos', sub: 'En dólares, todos en una lista (modo dueño)',
@@ -592,11 +592,10 @@ function toggleInvMenu() {
   ]);
 }
 
-// Todo lo de etiquetas, junto. Se abre en el mismo lugar, sin cerrar el menú,
-// y "Volver" trae el de afuera.
-function invMenuEtiquetas() {
-  if (typeof openSheet !== 'function') return;
-  openSheet('Etiquetas e impresión', [
+// Todo lo de etiquetas, junto. El grupo lo arma sheetGrupo (utils.js), que
+// es el mismo que usan los menús de la caja, el stock y los repuestos.
+function _invItemsEtiquetas() {
+  return [
     { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: imprimirEtiquetasInv },
     { icon: '🆕', label: 'Etiquetas de lo cargado hoy', sub: 'Al terminar una tanda', onClick: etiquetasDeHoy },
     { icon: '🔢', label: 'Generar códigos de barras', sub: 'A los artículos que no tienen', onClick: generarCodigosInv },
@@ -607,9 +606,7 @@ function invMenuEtiquetas() {
     { icon: '🖨️', label: 'Impresión directa',
       sub: (typeof qzMenuSub === 'function') ? qzMenuSub() : '',
       onClick: () => { closeInvMenu(); if (typeof configurarImpresoras === 'function') configurarImpresoras(); } },
-    { divider: true },
-    { icon: '↩️', label: 'Volver', submenu: toggleInvMenu },
-  ]);
+  ];
 }
 
 function closeInvMenu() { if (typeof closeSheet === 'function') closeSheet(); }

@@ -426,6 +426,25 @@ function openSheet(title, items) {
   requestAnimationFrame(() => sheet.classList.add('sheet--open'));
 }
 
+// Un GRUPO dentro de un menú: una sola opción que abre otra hoja con las de
+// adentro, y un "Volver" al final. Los menús habían llegado a catorce opciones
+// de un tirón; una lista así no se lee, se busca.
+//
+// `volver` es la función que vuelve a abrir el menú de afuera. Si por permisos
+// quedaran escondidas TODAS las de adentro, el grupo tampoco se muestra: una
+// puerta que no lleva a ningún lado es peor que no tenerla.
+function sheetGrupo(volver, titulo, icon, label, sub, items) {
+  const visibles = (items || []).filter(it => !it.hide);
+  return {
+    icon, label, sub,
+    hide: !visibles.some(it => !it.divider),
+    submenu: () => openSheet(titulo, visibles.concat([
+      { divider: true },
+      { icon: '↩️', label: 'Volver', submenu: volver },
+    ])),
+  };
+}
+
 function closeSheet() {
   const overlay = document.getElementById('sheet-overlay');
   const sheet   = document.getElementById('sheet');

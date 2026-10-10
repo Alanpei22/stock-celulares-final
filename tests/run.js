@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-menus.js':          'Que los menus se lean de una mirada y se agrupen igual en todas',
   'test-roturas.js':        'Dar de baja vidrios y accesorios que se rompen, y su informe',
   'test-repu-seleccion.js': 'Seleccionar varios repuestos para imprimir o eliminar en masa',
   'test-carga-repuestos.js':'Cargar repuestos de cero: codigo de barras solo y alta en cadena',

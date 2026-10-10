@@ -41,6 +41,19 @@ const ctx = {
 };
 ctx.globalThis = ctx; ctx.window = ctx;
 vm.createContext(ctx);
+// Como en el navegador: utils.js primero, inventario.js después. El menú usa
+// sheetGrupo(), que vive en utils.js. Los ayudantes de mentira se reponen
+// encima, porque utils.js trae los de verdad y tocan el DOM.
+// Todo lo que el test dejó puesto a mano (incluido _todayAR, que fija el día)
+// se repone encima: utils.js trae las de verdad y pisarían al de mentira.
+const _stubs = Object.fromEntries(Object.entries(ctx).filter(([, v]) => typeof v === 'function'));
+vm.runInContext(fs.readFileSync(DIR + 'utils.js', 'utf8'), ctx, { filename: 'utils.js' });
+// Hay que reponerlos DESDE ADENTRO: una `function` declarada por el script
+// queda enganchada al global interno y asignar sobre `ctx` no la pisa.
+ctx.__stubs = _stubs;
+vm.runInContext(Object.keys(_stubs).filter(k => /^[A-Za-z_$][\w$]*$/.test(k))
+  .map(k => `try { ${k} = __stubs[${JSON.stringify(k)}]; } catch (e) {}`)
+  .join(String.fromCharCode(10)), ctx);
 vm.runInContext(inv, ctx, { filename: 'inventario.js' });
 const run = e => vm.runInContext(e, ctx);
 
@@ -160,10 +173,14 @@ await run('_invCatElegida()');
 ok(els['inv-fi-cat'].value === '', 'si cancelás, queda sin categoría y no "__nueva"', els['inv-fi-cat'].value);
 
 console.log('\n5) Las etiquetas de lo cargado hoy');
-const hoy = { fechaAlta: { toDate: () => new Date('2026-10-06T14:00:00-03:00') } };
-const ayer = { fechaAlta: { toDate: () => new Date('2026-10-05T14:00:00-03:00') } };
-// 21:00 de acá ya es el dia siguiente en Londres: no tiene que contar como de ayer.
-const anoche = { fechaAlta: { toDate: () => new Date('2026-10-06T21:30:00-03:00') } };
+// El día sale del _todayAR de utils.js, el mismo que usa la app: así la
+// prueba vale cualquier día que se corra, y no el 6 de octubre nada más.
+const _d = run('_todayAR()');
+const hoy = { fechaAlta: { toDate: () => new Date(_d + 'T14:00:00-03:00') } };
+const _ayerStr = new Date(new Date(_d + 'T12:00:00Z').getTime() - 86400000).toISOString().slice(0, 10);
+const ayer = { fechaAlta: { toDate: () => new Date(_ayerStr + 'T14:00:00-03:00') } };
+// 21:00 de acá ya es el día siguiente en Londres: no tiene que contar como de ayer.
+const anoche = { fechaAlta: { toDate: () => new Date(_d + 'T21:30:00-03:00') } };
 ctx.__p = hoy;    ok(run('_invEsDeHoy(__p)') === true, 'uno de hoy, sí');
 ctx.__p = ayer;   ok(run('_invEsDeHoy(__p)') === false, 'uno de ayer, no');
 ctx.__p = anoche; ok(run('_invEsDeHoy(__p)') === true, 'y uno de las 21:30 sigue siendo de hoy');
@@ -181,6 +198,10 @@ const HOJAS = [];
 ctx.openSheet = (titulo, items) => HOJAS.push({ titulo, items });
 ctx.toggleDarkMode = () => {};
 ctx.openCajaOwnerPin = () => {};
+
+// La hoja no se cierra para abrir la de adentro: si se cerrara, la otra
+// entrar\u00eda 220 ms despu\u00e9s y se ver\u00eda el salto.
+
 
 run('toggleInvMenu()');
 const menu = HOJAS[HOJAS.length - 1];
@@ -211,21 +232,16 @@ ok(HOJAS[HOJAS.length - 1].titulo === 'Inventario', 'volver trae el men\u00fa de
    HOJAS[HOJAS.length - 1].titulo);
 
 // La hoja no se cierra para abrir la de adentro: si se cerrara, la otra
-// entrar\u00eda 220 ms despu\u00e9s y se ver\u00eda el salto.
-const uctx = { console, Math, Date, JSON, Number, String, Array, Object, setTimeout: f => f(),
-  document: { getElementById: () => null, querySelectorAll: () => [], body: { appendChild() {} } },
-  localStorage: { getItem: () => null, setItem: () => {} }, requestAnimationFrame: f => f() };
-uctx.globalThis = uctx; uctx.window = uctx;
-vm.createContext(uctx);
-vm.runInContext(fs.readFileSync(DIR + 'utils.js', 'utf8'), uctx, { filename: 'utils.js' });
+// entraría 220 ms después y se vería el salto.
+
 let cerro = 0, abrio = 0;
-uctx.closeSheet = () => { cerro++; };
-vm.runInContext('_sheetItems = [{ label: "x", submenu: () => _marca() }]', uctx);
-uctx._marca = () => { abrio++; };
-vm.runInContext('_sheetItemClick(0)', uctx);
+ctx.closeSheet = () => { cerro++; };
+vm.runInContext('_sheetItems = [{ label: "x", submenu: () => _marca() }]', ctx);
+ctx._marca = () => { abrio++; };
+vm.runInContext('_sheetItemClick(0)', ctx);
 ok(abrio === 1 && cerro === 0, 'tocar un submen\u00fa abre sin cerrar', { abrio, cerro });
-vm.runInContext('_sheetItems = [{ label: "y", onClick: () => _marca() }]', uctx);
-vm.runInContext('_sheetItemClick(0)', uctx);
+vm.runInContext('_sheetItems = [{ label: "y", onClick: () => _marca() }]', ctx);
+vm.runInContext('_sheetItemClick(0)', ctx);
 ok(cerro === 1, 'y una opci\u00f3n normal sigue cerrando', { cerro });
 
 console.log('\n7) El código de barras sale solo al agregar');
@@ -238,8 +254,8 @@ console.log('\n7) El código de barras sale solo al agregar');
 
 // El contador de códigos de verdad (el utils.js que ya se cargó arriba),
 // contra una base de mentira.
-ctx.tpReservarCodigos = uctx.tpReservarCodigos;
-ctx.tpMaxCodigoLocal  = uctx.tpMaxCodigoLocal;
+ctx.tpReservarCodigos = ctx.tpReservarCodigos;
+ctx.tpMaxCodigoLocal  = ctx.tpMaxCodigoLocal;
 
 let META = null, FALLAR = false;
 const GUARDADO = [];
