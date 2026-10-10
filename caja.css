@@ -1762,3 +1762,12 @@ body.dark .inv-mon-btn.inv-mon-on { background: var(--accent); border-color: var
 .tk-cam-sacar { background: #C8965A; color: #fff; }
 .tk-cam-sacar:disabled { opacity: .5; cursor: default; }
 .tk-cam-sec { background: rgba(255,255,255,.15); color: #fff; }
+
+/* Recalcular el saldo de caja dueño (caja_extra.js): solo hace falta si el
+   número dejara de cerrar, así que va discreto al lado del saldo. */
+.cd-recalc {
+  display: block; margin: 6px auto 0; padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: none; color: var(--t3); font-size: .72rem; cursor: pointer;
+}
+.cd-recalc:active { opacity: .7; }

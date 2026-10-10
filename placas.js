@@ -312,9 +312,11 @@ function listenPlacas() {
   if (_placasListener) _placasListener();
   // CUPO: tope de 300 casos. Alcanza de sobra para la base de conocimiento
   // y no crece sin control con los años.
+  let _primerPlaca = true;
   _placasListener = db.collection('placas')
     .orderBy('createdAt', 'desc').limit(300)
     .onSnapshot(snap => {
+      if (typeof cupoSnap === 'function') { cupoSnap('placas', snap, _primerPlaca); _primerPlaca = false; }
       PLACAS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       renderStats();
       renderList();

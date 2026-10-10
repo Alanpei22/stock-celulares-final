@@ -41,8 +41,12 @@ function initPrecios() {
       }
     }
   } catch {}
+  // CUPO: la lista de precios se lee entera a propósito (hay que poder
+  // buscar en todos), pero se mide para que no crezca sin que nadie mire.
+  let _primerPrecio = true;
   _preciosListener = db.collection('precios_reparaciones')
     .onSnapshot(snap => {
+      if (typeof cupoSnap === 'function') { cupoSnap('precios', snap, _primerPrecio); _primerPrecio = false; }
       PRECIOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       PRECIOS.sort((a, b) => {
         const t = (a.tipo || '').localeCompare(b.tipo || '');

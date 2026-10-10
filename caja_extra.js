@@ -526,6 +526,7 @@ async function saveCajaDuenoFromCierre() {
       fecha: _todayAR(), tipo: 'ingreso', monto, desc,
       ts: new Date().toISOString()
     });
+    await _cdAjustarSaldo('ingreso', monto);
     closeCajaDuenoPrompt();
     toast('📦 ' + fmt(monto) + ' guardado en caja dueño', 'success');
     // 📨 Aviso Telegram: apartado a caja dueño en el cierre
@@ -553,18 +554,73 @@ function closeCajaDueno() {
   document.getElementById('cd-mgmt-modal').classList.add('hidden');
 }
 
+// ── El saldo de caja dueño ────────────────────────────────
+// Antes, cada vez que abrías el cartel se leía la colección ENTERA solo para
+// sumar el saldo, aunque en pantalla se muestren 80 movimientos. Eso crece
+// para siempre: a los dos años, abrir la caja dueño te cuesta miles de
+// lecturas del cupo.
+//
+// Ahora el saldo vive en un documento y se corrige con `increment()` en cada
+// alta y en cada borrado, que es atómico. Si alguna vez quedara desfasado
+// (una escritura que entró y un increment que no), el botón "Recalcular"
+// vuelve a contar todo y lo reescribe. La lista sigue mostrando los últimos 80.
+const _cdSaldoRef = () => db.collection('config').doc('cajaDuenoSaldo');
+
+// `quitar` es para cuando se BORRA un movimiento: no alcanza con sumar lo
+// contrario, porque entonces el total de ingresos subiría al borrar un egreso.
+// Hay que descontarlo de su propia columna.
+async function _cdAjustarSaldo(tipo, monto, quitar) {
+  const m = Number(monto) || 0;
+  if (!m) return;
+  const signo = quitar ? -1 : 1;
+  const esEgreso = tipo === 'egreso';
+  const inc = firebase.firestore.FieldValue.increment;
+  try {
+    await _cdSaldoRef().set({
+      saldo:    inc(signo * (esEgreso ? -m : m)),
+      ingresos: inc(esEgreso ? 0 : signo * m),
+      egresos:  inc(esEgreso ? signo * m : 0),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) { console.error('[caja dueño] saldo:', err); }
+}
+
+// Cuenta todo de nuevo y reescribe el documento. Se usa la primera vez (no
+// existe todavía) y desde el botón, si el número dejara de cerrar.
+async function recalcularSaldoCajaDueno(avisar) {
+  const snap = await db.collection('caja_dueno_movimientos').get();
+  if (typeof cupoContar === 'function') cupoContar('caja_dueno_movimientos', snap.size);
+  let ingresos = 0, egresos = 0;
+  snap.docs.forEach(d => {
+    const m = d.data();
+    if (m.tipo === 'egreso') egresos += Number(m.monto) || 0;
+    else ingresos += Number(m.monto) || 0;
+  });
+  const tot = { saldo: ingresos - egresos, ingresos, egresos, updatedAt: new Date().toISOString() };
+  await _cdSaldoRef().set(tot);
+  if (avisar) { toast('🔄 Saldo recalculado sobre ' + snap.size + ' movimientos', 'success'); _loadCajaDueno(); }
+  return tot;
+}
+
 async function _loadCajaDueno() {
   const list = document.getElementById('cd-movs-list');
   list.innerHTML = '<p style="text-align:center;padding:16px;color:var(--t2)">Cargando...</p>';
   try {
-    // MED-16: cargar TODOS los movimientos para saldo correcto; mostrar solo los últimos 80
+    // Solo los últimos 80, que es lo que se muestra.
     const snap = await db.collection('caja_dueno_movimientos')
-      .orderBy('ts', 'desc').get();
-    const allMovs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const movs = allMovs.slice(0, 80); // solo mostrar los últimos 80 en pantalla
-    const totalIng = allMovs.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-    const totalEg  = allMovs.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (Number(m.monto) || 0), 0);
-    const saldo = totalIng - totalEg;
+      .orderBy('ts', 'desc').limit(80).get();
+    const movs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // El saldo sale del documento; si no está, se cuenta una vez y queda.
+    let tot = null;
+    try {
+      const sd = await _cdSaldoRef().get();
+      if (sd.exists) tot = sd.data();
+    } catch (err) { console.error('[caja dueño] leer saldo:', err); }
+    if (!tot) tot = await recalcularSaldoCajaDueno(false);
+    const totalIng = Number(tot.ingresos) || 0;
+    const totalEg  = Number(tot.egresos) || 0;
+    const saldo    = Number(tot.saldo) || 0;
 
     const saldoEl = document.getElementById('cd-saldo-val');
     if (saldoEl) {
@@ -602,7 +658,12 @@ async function _loadCajaDueno() {
 async function deleteCajaDueno(id) {
   requireCajaOwnerPin(async () => {
     try {
-      await db.collection('caja_dueno_movimientos').doc(id).delete();
+      // Se lee antes de borrar: sin el monto no se puede corregir el saldo.
+      const ref = db.collection('caja_dueno_movimientos').doc(id);
+      const doc = await ref.get();
+      const m = doc.exists ? doc.data() : null;
+      await ref.delete();
+      if (m) await _cdAjustarSaldo(m.tipo, m.monto, true);
       toast('Movimiento eliminado', 'success');
       _loadCajaDueno();
     } catch(e) { toast('Error al eliminar', 'error'); }
@@ -635,6 +696,7 @@ async function saveCajaDuenoMov() {
       desc: desc || (tipo === 'egreso' ? 'Egreso' : 'Ingreso'),
       ts: new Date().toISOString()
     });
+    await _cdAjustarSaldo(tipo, monto);
     closeCajaDuenoMovForm();
     _loadCajaDueno();
     toast((tipo === 'ingreso' ? '📦 Ingreso' : '💸 Egreso') + ' guardado', 'success');

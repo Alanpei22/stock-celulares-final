@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-caja-dueno-saldo.js':'El saldo de caja dueno sin leer la coleccion entera cada vez',
   'test-menus.js':          'Que los menus se lean de una mirada y se agrupen igual en todas',
   'test-roturas.js':        'Dar de baja vidrios y accesorios que se rompen, y su informe',
   'test-repu-seleccion.js': 'Seleccionar varios repuestos para imprimir o eliminar en masa',

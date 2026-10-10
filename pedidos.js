@@ -76,7 +76,12 @@ function _llenarSelectsPedido() {
 // ── Listener Firestore ───────────────────────
 function listenPedidos() {
   if (_pedidosListener) { _pedidosListener(); _pedidosListener = null; }
+  // CUPO: la coleccion entera. No se acota a proposito: un pedido viejo sin
+  // `createdAt` se caeria de un orderBy y desaparecería de la lista sin aviso.
+  // Se mide acá para saber cuánto cuesta, y arranca recién al abrir el modal.
+  let _primerPedido = true;
   _pedidosListener = db.collection('pedidos').onSnapshot(snap => {
+    if (typeof cupoSnap === 'function') { cupoSnap('pedidos', snap, _primerPedido); _primerPedido = false; }
     PEDIDOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     // Más recientes primero
     PEDIDOS.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
