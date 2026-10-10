@@ -6369,3 +6369,37 @@ body.dark .tp-inst { background: #1a1d21; border-color: #2a2e34; color: #e8eaed;
 
 /* Repuesto marcado en "seleccionar varios" (repuestos.js) */
 .rep2-card--sel { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+
+/* ── Roturas: dar de baja lo que se perdió (inventario.js) ── */
+.rot-art {
+  padding: 10px 12px; border-radius: var(--radius-sm); margin-bottom: 10px;
+  background: var(--bg1); display: flex; flex-direction: column; gap: 2px;
+}
+.rot-art span { font-size: .78rem; color: var(--text3); }
+.rot-motivo {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 12px; margin-bottom: 6px; cursor: pointer; font: inherit;
+  background: var(--card); color: var(--text);
+  border: 2px solid var(--border); border-radius: var(--radius-sm);
+}
+.rot-motivo--on { border-color: var(--accent); background: var(--accent-soft); }
+.rot-motivo-ico { font-size: 1.2rem; flex-shrink: 0; }
+.rot-motivo-txt { display: flex; flex-direction: column; min-width: 0; }
+.rot-motivo-txt b { font-size: .88rem; }
+.rot-motivo-txt span { font-size: .74rem; color: var(--text3); }
+.rot-costo { font-size: .8rem; color: var(--text3); text-align: right; }
+.rot-vacio { padding: 18px 4px; color: var(--text3); font-size: .88rem; text-align: center; }
+.rot-resumen {
+  background: var(--bg1); border-radius: var(--radius-sm);
+  padding: 8px 12px; margin-bottom: 12px;
+}
+.rot-res-fila { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: .85rem; }
+.rot-res-total { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 6px; font-weight: 700; }
+.rot-item { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.rot-item-top { display: flex; justify-content: space-between; gap: 10px; font-size: .88rem; }
+.rot-item-n { flex-shrink: 0; font-weight: 700; color: var(--text2); }
+.rot-item-sub { font-size: .74rem; color: var(--text3); margin-top: 2px; }
+.rot-item-nota { font-size: .78rem; color: var(--text2); margin-top: 3px; font-style: italic; }
+body.dark .rot-art, body.dark .rot-resumen { background: #15181c; }
+body.dark .rot-motivo { background: #1a1d21; border-color: #2a2e34; color: #e8eaed; }
+body.dark .rot-motivo--on { border-color: var(--accent); background: rgba(212,167,106,.12); }
