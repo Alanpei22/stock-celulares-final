@@ -717,6 +717,8 @@ function toggleRep2Menu() {
         onClick: () => (typeof configurarImpresoras === 'function') && configurarImpresoras() },
     ]),
     { icon: '📊', label: 'Exportar / Importar Excel', onClick: () => location.href = 'bulk-edit-repuestos.html' },
+    { icon: '📉', label: 'Roturas del mes', sub: 'Lo que se rompió o vino roto',
+      onClick: () => (typeof tpAbrirRoturas === 'function') && tpAbrirRoturas() },
     { icon: '📋', label: 'Pedido de mercadería', onClick: () => (typeof openPedidosModal === 'function') && openPedidosModal() },
     { divider: true },
     { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },

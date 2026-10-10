@@ -446,6 +446,9 @@ function openRepuestoForm(id) {
   // "Cargar otro" solo tiene sentido dando de alta, no editando uno viejo.
   const otroBtn = document.getElementById('rep2-form-save-otro');
   if (otroBtn) otroBtn.style.display = id ? 'none' : '';
+  // Dar de baja solo tiene sentido con el repuesto ya guardado.
+  const rotBtn = document.getElementById('rep2-form-rotura');
+  if (rotBtn) rotBtn.style.display = id ? '' : 'none';
 
   if (id) {
     const r = REPUESTOS.find(x => x.id === id);
@@ -515,6 +518,24 @@ function _updateCostoARSHint() {
   } else {
     hintEl.textContent = '';
   }
+}
+
+// ── Roturas ───────────────────────────────────────────────
+// Las pantallas se rompen al colocarlas más seguido que los vidrios. Es el
+// mismo cartel de Accesorios (roturas.js), con la colección de repuestos.
+function repuRotura() {
+  const r = REPUESTOS.find(x => x.id === editingRepuestoId);
+  if (!r) { toast('Guardá el repuesto primero', 'error'); return; }
+  if (typeof tpRotura !== 'function') return;
+  const d = (typeof dolarBlue === 'number' && dolarBlue > 0) ? dolarBlue : 0;
+  const usd = Number(r.precioCostoUSD) || 0;
+  tpRotura({
+    coleccion: 'repuestos', campoStock: 'cantidad', origen: 'repuesto',
+    item: { id: r.id, nombre: r.nombre, codigo: r.codigo, categoria: r.tipo,
+            stock: Number(r.cantidad) || 0 },
+    costo: usd > 0 && d > 0 ? Math.round(usd * d) : (Number(r.precioCompra) || 0),
+    alTerminar: closeRepuestoForm,
+  });
 }
 
 // ══════════════════════════════════════════
