@@ -40,7 +40,15 @@
     <button type="button" data-c="usado">Usados</button>
   </div>
   <div class="chips" id="f-marcas"></div>
-  <input class="buscar" id="f-buscar" type="search" placeholder="🔍 Buscá modelo, color o capacidad" autocomplete="off" enterkeyhint="search">
+  <div class="fila-orden">
+    <input class="buscar" id="f-buscar" type="search" placeholder="🔍 Buscá modelo, color o capacidad" autocomplete="off" enterkeyhint="search">
+    <select class="orden" id="f-orden" aria-label="Ordenar">
+      <option value="">Recomendados</option>
+      <option value="barato">Más barato primero</option>
+      <option value="caro">Más caro primero</option>
+    </select>
+  </div>
+  <p class="actualizado" id="actualizado"></p>
 </section>
 
 <main class="grilla" id="grilla" aria-live="polite">

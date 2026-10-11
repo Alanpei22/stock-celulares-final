@@ -67,7 +67,11 @@ const nodos = {};
 const nodo = id => nodos[id] || (nodos[id] = { id, innerHTML: '', textContent: '', style: {}, value: '', href: '', classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, addEventListener() {} });
 const ctx = { console, Math, JSON, String, Number, Array, Object, Date, encodeURIComponent, Promise, setTimeout, clearTimeout,
   document: { getElementById: nodo, querySelectorAll: () => [], addEventListener() {}, body: { style: {} } },
-  history: { pushState() {}, back() {} }, fetch: async () => ({ ok: true, json: async () => ({ equipos: [] }) }) };
+  history: { pushState() {}, back() {}, replaceState() {} },
+  location: { origin: 'https://x.vercel.app', pathname: '/equipos', search: '' },
+  URLSearchParams,
+  navigator: { clipboard: { writeText: async () => {} } },
+  fetch: async () => ({ ok: true, json: async () => ({ equipos: [] }) }) };
 ctx.window = ctx; ctx.window.addEventListener = () => {};
 vm.createContext(ctx);
 vm.runInContext(leer('equipos.js'), ctx);
@@ -91,6 +95,112 @@ ok(EQ.filtrados().length === 2, 'buscar "128gb" encuentra "128 GB"');
 EQ.S.q = 'lila'; ok(EQ.filtrados().map(x => x.id).join() === 'b', 'buscar por color');
 EQ.S.q = ''; EQ.S.cond = 'nuevo'; ok(EQ.filtrados().map(x => x.id).join() === 'b', 'filtro Nuevos');
 EQ.S.cond = ''; EQ.S.marca = 'iPhone'; ok(EQ.filtrados().map(x => x.id).join() === 'a', 'filtro por marca');
+
+// ── Lo que se agregó mirando la página en vivo ──
+console.log('\n2b) Un precio imposible no sale publicado');
+// Estaba publicado un Realme nuevo a "$67": eran 67 dólares cargados en el
+// campo de pesos. El cliente que ve eso no piensa "ganga", piensa que los
+// precios de la página no son serios.
+ok(api.PRECIO_MIN_ARS >= 1000, 'hay un piso en pesos', api.PRECIO_MIN_ARS);
+ok(api.equipoPublico({ ...privado, precio: 67, moneda: 'ars', precioUSD: 0 }, AHORA).precio === 0,
+   'un celular a $67 sale como "Consultar precio", no con ese número');
+ok(api.equipoPublico({ ...privado, precio: 250000, moneda: 'ars', precioUSD: 0 }, AHORA).precio === 250000,
+   'un precio normal pasa igual');
+ok(api.equipoPublico({ ...privado, moneda: 'usd', precioUSD: 3 }, AHORA).precio === 0,
+   'y en dólares también hay piso');
+ok(api.equipoPublico({ ...privado, moneda: 'usd', precioUSD: 250 }, AHORA).precio === 250,
+   'con un precio en dólares normal, pasa');
+
+// Y en la app, antes de guardar.
+const catSrc = leer('catalogo-stock.js');
+// catalogo-stock.js de verdad, con un formulario de mentira.
+const frm = {};
+const frmEl = id => frm[id] || (frm[id] = { id, value: '', checked: false, innerHTML: '', className: '',
+  classList: { add() {}, remove() {}, toggle() {}, contains: () => false }, addEventListener() {} });
+const cctx = { console, Math, JSON, String, Number, Array, Object, Date, parseInt, parseFloat, setTimeout,
+  document: { getElementById: frmEl, querySelectorAll: () => [], createElement: () => frmEl('tmp'),
+              addEventListener() {}, body: { appendChild() {} } },
+  esc: x => String(x == null ? '' : x), toast: () => {}, confirm: () => true, URL: { revokeObjectURL() {} } };
+cctx.window = cctx; cctx.globalThis = cctx;
+vm.createContext(cctx);
+vm.runInContext(catSrc, cctx, { filename: 'catalogo-stock.js' });
+const crun = x => vm.runInContext(x, cctx);
+
+ok(crun('catPrecioRaro(67, false)') === true, 'un celular a $67 es un precio que no cierra');
+ok(crun('catPrecioRaro(250000, false)') === false, 'uno normal no molesta');
+ok(crun('catPrecioRaro(67, true)') === false, '67 D\u00d3LARES s\u00ed es un precio posible');
+ok(crun('catPrecioRaro(3, true)') === true, 'pero 3 d\u00f3lares no');
+ok(crun('catPrecioRaro(0, false)') === false, 'sin precio no avisa nada: para eso est\u00e1 "Consultar precio"');
+
+// Lo que le falta a la ficha, que es por lo que sal\u00edan peladas.
+frmEl('fi-estado').value = 'Usado';
+let falta = crun('catFaltantes()');
+ok(falta.includes('color') && falta.includes('bater\u00eda') && falta.includes('detalles') && falta.includes('fotos'),
+   'en un usado vac\u00edo, pide color, bater\u00eda, detalles y fotos', falta);
+frmEl('fi-estado').value = 'Nuevo';
+falta = crun('catFaltantes()');
+ok(!falta.includes('bater\u00eda'), 'en uno nuevo no pide bater\u00eda: no aplica', falta);
+frmEl('fi-color').value = 'Negro';
+frmEl('fi-bateria').value = '92';
+frmEl('fi-detalles-pub').value = 'Con caja';
+frmEl('fi-garantia').value = '6';
+crun('_catFotos = ["https://x/1.jpg"]');
+ok(crun('catFaltantes()').length === 0, 'con todo cargado no pide nada', crun('catFaltantes()'));
+
+// Y el freno al guardar: solo si el equipo va a la p\u00e1gina.
+// El cartel se deja en "no" ANTES: así, si alguien sacara la traba del
+// publicar, este chequeo se daría cuenta.
+crun('confirm = () => __NO();'); cctx.__NO = () => false;
+frmEl('fi-publicar').checked = false;
+ok(crun('catConfirmarPublicacion(67, false)') === true, 'sin publicar, un precio raro no frena nada');
+frmEl('fi-publicar').checked = true;
+ok(crun('catConfirmarPublicacion(67, false)') === false, 'publicando, pregunta y si dec\u00eds que no, no guarda');
+crun('confirm = () => __SI();'); cctx.__SI = () => true;
+ok(crun('catConfirmarPublicacion(67, false)') === true, 'y si dec\u00eds que s\u00ed, guarda igual: es tu decisi\u00f3n');
+ok(crun('catConfirmarPublicacion(250000, false)') === true, 'con un precio normal no pregunta nada');
+
+ok(/function catConfirmarPublicacion/.test(catSrc), 'y pregunta antes de publicarlo');
+ok(/catConfirmarPublicacion\(precio/.test(leer('app.js')), 'enganchado al guardar el equipo');
+ok(/function catFaltantes/.test(catSrc) && /bater\u00eda/.test(JSON.stringify(catSrc)),
+   'y avisa lo que le falta a la ficha (batería, color, detalles…)');
+ok(/id="fi-pub-aviso"/.test(leer('index.html')), 'con un renglón en el formulario');
+
+console.log('\n2c) Ordenar, compartir y la fecha');
+// Lo que faltaba para el que entra desde Instagram: ver de más barato a más
+// caro, mandarle a un cliente el link de UN equipo, y saber si los precios
+// son de hoy.
+EQ.S.q = ''; EQ.S.cond = ''; EQ.S.marca = ''; EQ.S.uno = '';
+EQ.S.equipos = [
+  { ...e, id: 'caro',  precio: 500000, moneda: 'ars' },
+  { ...e, id: 'barato', precio: 150000, moneda: 'ars' },
+  { ...e, id: 'sinprecio', precio: 0 },
+];
+EQ.S.orden = 'barato';
+ok(EQ.filtrados().map(x => x.id).join() === 'barato,caro,sinprecio',
+   'de más barato a más caro, y los "a consultar" al final', EQ.filtrados().map(x => x.id));
+EQ.S.orden = 'caro';
+ok(EQ.filtrados()[0].id === 'caro', 'y al revés', EQ.filtrados().map(x => x.id));
+// Un precio en dólares no puede quedar último por ser "250".
+ok(EQ.precioComparable({ precio: 250, moneda: 'usd' }) > EQ.precioComparable({ precio: 200000, moneda: 'ars' }),
+   'los dólares se comparan contra los pesos, no por el número pelado');
+EQ.S.orden = '';
+
+// El link de un equipo solo.
+ok(/\?eq=barato$/.test(EQ.linkEquipo({ id: 'barato' })), 'el link lleva el id del equipo', EQ.linkEquipo({ id: 'barato' }));
+EQ.S.uno = 'barato';
+ok(EQ.filtrados().map(x => x.id).join() === 'barato', 'abriendo ese link se ve ese equipo solo');
+EQ.S.uno = 'noexiste';
+ok(EQ.filtrados().length === 0, 'y si ya se vendió, no se ve nada (la página ofrece uno parecido)');
+EQ.S.uno = '';
+ok(/data-share=/.test(EQ.fichaHtml(e, 0)), 'cada ficha tiene su botón de compartir');
+ok(/id="f-orden"/.test(html), 'el selector de orden está en la página');
+
+// La fecha: el que entra no sabe si los precios son de hoy o de hace meses.
+nodos['actualizado'] = { id: 'actualizado', textContent: '' };
+EQ.pintarActualizado(new Date().toISOString());
+ok(/hoy/.test(nodos['actualizado'].textContent), 'dice que se actualizó hoy', nodos['actualizado'].textContent);
+EQ.pintarActualizado('2026-01-05T12:00:00.000Z');
+ok(/05\/01/.test(nodos['actualizado'].textContent), 'o la fecha, si es de antes', nodos['actualizado'].textContent);
 
 console.log('\n3) En la app: el formulario del stock');
 const ix = leer('index.html'), app = leer('app.js'), cat = leer('catalogo-stock.js'), sx = leer('stock-extras.js');

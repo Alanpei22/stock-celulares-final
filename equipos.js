@@ -4,7 +4,7 @@
   'use strict';
 
   const WA = '5491172392511';
-  const S = { equipos: [], cond: '', marca: '', q: '' };
+  const S = { equipos: [], cond: '', marca: '', q: '', orden: '', uno: '' };
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -29,6 +29,36 @@
     if (!e.precio) return '<span class="consultar">Consultar precio</span>';
     const n = Math.round(e.precio).toLocaleString('es-AR');
     return `<span class="precio mono"><small>${e.moneda === 'usd' ? 'U$S' : '$'}</small>${n}</span>`;
+  }
+
+  // El link de UN equipo. Si un cliente pregunta por el A16, no se le manda el
+  // catálogo entero para que lo busque.
+  function linkEquipo(e) {
+    return location.origin + location.pathname + '?eq=' + encodeURIComponent(e.id);
+  }
+
+  async function compartir(id) {
+    const e = S.equipos.find(x => x.id === id);
+    if (!e) return;
+    const url = linkEquipo(e);
+    const texto = `${nombreEquipo(e)} — TechPoint`;
+    try {
+      // En el celular abre el menú de compartir del sistema; en la compu no
+      // existe, y ahí se copia al portapapeles.
+      if (navigator.share) { await navigator.share({ title: texto, url }); return; }
+      await navigator.clipboard.writeText(url);
+      avisar('Link copiado');
+    } catch (err) { if (err && err.name !== 'AbortError') avisar('No se pudo compartir'); }
+  }
+
+  let _avisoT;
+  function avisar(txt) {
+    let a = $('aviso');
+    if (!a) { a = document.createElement('div'); a.id = 'aviso'; a.className = 'aviso'; document.body.appendChild(a); }
+    a.textContent = txt;
+    a.classList.add('ver');
+    clearTimeout(_avisoT);
+    _avisoT = setTimeout(() => a.classList.remove('ver'), 2000);
   }
 
   function fichaHtml(e, i) {
@@ -61,13 +91,29 @@
         ${e.detalles ? `<p class="det">${esc(e.detalles)}</p>` : ''}
         <div class="precio-fila">${precioHtml(e)}${gar}</div>
         ${boton}
+        <button type="button" class="compartir" data-share="${esc(e.id)}" aria-label="Compartir este equipo">🔗 Compartir</button>
       </div>
     </article>`;
   }
 
+  // El orden que viene de la API (disponibles primero, lo más nuevo arriba) es
+  // el recomendado. Por precio es lo que pide el que entra con un presupuesto.
+  function ordenar(lista) {
+    if (S.orden === 'barato') return lista.slice().sort((a, b) => precioComparable(a) - precioComparable(b));
+    if (S.orden === 'caro')   return lista.slice().sort((a, b) => precioComparable(b) - precioComparable(a));
+    return lista;
+  }
+  // Los "Consultar precio" van al final en los dos órdenes: no se pueden comparar.
+  function precioComparable(e) {
+    if (!e.precio) return S.orden === 'caro' ? -1 : Infinity;
+    return e.moneda === 'usd' ? e.precio * 1000 : e.precio;
+  }
+
   function filtrados() {
     const q = norm(S.q).split(/\s+/).filter(Boolean);
-    return S.equipos.filter(e => {
+    // Un link a UN equipo muestra ese y nada más.
+    if (S.uno) return S.equipos.filter(e => e.id === S.uno);
+    return ordenar(S.equipos.filter(e => {
       if (S.cond && e.condicion !== S.cond) return false;
       if (S.marca && e.marca !== S.marca) return false;
       if (q.length) {
@@ -77,7 +123,7 @@
         return q.every(t => h.includes(t) || junto.includes(t));
       }
       return true;
-    });
+    }));
   }
 
   function pintar() {
@@ -89,6 +135,16 @@
       return;
     }
     const lista = filtrados();
+    if (S.uno && !lista.length) {
+      // El link apunta a un equipo que ya no está (se vendió y pasó el mes).
+      S.uno = '';
+      g.innerHTML = `<div class="vacio"><b>Ese equipo ya no está</b>
+        Se vendió o lo sacamos de la página.
+        <a class="btn-wa" href="${esc(waLink('Hola TechPoint! Vi un equipo en la página que ya no está. ¿Tienen algo parecido?'))}" target="_blank" rel="noopener">💬 Preguntar por uno parecido</a>
+        <br><button type="button" class="limpiar" id="limpiar">Ver todos los equipos</button></div>`;
+      $('limpiar').onclick = () => { pintar(); pintarFiltros(); };
+      return;
+    }
     if (!lista.length) {
       g.innerHTML = `<div class="vacio"><b>No encontramos ese equipo</b>
         Capaz lo tenemos y todavía no está en la página.
@@ -97,7 +153,15 @@
       $('limpiar').onclick = () => { S.cond = ''; S.marca = ''; S.q = ''; $('f-buscar').value = ''; pintarFiltros(); pintar(); };
       return;
     }
-    g.innerHTML = lista.map(fichaHtml).join('');
+    g.innerHTML = (S.uno
+      ? `<div class="solo-uno">Estás viendo un equipo solo.
+           <button type="button" class="limpiar" id="ver-todos">Ver todos</button></div>` : '')
+      + lista.map(fichaHtml).join('');
+    if (S.uno) $('ver-todos').onclick = () => {
+      S.uno = '';
+      history.replaceState({}, '', location.pathname);
+      pintar(); pintarFiltros();
+    };
   }
 
   function pintarFiltros() {
@@ -152,11 +216,15 @@
       const b = ev.target.closest('button'); if (!b) return;
       S.marca = b.dataset.m; pintarFiltros(); pintar();
     };
+    const ord = $('f-orden');
+    if (ord) ord.onchange = () => { S.orden = ord.value; pintar(); };
     let t;
     $('f-buscar').oninput = ev => { clearTimeout(t); t = setTimeout(() => { S.q = ev.target.value; pintar(); }, 120); };
     const g = $('grilla');
     g.addEventListener('scroll', ev => { if (ev.target.classList && ev.target.classList.contains('pista')) alDeslizar(ev.target); }, true);
     g.addEventListener('click', ev => {
+      const sh = ev.target.closest('[data-share]');
+      if (sh) { compartir(sh.dataset.share); return; }
       const fl = ev.target.closest('.flecha');
       if (fl) {
         const pista = fl.parentElement.querySelector('.pista');
@@ -177,6 +245,8 @@
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
       S.equipos = Array.isArray(j.equipos) ? j.equipos : [];
+      S.uno = new URLSearchParams(location.search).get('eq') || '';
+      pintarActualizado(j.actualizado);
       pintarFiltros();
       pintar();
     } catch (e) {
@@ -187,8 +257,25 @@
     }
   }
 
+  // Cuándo se actualizó: el que entra no tiene forma de saber si los precios
+  // son de hoy o de hace tres meses.
+  function pintarActualizado(iso) {
+    const el = $('actualizado');
+    if (!el || !iso) return;
+    const d = new Date(iso);
+    if (isNaN(d)) return;
+    const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+    const dia = d.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+    // La fecha se arma a mano: toLocaleDateString da "5/1" en un navegador y
+    // "05/01" en otro, y esto lo ve el cliente.
+    el.textContent = dia === hoy
+      ? 'Precios actualizados hoy'
+      : `Precios actualizados el ${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+  }
+
   // Para los tests
-  if (typeof window !== 'undefined') window._equipos = { S, fichaHtml, filtrados, mensajeInteres, mensajeParecido, pintar };
+  if (typeof window !== 'undefined') window._equipos = { S, fichaHtml, filtrados, mensajeInteres, mensajeParecido, pintar,
+    ordenar, precioComparable, linkEquipo, pintarActualizado };
 
   enganchar();
   cargar();

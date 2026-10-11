@@ -277,3 +277,15 @@
   body.sb-collapsed #app-sidebar { display: none; }
   body.sb-collapsed.has-sidebar #app { padding-left: 0; }
 }
+
+/* Aviso de la ficha pública (catalogo-stock.js): lo que le falta al equipo
+   antes de que lo vea un cliente. No frena nada, pero se ve mientras cargás. */
+.pub-aviso {
+  margin: 8px 0 0; padding: 8px 11px; border-radius: 10px;
+  font-size: .78rem; line-height: 1.4;
+  background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.35);
+  color: var(--text, #1c1c1e);
+}
+.pub-aviso.hidden { display: none; }
+.pub-aviso--ok { background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.35); }
+body.dark .pub-aviso { color: #e8eaed; }

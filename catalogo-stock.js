@@ -21,6 +21,62 @@ function _catEl(id) { return document.getElementById(id); }
 function catPubToggle() {
   const on = !!_catEl('fi-publicar')?.checked;
   _catEl('fi-pub-campos')?.classList.toggle('hidden', !on);
+  catPubAviso();
+}
+
+// ── Lo que le falta a la ficha ────────────────────────────
+// Los equipos publicados salían pelados: de los 19 que había, ninguno tenía
+// batería, ni color, ni detalles. La ficha sabe mostrar todo eso lindo (hasta
+// una barra de batería de color) y quedaba vacía porque el formulario no lo
+// pedía. Esto NO frena el guardado: avisa, ahí, mientras lo cargas.
+const CAT_PRECIO_MIN_ARS = 10000;
+const CAT_PRECIO_MIN_USD = 10;
+
+function catPrecioRaro(precio, esUSD) {
+  const n = Number(precio) || 0;
+  if (n <= 0) return false;
+  return n < (esUSD ? CAT_PRECIO_MIN_USD : CAT_PRECIO_MIN_ARS);
+}
+
+// Lo que el cliente pregunta y la ficha podría contestar sola.
+function catFaltantes() {
+  const v = id => (_catEl(id)?.value || '').trim();
+  const falta = [];
+  if (!v('fi-color')) falta.push('color');
+  // La batería es LA pregunta de un usado. En uno nuevo no hace falta.
+  const esUsado = v('fi-estado') && v('fi-estado') !== 'Nuevo';
+  if (esUsado && !(parseInt(v('fi-bateria'), 10) > 0)) falta.push('batería');
+  if (!v('fi-detalles-pub')) falta.push('detalles');
+  if (!(parseInt(v('fi-garantia'), 10) > 0)) falta.push('garantía');
+  if (!_catFotos.length && !_catPendientes.length) falta.push('fotos');
+  return falta;
+}
+
+function catPubAviso() {
+  const box = _catEl('fi-pub-aviso');
+  if (!box) return;
+  if (!_catEl('fi-publicar')?.checked) { box.innerHTML = ''; box.classList.add('hidden'); return; }
+  const falta = catFaltantes();
+  const esUSD = typeof window !== 'undefined' && window._precioUSD !== null && window._precioUSD !== undefined;
+  const raro = catPrecioRaro(_catEl('fi-precio')?.value, esUSD);
+  if (!falta.length && !raro) {
+    box.innerHTML = '✅ La ficha sale completa';
+    box.className = 'pub-aviso pub-aviso--ok';
+    return;
+  }
+  box.className = 'pub-aviso';
+  box.innerHTML = (raro ? `<b>⚠️ Revisá el precio: ${esc(_catEl('fi-precio')?.value || '')} es muy bajo para un celular.</b><br>` : '')
+    + (falta.length ? `Le falta <b>${falta.join(', ')}</b> — son los datos que te preguntan por WhatsApp.` : '');
+}
+
+// Antes de guardar: el precio imposible sí frena, porque lo ve el cliente.
+// Devuelve false para cortar el guardado.
+function catConfirmarPublicacion(precio, esUSD) {
+  if (!_catEl('fi-publicar')?.checked) return true;
+  if (!catPrecioRaro(precio, esUSD)) return true;
+  return confirm(`El precio es ${esUSD ? 'U$S ' : '$'}${precio}.\n\n` +
+    `Para un celular eso no cierra: ¿no son dólares cargados en el campo de pesos?\n\n` +
+    `Si lo publicás así, el cliente ve ese número en la página.\n\n¿Guardar igual?`);
 }
 
 // Al abrir el formulario (p = equipo, o null si es nuevo)
@@ -38,6 +94,18 @@ function catFormCargar(p) {
   if (op) op.checked = !!p?.ocultarPrecio;
   catPubToggle();
   _catPintarFotos();
+  catEngancharAviso();
+  catPubAviso();
+}
+
+// El aviso se repinta cuando cambia cualquiera de los campos que mira.
+let _catEnganchado = false;
+function catEngancharAviso() {
+  if (_catEnganchado) return;   // catFormCargar corre en cada apertura
+  _catEnganchado = true;
+  ['fi-color', 'fi-detalles-pub', 'fi-bateria', 'fi-garantia', 'fi-precio', 'fi-estado']
+    .forEach(id => _catEl(id)?.addEventListener('input', catPubAviso));
+  _catEl('fi-estado')?.addEventListener('change', catPubAviso);
 }
 
 // Los campos de la página para guardar en el doc del stock
@@ -51,6 +119,7 @@ function catFormCampos() {
 }
 
 function _catPintarFotos() {
+  catPubAviso();   // las fotos también son uno de los faltantes
   const box = _catEl('fi-fotos');
   if (!box) return;
   const ya = _catFotos.map((url, i) => `<div class="photo-thumb">

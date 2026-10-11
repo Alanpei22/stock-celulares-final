@@ -47,6 +47,18 @@ export default async function handler(req, res) {
 const txt = (v, max = 120) => String(v == null ? '' : v).trim().slice(0, max);
 const num = v => { const n = Number(v); return isFinite(n) && n > 0 ? n : 0; };
 
+// Un celular no vale menos que esto. Salió publicado un Realme nuevo a "$67":
+// eran 67 dólares cargados en el campo de pesos. El cliente que ve eso no
+// piensa "ganga", piensa que los precios de la página no son serios. Ante la
+// duda, mejor "Consultar precio" que un número que no puede ser.
+export const PRECIO_MIN_ARS = 10000;
+export const PRECIO_MIN_USD = 10;
+export function precioPublicable(p, usd) {
+  const n = num(p);
+  if (!n) return 0;
+  return n < (usd ? PRECIO_MIN_USD : PRECIO_MIN_ARS) ? 0 : n;
+}
+
 // "128GB" → "128 GB"
 function capacidad(s) {
   const t = txt(s, 20);
@@ -67,7 +79,7 @@ export function equipoPublico(p, ahora = Date.now()) {
     estado = 'reservado';
   }
   const usd = p.moneda === 'usd' && num(p.precioUSD) > 0;
-  const precio = p.ocultarPrecio ? 0 : (usd ? num(p.precioUSD) : num(p.precio));
+  const precio = p.ocultarPrecio ? 0 : precioPublicable(usd ? p.precioUSD : p.precio, usd);
   const condicion = p.estado === 'Nuevo' ? 'nuevo' : 'usado';
   return {
     id: txt(p.id, 60),

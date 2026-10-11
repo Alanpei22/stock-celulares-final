@@ -1462,6 +1462,10 @@ async function savePhone() {
   if (typeof imeiConfirmar === 'function' && !imeiConfirmar(imei, 'IMEI')) return;
   if (!estado) { toast('Seleccioná el estado', 'error'); return; }
   if (!precio || precio <= 0) { toast('Ingresá un precio válido', 'error'); return; }
+  // Si va a la página pública, el precio lo ve cualquiera: un número que no
+  // cierra se pregunta antes de publicarlo.
+  if (typeof catConfirmarPublicacion === 'function'
+      && !catConfirmarPublicacion(precio, window._precioUSD !== null)) return;
   if (imei && !/^\d{15}$/.test(imei)) { toast('El IMEI debe tener 15 dígitos', 'error'); return; }
 
   const saveBtn = document.getElementById('form-save');
