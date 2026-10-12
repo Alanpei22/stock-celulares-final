@@ -97,6 +97,51 @@ EQ.S.q = ''; EQ.S.cond = 'nuevo'; ok(EQ.filtrados().map(x => x.id).join() === 'b
 EQ.S.cond = ''; EQ.S.marca = 'iPhone'; ok(EQ.filtrados().map(x => x.id).join() === 'a', 'filtro por marca');
 
 // ── Lo que se agregó mirando la página en vivo ──
+console.log('\n1b) Varias unidades del mismo modelo, una sola ficha');
+// De los nuevos entran varios iguales: misma foto, mismo precio, distinto
+// IMEI. Adentro de la app cada uno sigue siendo su propio equipo (su
+// garant\u00eda, su venta, su comprobante). Lo que cambia es que al cliente no se
+// le muestra la misma ficha cinco veces.
+const u = (id, extra) => api.equipoPublico({ ...privado, id, estado: 'Nuevo', moneda: 'ars',
+  precioUSD: 0, precio: 300000, bateria: 0, almacenamiento: '128GB', color: '',
+  marca: 'Samsung', modelo: 'A16', garantiaMeses: 6, detallesPublicos: '', ...extra }, AHORA);
+
+let gr = api.agruparEquipos([u('a'), u('b'), u('c')]);
+ok(gr.length === 1, 'tres unidades iguales son una sola ficha', gr.length);
+ok(gr[0].unidades === 3, 'que dice que hay 3', gr[0].unidades);
+ok(gr[0].id === 'a', 'con el id de la primera, para el link de compartir', gr[0].id);
+
+// Los colores son la gracia: "lo tenemos en negro, azul y verde".
+gr = api.agruparEquipos([u('a', { color: 'Negro' }), u('b', { color: 'Azul' }), u('c', { color: 'Negro' })]);
+ok(gr.length === 1 && gr[0].unidades === 3, 'distinto color no las separa', gr.map(x => x.unidades));
+ok(gr[0].color === 'Negro, Azul', 'los colores se juntan, sin repetir', gr[0].color);
+
+// Lo que el cliente ver\u00eda distinto S\u00cd las separa.
+ok(api.agruparEquipos([u('a'), u('b', { precio: 320000 })]).length === 2,
+   'dos precios distintos no se pueden mostrar con un n\u00famero solo');
+ok(api.agruparEquipos([u('a'), u('b', { almacenamiento: '256GB' })]).length === 2, 'ni dos capacidades');
+ok(api.agruparEquipos([u('a'), u('b', { garantiaMeses: 3 })]).length === 2, 'ni dos garant\u00edas');
+ok(api.agruparEquipos([u('a'), u('b', { estado: 'Usado' })]).length === 2, 'ni nuevo con usado');
+ok(api.agruparEquipos([u('a'), u('b', { modelo: 'A17' })]).length === 2, 'ni dos modelos');
+// Reservado y disponible tampoco: diria "2 disponibles" y hay uno solo.
+ok(api.agruparEquipos([u('a'), u('b', { reservado: true })]).length === 2,
+   'ni uno reservado con uno disponible');
+
+// Si la primera unidad vino sin fotos, la ficha no queda pelada.
+gr = api.agruparEquipos([u('a', { fotos: [] }), u('b', { fotos: ['https://x/9.jpg'] })]);
+ok(gr.length === 1 && gr[0].fotos.length === 1, 'usa las fotos de la unidad que tenga', gr[0].fotos);
+
+// Para ordenar vale la m\u00e1s nueva del grupo.
+gr = api.agruparEquipos([u('a', { fecha: dias(9) }), u('b', { fecha: dias(1) })]);
+ok(gr[0].fecha === dias(1), 'la fecha del grupo es la de la unidad m\u00e1s nueva', gr[0].fecha);
+
+// El endpoint no se puede correr aca (necesita las credenciales de Firebase),
+// asi que se chequea que la respuesta pase por el agrupado.
+ok(/ordenarEquipos\(agruparEquipos\(/.test(leer('api/equipos.js')),
+   'y la respuesta del endpoint pasa por el agrupado');
+
+// Y en la ficha.
+
 console.log('\n2b) Un precio imposible no sale publicado');
 // Estaba publicado un Realme nuevo a "$67": eran 67 dólares cargados en el
 // campo de pesos. El cliente que ve eso no piensa "ganga", piensa que los
@@ -164,6 +209,14 @@ ok(/catConfirmarPublicacion\(precio/.test(leer('app.js')), 'enganchado al guarda
 ok(/function catFaltantes/.test(catSrc) && /bater\u00eda/.test(JSON.stringify(catSrc)),
    'y avisa lo que le falta a la ficha (batería, color, detalles…)');
 ok(/id="fi-pub-aviso"/.test(leer('index.html')), 'con un renglón en el formulario');
+
+// La ficha de un grupo lo dice.
+let fg = EQ.fichaHtml({ ...e, estado: 'disponible', unidades: 3 }, 0);
+ok(/3 disponibles/.test(fg), 'la ficha avisa que hay 3');
+fg = EQ.fichaHtml({ ...e, estado: 'disponible', unidades: 1 }, 0);
+ok(!/disponibles/.test(fg), 'con una sola unidad no dice nada');
+fg = EQ.fichaHtml({ ...e, estado: 'sinstock', unidades: 3 }, 0);
+ok(!/3 disponibles/.test(fg), 'y si est\u00e1n todas vendidas, tampoco');
 
 console.log('\n2c) Ordenar, compartir y la fecha');
 // Lo que faltaba para el que entra desde Instagram: ver de más barato a más

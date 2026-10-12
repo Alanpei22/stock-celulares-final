@@ -71,6 +71,11 @@
     const flechas = fotos.length > 1
       ? '<button type="button" class="flecha izq" data-dir="-1" aria-label="Foto anterior">‹</button><button type="button" class="flecha der" data-dir="1" aria-label="Foto siguiente">›</button>' : '';
     const specs = [e.capacidad, e.color].filter(Boolean).map(s => `<span>${esc(s)}</span>`).join('');
+    // Varias unidades iguales son una sola ficha: al cliente le importa que
+    // haya, no cuál de los IMEI le toca.
+    const unidades = Number(e.unidades) || 1;
+    const tagU = unidades > 1 && e.estado === 'disponible'
+      ? `<span class="tag tag-u">${unidades} disponibles</span>` : '';
     const bat = e.bateria
       ? `<div class="bat mono">🔋 ${e.bateria}% <div class="barra"><i class="${e.bateria < 75 ? 'baja' : e.bateria < 85 ? 'media' : ''}" style="width:${e.bateria}%"></i></div></div>` : '';
     const gar = e.garantiaMeses ? `<span class="garantia mono">Garantía<br>${e.garantiaMeses} ${e.garantiaMeses === 1 ? 'mes' : 'meses'}</span>` : '';
@@ -80,7 +85,7 @@
     return `<article class="ficha ${e.estado}" data-id="${esc(e.id)}">
       <div class="fotos">
         <div class="pista">${pista}</div>
-        <span class="tag tag-cond">${esc(e.condicionTexto || (e.condicion === 'nuevo' ? 'Nuevo' : 'Usado'))}</span>${tagEst}
+        <span class="tag tag-cond">${esc(e.condicionTexto || (e.condicion === 'nuevo' ? 'Nuevo' : 'Usado'))}</span>${tagEst}${tagU}
         ${fotos.length > 1 ? `<span class="cont mono">1 / ${fotos.length}</span>` : ''}${flechas}
       </div>
       <div class="cuerpo">

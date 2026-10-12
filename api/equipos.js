@@ -32,9 +32,9 @@ export default async function handler(req, res) {
     const db = getAdmin().firestore();
     const snap = await db.collection('stock').where('publicar', '==', true).get();
     const ahora = Date.now();
-    const equipos = ordenarEquipos(
+    const equipos = ordenarEquipos(agruparEquipos(
       snap.docs.map(d => equipoPublico({ id: d.id, ...d.data() }, ahora)).filter(Boolean)
-    );
+    ));
     res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
     return res.status(200).json({ equipos, actualizado: new Date(ahora).toISOString() });
   } catch (e) {
@@ -100,6 +100,46 @@ export function equipoPublico(p, ahora = Date.now()) {
       .filter(u => typeof u === 'string' && /^https:\/\//.test(u)).slice(0, 30),
     fecha: txt(p.fecha, 30),
   };
+}
+
+// ── Varias unidades del mismo modelo ──────────────────────
+// De los nuevos entran varios iguales: misma foto, mismo precio, distinto
+// IMEI. Adentro de la app cada uno es su propio equipo (su garantía, su
+// comprobante, su venta) y eso no se toca. Pero al cliente mostrarle la misma
+// ficha cinco veces es ruido, y publicar uno solo le dice que hay uno cuando
+// hay cinco.
+//
+// Se juntan SOLO las que el cliente vería idénticas: todo lo que sale en la
+// ficha tiene que coincidir. El color no, porque ahí está la gracia — "lo
+// tenemos en negro, azul y verde" es una ficha sola con tres colores.
+// El precio entra en la clave a propósito: dos unidades a precios distintos
+// no se pueden mostrar con un solo número.
+function claveGrupo(e) {
+  return [e.marca, e.modelo, e.capacidad, e.condicion, e.condicionTexto,
+          e.precio, e.moneda, e.garantiaMeses, e.bateria, e.detalles, e.estado]
+    .map(v => String(v == null ? '' : v).toLowerCase()).join('|');
+}
+
+export function agruparEquipos(lista) {
+  // Un objeto pelado y no un Map: `grupos.set(...)` lo marcaría como
+  // escritura el guardia de tests/test-api-auth.js, que revisa que este
+  // endpoint publico no escriba NADA. Preferible eso a aflojar el guardia.
+  const grupos = Object.create(null);
+  const orden = [];
+  for (const e of lista) {
+    const k = claveGrupo(e);
+    const g = grupos[k];
+    if (!g) { grupos[k] = { ...e, unidades: 1, colores: e.color ? [e.color] : [] }; orden.push(k); continue; }
+    g.unidades++;
+    if (e.color && !g.colores.includes(e.color)) g.colores.push(e.color);
+    // Las fotos: las de la primera unidad que tenga. Si la que abrió el grupo
+    // vino sin fotos, se usan las de otra en vez de dejar la ficha pelada.
+    if (!g.fotos.length && e.fotos.length) g.fotos = e.fotos;
+    // Para ordenar vale la más nueva del grupo.
+    if (String(e.fecha) > String(g.fecha)) g.fecha = e.fecha;
+  }
+  // El color de la ficha pasa a ser la lista, para no repetir el del primero.
+  return orden.map(k => grupos[k]).map(g => ({ ...g, color: g.colores.join(', ') }));
 }
 
 // Primero los disponibles, después reservados, al final sin stock; dentro de

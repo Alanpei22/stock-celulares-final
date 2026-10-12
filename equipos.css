@@ -140,3 +140,6 @@ button { font: inherit; color: inherit; }
   opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
 }
 .aviso.ver { opacity: 1; transform: translate(-50%, 0); }
+
+/* Varias unidades del mismo modelo (api/equipos.js agruparEquipos) */
+.tag-u { background: rgba(255,255,255,.14); color: #fff; }
