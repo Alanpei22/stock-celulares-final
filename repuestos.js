@@ -462,6 +462,7 @@ function openRepuestoForm(id) {
   // "Cargar otro" solo tiene sentido dando de alta, no editando uno viejo.
   const otroBtn = document.getElementById('rep2-form-save-otro');
   if (otroBtn) otroBtn.style.display = id ? 'none' : '';
+  if (typeof etqAlGuardarPreparar === 'function') etqAlGuardarPreparar('rep2', !!id);
   // Dar de baja solo tiene sentido con el repuesto ya guardado.
   const rotBtn = document.getElementById('rep2-form-rotura');
   if (rotBtn) rotBtn.style.display = id ? '' : 'none';
@@ -815,8 +816,16 @@ function saveRepuesto(opts) {
                  proveedor, notas };
   if (dolarCosto) data.dolarCosto = dolarCosto;
 
+  // Etiquetas al guardar: la ventana se pide acá, en el toque (si se espera
+  // a Firestore Chrome la bloquea), y se llena con el repuesto ya guardado.
+  let alGuardar = null;
+  const copiasEtq = (!editingRepuestoId && typeof etqAlGuardarCopias === 'function') ? etqAlGuardarCopias('rep2', cantidad) : 0;
+  if (copiasEtq && typeof printEtiquetasAlGuardar === 'function') {
+    printEtiquetasAlGuardar(new Promise(r => { alGuardar = r; }), copiasEtq, 'repuesto');
+  }
+
   // Devuelve la promesa: el guardado es asíncrono (reserva el código).
-  return _guardarRepuesto(data, !!codigo, opts);
+  return _guardarRepuesto(data, !!codigo, Object.assign({}, opts, { alGuardar }));
 }
 
 // El campo del código dice "Vacío = se genera uno (TP…)" desde que existe, pero
@@ -842,7 +851,9 @@ async function _guardarRepuesto(data, teniaCodigo, opts) {
       toast('Repuesto actualizado ✅', 'success');
     } else {
       const ref = db.collection('repuestos').doc();
-      await ref.set({ id: ref.id, ...data, fechaAlta: new Date().toISOString() });
+      const nuevo = { id: ref.id, ...data, fechaAlta: new Date().toISOString() };
+      await ref.set(nuevo);
+      if (opts && opts.alGuardar) opts.alGuardar(nuevo);
       toast('Repuesto agregado ✅' + (!teniaCodigo && data.codigo ? ' · ' + data.codigo : ''), 'success');
     }
     if (seguir) _repuSiguiente(data);
@@ -851,6 +862,7 @@ async function _guardarRepuesto(data, teniaCodigo, opts) {
     console.error('[repuestos] guardar:', e);
     toast('Error al guardar', 'error');
   } finally {
+    if (opts && opts.alGuardar) opts.alGuardar(null);   // no se guardó: no sale nada
     if (btn) btn.disabled = false;
   }
 }
@@ -868,6 +880,9 @@ function _repuSiguiente(data) {
   });
   const etq = document.getElementById('rep2-form-etq');
   if (etq) etq.style.display = 'none';
+  // Las copias son de cada repuesto; la casilla queda tildada para la tanda
+  const cop = document.getElementById('rep2-fi-etq-copias');
+  if (cop) cop.value = '';
   const del = document.getElementById('rep2-delete-wrap');
   if (del) del.style.display = 'none';
   _updateCostoARSHint();

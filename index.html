@@ -2024,6 +2024,14 @@
         <label class="fl">Notas</label>
         <textarea id="rep2-fi-notas" class="fi" placeholder="Observaciones, código, origen…" rows="2" style="resize:none"></textarea>
       </div>
+      <div class="fg etq-al-guardar" id="rep2-etq-row">
+        <label class="inv-activo-lbl">
+          <input id="rep2-fi-etq" type="checkbox">
+          🏷️ Imprimir etiquetas al guardar
+        </label>
+        <input id="rep2-fi-etq-copias" class="fi" type="number" min="1" max="20" inputmode="numeric"
+               placeholder="1 por unidad" title="Cuántas etiquetas. Vacío = una por unidad de la cantidad">
+      </div>
       <div id="rep2-delete-wrap" style="display:none;margin-top:4px">
         <button class="btn-danger" id="rep2-delete-btn">🗑 Eliminar repuesto</button>
       </div>

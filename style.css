@@ -6403,3 +6403,9 @@ body.dark .tp-inst { background: #1a1d21; border-color: #2a2e34; color: #e8eaed;
 body.dark .rot-art, body.dark .rot-resumen { background: #15181c; }
 body.dark .rot-motivo { background: #1a1d21; border-color: #2a2e34; color: #e8eaed; }
 body.dark .rot-motivo--on { border-color: var(--accent); background: rgba(212,167,106,.12); }
+
+/* Formularios de carga (accesorios y repuestos): "imprimir etiquetas al
+   guardar" con cuántas copias al lado, en un solo renglón */
+.etq-al-guardar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.etq-al-guardar .inv-activo-lbl { flex: 1; min-width: 180px; }
+.etq-al-guardar .fi { width: 120px; flex: none; }

@@ -802,6 +802,14 @@
           <label class="fl">Stock mínimo</label>
           <input id="inv-fi-stockmin" class="fi" type="number" placeholder="0" min="0" inputmode="numeric">
         </div>
+        <div class="fg fg--full etq-al-guardar" id="inv-etq-row">
+          <label class="inv-activo-lbl">
+            <input id="inv-fi-etq" type="checkbox">
+            🏷️ Imprimir etiquetas al guardar
+          </label>
+          <input id="inv-fi-etq-copias" class="fi" type="number" min="1" max="20" inputmode="numeric"
+                 placeholder="1 por unidad" title="Cuántas etiquetas. Vacío = una por unidad del stock">
+        </div>
         <div class="fg fg--full inv-activo-row">
           <label class="inv-activo-lbl">
             <input id="inv-fi-activo" type="checkbox" checked>

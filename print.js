@@ -483,8 +483,12 @@ function _imprimirDespuesDe(promesa, armar) {
   const w = conQz ? null : window.open('', '_blank', 'width=520,height=720,scrollbars=yes');
   if (w) w.document.write('<p style="font:16px sans-serif;padding:20px">Preparando etiquetas…</p>');
   Promise.resolve(promesa).catch(e => console.error('antes de imprimir:', e)).then(() => {
-    if (!w) { _imprimirTocando('etiqueta', armar(), 'Etiquetas'); return; }
-    w.document.open(); w.document.write(armar()); w.document.close();
+    // armar() puede no tener nada que imprimir (no se pudo guardar el
+    // artículo): la ventana que se abrió en el toque se cierra sola.
+    const html = armar();
+    if (!html) { if (w) w.close(); return; }
+    if (!w) { _imprimirTocando('etiqueta', html, 'Etiquetas'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
     w.addEventListener('load', () => { w.focus(); setTimeout(() => w.print(), 350); });
   });
 }
@@ -548,8 +552,8 @@ async function _asegurarCodigosCortos(lista) {
 
 // Repuestos: "Módulo" solo no dice nada, así que el nombre es el tipo con la
 // marca y el modelo. Sale por el mismo cartel que los artículos.
-function printEtiquetasRepuestos(lista, copias) {
-  const reps = (Array.isArray(lista) ? lista : [lista]).filter(Boolean).map(r => ({
+function _repuParaEtiqueta(r) {
+  return {
     id: r.id,
     nombre: [r.tipo || r.nombre || 'Repuesto', r.nombre && r.tipo ? r.nombre : ''].filter(Boolean).join(' '),
     marca: r.marca, modelo: r.modelo,
@@ -557,8 +561,64 @@ function printEtiquetasRepuestos(lista, copias) {
     codigo: r.codigo,
     codigoCorto: r.codigoCorto,
     _col: 'repuestos', _orig: r,
-  }));
+  };
+}
+function printEtiquetasRepuestos(lista, copias) {
+  const reps = (Array.isArray(lista) ? lista : [lista]).filter(Boolean).map(_repuParaEtiqueta);
   printEtiquetasProductos(reps, copias);
+}
+
+// ── Etiquetas desde el formulario de carga ───────────────────
+// Cargando un artículo o un repuesto nuevo, la etiqueta sale al guardar, con
+// lo que escribiste. Antes había que guardar, buscarlo en la lista, abrirlo y
+// tocar 🏷️.
+//
+// `promesa` es el guardado: devuelve el artículo como quedó en la base (con
+// su id y el código TP que se le reservó), o null si no se pudo guardar.
+// Sin QZ, Chrome solo deja abrir la ventana EN el toque: se abre ya y se
+// llena cuando termina de guardar (_imprimirDespuesDe).
+function printEtiquetasAlGuardar(promesa, copias, tipo) {
+  let base = [];
+  const listo = Promise.resolve(promesa).then(async art => {
+    if (!art) return;
+    base = [tipo === 'repuesto' ? _repuParaEtiqueta(art) : art];
+    // Un código de fábrica largo no entra legible: se le da uno corto
+    const faltan = _faltanCodigosCortos(base);
+    if (faltan.length) await _asegurarCodigosCortos(faltan);
+  });
+  _imprimirDespuesDe(listo, () => {
+    const prods = _repetir(base, copias);
+    return prods.length ? _hojaEtiquetas(prods, _etiquetaProdHtml) : '';
+  });
+}
+
+// Lo que dice el formulario: ¿imprimir al guardar, y cuántas? Si no pusiste
+// cuántas, una por unidad cargada (al menos una).
+//   prefijo: 'inv' (accesorios, caja.html) o 'rep2' (repuestos, index.html)
+function etqAlGuardarCopias(prefijo, cantidad) {
+  const chk = document.getElementById(prefijo + '-fi-etq');
+  const row = document.getElementById(prefijo + '-etq-row');
+  if (!chk || !chk.checked || (row && row.style.display === 'none')) return 0;
+  const n = parseInt(document.getElementById(prefijo + '-fi-etq-copias')?.value, 10);
+  return n > 0 ? n : Math.max(1, parseInt(cantidad, 10) || 0);
+}
+
+// La casilla queda tildada para toda la tanda (y para la próxima vez).
+function etqAlGuardarPreparar(prefijo, editando) {
+  const row = document.getElementById(prefijo + '-etq-row');
+  if (row) row.style.display = editando ? 'none' : '';   // editando está el botón 🏷️
+  const chk = document.getElementById(prefijo + '-fi-etq');
+  if (chk) {
+    try { chk.checked = localStorage.getItem('etqAlGuardar_' + prefijo) === '1'; } catch {}
+    if (!chk._atado) {
+      chk._atado = true;
+      chk.addEventListener('change', () => {
+        try { localStorage.setItem('etqAlGuardar_' + prefijo, chk.checked ? '1' : '0'); } catch {}
+      });
+    }
+  }
+  const cop = document.getElementById(prefijo + '-fi-etq-copias');
+  if (cop) cop.value = '';
 }
 
 function printEtiquetasReparaciones(lista, copias) {
