@@ -6409,3 +6409,18 @@ body.dark .rot-motivo--on { border-color: var(--accent); background: rgba(212,16
 .etq-al-guardar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .etq-al-guardar .inv-activo-lbl { flex: 1; min-width: 180px; }
 .etq-al-guardar .fi { width: 120px; flex: none; }
+
+/* ── Equipo de gremio (repairs.js) ──
+   Equipos de otro taller: mismo N° de orden, pero sin la hoja del cliente. */
+.gremio-toggle {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg1);
+}
+.gremio-toggle input { width: 18px; height: 18px; margin-top: 1px; flex-shrink: 0; accent-color: var(--accent); }
+.gremio-toggle span { display: flex; flex-direction: column; gap: 2px; }
+.gremio-toggle b { font-size: .9rem; }
+.gremio-toggle small { font-size: .74rem; color: var(--text3); line-height: 1.35; }
+.badge-gremio { background: #E0E7FF; color: #3730A3; }
+body.dark .gremio-toggle { background: #15181c; border-color: #2a2e34; }
+body.dark .badge-gremio { background: rgba(99,102,241,.22); color: #c7d2fe; }

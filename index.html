@@ -193,6 +193,7 @@
         </select>
         <select class="pill" id="rep-f-estado">
           <option value="">Todos los estados</option>
+          <option value="gremio">🤝 De gremio</option>
           <option value="reparando">Reparando</option>
           <option value="listo">Listo</option>
           <option value="entregado">Entregado</option>
@@ -1135,8 +1136,15 @@
         </div><!-- /paso 2 -->
 
         <div class="repwiz-step" data-rstep="3">
+        <!-- Equipo de otro taller: mismo Nº de orden, pero sin la hoja A5 -->
         <div class="fg fg--full">
-          <label class="fl">Nombre del cliente</label>
+          <label class="gremio-toggle">
+            <input type="checkbox" id="rep-fi-gremio" onchange="repGremioToggle()">
+            <span><b>🤝 Equipo de gremio</b><small>De otro taller. Al guardar sale solo la etiqueta, sin la hoja para el cliente.</small></span>
+          </label>
+        </div>
+        <div class="fg fg--full">
+          <label class="fl" id="rep-lbl-nombre">Nombre del cliente</label>
           <input id="rep-fi-nombre" class="fi" type="text" placeholder="Juan García" autocomplete="off">
         </div>
         <div class="fg">

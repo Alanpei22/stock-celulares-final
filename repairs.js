@@ -669,6 +669,9 @@ function renderRepairs() {
       else if (TP_CERRADAS.includes(tpFaseDe(r))) return false;
     } else if (fEstado.startsWith('fase:')) {
       if (!_tpOn || tpFaseDe(r) !== fEstado.slice(5)) return false;
+    } else if (fEstado === 'gremio') {
+      // Los de otro taller, para pasarle la cuenta al colega sin ir uno por uno.
+      if (!r.gremio) return false;
     } else if (fEstado === 'para-entregar') {
       if (r.estado !== 'listo') return false;
     } else if (fEstado === 'para-devolver') {
@@ -826,6 +829,7 @@ function renderRepairs() {
           <div class="card-right">
             ${typeof tpChipHtml === 'function' ? tpChipHtml(r) : `<span class="badge ${st.cls}">${st.label}</span>`}
             ${r.esGarantia ? '<span class="badge bg-warn" style="margin-top:3px">Garantía</span>' : ''}
+            ${r.gremio ? '<span class="badge badge-gremio" style="margin-top:3px">🤝 Gremio</span>' : ''}
             ${typeof tpDesde === 'function'
               ? `<span class="tp-dias ${isVencido ? 'rojo' : ''}">${tpTxtTiempo(tpDesde(r))} acá${vencTxt}</span>`
               : (isDemorado ? '<span class="badge" style="margin-top:3px;background:#fee2e2;color:#dc2626;font-size:.6rem">⚠️ Demorado</span>' : '')}
@@ -1458,6 +1462,20 @@ function abrirCobro(id) {
   if (r) openCobroModal(r);
 }
 
+// ── Equipo de gremio ──────────────────────────────────────
+// Equipos que trae otro taller. Van con el MISMO contador de órdenes (es una
+// reparación más) pero no llevan la hoja A5: esa tiene las condiciones y la
+// garantía para el cliente de mostrador, y al colega no le sirve.
+function repEsGremio() { return !!document.getElementById('rep-fi-gremio')?.checked; }
+
+function repGremioToggle() {
+  const on = repEsGremio();
+  const lbl = document.getElementById('rep-lbl-nombre');
+  if (lbl) lbl.textContent = on ? 'Taller / colega' : 'Nombre del cliente';
+  const nom = document.getElementById('rep-fi-nombre');
+  if (nom) nom.placeholder = on ? 'Nombre del taller' : 'Juan García';
+}
+
 // La etiqueta del equipo (la que queda pegada en el taller).
 // Sale de la ficha abierta; `window._printRep` es lo que ya usa print.js.
 function etiquetaReparacion(id) {
@@ -1651,6 +1669,9 @@ function openRepairForm(id) {
     document.getElementById('rep-fi-monto').value      = r.monto        || '';
     document.getElementById('rep-fi-sena').value       = r.sena         || '';
     document.getElementById('rep-fi-fecha-est').value  = r.fechaEstimada|| '';
+    const gre = document.getElementById('rep-fi-gremio');
+    if (gre) gre.checked = !!r.gremio;
+    repGremioToggle();
     document.getElementById('rep-fi-nombre').value     = r.nombre       || '';
     document.getElementById('rep-fi-tlf').value        = r.tlf          || '';
     document.getElementById('rep-fi-dni').value        = r.dni          || '';
@@ -1693,6 +1714,10 @@ function openRepairForm(id) {
     _repIngresoReset(r.fechaIngreso ? new Date(r.fechaIngreso) : null);
   } else {
     document.getElementById('rep-form-title').textContent = '🔧 Nueva Reparación';
+    // Que no quede tildado del ingreso anterior: el de gremio es la excepción.
+    const greN = document.getElementById('rep-fi-gremio');
+    if (greN) greN.checked = false;
+    repGremioToggle();
     document.getElementById('rep-orden-row').style.display    = '';
     document.getElementById('rep-orden-spacer').style.display = '';
     document.getElementById('rep-orden-label').textContent    = 'N° Orden (editable)';
@@ -1886,6 +1911,7 @@ async function saveRepair() {
   const presupuesto = parseFloat((document.getElementById('rep-fi-presupuesto') || {}).value) || 0;
   const tecnico     = document.getElementById('rep-fi-tecnico').value.trim();
   const fechaEstimada = document.getElementById('rep-fi-fecha-est').value;
+  const gremio   = repEsGremio();
   const nombre   = document.getElementById('rep-fi-nombre').value.trim();
   const tlf      = document.getElementById('rep-fi-tlf').value.trim();
   const dni      = document.getElementById('rep-fi-dni').value.trim();
@@ -2031,7 +2057,9 @@ async function saveRepair() {
         diasGarantia, checklist,
         seguimientoFecha: seguimientoFecha || null,
         seguimientoNota: seguimientoNota || null,
-        seguimientoAck: false
+        seguimientoAck: false,
+        // Campo NUEVO: las reparaciones de antes no lo tienen y siguen igual.
+        gremio
       };
       // Número dado por el celu porque la base no contestó: queda marcado para
       // poder revisarlo cuando vuelva a andar.
@@ -2096,7 +2124,12 @@ async function saveRepair() {
       // reimprimir si algo salió mal.
       _showPrintPrompt(id);
       _ultimoIngreso = newDoc;   // para mandarla por WhatsApp antes de que llegue el snapshot
-      if (typeof imprimirIngresoReparacion === 'function') imprimirIngresoReparacion(newDoc);
+      // De gremio sale solo la etiqueta; del mostrador, la hoja y la etiqueta.
+      if (gremio) {
+        if (typeof imprimirEtiquetaIngreso === 'function') imprimirEtiquetaIngreso(newDoc);
+      } else if (typeof imprimirIngresoReparacion === 'function') {
+        imprimirIngresoReparacion(newDoc);
+      }
       return;
     }
     closeRepairForm();

@@ -681,6 +681,17 @@ async function imprimirIngresoReparacion(rep) {
   if (!etqOk) await _imprimirEnIframe(etq);
 }
 
+// Equipo de gremio: SOLO la etiqueta. La hoja A5 lleva las condiciones, la
+// garantía y la firma del cliente: al colega del taller no le sirve y es una
+// hoja desperdiciada en cada ingreso. Se imprime igual que la otra (directo
+// por QZ, y si no, en un iframe escondido), porque al guardar ya se esperó a
+// la base y Chrome bloquea una ventana nueva.
+async function imprimirEtiquetaIngreso(rep) {
+  if (!rep) return;
+  const etq = _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep');
+  if (!(await _imprimirDirecto('etiqueta', etq))) await _imprimirEnIframe(etq);
+}
+
 // ══════════════════════════════════════════════════════════════
 //  BOLETA DE LA REPARACIÓN: imprimir, descargar o mandar por WhatsApp
 // ══════════════════════════════════════════════════════════════
