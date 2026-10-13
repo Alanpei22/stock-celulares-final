@@ -668,17 +668,44 @@ function _imprimirEnIframe(html) {
   });
 }
 
+// ── ¿Este aparato puede imprimir? ─────────────────────────
+// La impresora no está en la nube: está atada al aparato. Qué impresora usar
+// para cada cosa vive en el navegador de la compu que tiene QZ Tray; un
+// celular no tiene ninguna.
+//
+// En un celular, el plan B (el diálogo del navegador) no sirve para nada: sale
+// un cartel que hay que cancelar y de la etiquetadora del local no sale nada.
+// Ahí es mejor no intentar y dejarlo anotado para la compu.
+//
+// En una compu SIN QZ el diálogo sí sirve, y por eso se sigue abriendo.
+function _esCelular() {
+  try {
+    return window.matchMedia('(max-width: 820px)').matches && (navigator.maxTouchPoints || 0) > 0;
+  } catch { return false; }
+}
+function _puedeImprimirAca(tipo) {
+  if (typeof qzActivo === 'function' && qzActivo(tipo)) return true;
+  return !_esCelular();
+}
+
+// Devuelven qué quedó SIN imprimir, para que quien llama lo anote.
 async function imprimirIngresoReparacion(rep) {
-  if (!rep) return;
+  if (!rep) return {};
   if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);
-  const hoja = _buildA5(rep);
-  const etq = _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep');
+  const pend = {};
+  const hoja = _puedeImprimirAca('hoja') ? _buildA5(rep) : (pend.hoja = true, null);
+  const etq = _puedeImprimirAca('etiqueta')
+    ? _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep') : (pend.etiqueta = true, null);
   // Por QZ Tray las dos salen A LA VEZ: son impresoras distintas y no hay por
   // qué esperar a que la hoja termine para mandar la etiqueta.
-  const [hojaOk, etqOk] = await Promise.all([_imprimirDirecto('hoja', hoja), _imprimirDirecto('etiqueta', etq)]);
+  const [hojaOk, etqOk] = await Promise.all([
+    hoja ? _imprimirDirecto('hoja', hoja) : Promise.resolve(true),
+    etq ? _imprimirDirecto('etiqueta', etq) : Promise.resolve(true),
+  ]);
   // Lo que no salió directo va por el diálogo, de a uno (Chrome muestra uno solo).
-  if (!hojaOk) await _imprimirEnIframe(hoja);
-  if (!etqOk) await _imprimirEnIframe(etq);
+  if (hoja && !hojaOk) await _imprimirEnIframe(hoja);
+  if (etq && !etqOk) await _imprimirEnIframe(etq);
+  return pend;
 }
 
 // Equipo de gremio: SOLO la etiqueta. La hoja A5 lleva las condiciones, la
@@ -687,9 +714,11 @@ async function imprimirIngresoReparacion(rep) {
 // por QZ, y si no, en un iframe escondido), porque al guardar ya se esperó a
 // la base y Chrome bloquea una ventana nueva.
 async function imprimirEtiquetaIngreso(rep) {
-  if (!rep) return;
+  if (!rep) return {};
+  if (!_puedeImprimirAca('etiqueta')) return { etiqueta: true };
   const etq = _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep');
   if (!(await _imprimirDirecto('etiqueta', etq))) await _imprimirEnIframe(etq);
+  return {};
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-cola-impresion.js': 'Lo que queda sin imprimir cuando cargas desde el celular',
   'test-gremio.js':         'Equipos de otro taller: misma serie de ordenes, solo la etiqueta',
   'test-etq-al-guardar.js': 'Etiquetas al guardar, desde el formulario de carga de accesorios y repuestos',
   'test-caja-dueno-saldo.js':'El saldo de caja dueno sin leer la coleccion entera cada vez',

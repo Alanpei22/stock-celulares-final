@@ -6424,3 +6424,20 @@ body.dark .rot-motivo--on { border-color: var(--accent); background: rgba(212,16
 .badge-gremio { background: #E0E7FF; color: #3730A3; }
 body.dark .gremio-toggle { background: #15181c; border-color: #2a2e34; }
 body.dark .badge-gremio { background: rgba(99,102,241,.22); color: #c7d2fe; }
+
+/* Lo que quedó sin imprimir porque se cargó desde el celular (repairs.js).
+   Solo aparece en el aparato que tiene esa impresora configurada. */
+.rep-pend-barra {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 900;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: var(--card); border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 16px rgba(0,0,0,.12); font-size: .9rem;
+}
+.rep-pend-barra b { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rep-pend-barra .btn-primary { padding: 9px 16px; font-size: .86rem; flex-shrink: 0; }
+.rep-pend-x {
+  width: 32px; height: 32px; flex-shrink: 0; border: none; border-radius: 8px;
+  background: none; color: var(--text3); font-size: .85rem; cursor: pointer;
+}
+body.dark .rep-pend-barra { background: #1a1d21; border-top-color: #2a2e34; }

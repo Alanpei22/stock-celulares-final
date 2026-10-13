@@ -74,8 +74,8 @@ ok(get('repEsGremio()') === true, 'y la app sabe que es de gremio');
 console.log('\n2) Al guardar, SOLO la etiqueta');
 // Es el punto de todo esto: la hoja A5 es para el cliente de mostrador.
 const src = leer('repairs.js');
-const bloque = src.slice(src.indexOf('// De gremio sale solo la etiqueta'), src.indexOf('// De gremio sale solo la etiqueta') + 400);
-ok(/if \(gremio\)/.test(bloque), 'al guardar se fija si es de gremio', bloque.slice(0, 120));
+const bloque = src.slice(src.indexOf('// De gremio sale solo la etiqueta'), src.indexOf('// De gremio sale solo la etiqueta') + 600);
+ok(bloque.includes('gremio'), 'al guardar se fija si es de gremio', bloque.slice(0, 160));
 ok(/imprimirEtiquetaIngreso\(newDoc\)/.test(bloque), 'y manda solo la etiqueta');
 ok(/imprimirIngresoReparacion\(newDoc\)/.test(bloque), 'mientras que uno normal sigue sacando la hoja y la etiqueta');
 

@@ -81,10 +81,13 @@ QZ_FALLA = false;
 console.log('\n4) Enganchado en print.js');
 const pr = leer('print.js');
 const ing = pr.slice(pr.indexOf('async function imprimirIngresoReparacion'), pr.indexOf('function _imprimirTocando'));
-ok(/Promise\.all\(\[_imprimirDirecto\('hoja', hoja\), _imprimirDirecto\('etiqueta', etq\)\]\)/.test(ing),
+ok(/Promise\.all\(\[[\s\S]*_imprimirDirecto\('hoja'[\s\S]*_imprimirDirecto\('etiqueta'[\s\S]*\]\)/.test(ing),
    'ingreso: por QZ la hoja y la etiqueta salen a la vez (impresoras distintas, nada que esperar)');
-ok(/if \(!hojaOk\) await _imprimirEnIframe\(hoja\)/.test(ing) && /if \(!etqOk\) await _imprimirEnIframe\(etq\)/.test(ing),
+ok(/!hojaOk\) await _imprimirEnIframe\(hoja\)/.test(ing) && /!etqOk\) await _imprimirEnIframe\(etq\)/.test(ing),
    'y la que no salió por QZ va por el diálogo');
+// Desde un celular no se intenta: el diálogo de ahí no imprime en el local.
+ok(/_puedeImprimirAca\('hoja'\)/.test(ing) && /_puedeImprimirAca\('etiqueta'\)/.test(ing),
+   'y en un aparato que no imprime, ni lo intenta: queda anotado para la compu');
 const qzs = leer('qz-print.js');
 ok(/toDataURL\(byn \? 'image\/png' : 'image\/jpeg', 0\.9\)/.test(qzs), 'la hoja viaja en JPEG (la mitad de peso); la térmica en PNG blanco y negro');
 ok(/function qzPrecalentar/.test(qzs) && /addEventListener\('load', \(\) => setTimeout\(qzPrecalentar/.test(qzs),

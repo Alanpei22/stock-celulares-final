@@ -412,6 +412,8 @@ const EXENTAS = [
                       // tiene los arreglos, solo paso/equipo/fechas
   '_pendBorrar',      // reintento de un ingreso que no se pudo subir: el QR ya
                       // se publicó cuando se cargó el equipo, es el mismo doc
+  'etiquetaPendiente',// falta imprimir la etiqueta o la hoja: es cosa del
+  'hojaPendiente',    // taller, el cliente no ve nada de eso en su QR
 ];
 const sospechosas = [];
 for (const archivo of ['repairs.js', 'caja.js', 'tp-fases.js', 'seguimiento.js']) {

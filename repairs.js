@@ -132,6 +132,7 @@ async function _cargarHistorialRep() {
 // Arma REPAIRS. Lo de la ventana en vivo pisa a la copia del historial (es más
 // nuevo): se unen por id.
 function _repPintar() {
+  if (!_pendOculto && typeof repPintarPendientes === 'function') repPintarPendientes();
   const porId = new Map();
   _repHistorial.forEach(r => porId.set(r.id, r));
   _repVentana.forEach(r => porId.set(r.id, r));
@@ -1462,6 +1463,91 @@ function abrirCobro(id) {
   if (r) openCobroModal(r);
 }
 
+// ── Lo que quedó sin imprimir ─────────────────────────────
+// Si el equipo se carga desde un celular, la etiquetadora del local no está
+// ahí. Queda anotado en la reparación y la compu del mostrador lo muestra en
+// una barra para imprimirlo de un toque.
+function _anotarPendiente(id, pend) {
+  if (!pend || (!pend.etiqueta && !pend.hoja)) return;
+  const campos = {};
+  if (pend.etiqueta) campos.etiquetaPendiente = true;
+  if (pend.hoja)     campos.hojaPendiente = true;
+  // Sin await: no se frena el mostrador por esto.
+  db.collection('repairs').doc(id).update(campos).catch(e => console.error('pendiente:', e));
+  const rep = REPAIRS.find(x => x.id === id);
+  if (rep) Object.assign(rep, campos);
+  toast('🏷️ Queda para imprimir en la compu', 'info');
+}
+
+// Lo que este aparato SÍ puede imprimir y está esperando.
+function _repPendientes(tipo) {
+  const campo = tipo === 'hoja' ? 'hojaPendiente' : 'etiquetaPendiente';
+  if (typeof qzActivo !== 'function' || !qzActivo(tipo)) return [];
+  return REPAIRS.filter(r => r[campo] === true);
+}
+
+// La barra: solo en el aparato que tiene esa impresora configurada.
+function repPintarPendientes() {
+  const etq = _repPendientes('etiqueta');
+  const hoj = _repPendientes('hoja');
+  let b = document.getElementById('rep-pend-barra');
+  if (!etq.length && !hoj.length) { b?.remove(); return; }
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'rep-pend-barra';
+    b.className = 'rep-pend-barra';
+    document.body.appendChild(b);
+  }
+  const partes = [];
+  if (etq.length) partes.push(`${etq.length} etiqueta${etq.length === 1 ? '' : 's'}`);
+  if (hoj.length) partes.push(`${hoj.length} hoja${hoj.length === 1 ? '' : 's'}`);
+  b.innerHTML = `<b>🏷️ ${partes.join(' y ')} para imprimir</b>
+    <button type="button" class="btn-primary" onclick="repImprimirPendientes()">Imprimir</button>
+    <button type="button" class="rep-pend-x" onclick="repPendientesDespues()" title="Después">✕</button>`;
+}
+
+// La cruz la calla hasta el próximo ingreso: lo pendiente no se borra.
+let _pendOculto = false;
+function repPendientesDespues() {
+  _pendOculto = true;
+  document.getElementById('rep-pend-barra')?.remove();
+}
+
+async function repImprimirPendientes() {
+  const etq = _repPendientes('etiqueta');
+  const hoj = _repPendientes('hoja');
+  if (!etq.length && !hoj.length) return;
+  document.getElementById('rep-pend-barra')?.remove();
+  try {
+    // Las etiquetas van todas juntas en una tirada; las hojas, una por una.
+    if (etq.length && typeof printEtiquetasReparaciones === 'function') {
+      printEtiquetasReparaciones(etq);
+      await _repMarcarImpreso(etq, 'etiquetaPendiente');
+    }
+    for (const r of hoj) {
+      window._printRep = r;
+      if (typeof printRepair === 'function') printRepair('A5');
+      await _repMarcarImpreso([r], 'hojaPendiente');
+    }
+    toast('🖨️ Listo', 'success');
+  } catch (e) {
+    console.error('imprimir pendientes:', e);
+    toast('No se pudo imprimir todo', 'error');
+    repPintarPendientes();
+  }
+}
+
+async function _repMarcarImpreso(lista, campo) {
+  for (let i = 0; i < lista.length; i += 450) {
+    const batch = db.batch();
+    lista.slice(i, i + 450).forEach(r => {
+      batch.update(db.collection('repairs').doc(r.id), { [campo]: false });
+      r[campo] = false;
+    });
+    await batch.commit();
+  }
+}
+
 // ── Equipo de gremio ──────────────────────────────────────
 // Equipos que trae otro taller. Van con el MISMO contador de órdenes (es una
 // reparación más) pero no llevan la hoja A5: esa tiene las condiciones y la
@@ -2125,11 +2211,11 @@ async function saveRepair() {
       _showPrintPrompt(id);
       _ultimoIngreso = newDoc;   // para mandarla por WhatsApp antes de que llegue el snapshot
       // De gremio sale solo la etiqueta; del mostrador, la hoja y la etiqueta.
-      if (gremio) {
-        if (typeof imprimirEtiquetaIngreso === 'function') imprimirEtiquetaIngreso(newDoc);
-      } else if (typeof imprimirIngresoReparacion === 'function') {
-        imprimirIngresoReparacion(newDoc);
-      }
+      // Si este aparato no imprime (un celular), queda anotado para la compu.
+      const impr = gremio
+        ? (typeof imprimirEtiquetaIngreso === 'function' ? imprimirEtiquetaIngreso(newDoc) : null)
+        : (typeof imprimirIngresoReparacion === 'function' ? imprimirIngresoReparacion(newDoc) : null);
+      Promise.resolve(impr).then(pend => _anotarPendiente(id, pend));
       return;
     }
     closeRepairForm();
