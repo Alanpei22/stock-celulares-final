@@ -67,6 +67,15 @@ const b = cambios.find(c => c.id === 'b');
 ok(b.data.precioCostoUSD === 3.5 && b.data.precioCosto === 3500, 'con dólares y pesos del día', b.data);
 const d = cambios.find(c => c.id === 'd');
 ok(d.data.precioCostoUSD === 0 && !('precioCosto' in d.data), 'borrar el costo en dólares no inventa uno en pesos', d.data);
+// En pesos: el bug era que 2550 se tomaba como u$2.550 (≈ 3 millones).
+const enPesos = run("_invCostosCambios(_v, 1200, 'ars')", [el('e', '', 2550), el('f', 4500, 4500)]);
+ok(enPesos.length === 1 && enPesos[0].data.precioCosto === 2550, 'cargando en pesos, $2.550 son $2.550', enPesos);
+ok(enPesos[0].data.precioCostoUSD === 2.13, 'y en dólares 2.550 / 1.200 = u$2,13, no u$2.550', enPesos[0].data);
+ok(/_invCostosCambios\(\[\.\.\.m\.querySelectorAll\('\.invc-usd'\)\], invDolar\(\), invMoneda\(\)\)/.test(inv),
+   'al guardar la lista se usa la moneda elegida');
+ok(/onclick="_invCostosMoneda\('ars'\)"/.test(inv) && /onclick="_invCostosMoneda\('usd'\)"/.test(inv),
+   'la lista tiene el mismo botón $ / u$ que el formulario');
+ok(run('_invCostosOtra(2550, false, 1200)') === 'u$2.13', 'y al lado muestra los dólares', run('_invCostosOtra(2550, false, 1200)'));
 const abrir = inv.slice(inv.indexOf('function abrirCostosInv'), inv.indexOf('function abrirCostosInv') + 300);
 ok(/if \(!_invIsOwner\(\)\)/.test(abrir), 'solo el dueño');
 ok(/_invFiltrados\(\)/.test(abrir), 'con la lista que estás viendo (filtros y búsqueda)');

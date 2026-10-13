@@ -326,6 +326,7 @@ function openProductoForm(id, precodigo) {
   _invPintarMoneda();
 
   _clearProductoForm();
+  if (typeof etqAlGuardarPreparar === 'function') etqAlGuardarPreparar('inv', !!id);
 
   if (id) {
     const p = PRODUCTOS.find(x => x.id === id);
@@ -421,6 +422,15 @@ async function saveProducto(opts) {
   const btn = document.getElementById(seguir ? 'inv-form-save-otro' : 'inv-form-save');
   btn.disabled = true;
 
+  // Etiquetas al guardar: la ventana de impresión se pide ACÁ, en el toque
+  // (si se espera a Firestore, Chrome la bloquea), y se llena con el artículo
+  // ya guardado, con su código. Si el guardado falla, no sale nada.
+  let alGuardar = () => {};
+  const copiasEtq = (!_invEditingId && typeof etqAlGuardarCopias === 'function') ? etqAlGuardarCopias('inv', stock) : 0;
+  if (copiasEtq && typeof printEtiquetasAlGuardar === 'function') {
+    printEtiquetasAlGuardar(new Promise(r => { alGuardar = r; }), copiasEtq);
+  }
+
   try {
     // Un articulo sin codigo no se puede escanear en la caja ni etiquetar, y
     // la etiqueta es el motivo por el que se carga. Si no escaneaste el codigo
@@ -456,7 +466,8 @@ async function saveProducto(opts) {
       toast('✅ Producto actualizado', 'success');
     } else {
       data.fechaAlta = firebase.firestore.FieldValue.serverTimestamp();
-      await db.collection('productos').add(data);
+      const ref = await db.collection('productos').add(data);
+      alGuardar({ ...data, id: ref && ref.id });
       toast('✅ Producto guardado' + (!cod && codigo ? ' · ' + codigo : ''), 'success');
     }
     // Cargando una tanda, cerrar el formulario y volver a tocar "escanear" en
@@ -468,6 +479,7 @@ async function saveProducto(opts) {
     console.error(e);
     toast('Error al guardar', 'error');
   } finally {
+    alGuardar(null);   // si no se guardó, la ventana de etiquetas se cierra
     btn.disabled = false;
   }
 }
@@ -644,6 +656,9 @@ function _invSiguiente(cat) {
   if (del) del.style.display = 'none';
   const etq = document.getElementById('inv-form-etq');
   if (etq) etq.style.display = 'none';
+  // Las copias son de cada artículo; la casilla queda tildada para la tanda
+  const cop = document.getElementById('inv-fi-etq-copias');
+  if (cop) cop.value = '';
   _invPintarMoneda();
   const cod = document.getElementById('inv-fi-cod');
   if (cod) { cod.value = ''; setTimeout(() => cod.focus(), 60); }
@@ -882,7 +897,10 @@ function _invWizFinish() {
 // ══════════════════════════════════════════
 // Abrir artículo por artículo para ponerle el costo era eterno. Acá van todos
 // los de la lista que estás viendo (mismos filtros y búsqueda), con un
-// casillero de costo en dólares cada uno. Se guardan solo los que cambiaron.
+// casillero de costo cada uno. Se guardan solo los que cambiaron.
+// El casillero va en la moneda elegida ($ o u$, la misma del formulario).
+// Antes era solo en dólares: cargando $2.550 lo tomaba como u$2.550 y decía
+// que el artículo costaba más de 3 millones de pesos.
 // Solo el dueño: el costo no lo ven los empleados.
 function abrirCostosInv() {
   if (!_invIsOwner()) { toast('🔒 Activá el modo dueño para cargar costos', 'error'); return; }
@@ -890,6 +908,7 @@ function abrirCostosInv() {
     .slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
   if (!lista.length) { toast('No hay artículos en la lista', 'error'); return; }
   const d = invDolar();
+  const enUSD = invMoneda() === 'usd';
 
   document.getElementById('inv-costos-modal')?.remove();
   const m = document.createElement('div');
@@ -898,22 +917,29 @@ function abrirCostosInv() {
   m.innerHTML = `
   <div class="modal-card form-card">
     <div class="modal-header">
-      <h3>💵 Cargar costos <small style="font-weight:500;color:var(--t3)">${lista.length} artículos${d > 0 ? ' · dólar $' + d.toLocaleString('es-AR') : ''}</small></h3>
+      <h3>💵 Cargar costos <small style="font-weight:500;color:var(--t3)">${lista.length} artículos${d > 0 ? ' · dólar $' + d.toLocaleString('es-AR') : ''}</small>
+        <span class="inv-moneda">
+          <button type="button" id="invc-mon-ars" class="inv-mon-btn${enUSD ? '' : ' inv-mon-on'}" onclick="_invCostosMoneda('ars')">$</button>
+          <button type="button" id="invc-mon-usd" class="inv-mon-btn${enUSD ? ' inv-mon-on' : ''}" onclick="_invCostosMoneda('usd')">u$</button>
+        </span></h3>
       <button class="modal-close" onclick="cerrarCostosInv()">✕</button>
     </div>
     <div class="modal-body" style="max-height:65vh;overflow:auto">
       ${lista.map(p => {
         const usd = invCostoUSD(p), viejo = Number(p.precioCosto) || 0;
+        // En pesos: lo que se pagó; si no está, los dólares al dólar de hoy
+        const ars = viejo > 0 ? Math.round(viejo) : (usd && d ? Math.round(usd * d) : 0);
+        const val = enUSD ? usd : ars;
         return `<div class="invc-fila" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.nombre || '(sin nombre)')}</div>
-            <div style="font-size:12px;color:var(--t3)">${esc(p.codigo || 'sin código')} · venta $${(Number(p.precioVenta) || 0).toLocaleString('es-AR')}${!usd && viejo ? ' · antes $' + viejo.toLocaleString('es-AR') + ' en pesos' : ''}</div>
+            <div style="font-size:12px;color:var(--t3)">${esc(p.codigo || 'sin código')} · venta $${(Number(p.precioVenta) || 0).toLocaleString('es-AR')}</div>
           </div>
-          <span style="font-size:13px;color:var(--t3)">u$</span>
-          <input class="fi invc-usd" data-id="${esc(p.id)}" data-antes="${usd || ''}" type="number" min="0" step="0.01"
-                 inputmode="decimal" value="${usd || ''}" placeholder="0" style="width:90px"
+          <span class="invc-mon" style="font-size:13px;color:var(--t3)">${enUSD ? 'u$' : '$'}</span>
+          <input class="fi invc-usd" data-id="${esc(p.id)}" data-antes="${val || ''}" type="number" min="0" step="0.01"
+                 inputmode="decimal" value="${val || ''}" placeholder="0" style="width:90px"
                  oninput="_invCostosFila(this)">
-          <span class="invc-ars" style="width:78px;font-size:12px;color:var(--t3);text-align:right">${usd && d ? '$' + Math.round(usd * d).toLocaleString('es-AR') : ''}</span>
+          <span class="invc-ars" style="width:78px;font-size:12px;color:var(--t3);text-align:right">${_invCostosOtra(val, enUSD, d)}</span>
         </div>`;
       }).join('')}
     </div>
@@ -932,10 +958,37 @@ function abrirCostosInv() {
   setTimeout(() => inputs[0]?.focus(), 100);
 }
 
+// Al costado de cada casillero, lo mismo en la otra moneda
+function _invCostosOtra(v, enUSD, d) {
+  v = Number(v) || 0;
+  if (!(v > 0 && d > 0)) return '';
+  return enUSD ? '$' + Math.round(v * d).toLocaleString('es-AR') : 'u$' + (v / d).toFixed(2);
+}
+
 function _invCostosFila(el) {
-  const usd = parseFloat(el.value) || 0, d = invDolar();
-  const ars = el.parentElement.querySelector('.invc-ars');
-  if (ars) ars.textContent = usd > 0 && d > 0 ? '$' + Math.round(usd * d).toLocaleString('es-AR') : '';
+  const otra = el.parentElement.querySelector('.invc-ars');
+  if (otra) otra.textContent = _invCostosOtra(parseFloat(el.value), invMoneda() === 'usd', invDolar());
+}
+
+// Cambiar $ ↔ u$ con la lista abierta: los números se convierten (lo escrito
+// y lo que había), así no se pierde nada ni cuenta como cambio.
+function _invCostosMoneda(m) {
+  const antes = invMoneda();
+  invSetMoneda(m);
+  const nueva = invMoneda(), d = invDolar();
+  const modal = document.getElementById('inv-costos-modal');
+  if (!modal) return;
+  document.getElementById('invc-mon-ars')?.classList.toggle('inv-mon-on', nueva === 'ars');
+  document.getElementById('invc-mon-usd')?.classList.toggle('inv-mon-on', nueva === 'usd');
+  if (nueva === antes) return;
+  if (!(d > 0)) { toast('Sin cotización del dólar no se puede convertir', 'error'); return; }
+  const conv = v => { v = parseFloat(v) || 0; if (!v) return ''; return nueva === 'usd' ? Math.round((v / d) * 100) / 100 : Math.round(v * d); };
+  modal.querySelectorAll('.invc-usd').forEach(el => {
+    el.value = conv(el.value);
+    el.dataset.antes = String(conv(el.dataset.antes));
+    _invCostosFila(el);
+  });
+  modal.querySelectorAll('.invc-mon').forEach(s => { s.textContent = nueva === 'usd' ? 'u$' : '$'; });
 }
 
 function cerrarCostosInv() {
@@ -943,14 +996,23 @@ function cerrarCostosInv() {
 }
 
 // Lo que cambió en la lista, listo para guardar. Aparte para poder probarlo.
-function _invCostosCambios(inputs, dolar) {
+// moneda: en qué está escrito ('usd' o 'ars'). Se guardan las dos: lo que
+// escribiste tal cual y lo otro convertido al dólar de hoy.
+function _invCostosCambios(inputs, dolar, moneda) {
   const out = [];
+  const enUSD = moneda !== 'ars';
   inputs.forEach(el => {
     const nuevo = Math.max(0, parseFloat(el.value) || 0);
     const antes = parseFloat(el.dataset.antes) || 0;
     if (Math.abs(nuevo - antes) < 0.005) return;
-    const data = { precioCostoUSD: nuevo };
-    if (nuevo > 0 && dolar > 0) data.precioCosto = Math.round(nuevo * dolar);
+    let data;
+    if (enUSD) {
+      data = { precioCostoUSD: nuevo };
+      if (nuevo > 0 && dolar > 0) data.precioCosto = Math.round(nuevo * dolar);
+    } else {
+      data = { precioCosto: Math.round(nuevo),
+               precioCostoUSD: nuevo > 0 && dolar > 0 ? Math.round((nuevo / dolar) * 100) / 100 : 0 };
+    }
     out.push({ id: el.dataset.id, data });
   });
   return out;
@@ -959,7 +1021,7 @@ function _invCostosCambios(inputs, dolar) {
 async function guardarCostosInv() {
   const m = document.getElementById('inv-costos-modal');
   if (!m) return;
-  const cambios = _invCostosCambios([...m.querySelectorAll('.invc-usd')], invDolar());
+  const cambios = _invCostosCambios([...m.querySelectorAll('.invc-usd')], invDolar(), invMoneda());
   if (!cambios.length) { cerrarCostosInv(); toast('No cambiaste ningún costo', 'info'); return; }
   const btn = document.getElementById('inv-costos-save');
   if (btn) btn.disabled = true;
