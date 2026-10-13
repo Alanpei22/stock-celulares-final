@@ -89,9 +89,9 @@ run("invSetMoneda('ars')");
 
 console.log('\n3) Lo que se guarda, en las dos monedas');
 const save = inv.slice(inv.indexOf('async function saveProducto'), inv.indexOf('function _invSiguiente'));
-ok(/const costoUSD = enUSD \? costoIn : \(dolarHoy > 0 \? Math\.round\(\(costoIn \/ dolarHoy\) \* 100\) \/ 100 : 0\)/.test(save),
+ok(/(?:const|let) costoUSD = enUSD \? costoIn : \(dolarHoy > 0 \? Math\.round\(\(costoIn \/ dolarHoy\) \* 100\) \/ 100 : 0\)/.test(save),
    'cargás pesos → los dólares salen del dólar de hoy, a dos decimales');
-ok(/const costoARS = enUSD \? \(dolarHoy > 0 \? Math\.round\(costoIn \* dolarHoy\) : 0\) : Math\.round\(costoIn\)/.test(save),
+ok(/(?:const|let) costoARS = enUSD \? \(dolarHoy > 0 \? Math\.round\(costoIn \* dolarHoy\) : 0\) : Math\.round\(costoIn\)/.test(save),
    'cargás dólares → los pesos salen del dólar de hoy');
 ok(/precioCostoUSD: costoUSD/.test(save) && /data\.precioCosto = costoARS/.test(save),
    'y los dos quedan en el documento: lo que escribiste, tal cual');
@@ -321,6 +321,46 @@ ok(ultimo().data.codigo === '', 'sin código, que queda para "Generar códigos d
 // Y el aviso dice cuál le tocó: es el número que hay que pegarle al artículo.
 ok(/toast\('✅ Producto guardado' \+ \(!cod && codigo \? ' · ' \+ codigo : ''\)/.test(inv),
    'el aviso muestra el código que le tocó');
+
+
+console.log('\n7) La conversión del costo no se confunde');
+// Bug: había DOS avisos al lado del costo. El viejo tomaba el número siempre
+// como dólares: escribiendo $4.500 en pesos decía "≈ $5.400.000".
+ok(!/function _invCostoHint/.test(inv) && !/addEventListener\('input', _invCostoHint\)/.test(inv),
+   'queda un solo aviso, el que sabe en qué moneda estás');
+['inv-fi-cod', 'inv-fi-nom', 'inv-fi-pv', 'inv-fi-stock', 'inv-fi-stockmin', 'inv-fi-activo', 'inv-form-title',
+ 'inv-form-del', 'inv-form-etq', 'inv-form-rotura', 'inv-form-save', 'inv-form-save-otro', 'inv-form-modal'].forEach(mk);
+els['inv-fi-cat'] = els['inv-fi-cat'] || mk('inv-fi-cat');
+const ACT = [];
+ctx.db = { collection: () => ({ doc: () => ({ update: async d => { ACT.push(d); } }) }) };
+run('dolarBlue = 1200; _invIsOwner = () => true');
+run("invSetMoneda('ars')");
+run(`PRODUCTOS = [{ id:'f1', codigo:'TP00001', nombre:'Funda', precioVenta: 9000, precioCostoUSD: 3.75, precioCosto: 4500, stock: 3 }];
+     PRODUCTOS_MAP = new Map(PRODUCTOS.map(p => [p.codigo, p]));`);
+run("openProductoForm('f1')");
+ok(String(els['inv-fi-costoUSD'].value) === '4500', 'al editar, en pesos se ve lo que pagaste', els['inv-fi-costoUSD'].value);
+ok(/≈ u\$3\.75/.test(els['inv-fi-costoARS-hint'].textContent), 'y al lado los dólares, no millones de pesos',
+   els['inv-fi-costoARS-hint'].textContent);
+
+// Cambiar $ ↔ u$ con el costo escrito: antes el número quedaba igual ($4.500
+// pasaban a ser u$4.500). Ahora se convierte.
+run("invSetMoneda('usd')");
+ok(String(els['inv-fi-costoUSD'].value) === '3.75', 'pasar a u$ convierte el número', els['inv-fi-costoUSD'].value);
+run("invSetMoneda('ars')");
+ok(String(els['inv-fi-costoUSD'].value) === '4500', 'y volver a $ también', els['inv-fi-costoUSD'].value);
+
+// Abrir y guardar sin tocar el costo: queda como estaba aunque el dólar suba
+run('dolarBlue = 1500');
+await run('saveProducto()');
+const g = ACT[ACT.length - 1] || {};
+ok(g.precioCostoUSD === 3.75 && g.precioCosto === 4500, 'guardar sin tocar el costo no lo recalcula', g);
+// Cambiándolo sí: pesos de hoy → dólares de hoy
+run("openProductoForm('f1')");
+els['inv-fi-costoUSD'].value = '6000';
+await run('saveProducto()');
+const g2 = ACT[ACT.length - 1] || {};
+ok(g2.precioCosto === 6000 && g2.precioCostoUSD === 4, 'si lo cambiás, $6.000 al dólar de 1.500 = u$4', g2);
+run('dolarBlue = 1200');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

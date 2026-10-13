@@ -29,7 +29,20 @@ function invMoneda() {
   try { return localStorage.getItem('invMonedaCosto') === 'usd' ? 'usd' : 'ars'; } catch { return 'ars'; }
 }
 function invSetMoneda(m) {
+  const antes = invMoneda();
   try { localStorage.setItem('invMonedaCosto', m === 'usd' ? 'usd' : 'ars'); } catch {}
+  // Antes, cambiar $ ↔ u$ con un costo ya escrito dejaba el MISMO número:
+  // $4.500 pasaban a ser u$4.500 y se guardaba un costo de millones. Ahora el
+  // número se convierte al dólar de hoy, así el costo sigue siendo el mismo.
+  const inp = document.getElementById('inv-fi-costoUSD');
+  const nueva = invMoneda(), d = invDolar();
+  const v = parseFloat(inp && inp.value) || 0;
+  if (inp && nueva !== antes && v > 0 && d > 0) {
+    const sinTocar = _invCostoMostrado && String(inp.value) === String(_invCostoMostrado.valor);
+    inp.value = nueva === 'usd' ? Math.round((v / d) * 100) / 100 : Math.round(v * d);
+    // Si era el costo que tenía guardado, convertirlo no cuenta como cambiarlo
+    if (sinTocar) _invCostoMostrado = { valor: String(inp.value), moneda: nueva };
+  }
   _invPintarMoneda();
 }
 function _invPintarMoneda() {
@@ -160,7 +173,9 @@ function initInventario(opts = {}) {
   document.getElementById('inv-form-close').addEventListener('click', closeProductoForm);
   document.getElementById('inv-form-cancel').addEventListener('click', closeProductoForm);
   document.getElementById('inv-form-save').addEventListener('click', saveProducto);
-  document.getElementById('inv-fi-costoUSD')?.addEventListener('input', _invCostoHint);
+  // (El aviso de la otra moneda se engancha en _initInvFormAtajos: antes había
+  // acá otro, viejo, que tomaba el número siempre como dólares y en pesos
+  // mostraba $4.500 → "≈ $5.400.000".)
   document.getElementById('inv-form-modal').addEventListener('click', e => {
     if (e.target.id === 'inv-form-modal') closeProductoForm();
   });
@@ -321,10 +336,12 @@ function openProductoForm(id, precodigo) {
     document.getElementById('inv-fi-cat').value   = p.categoria || '';
     document.getElementById('inv-fi-pv').value    = p.precioVenta ?? '';
     // Se muestra en la moneda que estas usando, no siempre en dolares.
+    // En pesos se muestra lo que se pagó (precioCosto), igual que en repuestos;
+    // los que no lo tienen, sus dólares al dólar de hoy.
     document.getElementById('inv-fi-costoUSD').value = invMoneda() === 'usd'
       ? (invCostoUSD(p) || '')
-      : (invCostoARS(p) || '');
-    _invCostoAnterior = Number(p.precioCosto) || 0;
+      : (Number(p.precioCosto) > 0 ? Math.round(p.precioCosto) : (invCostoARS(p) || ''));
+    _invCostoMostrado = { valor: String(document.getElementById('inv-fi-costoUSD').value), moneda: invMoneda() };
     document.getElementById('inv-fi-stock').value = p.stock ?? 0;
     document.getElementById('inv-fi-stockmin').value = p.stockMin ?? 0;
     document.getElementById('inv-fi-activo').checked = p.activo !== false;
@@ -335,7 +352,7 @@ function openProductoForm(id, precodigo) {
     if (delBtn) delBtn.style.display = 'none';
   }
 
-  _invCostoHint();
+  _invHintCosto();
   document.getElementById('inv-form-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('inv-fi-nom').focus(), 100);
 }
@@ -345,22 +362,14 @@ function closeProductoForm() {
   _invEditingId = null;
 }
 
-// Costo en pesos que tenía el producto (los cargados antes de pasar a dólares).
-// Se muestra como referencia y no se pisa si no se carga el costo en dólares.
-let _invCostoAnterior = 0;
-
-function _invCostoHint() {
-  const el = document.getElementById('inv-fi-costoARS-hint');
-  if (!el) return;
-  const usd = parseFloat(document.getElementById('inv-fi-costoUSD')?.value) || 0;
-  const d = invDolar();
-  if (usd > 0 && d > 0) el.textContent = '≈ $' + Math.round(usd * d).toLocaleString('es-AR');
-  else if (_invCostoAnterior > 0) el.textContent = '(antes $' + _invCostoAnterior.toLocaleString('es-AR') + ' en pesos)';
-  else el.textContent = '';
-}
+// El costo que se mostró al abrir un artículo para editarlo ({ valor, moneda }).
+// Si al guardar sigue igual, no se recalcula con el dólar de hoy: antes, abrir
+// y guardar un accesorio (para cambiarle el stock, por ejemplo) le cambiaba el
+// costo cada vez que se movía el dólar.
+let _invCostoMostrado = null;
 
 function _clearProductoForm() {
-  _invCostoAnterior = 0;
+  _invCostoMostrado = null;
   ['inv-fi-cod','inv-fi-nom','inv-fi-pv','inv-fi-costoUSD'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
@@ -383,8 +392,15 @@ async function saveProducto(opts) {
   // Lo que escribiste se guarda tal cual; lo otro, convertido al dólar de hoy.
   // A dos decimales: cargando $2.800 el canónico salía 2.3333333333333335 y
   // eso es lo que veías al reabrir el artículo en modo dólares.
-  const costoUSD = enUSD ? costoIn : (dolarHoy > 0 ? Math.round((costoIn / dolarHoy) * 100) / 100 : 0);
-  const costoARS = enUSD ? (dolarHoy > 0 ? Math.round(costoIn * dolarHoy) : 0) : Math.round(costoIn);
+  let costoUSD = enUSD ? costoIn : (dolarHoy > 0 ? Math.round((costoIn / dolarHoy) * 100) / 100 : 0);
+  let costoARS = enUSD ? (dolarHoy > 0 ? Math.round(costoIn * dolarHoy) : 0) : Math.round(costoIn);
+  // Editando sin tocar el costo: queda el que tenía (ver _invCostoMostrado)
+  const previo = _invEditingId ? PRODUCTOS.find(x => x.id === _invEditingId) : null;
+  if (previo && _invCostoMostrado && _invCostoMostrado.moneda === invMoneda()
+      && String(document.getElementById('inv-fi-costoUSD').value) === _invCostoMostrado.valor) {
+    costoUSD = invCostoUSD(previo);
+    costoARS = Number(previo.precioCosto) || 0;
+  }
   const stock  = parseInt(document.getElementById('inv-fi-stock').value)    || 0;
   const stmin  = parseInt(document.getElementById('inv-fi-stockmin').value) || 0;
   const activo = document.getElementById('inv-fi-activo').checked;
