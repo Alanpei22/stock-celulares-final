@@ -13,7 +13,10 @@ const DEFAULT_SELLERS = ['Vendedor 1', 'Vendedor 2'];
 // donde hay uno solo.
 const DEFAULT_PAYMENTS = ['Efectivo', 'Transferencia', 'Tarjeta débito', 'Tarjeta crédito', 'MercadoPago'];
 const PRICES_KEY = 'cel_prices';
-const DEFAULT_PRICES = { transfer: 0, c3: 15, c6: 25 };
+// El recargo que cobra el local por 3 cuotas es 26%. Estaba en 15 (un valor
+// de cuando se escribio esto) y una compu nueva arrancaba mostrando cuotas
+// mas baratas de lo que se cobran. Lo guardado en Firestore manda sobre esto.
+const DEFAULT_PRICES = { transfer: 0, c3: 26, c6: 25 };
 
 // ── WA Templates ─────────────────────────────────────────
 const WA_TEMPLATES_KEY = 'cel_wa_templates';
@@ -445,6 +448,9 @@ async function syncConfigFromFirestore() {
       localStorage.setItem(BIZDATA_KEY, JSON.stringify(BIZ_DATA));
       if (typeof _fillBizDataForm === 'function') _fillBizDataForm();
     }
+    // Los ajustes de los carteles (garantias y color) viajan con el resto:
+    // se cargan en el mostrador y el celular los ve igual.
+    if (d.carteles && typeof cartCfgDesdeFirestore === 'function') cartCfgDesdeFirestore(d.carteles);
     if (d.dolarManual > 0) { localStorage.setItem('dolarManual', d.dolarManual); dolarBlue = d.dolarManual; changed = true; }
     if (changed) render();
   } catch {}
@@ -648,7 +654,9 @@ function toggleHdrMenu() {
     { icon: '☑️', label: 'Seleccionar varios', sub: 'Editar varios equipos a la vez', onClick: enterBatchMode },
     { icon: '🌐', label: 'Página de equipos', sub: 'Ver la página y copiar el link para Instagram / WhatsApp',
       onClick: () => (typeof catAbrirPagina === 'function') && catAbrirPagina() },
-    sheetGrupo(toggleHdrMenu, 'Etiquetas e impresión', '🏷️', 'Etiquetas e impresión', 'Sentido de la etiqueta e impresora', [
+    sheetGrupo(toggleHdrMenu, 'Etiquetas, carteles e impresión', '🏷️', 'Etiquetas, carteles e impresión', 'Carteles de vidriera, etiquetas e impresora', [
+      { icon: '🪧', label: 'Carteles de exhibición', sub: 'Los de la vidriera: 8 por hoja A4',
+        onClick: () => (typeof cartAbrir === 'function') && cartAbrir() },
       { icon: '📐', label: 'Sentido de la etiqueta',
         sub: (typeof etqFormato === 'function' && typeof ETQ_FORMATO_NOMBRE === 'object') ? ETQ_FORMATO_NOMBRE[etqFormato()] : '',
         onClick: elegirFormatoEtiqueta },
@@ -2559,7 +2567,7 @@ function renderSettingsPrices() {
   const inp = document.getElementById('price-transfer');
   if (inp) inp.value = PRICES.transfer ?? 0;
   const inp3 = document.getElementById('price-c3');
-  if (inp3) inp3.value = PRICES.c3 ?? 15;
+  if (inp3) inp3.value = PRICES.c3 ?? DEFAULT_PRICES.c3;
   const inp6 = document.getElementById('price-c6');
   if (inp6) inp6.value = PRICES.c6 ?? 25;
 

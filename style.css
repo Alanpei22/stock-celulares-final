@@ -6441,3 +6441,50 @@ body.dark .badge-gremio { background: rgba(99,102,241,.22); color: #c7d2fe; }
   background: none; color: var(--text3); font-size: .85rem; cursor: pointer;
 }
 body.dark .rep-pend-barra { background: #1a1d21; border-top-color: #2a2e34; }
+
+/* ═══ CARTELES DE EXHIBICIÓN ═══
+   El cuadro para elegir equipos. El CSS DEL CARTEL no está acá: viaja dentro
+   del documento que se imprime (carteles.js), igual que el de las etiquetas,
+   así la vista previa y la hoja impresa son el mismo archivo. */
+.carteles-modal { max-width: 560px; }
+/* El verde de la lista de WhatsApp no pinta acá: esto no va a WhatsApp. */
+.cart-item.lwa-item--on { background: var(--accent-soft, rgba(0,64,255,.10)); }
+.cart-nro {
+ display: inline-block; min-width: 18px; margin-right: 6px; padding: 0 5px;
+ border-radius: 9999px; background: var(--accent); color: #fff;
+ font-size: .68rem; text-align: center;
+}
+.cart-tag {
+ font-size: .66rem; font-weight: 700; text-transform: uppercase;
+ letter-spacing: .04em; color: var(--warn);
+}
+.cart-lapiz {
+ flex-shrink: 0; width: 30px; height: 30px; border-radius: 9999px; cursor: pointer;
+ border: 1px solid var(--border); background: var(--card); font-size: .8rem;
+}
+.cart-ed {
+ display: flex; flex-direction: column; gap: 6px;
+ margin: 2px 0 6px; padding: 10px;
+ border: 1px solid var(--border); border-radius: 10px; background: var(--bg1);
+}
+.cart-ed-nota { margin: 0; font-size: .72rem; color: var(--text3); }
+.cart-ed-btns { display: flex; gap: 6px; }
+.cart-ed-btns .tpent-btn { margin: 0; flex: 1; }
+.cart-ajustes {
+ display: flex; flex-direction: column; gap: 6px;
+ margin: 6px 0 10px; padding: 12px;
+ border: 1px solid var(--border); border-radius: 12px; background: var(--bg1);
+}
+.cart-colores { display: flex; gap: 8px; }
+.cart-color {
+ width: 32px; height: 32px; border-radius: 9999px; cursor: pointer;
+ border: 2px solid var(--border);
+}
+.cart-color--on { border-color: var(--text); box-shadow: 0 0 0 3px var(--accent-soft); }
+/* La vista previa es un marco con el documento de verdad adentro, achicado
+   para que la hoja A4 entre en la pantalla. El alto lo pone carteles.js. */
+.cart-prev-wrap {
+ overflow: hidden; border: 1px solid var(--border); border-radius: 10px;
+ background: var(--bg1); margin: 4px 0 10px;
+}
+.cart-prev { width: 1123px; border: 0; transform-origin: top left; display: block; }

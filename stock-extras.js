@@ -123,6 +123,15 @@ function batchExportWA() {
   openListaWaModal(items);
 }
 
+// Carteles de los seleccionados. Mismo camino que Exportar WA: el modo
+// seleccion multiple elige y el cuadro de carteles hace el resto.
+function batchCarteles() {
+  if (!_batchSelected.size) { toast('Seleccioná al menos uno', 'info'); return; }
+  const items = Array.from(_batchSelected).map(id => STOCK.find(x => x.id === id)).filter(Boolean);
+  if (!items.length) return;
+  if (typeof cartAbrir === 'function') cartAbrir(items);
+}
+
 // ── F6: Fotos múltiples (Firebase Storage) ──
 function _getStorage() {
   if (typeof firebase === 'undefined' || !firebase.storage) return null;

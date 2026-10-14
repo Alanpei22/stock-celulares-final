@@ -132,6 +132,7 @@
         <button class="batch-action-btn" onclick="batchChangeUbicacion()">📍 Ubicación</button>
         <button class="batch-action-btn" onclick="batchDescuento()">💸 Descuento %</button>
         <button class="batch-action-btn" onclick="batchExportWA()">🟢 Exportar WA</button>
+        <button class="batch-action-btn" onclick="batchCarteles()">🪧 Carteles</button>
         <button class="batch-action-btn" onclick="batchPublicar(true)">🌐 Publicar en la página</button>
         <button class="batch-action-btn" onclick="batchPublicar(false)">🚫 Sacar de la página</button>
       </div>
@@ -1487,6 +1488,56 @@
   <button class="tpent-volver" onclick="closeListaWaModal()">Cerrar</button>
 </div>
 
+<!-- MODAL: CARTELES DE EXHIBICIÓN - los de la vidriera, A7, 8 por hoja A4.
+     Los arma carteles.js con los equipos del stock, en el momento: no se
+     guarda ninguna copia, asi que un cambio de precio ya sale en el proximo. -->
+<div id="carteles-overlay" class="tpent-overlay hidden" onclick="cartCerrar()"></div>
+<div id="carteles-modal" class="tpent-modal carteles-modal hidden">
+  <div class="tpent-hd">
+    <span>&#129703; Carteles de exhibici&oacute;n</span>
+    <button class="tpent-x" onclick="cartCerrar()">&#10005;</button>
+  </div>
+  <p class="fi-helper" id="carteles-nota"></p>
+  <div class="lwa-filtros">
+    <input id="cart-f-buscar" class="pill" type="search" placeholder="&#128269; Buscar modelo&hellip;" autocomplete="off" oninput="cartFiltrar()">
+    <select id="cart-f-estado" class="pill" onchange="cartFiltrar()">
+      <option value="">Nuevos y usados</option>
+      <option value="Nuevo">Solo nuevos</option>
+      <option value="Usado">Solo usados</option>
+    </select>
+  </div>
+  <div class="lwa-barra">
+    <span id="carteles-cuenta"></span>
+    <span class="lwa-barra-btns">
+      <button type="button" onclick="cartTodos(true)">Todos</button>
+      <button type="button" onclick="cartTodos(false)">Ninguno</button>
+      <button type="button" onclick="cartAjustesToggle()">&#9881;&#65039; Ajustes</button>
+    </span>
+  </div>
+
+  <div id="carteles-ajustes" class="cart-ajustes hidden">
+    <label class="fl">Garant&iacute;a de los nuevos</label>
+    <input id="cart-gar-nuevo" class="fi" type="text" placeholder="6 meses">
+    <label class="fl">Garant&iacute;a de los usados</label>
+    <input id="cart-gar-usado" class="fi" type="text" placeholder="30 d&iacute;as">
+    <p class="fi-helper">Se usa solo cuando el equipo no tiene la garant&iacute;a cargada. Si la tiene, manda la del equipo: es la que sale en el comprobante.</p>
+    <label class="fl">Color del cartel</label>
+    <div id="carteles-colores" class="cart-colores"></div>
+    <p class="fi-helper" id="carteles-recargo"></p>
+    <button type="button" class="tpent-btn tpent-btn--si" onclick="cartGuardarGarantias()">&#128190; Guardar ajustes</button>
+  </div>
+
+  <div class="lwa-sel" id="carteles-lista"></div>
+
+  <label class="fl" style="margin-top:10px;display:block">Vista previa</label>
+  <div class="cart-prev-wrap" id="carteles-preview-wrap">
+    <iframe id="carteles-preview" class="cart-prev" title="Vista previa de los carteles"></iframe>
+  </div>
+
+  <button class="tpent-btn tpent-btn--si" id="carteles-imprimir" onclick="cartImprimir()">&#128424;&#65039; Imprimir</button>
+  <button class="tpent-volver" onclick="cartCerrar()">Cerrar</button>
+</div>
+
 <!-- MODAL: ¿LE AVISO AL CLIENTE? — sale al marcar una reparación como Listo.
      Reemplaza al confirm() del navegador: acá se ve el mensaje que se manda. -->
 <div id="avisowa-overlay" class="tpent-overlay hidden" onclick="closeAvisoWaModal()"></div>
@@ -2276,6 +2327,7 @@
 <script defer src="instalar.js"></script>
 <script defer src="barcode.js"></script>
 <script defer src="print.js"></script>
+<script defer src="carteles.js"></script>
 <script defer src="venta-articulos.js"></script>
 <script defer src="qz-print.js"></script>
 <script defer src="bluetooth-print.js"></script>
