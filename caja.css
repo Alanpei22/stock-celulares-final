@@ -467,10 +467,13 @@ body.dark .cqb-chevron { background: #D4A76A; color: #1a1a1a; }
 .arqueo-total-num { font-size: 1.5rem; font-weight: 900; color: var(--text, #1A1A1A); letter-spacing: -0.02em; }
 
 /* ── MOVEMENT FORM ── */
+/* --teclado: lo que tapa el teclado del celular (lo mide caja.js). La ventana
+   se levanta por encima para que el total y el botón de cobrar sigan a la
+   vista; sin teclado vale 0 y queda pegada abajo, como siempre. */
 .modal-sheet-bottom {
- position: fixed; bottom: 0; left: 0; right: 0; z-index: 1100;
+ position: fixed; bottom: var(--teclado, 0px); left: 0; right: 0; z-index: 1100;
  background: var(--card, #FFFFFF); border-radius: 24px 24px 0 0;
- padding: 1rem 1.25rem 2rem; max-height: 90vh; overflow-y: auto;
+ padding: 1rem 1.25rem 2rem; max-height: calc(90vh - var(--teclado, 0px)); overflow-y: auto;
  -webkit-overflow-scrolling: touch;
  box-shadow: 0 -8px 40px rgba(0,0,0,.12); max-width: 480px; margin: 0 auto;
 }
@@ -501,10 +504,18 @@ body.dark .cqb-chevron { background: #D4A76A; color: #1a1a1a; }
 .mov-footer-btns { display: flex; gap: 9px; }
 .mov-footer-btns .btn-secondary { flex: 0 0 34%; }
 .mov-footer-btns .btn-primary { flex: 1; }
-/* Con el teclado abierto la barra estorba: se esconde mientras se escribe */
-#mov-modal.mov-tecleando .mov-footer { display: none; }
 /* Botón bloqueado cuando falta un precio */
 .btn-primary.btn-bloqueado { opacity: .55; cursor: not-allowed; }
+/* Hacer precio: el lápiz es para que se vea que el precio se toca, y el
+   recuadro naranja para que un precio cambiado no pase desapercibido. */
+.cart-precio-lapiz { font-size: .72em; opacity: .55; }
+.cart-line-precio--hecho { border: 1px solid var(--warn, #F59E0B); border-radius: 10px; }
+.cart-line-precio--hecho small { color: var(--warn, #F59E0B); font-weight: 700; }
+.cart-precio-volver {
+ flex: none; width: 30px; height: 30px; margin-left: 4px; border-radius: 9999px;
+ cursor: pointer; border: 1px solid var(--border, #E3E1DE);
+ background: var(--card, #FFFFFF); color: var(--text2, #5c5c5c); font-size: .85rem;
+}
 .tipo-toggle { display: flex; gap: 8px; margin: .75rem 0; }
 .tipo-btn {
  flex: 1; padding: .6rem; border: 2px solid var(--border, #E3E1DE); border-radius: 14px;

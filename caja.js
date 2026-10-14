@@ -2720,23 +2720,7 @@ function _initMovDescAutocomplete() {
   // Primer contacto con el buscador → recién ahí se traen productos y equipos
   input.addEventListener('focus', _asegurarDatosVenta, { once: true });
 
-  // Con el teclado abierto, la barra fija de abajo queda tapada o estorba:
-  // se esconde mientras se escribe y vuelve al soltar el campo.
-  const modal = document.getElementById('mov-modal');
-  if (modal && !modal._tecladoBind) {
-    modal._tecladoBind = true;
-    modal.addEventListener('focusin', e => {
-      if (e.target.matches('input, textarea')) modal.classList.add('mov-tecleando');
-    });
-    modal.addEventListener('focusout', () => {
-      setTimeout(() => {
-        const a = document.activeElement;
-        if (!a || !modal.contains(a) || !a.matches('input, textarea')) {
-          modal.classList.remove('mov-tecleando');
-        }
-      }, 60);
-    });
-  }
+  _initTecladoCaja();
   input.addEventListener('input', _onMovDescInput);
   input.addEventListener('focus', _onMovDescInput);
   // MED-10: 300ms en vez de 180ms para que el tap mobile registre antes de que se oculte
@@ -2767,6 +2751,34 @@ function _initMovDescAutocomplete() {
       }
     }
   });
+}
+
+// El teclado del celular y el boton de cobrar
+// ---------------------------------------------------------
+// Antes la barra de abajo (el total y Cobrar) se escondía al tocar CUALQUIER
+// campo y volvía 60ms después de soltarlo. En el mostrador se sentía así:
+// ponías el precio, tocabas el método de pago y el botón de cobrar no estaba;
+// ese primer toque solo servía para que la barra volviera y la pantalla
+// saltara, y había que tocar otra vez.
+//
+// Ahora no se esconde nada: se levanta la ventana por encima del teclado, así
+// el total y Cobrar quedan siempre a la vista y nada salta. `visualViewport`
+// es lo único que sabe cuánto ocupa el teclado; donde no está (la compu),
+// queda todo como estaba.
+function _initTecladoCaja() {
+  const modal = document.getElementById('mov-modal');
+  const vv = (typeof window !== 'undefined') ? window.visualViewport : null;
+  if (!modal || !vv || modal._tecladoBind) return;
+  modal._tecladoBind = true;
+  const mirar = () => {
+    // Lo que tapa el teclado. Hay navegadores que ya achican la página solos:
+    // ahí esto da 0 y no hay nada que levantar.
+    const tapa = Math.max(0, Math.round(window.innerHeight - (vv.height || 0) - (vv.offsetTop || 0)));
+    modal.style.setProperty('--teclado', tapa + 'px');
+  };
+  vv.addEventListener('resize', mirar);
+  vv.addEventListener('scroll', mirar);
+  mirar();
 }
 
 function _onMovDescInput() {
@@ -3264,11 +3276,32 @@ function _addFreeFromSearch() {
 }
 
 // Precio por línea. Sirve tanto para un producto libre como para hacerle precio
-// a algo del inventario. Al confirmar (onchange) se re-dibuja para que la línea
+// a algo del inventario. Al soltar el campo se re-dibuja para que la línea
 // muestre el subtotal nuevo.
 function _setCartPrice(i, val) {
   if (!_cart[i]) return;
   _cart[i].precio = Math.max(0, parseFloat(val) || 0);
+  _syncMontoFromCart();
+  _renderCart();
+  _updateMovResumen();
+}
+
+// Mientras TIPEA el precio: se actualiza el total de abajo pero NO se re-dibuja
+// la línea. Re-dibujar en medio del tipeo sacaba el campo de abajo del dedo, se
+// cerraba el teclado y el toque siguiente (el chip del pago, o Cobrar) se
+// perdía: eso es el "hay que apretar varias veces".
+function _setCartPrecioVivo(i, val) {
+  if (!_cart[i]) return;
+  _cart[i].precio = Math.max(0, parseFloat(val) || 0);
+  _syncMontoFromCart();
+  _updateMovResumen();
+}
+
+// Volver al precio de la lista después de haber hecho precio.
+function _volverPrecioLista(i) {
+  const it = _cart[i];
+  if (!it || !(Number(it.precioLista) > 0)) return;
+  it.precio = Number(it.precioLista);
   _syncMontoFromCart();
   _renderCart();
   _updateMovResumen();
@@ -3295,6 +3328,8 @@ function _addToCart(r) {
     _cart.push({
       source: r.source, id: r.id, nombre: r.nombre,
       precio: Number(r.precio) || 0,
+      // El de la lista, para avisar cuando se hace precio y poder volver.
+      precioLista: Number(r.precio) || 0,
       costoUSD: r.costoUSD || 0, costoARS: r.costoARS || 0,
       icon: r.icon || '📦', stock: r.stock, qty: 1,
       extra: r.extra || '',
@@ -3364,6 +3399,10 @@ function _renderCart() {
     }
     // Con más de una unidad se aclara la cuenta: "2 × $5.000"
     const detallePrecio = it.qty > 1 ? `${it.qty} × ${fmt(precio)}` : meta;
+    // Hacer precio es lo normal llevando varias cosas, pero tiene que verse: si
+    // no, un precio tocado sin querer se va en la venta y nadie se entera.
+    const lista = Number(it.precioLista) || 0;
+    const hecho = lista > 0 && precio > 0 && precio !== lista;
 
     return `
       <div class="cart-line${sinPrecio ? ' cart-line--sinprecio' : ''}">
@@ -3385,10 +3424,11 @@ function _renderCart() {
                        value="" placeholder="$ precio c/u" onchange="_setCartPrice(${i}, this.value)">
               </div>`
             : `
-              <button type="button" class="cart-line-precio" onclick="_editarPrecioLinea(${i})" title="Tocá para hacer precio">
-                <small>${detallePrecio}</small>
-                <b>${fmt(sub)}</b>
-              </button>`}
+              <button type="button" class="cart-line-precio${hecho ? ' cart-line-precio--hecho' : ''}" onclick="_editarPrecioLinea(${i})" title="Tocá para hacer precio">
+                <small>${hecho ? '✏️ precio hecho · antes ' + fmt(lista) : detallePrecio}</small>
+                <b>${fmt(sub)} <span class="cart-precio-lapiz">✏️</span></b>
+              </button>
+              ${hecho ? `<button type="button" class="cart-precio-volver" onclick="_volverPrecioLista(${i})" title="Volver al precio de la lista">↩</button>` : ''}`}
           </div>
           ${sinPrecio ? '<div class="sale-item-warn sale-item-warn--precio">⚠️ Falta el precio — no se puede cobrar así</div>' : ''}
           ${it.stock <= 0 && !isLibre && !isEquipo ? '<div class="sale-item-warn">⚠️ Sin stock — pedido especial</div>' : ''}
@@ -3414,10 +3454,16 @@ function _editarPrecioLinea(i) {
   if (!cont) return;
   const btn = cont.querySelector('.cart-line-precio');
   if (!btn) return;
+  // `oninput` y no `onchange`: el total de abajo sigue al dedo mientras tipea y
+  // no hace falta salir del campo para que el precio valga. Al soltarlo recién
+  // ahí se re-dibuja la línea con el subtotal nuevo.
   btn.outerHTML = `<div class="cart-precio-edit">
       <span class="cart-precio-lbl">Precio c/u</span>
       <input type="number" class="cart-price-input" min="0" inputmode="numeric"
-             value="${Number(it.precio) || ''}" onchange="_setCartPrice(${i}, this.value)">
+             value="${Number(it.precio) || ''}"
+             oninput="_setCartPrecioVivo(${i}, this.value)"
+             onblur="_setCartPrice(${i}, this.value)"
+             onkeydown="if (event.key === 'Enter') { event.preventDefault(); this.blur(); }">
     </div>`;
   const input = cont.querySelector('.cart-price-input');
   if (input) { input.focus(); input.select(); }

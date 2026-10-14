@@ -250,7 +250,8 @@ addCart('FUNDA');            // 2 unidades
 const h2 = els['mov-sale-item-info'].innerHTML;
 ok(/cart-line-top/.test(h2) && /cart-line-bot/.test(h2), 'la línea va en dos filas');
 ok(/2 × \$5\.000/.test(h2), 'aclara la cuenta cuando hay más de una unidad', h2.match(/\d+ × [^<]*/));
-ok(/<b>\$10\.000<\/b>/.test(h2), 'y muestra el subtotal de la línea', h2.match(/<b>[^<]*<\/b>/g));
+ok(/<b>\$10\.000 <span class="cart-precio-lapiz">/.test(h2),
+   'y muestra el subtotal de la línea, con el lápiz al lado', h2.slice(0, 400));
 ok(/_editarPrecioLinea\(0\)/.test(h2), 'el precio se puede tocar para hacer precio');
 run('_setCartPrice(0, 4000)');
 ok(get('_cart[0].precio') === 4000, 'cambiar el precio de la línea actualiza el ítem', get('_cart[0].precio'));
@@ -314,6 +315,58 @@ ok(WRITES.updates.some(u => u[0] === 'productos' && u[1] === 'p1'),
    'un artículo del inventario sigue descontando stock', WRITES.updates);
 ok(WRITES.adds.filter(a => a[0] === 'productos').length === 0, 'y tampoco se da de alta de nuevo',
    WRITES.adds.map(a => a[0]));
+
+console.log('\n12) Hacer precio: llevando varias cosas se arregla el precio');
+// Es lo de todos los días en el mostrador: entran tres cosas y se hace un
+// precio. Tenía que ser de un toque, y tiene que NOTARSE que está hecho.
+reset();
+addCart('FUNDA');
+ok(get('_cart[0].precioLista') === 5000, 'al agregarlo se guarda el precio de la lista');
+
+const antes = els['mov-sale-item-info'].innerHTML;
+run('_setCartPrecioVivo(0, 4000)');
+ok(get('_cart[0].precio') === 4000, 'tipeando, el precio vale en el momento');
+ok(Number(els['mov-fi-monto'].value) === 4000, 'y el total de abajo lo sigue', els['mov-fi-monto'].value);
+// Lo importante: NO se redibuja la línea mientras tipea. Si se redibujara, el
+// campo desaparece de abajo del dedo, se cierra el teclado y el toque
+// siguiente (el chip del pago, o Cobrar) se pierde.
+ok(els['mov-sale-item-info'].innerHTML === antes, 'y la línea no se redibuja abajo del dedo');
+
+run('_setCartPrice(0, 4000)');
+const hecho = els['mov-sale-item-info'].innerHTML;
+ok(/precio hecho/.test(hecho), 'al soltarlo, la línea avisa que el precio está hecho', hecho.slice(0, 500));
+ok(/antes \$5\.000/.test(hecho), 'y dice cuánto valía');
+ok(/cart-line-precio--hecho/.test(hecho), 'queda marcada');
+ok(/_volverPrecioLista\(0\)/.test(hecho), 'con cómo volver al precio de la lista');
+
+run('_volverPrecioLista(0)');
+ok(get('_cart[0].precio') === 5000, 'y vuelve', get('_cart[0].precio'));
+ok(!/precio hecho/.test(els['mov-sale-item-info'].innerHTML), 'sin el aviso');
+ok(Number(els['mov-fi-monto'].value) === 5000, 'con el total de vuelta en su lugar');
+
+// Vendiendo al mismo precio de la lista no hay nada que avisar.
+reset(); addCart('VIDRIO');
+ok(!/precio hecho/.test(els['mov-sale-item-info'].innerHTML), 'al precio de siempre, no avisa nada');
+
+console.log('\n13) El botón de cobrar no se esconde mas');
+// Antes la barra de abajo se escondía al tocar cualquier campo y volvía 60ms
+// después de soltarlo: ponías el precio, tocabas el método de pago y Cobrar no
+// estaba; ese toque solo servía para que la barra volviera, y había que tocar
+// de nuevo.
+const cajaCss = fs.readFileSync(require('path').join(__dirname, '..', 'caja.css'), 'utf8');
+const cajaSrc = fs.readFileSync(SRC, 'utf8');
+ok(!/mov-tecleando/.test(cajaCss), 'ya no hay una regla que esconda la barra', (cajaCss.match(/.*mov-tecleando.*/g) || []));
+ok(!/focusout/.test(cajaSrc), 'ni el soplido de 60ms que la traía de vuelta');
+ok(/visualViewport/.test(cajaSrc), 'el teclado se mide con visualViewport, que es lo único que lo sabe');
+ok(/--teclado/.test(cajaSrc) && /bottom: var\(--teclado/.test(cajaCss),
+   'y la ventana se levanta por encima del teclado en vez de esconder el botón');
+ok(/max-height: calc\(90vh - var\(--teclado/.test(cajaCss),
+   'sin que se le vaya la cabeza por arriba de la pantalla');
+// El campo de precio: en vivo mientras tipea, y Enter cierra el teclado.
+const edit = cajaSrc.slice(cajaSrc.indexOf('function _editarPrecioLinea'), cajaSrc.indexOf('function _cartSinPrecio'));
+ok(/oninput="_setCartPrecioVivo/.test(edit), 'el precio vale mientras se tipea', edit.slice(0, 300));
+ok(!/onchange=/.test(edit), 'y no hace falta salir del campo para que valga');
+ok(/Enter/.test(edit) && /this.blur\(\)/.test(edit), 'Enter confirma y baja el teclado');
 
 console.log(fails ? `\n${fails} FALLARON` : '\nTodo OK');
 process.exit(fails ? 1 : 0);
