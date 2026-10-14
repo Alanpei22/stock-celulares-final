@@ -615,6 +615,48 @@
   </div>
 </div>
 
+<!-- MODAL: CARTELES DE ACCESORIOS - los de la vitrina y la gondola.
+     Horizontales, tres medidas que se mezclan en la misma hoja A4 para no
+     desperdiciar papel. Los arma carteles-acc.js con el inventario, en el
+     momento: no se guarda ninguna copia. -->
+<div id="cartacc-overlay" class="tpent-overlay hidden" onclick="cartAccCerrar()"></div>
+<div id="cartacc-modal" class="tpent-modal carteles-modal hidden">
+  <div class="tpent-hd">
+    <span>&#129703; Carteles de accesorios</span>
+    <button class="tpent-x" onclick="cartAccCerrar()">&#10005;</button>
+  </div>
+  <p class="fi-helper" id="cartacc-nota"></p>
+  <div class="lwa-filtros">
+    <input id="acc-f-buscar" class="pill" type="search" placeholder="&#128269; Buscar art&iacute;culo&hellip;" autocomplete="off" oninput="accFiltrar()">
+    <select id="acc-f-cat" class="pill" onchange="accFiltrar()"><option value="">Todas las categor&iacute;as</option></select>
+  </div>
+  <div class="lwa-barra">
+    <span id="cartacc-cuenta"></span>
+    <span class="lwa-barra-btns">
+      <button type="button" onclick="accTodos(true)">Todos</button>
+      <button type="button" onclick="accTodos(false)">Ninguno</button>
+    </span>
+  </div>
+  <div class="lwa-barra acc-barra-med">
+    <span>Medida de los elegidos</span>
+    <span class="lwa-barra-btns">
+      <button type="button" onclick="accMedidaTodos('chico')">Chico</button>
+      <button type="button" onclick="accMedidaTodos('mediano')">Mediano</button>
+      <button type="button" onclick="accMedidaTodos('grande')">Grande</button>
+    </span>
+  </div>
+
+  <div class="lwa-sel" id="cartacc-lista"></div>
+
+  <label class="fl" style="margin-top:10px;display:block">Vista previa</label>
+  <div class="cart-prev-wrap" id="cartacc-preview-wrap">
+    <iframe id="cartacc-preview" class="cart-prev cart-prev--a4" title="Vista previa de los carteles"></iframe>
+  </div>
+
+  <button class="tpent-btn tpent-btn--si" id="cartacc-imprimir" onclick="cartAccImprimir()">&#128424;&#65039; Imprimir</button>
+  <button class="tpent-volver" onclick="cartAccCerrar()">Cerrar</button>
+</div>
+
 <!-- OWNER PIN MODAL -->
 <div id="caja-owner-overlay" class="nota-overlay hidden" onclick="closeCajaOwnerPin()"></div>
 <div id="caja-owner-modal" class="arqueo-modal hidden" style="max-width:320px">
@@ -1045,6 +1087,8 @@
 <script src="caja_extra.js"></script>
 <script src="clientes.js"></script>
 <script src="escaner.js"></script>
+<script src="carteles.js"></script>
+<script src="carteles-acc.js"></script>
 <script src="inventario.js"></script>
 <script src="finanzas-report.js"></script>
 <script src="modulos_catalog.js"></script>

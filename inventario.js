@@ -624,6 +624,8 @@ function toggleInvMenu() {
 // es el mismo que usan los menús de la caja, el stock y los repuestos.
 function _invItemsEtiquetas() {
   return [
+    { icon: '🪧', label: 'Carteles de exhibición', sub: 'Los de la vitrina: chicos, medianos y grandes en la misma hoja',
+      onClick: () => { closeInvMenu(); if (typeof cartAccAbrir === 'function') cartAccAbrir(); } },
     { icon: '🏷️', label: 'Imprimir etiquetas', sub: 'Las de la lista que estás viendo', onClick: imprimirEtiquetasInv },
     { icon: '🆕', label: 'Etiquetas de lo cargado hoy', sub: 'Al terminar una tanda', onClick: etiquetasDeHoy },
     { icon: '🔢', label: 'Generar códigos de barras', sub: 'A los artículos que no tienen', onClick: generarCodigosInv },
@@ -1120,6 +1122,8 @@ function invSelAcciones() {
     { icon: '⏸️', label: 'Desactivar', sub: 'No se venden ni aparecen en la caja', onClick: () => { closeInvMenu(); invSelActivo(false); } },
     { icon: '▶️', label: 'Activar', onClick: () => { closeInvMenu(); invSelActivo(true); } },
     { icon: '🏷️', label: 'Imprimir etiquetas', onClick: () => { closeInvMenu(); printEtiquetasProductos(_invSelLista(), 1); } },
+    { icon: '🪧', label: 'Carteles de exhibición', sub: 'Para la vitrina, con nombre y precio',
+      onClick: () => { closeInvMenu(); if (typeof cartAccAbrir === 'function') cartAccAbrir(_invSelLista()); } },
     { divider: true },
     { icon: '🗑️', label: 'Eliminar', sub: 'No se puede deshacer (dueño, con PIN)', danger: true, onClick: () => { closeInvMenu(); invSelEliminar(); } },
   ]);

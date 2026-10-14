@@ -6488,3 +6488,14 @@ body.dark .rep-pend-barra { background: #1a1d21; border-top-color: #2a2e34; }
  background: var(--bg1); margin: 4px 0 10px;
 }
 .cart-prev { width: 1123px; border: 0; transform-origin: top left; display: block; }
+/* Los de accesorios salen en A4 vertical: la hoja es más angosta. */
+.cart-prev--a4 { width: 794px; }
+/* C / M / G: la medida de cada cartel, en la misma fila del artículo. */
+.acc-meds { display: flex; gap: 3px; flex-shrink: 0; }
+.acc-med {
+ width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
+ border: 1px solid var(--border); background: var(--card);
+ color: var(--text2); font-size: .72rem; font-weight: 800;
+}
+.acc-med--on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.acc-barra-med { font-size: .74rem; }

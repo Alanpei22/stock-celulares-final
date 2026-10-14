@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-carteles-acc.js':   'Carteles de accesorios: apaisados, tres medidas que se mezclan en la misma hoja',
   'test-carteles.js':       'Carteles de vidriera: A7, 8 por hoja A4, con el recargo de 3 cuotas de la app',
   'test-cola-impresion.js': 'Lo que queda sin imprimir cuando cargas desde el celular',
   'test-gremio.js':         'Equipos de otro taller: misma serie de ordenes, solo la etiqueta',
