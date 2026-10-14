@@ -81,46 +81,90 @@ function cartAccPrecio(p) {
   return Math.round(Number(p && (p.precioVenta ?? p.precio)) || 0);
 }
 
-// Las letras se achican solas según el lugar que tenga el cartel: lo mismo
-// escrito entra distinto en 70mm que en 210mm. `k` es cuántos casilleros de
-// ancho ocupa.
-// `ancho` es el lugar que tiene de verdad: el casillero por lo que ocupa a lo
-// ancho, menos el padding y el borde. El .55 y el .58 son lo que ocupa una
-// letra de Baloo 2 en negrita, medido en el navegador. Los topes salen del
-// ALTO del cartel: más grande que eso y el precio no entra abajo.
-function cartAccTamNombre(nombre, w, h) {
-  const n = String(nombre || '').trim().length || 1;
-  const ancho = w * 248 - 30;
-  const tope = h > 1 ? 72 : 34;
-  // Puede usar dos renglones, pero no se cuenta como dos enteros: el texto
-  // corta por palabra, así que el final de cada renglón queda a medio llenar.
-  // Con los dos completos, "Soporte de auto magnético" se iba a un tercer
-  // renglón y salía cortado con puntos suspensivos.
-  return Math.max(11, Math.min(tope, Math.floor((ancho * 1.7) / (0.55 * n))));
+// ── El tamaño de las letras sale del cartel ───────────────
+// La primera versión usaba topes escritos a mano (34px, 72px) y quedaba mal:
+// en un cartel de 10cm las letras se veían igual de chicas que en uno de 5, y
+// sobraba un vacío en el medio. Ahora todo sale de las medidas de verdad.
+//
+// Un casillero de la grilla mide 255 × 182 px (una A4 de 794 × 1123 menos el
+// margen, dividida 3 × 6), y el cartel es su casillero menos el espacio que lo
+// separa del de al lado.
+const _ACC_CELDA_W = 255;
+const _ACC_CELDA_H = 182;
+const _ACC_BARRA = 0.42;        // cuánto del alto se lleva la barra del precio
+
+function cartAccCaja(m) {
+  return { w: m.w * _ACC_CELDA_W - 16, h: m.h * _ACC_CELDA_H - 16 };
 }
 
-// El precio es lo que se mira primero: va siempre más grande que el nombre y
-// en un solo renglón.
-function cartAccTamPrecio(txt, w, h) {
-  const n = String(txt || '').length || 1;
-  const ancho = w * 248 - 30;
-  const tope = h > 1 ? 80 : 40;
-  return Math.max(13, Math.min(tope, Math.floor(ancho / (0.58 * n))));
-}
-
-function cartelAccHtml(it) {
+// Todo lo que cambia de tamaño en un cartel, junto y en un solo lugar: así
+// las letras acompañan siempre a la medida en vez de ir cada una por su lado.
+function cartAccEscala(it) {
   const m = cartAccMedida(it.medida);
+  const caja = cartAccCaja(m);
+  const g = m.h > 1;
+  const pad = g ? 20 : 11;
+  const util = caja.w - pad * 2 - 6;              // el ancho libre adentro
+  const barra = Math.round(caja.h * _ACC_BARRA);
+
+  // El nombre llena el espacio que queda arriba de la barra. Se prueban las
+  // dos formas y gana la que deje las letras más grandes: un nombre corto
+  // entra en un renglón enorme, uno largo conviene partirlo en dos.
+  // El 1.25 y el 2.3 son los renglones con su interlineado y algo de aire
+  // (con 2.2 el nombre tocaba el borde de arriba). El 1.7 del de dos
+  // renglones es que el texto corta por palabra, así que el final de cada
+  // uno queda a medio llenar y no se pueden contar como dos enteros.
   const nombre = String(it.nombre || '').trim() || 'Producto';
-  const precio = cartAccPrecio(it);
-  const txt = (typeof cartPlata === 'function') ? cartPlata(precio) : '$' + precio;
+  const largo = nombre.length || 1;
+  const libreAlto = caja.h - barra - pad * 2;
+  const una = Math.min(Math.floor(libreAlto / 1.25), Math.floor(util / (0.55 * largo)));
+  const dos = Math.min(Math.floor(libreAlto / 2.3), Math.floor((util * 1.7) / (0.55 * largo)));
+  const tamNombre = Math.max(11, Math.max(una, dos));
+
+  // El precio llena la barra, menos lo que ocupa el "TECHPOINT" de la
+  // izquierda. Es lo que se mira primero: nunca más chico que el nombre.
+  const txt = cartAccPrecioTxt(it);
+  const biz = Math.max(8, Math.round(barra * 0.13));
+  const libre = util - (biz * 6.2) - (g ? 16 : 8);   // 6.2 = lo que mide "TECHPOINT"
+  const tamPrecio = Math.max(13, Math.min(
+    Math.round(barra * 0.66),
+    Math.floor(libre / (0.58 * (txt.length || 1)))));
+
+  return { caja, barra, pad, biz, tamNombre, tamPrecio, grande: g };
+}
+
+// Compat: se usaban sueltas y las prueba el test.
+function cartAccTamNombre(nombre, w, h) {
+  return cartAccEscala({ nombre, medida: _accMedidaDe(w, h) }).tamNombre;
+}
+function cartAccTamPrecio(txt, w, h) {
+  const n = Number(String(txt).replace(/[^\d]/g, '')) || 0;
+  return cartAccEscala({ nombre: '', precioVenta: n, medida: _accMedidaDe(w, h) }).tamPrecio;
+}
+function _accMedidaDe(w, h) {
+  return CART_ACC_ORDEN.find(k => CART_ACC_MEDIDAS[k].w === w && CART_ACC_MEDIDAS[k].h === h) || 'chico';
+}
+
+function cartAccPrecioTxt(it) {
+  const n = cartAccPrecio(it);
+  return (typeof cartPlata === 'function') ? cartPlata(n) : '$' + n;
+}
+
+// El nombre arriba, ocupando lo que haya, y el precio en una barra de color
+// abajo a todo el ancho: es lo que se mira de lejos y lo que le saca el vacío
+// del medio que tenía la primera versión.
+function cartelAccHtml(it) {
+  const e = cartAccEscala(it);
   const esc = (typeof _cartEsc === 'function') ? _cartEsc : (s => String(s == null ? '' : s));
-  const grande = m.h > 1;
-  return `<article class="cartelA${grande ? ' cartelA--g' : ''}">
-    <div class="ca-top">
-      <span class="ca-biz">TECHPOINT</span>
+  const nombre = String(it.nombre || '').trim() || 'Producto';
+  return `<article class="cartelA${e.grande ? ' cartelA--g' : ''}">
+    <div class="ca-cuerpo">
+      <div class="ca-nom" style="font-size:${e.tamNombre}px">${esc(nombre)}</div>
     </div>
-    <div class="ca-nom" style="font-size:${cartAccTamNombre(nombre, m.w, m.h)}px">${esc(nombre)}</div>
-    <div class="ca-precio" style="font-size:${cartAccTamPrecio(txt, m.w, m.h)}px">${esc(txt)}</div>
+    <div class="ca-barra">
+      <span class="ca-biz" style="font-size:${e.biz}px">TECHPOINT</span>
+      <span class="ca-precio" style="font-size:${e.tamPrecio}px">${esc(cartAccPrecioTxt(it))}</span>
+    </div>
   </article>`;
 }
 
@@ -139,15 +183,20 @@ body{font-family:'Baloo 2','Segoe UI',system-ui,sans-serif;color:#16161D;backgro
 .hojaA:last-child{break-after:auto;page-break-after:auto}
 .celdaA{border:1px dashed #9A9AA8;overflow:hidden;min-width:0;min-height:0;padding:8px}
 .cartelA{width:100%;height:100%;display:flex;flex-direction:column;background:#fff;
-  border:2px solid ${color};border-radius:12px;padding:7px 10px;line-height:1.1;overflow:hidden}
-.cartelA--g{border-width:3px;border-radius:18px;padding:14px 18px}
-.ca-top{display:flex;align-items:center;justify-content:space-between}
-.ca-biz{font-size:9px;font-weight:800;letter-spacing:.12em;color:${color}}
-.cartelA--g .ca-biz{font-size:15px}
-/* Dos renglones como máximo: con tres el cartel se desarma. */
-.ca-nom{font-weight:700;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;
-  -webkit-box-orient:vertical;overflow:hidden}
-.ca-precio{font-weight:800;color:${color};line-height:1;white-space:nowrap;margin-top:auto;text-align:right}
+  border:2px solid ${color};border-radius:12px;line-height:1.08;overflow:hidden}
+.cartelA--g{border-width:3px;border-radius:20px}
+/* El nombre, centrado en lo que queda arriba de la barra. */
+.ca-cuerpo{flex:1;min-height:0;display:flex;align-items:center;padding:6px 11px}
+.cartelA--g .ca-cuerpo{padding:14px 22px}
+.ca-nom{font-weight:800;letter-spacing:-.01em;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* La barra del precio: lo que se ve de lejos. Va a todo el ancho porque ahí
+   el número entra más grande que en cualquier rincón. */
+.ca-barra{flex:none;height:42%;background:${color};color:#fff;display:flex;
+  align-items:center;justify-content:space-between;gap:8px;padding:0 11px}
+.cartelA--g .ca-barra{padding:0 20px;gap:16px}
+.ca-biz{font-weight:800;letter-spacing:.1em;opacity:.9;flex:none}
+.ca-precio{font-weight:800;line-height:1;white-space:nowrap}
 /* Solo en la vista previa: se ven los bordes de cada hoja. Al imprimir no. */
 @media screen{
   body{background:#e9e9ee}

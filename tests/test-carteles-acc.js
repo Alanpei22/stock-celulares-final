@@ -65,6 +65,8 @@ const P = {
   baja:   { id: 'b1', nombre: 'Discontinuado', categoria: 'Varios', precioVenta: 8000, activo: false },
 };
 
+const CART_ACC_ORDEN_T = ['chico', 'mediano', 'grande'];
+
 console.log('\n1) Las tres medidas');
 ok(call('cartAccMedida', 'chico').w === 1 && call('cartAccMedida', 'chico').h === 1, 'el chico ocupa un casillero');
 ok(call('cartAccMedida', 'mediano').w === 2 && call('cartAccMedida', 'mediano').h === 1, 'el mediano, dos de ancho');
@@ -161,6 +163,39 @@ const anchoDe = w => w * 248 - 30;
 ok(call('cartAccTamPrecio', '$15.500', 1, 1) > call('cartAccTamNombre', 'Funda silicona iPhone 13', 1, 1),
    'y el precio siempre le gana al nombre en tamaño');
 
+console.log('\n4b) Las letras acompañan a la medida');
+// La primera versión usaba topes escritos a mano y en un cartel de 10cm las
+// letras se veían igual de chicas que en uno de 5. Ahora todo sale de las
+// medidas de verdad, así que un cartel más grande tiene SIEMPRE letras más
+// grandes, con el mismo texto.
+const mismo = m => ({ nombre: 'Funda silicona', precioVenta: 15500, medida: m });
+const esc = m => call('cartAccEscala', mismo(m));
+ok(esc('chico').tamPrecio < esc('mediano').tamPrecio, 'el precio crece del chico al mediano',
+   [esc('chico').tamPrecio, esc('mediano').tamPrecio]);
+ok(esc('mediano').tamPrecio < esc('grande').tamPrecio, 'y del mediano al grande',
+   [esc('mediano').tamPrecio, esc('grande').tamPrecio]);
+ok(esc('chico').tamNombre < esc('grande').tamNombre, 'el nombre también',
+   [esc('chico').tamNombre, esc('grande').tamNombre]);
+// Más del doble, no un poquito: el grande es el doble de alto y el triple de
+// ancho. Un tope escrito a mano lo dejaba en "un poquito más grande".
+ok(esc('grande').tamNombre > esc('chico').tamNombre * 2,
+   'y en el grande el nombre es más del doble que en el chico',
+   [esc('chico').tamNombre, esc('grande').tamNombre]);
+ok(esc('chico').biz < esc('grande').biz, 'y hasta el "TECHPOINT" de la barra');
+// El grande es el doble de alto que el chico: las letras tienen que ir por
+// ahí, no quedarse en un tope.
+ok(esc('grande').tamPrecio > esc('chico').tamPrecio * 2,
+   'en el grande el precio es más del doble que en el chico',
+   [esc('chico').tamPrecio, esc('grande').tamPrecio]);
+// Y la barra es siempre la misma parte del cartel.
+CART_ACC_ORDEN_T.forEach(m => {
+  const e = call('cartAccEscala', mismo(m));
+  ok(Math.abs(e.barra / e.caja.h - 0.42) < 0.02, `la barra del ${m} se lleva el 42% del alto`,
+     [m, e.barra, e.caja.h]);
+  // Lo de arriba de la barra tiene que alcanzar para el nombre.
+  ok(e.tamNombre * 1.25 <= e.caja.h - e.barra, `y el nombre entra arriba en el ${m}`, e);
+});
+
 console.log('\n5) La hoja');
 const doc = call('cartAccDocumento', [{ ...P.funda, medida: 'grande' }, { ...P.cable, medida: 'chico' }]);
 ok(/@page\{size:A4 portrait;margin:0\}/.test(doc), 'A4 vertical sin márgenes');
@@ -171,7 +206,11 @@ ok(/1px dashed #9A9AA8/.test(doc), 'las líneas de corte');
 ok(/print-color-adjust:exact/.test(doc) && /-webkit-print-color-adjust:exact/.test(doc), 'los colores salen impresos');
 ok(/Baloo\+2/.test(doc), 'la misma tipografía que los carteles de equipos');
 ok(/-webkit-line-clamp:2/.test(doc), 'el nombre nunca pasa de dos renglones');
-ok(/line-height:1\.1/.test(doc), 'con el interlineado apretado: con el de fábrica no cierra');
+const reglaA = sel => { const i = doc.indexOf(sel + '{'); return i < 0 ? '' : doc.slice(i, doc.indexOf('}', i) + 1); };
+ok(/line-height:1\.0/.test(reglaA('.cartelA')),
+   'con el interlineado apretado: con el de fábrica no cierra', reglaA('.cartelA'));
+ok(/height:42%/.test(reglaA('.ca-barra')) && /background:/.test(reglaA('.ca-barra')),
+   'el precio va en una barra de color a todo el ancho', reglaA('.ca-barra'));
 
 // El color es el MISMO que el de los carteles de equipos: se elige una vez.
 run("CART_CFG = { ...CART_CFG, color: '#008C3A' }");
