@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0f2b52">
+<title>Fichar · TechPoint</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  /* Pantalla del celu para fichar entrada y salida. Se abre escaneando el QR
+     pegado en la pared del local (☰ → ⏰ Horas del personal → QR). */
+  :root { --bg:#f3f5f9; --card:#fff; --tx:#0f1b2d; --mut:#5a6577; --line:#e2e7f0; --ent:#1faa53; --sal:#dc2626; --warn:#b45309; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0a1220; --card:#111c2e; --tx:#e9eef6; --mut:#93a0b5; --line:#1f2b40; --warn:#f59e0b; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--tx); font: 16px/1.4 system-ui, -apple-system, Roboto, sans-serif; padding: 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); min-height: 100dvh; }
+  .hidden { display: none !important; }
+  .caja { max-width: 420px; margin: 0 auto; text-align: center; }
+  h1 { font-size: 15px; font-weight: 600; color: var(--mut); margin: 8px 0 2px; text-transform: uppercase; letter-spacing: .5px; }
+  h2 { font-size: 28px; margin: 0 0 4px; }
+  .reloj { font-size: 54px; font-weight: 800; letter-spacing: -1px; margin: 10px 0 2px; font-variant-numeric: tabular-nums; }
+  .fecha { color: var(--mut); margin-bottom: 18px; }
+  .estado { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-bottom: 16px; font-size: 15px; }
+  .btn { display: block; width: 100%; border: 0; border-radius: 18px; padding: 26px 16px; font-size: 26px; font-weight: 800; color: #fff; cursor: pointer; }
+  .btn:disabled { opacity: .55; }
+  .btn-ent { background: var(--ent); }
+  .btn-sal { background: var(--sal); }
+  .msg { min-height: 24px; margin: 14px 0; font-size: 15px; }
+  .msg.ok { color: var(--ent); font-weight: 700; }
+  .msg.err { color: var(--sal); font-weight: 700; }
+  .msg.warn { color: var(--warn); font-weight: 700; }
+  .hoy { text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 14px; }
+  .hoy div { display: flex; justify-content: space-between; padding: 3px 0; }
+  .tip { font-size: 13px; color: var(--mut); margin-top: 16px; }
+  .aviso { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-top: 30px; }
+  .aviso a { color: inherit; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="caja">
+  <div id="cargando" class="msg">Cargando…</div>
+
+  <div id="app" class="hidden">
+    <h1>⏰ Fichar</h1>
+    <h2 id="nombre"></h2>
+    <div class="reloj" id="reloj">--:--</div>
+    <div class="fecha" id="fecha"></div>
+    <div class="estado" id="estado"></div>
+    <button type="button" class="btn" id="b-fichar" disabled></button>
+    <div class="msg" id="msg"></div>
+    <div class="hoy hidden" id="hoy"></div>
+    <p class="tip">La hora la pone el sistema, no tu celu. Si te olvidás de fichar la salida, avisale a Alan.</p>
+  </div>
+
+  <div id="error" class="aviso hidden"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="utils.js"></script>
+<script src="firebase-config.js"></script>
+<script src="auth.js"></script>
+<script src="roles.js"></script>
+<script src="horas.js"></script>
+<script src="fichar.js"></script>
+</body>
+</html>

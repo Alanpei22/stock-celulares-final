@@ -6,6 +6,8 @@ on:
     - cron: '30 22 * * *'
     # Reparaciones demoradas: 10:00 AR = 13:00 UTC
     - cron: '0 13 * * *'
+    # Quién no fichó la salida (Telegram): 20:00 AR = 23:00 UTC
+    - cron: '0 23 * * *'
   workflow_dispatch: {} # permite disparar manualmente desde GitHub UI
 
 jobs:
@@ -36,3 +38,17 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
             --data '{}'
+
+  fichadas-sin-salida:
+    if: github.event.schedule == '0 23 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/cron-cierre-pendiente (fichadas)
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsSL -X POST "$BASE_URL/api/cron-cierre-pendiente" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{"fichadas":true}'

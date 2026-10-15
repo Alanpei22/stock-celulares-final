@@ -190,8 +190,13 @@ ok(olvidadas.length === 0,
    'y cada coleccion cerrada esta en sensible(): ' + soloDuenoEnReglas.join(', '), olvidadas);
 ok(sensibles.indexOf('config') >= 0, 'config tambien: adentro esta el PIN de dueno', sensibles);
 // Sin esto no puede tomar una reparación: el número de orden sale de ahí.
-ok(/match \/config\/\{doc\} \{[\s\S]{0,120}allow read, write: if isAllowed\(\);/.test(rules),
+ok(/match \/config\/\{doc\} \{\s*allow read: if isAllowed\(\);\s*allow write: if isAllowed\(\) && !\(doc in \[/.test(rules),
    'config sigue abierto: ahí está el contador de números de orden');
+// La trampa de arriba, adentro de config: `config/{doc}` también matchea el
+// PIN de dueño. Si dejara escribir todo, el bloque de config/owner no frena.
+const excluidos = ((rules.match(/allow write: if isAllowed\(\) && !\(doc in \[([^\]]*)\]/) || [])[1] || '');
+['owner', 'chequeoCaja', 'fichar'].forEach(d => ok(excluidos.includes("'" + d + "'"),
+   `config/${d} no se puede pisar por el bloque general de config`, excluidos));
 
 console.log('\n10) Las tres listas dicen lo mismo');
 // roles.js decide qué se ve; firestore.rules decide qué se puede. Si se

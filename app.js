@@ -664,8 +664,13 @@ function toggleHdrMenu() {
         sub: (typeof qzMenuSub === 'function') ? qzMenuSub() : '',
         onClick: () => (typeof configurarImpresoras === 'function') && configurarImpresoras() },
     ]),
-    { icon: '👥', label: 'Empleados', sub: 'Crear cuentas, cambiar contraseñas, desactivar', hide: _soloDueno(),
-      onClick: () => (typeof abrirEmpleados === 'function') && abrirEmpleados() },
+    // Cuentas y horas del personal, juntos: el menú no pasa de diez renglones
+    sheetGrupo(toggleHdrMenu, 'Empleados', '👥', 'Empleados', 'Cuentas, permisos y horas', [
+      { icon: '👥', label: 'Cuentas y permisos', sub: 'Crear cuentas, cambiar contraseñas, desactivar', hide: _soloDueno(),
+        onClick: () => (typeof abrirEmpleados === 'function') && abrirEmpleados() },
+      { icon: '⏰', label: 'Horas del personal', sub: 'Entradas y salidas, horas por semana y mes', hide: _soloDueno(),
+        onClick: () => (typeof abrirHoras === 'function') && abrirHoras() },
+    ]),
     { icon: '📊', label: 'Estadísticas', hide: !_puede('reporte'), onClick: () => document.getElementById('stats-btn')?.click() },
     { icon: '⚙️', label: 'Configuración', hide: _soloDueno(), onClick: () => document.getElementById('settings-btn')?.click() },
     sheetGrupo(toggleHdrMenu, 'Datos', '💾', 'Exportar y backup', 'Bajarte el stock o una copia de todo', [
@@ -741,8 +746,13 @@ function toggleDashMenu() {
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
     { icon: '🔒', label: 'Modo dueño', hide: _soloDueno(), onClick: toggleOwnerLock },
     { icon: '🔔', label: 'Notificaciones', sub: 'Push + avisos in-app', onClick: () => (typeof openNotifConfig === 'function') && openNotifConfig() },
-    { icon: '👥', label: 'Empleados', sub: 'Crear cuentas, cambiar contraseñas, desactivar', hide: _soloDueno(),
-      onClick: () => (typeof abrirEmpleados === 'function') && abrirEmpleados() },
+    // Cuentas y horas del personal, juntos: el menú no pasa de diez renglones
+    sheetGrupo(toggleDashMenu, 'Empleados', '👥', 'Empleados', 'Cuentas, permisos y horas', [
+      { icon: '👥', label: 'Cuentas y permisos', sub: 'Crear cuentas, cambiar contraseñas, desactivar', hide: _soloDueno(),
+        onClick: () => (typeof abrirEmpleados === 'function') && abrirEmpleados() },
+      { icon: '⏰', label: 'Horas del personal', sub: 'Entradas y salidas, horas por semana y mes', hide: _soloDueno(),
+        onClick: () => (typeof abrirHoras === 'function') && abrirHoras() },
+    ]),
     { divider: true },
     { icon: '💰', label: 'Ir a caja', onClick: () => location.href = 'caja.html' },
     { divider: true },

@@ -86,3 +86,16 @@ Esconder un botón no protege nada: cualquiera con la consola del navegador
 abierta puede llamar a la función. Lo que decide es `firestore.rules`. Por eso
 la plata del día (arqueos, cierres, turnos, caja del dueño) y el PIN de dueño
 están cerrados **ahí**, no solo en la pantalla.
+
+## ⏰ Horas del personal (fichar)
+
+- Cada empleado ficha **con su celu**: escanea el QR pegado en el local
+  (`fichar.html`) y toca Entrada o Salida. No hace falta prender la compu.
+- La hora la pone Firebase (las reglas exigen `ts == request.time`), no el
+  celu. Se guarda dónde estaba el celu: si fichó lejos del local se marca ⚠️.
+- El local cierra a las 19:30: después no cuenta, y una entrada sin salida
+  se cuenta hasta las 19:30. A las 20:00 llega por Telegram quién no fichó la
+  salida (`api/cron-cierre-pendiente.js` con `{ fichadas: true }`).
+- El dueño ve y corrige todo en ☰ → 👥 Empleados → ⏰ Horas del personal.
+  Ahí se imprime el QR y se fija la ubicación del local (una vez, desde el
+  celu, parado en el local).

@@ -126,7 +126,10 @@ ok(/techpoint\\\.local/.test(lg) && /Pedile al dueño/.test(lg), '"olvidé mi co
 
 console.log('\n5) En la app');
 const app = leer('app.js'), uj = leer('usuarios.js'), ix = leer('index.html'), roles = leer('roles.js');
-ok((app.match(/label: 'Empleados'[^\n]*hide: _soloDueno\(\)/g) || []).length === 2, '👥 Empleados en el menú, solo para el dueño');
+// Va en el grupo "Empleados" (con ⏰ Horas del personal); el grupo se esconde
+// solo si todo lo de adentro está escondido (sheetGrupo en utils.js).
+ok((app.match(/sheetGrupo\(\w+, 'Empleados', '👥', 'Empleados'/g) || []).length === 2 &&
+   (app.match(/label: 'Cuentas y permisos'[^\n]*hide: _soloDueno\(\)/g) || []).length === 2, '👥 Empleados en el menú, solo para el dueño');
 ok(/requireOwnerPin\(abrir/.test(uj), 'y pide el PIN de dueño');
 ok(ix.includes('src="usuarios.js"'), 'usuarios.js se carga');
 ok(/apiFetch\('\/api\/usuarios'/.test(uj), 'habla con /api/usuarios con la sesión');

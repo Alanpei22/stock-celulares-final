@@ -84,7 +84,8 @@ service cloud.firestore {
         'caja_dueno_movimientos',   // caja del dueño
         'caja_chequeos_detalle',    // esperado vs contado de cada chequeo
         'backups',
-        'accessLogs'
+        'accessLogs',
+        'fichadas'                  // horas del personal: ver su bloque
       ];
     }
 
@@ -121,8 +122,23 @@ service cloud.firestore {
     // ── Resto de config (templates WA, numeración de órdenes, marcas…) ──
     // El empleado escribe acá sin saberlo: `config/repairsMeta` es el
     // contador de números de orden, y sin eso no puede tomar una reparación.
+    //
+    // Ojo: este bloque TAMBIÉN matchea config/owner, config/chequeoCaja y
+    // config/fichar, y Firestore deja pasar si cualquier regla dice que sí.
+    // Antes decía `write: if isAllowed()` a secas, y eso le devolvía al
+    // empleado la escritura que sus bloques le niegan (el PIN de dueño, el
+    // horario del chequeo). Por eso se excluyen a mano.
     match /config/{doc} {
-      allow read, write: if isAllowed();
+      allow read: if isAllowed();
+      allow write: if isAllowed() && !(doc in ['owner', 'chequeoCaja', 'fichar']);
+    }
+
+    // ── config/fichar: dónde está el local (para las fichadas) ──
+    // El celu del empleado la lee para decirle si está en el local; moverla
+    // es del dueño (si no, se la corre a su casa y ficha desde ahí).
+    match /config/fichar {
+      allow read: if isAllowed();
+      allow write: if esDueno();
     }
 
     // ── Subcolección de dispositivos para push ──
@@ -173,6 +189,22 @@ service cloud.firestore {
     match /caja_chequeos_detalle/{doc} {
       allow create, update: if isAllowed();
       allow read, delete: if esDueno();
+    }
+
+    // ── Fichadas: horas del personal (⏰) ──
+    // Cada uno anota SU entrada o salida desde su celu (fichar.html) y no la
+    // puede tocar después. La hora la pone Firebase (request.time), no el
+    // teléfono: atrasar el reloj del celu no sirve. Ver y corregir (una
+    // salida olvidada, por ejemplo) es del dueño; la corrección queda marcada.
+    match /fichadas/{doc} {
+      allow read: if esDueno() || (isAllowed() && resource.data.uid == request.auth.uid);
+      allow create: if esDueno() || (isAllowed()
+                   && request.resource.data.uid == request.auth.uid
+                   && request.resource.data.ts == request.time
+                   && request.resource.data.tipo in ['entrada', 'salida']
+                   && !('tsCorregido' in request.resource.data)
+                   && !('manual' in request.resource.data));
+      allow update, delete: if esDueno();
     }
 
     // ── Registro de accesos ──
