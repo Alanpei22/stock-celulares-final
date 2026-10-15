@@ -215,10 +215,38 @@ ok(/@page\{size:A4 landscape;margin:0\}/.test(doc), 'A4 apaisada sin márgenes')
 ok(/repeat\(4,1fr\)/.test(doc) && /repeat\(2,1fr\)/.test(doc), '4 columnas × 2 filas');
 ok(/print-color-adjust:exact/.test(doc) && /-webkit-print-color-adjust:exact/.test(doc),
    'los fondos de color salen impresos');
-ok(/Baloo\+2/.test(doc), 'la tipografía Baloo 2');
+ok(new RegExp('family=' + call('cartFuente').web.split(':')[0]).test(doc),
+   'la tipografía es la elegida en los ajustes', doc.match(/family=[^&"]*/));
 ok(/1px dashed #9A9AA8/.test(doc), 'las líneas de corte');
 ok(/transform:scale\(\.955\)/.test(doc), 'el cartel se achica para que entre en impresoras sin borde');
 ok(/width:280px;height:397px/.test(doc), 'y está diseñado a 280×397 (A7)');
+
+console.log('\n8b) La tipografía');
+// Es una sola para los dos tipos de cartel y se elige en los ajustes. Lo que
+// no se puede cambiar sin lo otro es el ANCHO de letra: de ahí sale el tamaño
+// automático, y si no acompaña, los nombres largos se salen del cartel.
+ok(Object.keys(run('CART_FUENTES')).length >= 3, 'hay varias para elegir', Object.keys(run('CART_FUENTES')));
+Object.keys(run('CART_FUENTES')).forEach(k => {
+  const f = run('CART_FUENTES')[k];
+  ok(f.em > 0.3 && f.em < 0.8, `${k}: tiene medido el ancho de letra`, f.em);
+  ok(f.emNum > 0.3 && f.emNum < 0.8, `${k}: y el de las cifras`, f.emNum);
+  ok(f.peso >= 700, `${k}: y cuánto negrita tiene de verdad`, f.peso);
+});
+// Oswald es angosta: con la misma caja tiene que dejar el modelo más grande.
+const _f = run('CART_CFG.fuente');
+run("CART_CFG = { ...CART_CFG, fuente: 'archivo' }");
+const anchoArchivo = call('cartTamModelo', 'Galaxy S23 Ultra 5G');
+run("CART_CFG = { ...CART_CFG, fuente: 'oswald' }");
+const anchoOswald = call('cartTamModelo', 'Galaxy S23 Ultra 5G');
+ok(anchoOswald > anchoArchivo, 'con una letra más angosta, el modelo sale más grande',
+   [anchoArchivo, anchoOswald]);
+// Y el peso que se pide es el que la fuente tiene: pedirle 800 a Oswald la
+// deja deforme, porque el navegador la engorda a mano.
+const docOs = call('cartDocumento', [EQ.ip]);
+ok(/font-weight:700/.test(docOs) && !/font-weight:800/.test(docOs),
+   'a Oswald se le pide 700, que es lo que tiene', (docOs.match(/font-weight:\d+/g) || []).slice(0, 5));
+ok(/family=Oswald/.test(docOs), 'y el documento la pide a Google Fonts');
+run(`CART_CFG = { ...CART_CFG, fuente: '${_f}' }`);
 
 console.log('\n9) El color del cartel');
 ok(/#0040FF/.test(doc), 'por defecto, el azul');

@@ -32,8 +32,30 @@ const CART_PRECIO_MIN = 10000;         // un celular no vale menos que esto
 // toque, y `config/appSettings` para que la compu del mostrador y el celular
 // usen lo mismo.
 const CART_KEY = 'cartelesCfg';
-const CART_DEF = { garNuevo: '6 meses', garUsado: '30 días', color: '#0040FF' };
+const CART_DEF = { garNuevo: '6 meses', garUsado: '30 días', color: '#0040FF',
+                   fuente: 'archivo', estiloAcc: 'liviano' };
 const CART_COLORES = ['#0040FF', '#E5006E', '#008C3A', '#F05A00'];
+
+// ── La tipografía ───────────────────────────────────
+// `em` y `emNum` son lo que ocupa a lo ancho cada letra y cada cifra, medidos
+// en el navegador con la fuente de verdad cargada. De ahí sale el tamaño
+// automático de los carteles: cambiar la fuente sin cambiar ese número hace
+// que los nombres largos se salgan del cartel.
+// `peso` es lo más negrita que tiene cada una (Oswald no llega a 800).
+const CART_FUENTES = {
+  archivo: { lbl: 'Archivo', sub: 'Firme y moderna', fam: "'Archivo'",
+             web: 'Archivo:wght@500;600;700;800;900', em: 0.55, emNum: 0.59, peso: 800, medio: 600 },
+  oswald:  { lbl: 'Oswald', sub: 'Angosta: entra más texto grande', fam: "'Oswald'",
+             web: 'Oswald:wght@400;500;600;700', em: 0.45, emNum: 0.50, peso: 700, medio: 500 },
+  figtree: { lbl: 'Figtree', sub: 'Redonda y neutra', fam: "'Figtree'",
+             web: 'Figtree:wght@500;600;700;800;900', em: 0.52, emNum: 0.58, peso: 800, medio: 600 },
+  outfit:  { lbl: 'Outfit', sub: 'Geométrica', fam: "'Outfit'",
+             web: 'Outfit:wght@500;600;700;800;900', em: 0.52, emNum: 0.59, peso: 800, medio: 600 },
+  baloo:   { lbl: 'Baloo 2', sub: 'La de antes', fam: "'Baloo 2'",
+             web: 'Baloo+2:wght@500;600;700;800', em: 0.50, emNum: 0.54, peso: 800, medio: 600 },
+};
+const CART_FUENTE_DEF = 'archivo';
+function cartFuente() { return CART_FUENTES[CART_CFG.fuente] || CART_FUENTES[CART_FUENTE_DEF]; }
 let CART_CFG = { ...CART_DEF };
 
 function cartCargarCfg() {
@@ -152,9 +174,9 @@ function cartGarantiaTxt(p, cfg) {
 // .55 lo que ocupa cada letra de Baloo 2 en negrita, medido en el navegador
 // sobre los modelos de verdad (van de .46 a .53, el resto es margen).
 const _CART_ANCHO_MODELO = 232;
-const _CART_EM_MODELO = 0.55;
 function cartTamModelo(s) {
   const n = String(s || '').trim().length || 1;
+  const _CART_EM_MODELO = cartFuente().em;
   // El piso es 19: más chico que eso no se lee de lejos, y un modelo que no
   // entra igual se parte en dos renglones, que ahí sí hay lugar.
   return Math.max(19, Math.min(36, Math.floor(_CART_ANCHO_MODELO / (_CART_EM_MODELO * n))));
@@ -238,11 +260,12 @@ function cartHojas(lista) {
 // documento que se imprime (como las etiquetas). La vista previa usa el mismo
 // documento, así que lo que se ve es exactamente lo que sale.
 function _cartCss(color) {
+  const f = cartFuente();
   return `
 @page{size:A4 landscape;margin:0}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{font-family:'Baloo 2','Segoe UI',system-ui,sans-serif;color:#16161D;background:#fff;
+body{font-family:${f.fam},'Segoe UI',system-ui,sans-serif;color:#16161D;background:#fff;
   print-color-adjust:exact;-webkit-print-color-adjust:exact}
 /* La hoja: 297×210mm. La altura va un pelo corta porque a la medida exacta
    Chrome a veces se pasa un pixel y manda una hoja en blanco atrás. */
@@ -263,39 +286,45 @@ body{font-family:'Baloo 2','Segoe UI',system-ui,sans-serif;color:#16161D;backgro
   background:#fff;display:flex;flex-direction:column;padding:10px;gap:8px;line-height:1.1}
 .c-top{background:${color};color:#fff;border-radius:18px;padding:14px 14px 16px}
 .c-top-fila{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.c-biz{font-size:12px;font-weight:800;letter-spacing:.12em}
-.c-pastilla{background:#fff;color:${color};font-size:12px;font-weight:800;
+.c-biz{font-size:12px;font-weight:${f.peso};letter-spacing:.12em}
+.c-pastilla{background:#fff;color:${color};font-size:12px;font-weight:${f.peso};
   border-radius:999px;padding:2px 10px;white-space:nowrap}
-.c-marca{font-size:19px;font-weight:600;margin-top:6px}
+.c-marca{font-size:19px;font-weight:${f.medio};margin-top:6px}
 /* Dos renglones como máximo: con tres el cartel se desarma. */
-.c-modelo{font-weight:800;line-height:1.05;display:-webkit-box;-webkit-line-clamp:2;
+.c-modelo{font-weight:${f.peso};line-height:1.05;display:-webkit-box;-webkit-line-clamp:2;
   -webkit-box-orient:vertical;overflow:hidden}
 .c-casillas{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .c-casillas--una{grid-template-columns:1fr}
 .c-box{background:#E3E5EE;border-radius:14px;padding:8px 12px;display:flex;flex-direction:column}
-.c-lbl{font-size:13px;font-weight:600;color:#3E3E52}
-.c-val{font-size:24px;font-weight:800;line-height:1.1}
+.c-lbl{font-size:13px;font-weight:${f.medio};color:#3E3E52}
+.c-val{font-size:24px;font-weight:${f.peso};line-height:1.1}
 .c-fila-gar{display:flex;gap:8px}
 .c-gar{flex:1;border:2px solid ${color};border-radius:14px;padding:8px 10px;color:${color};
-  font-size:16px;font-weight:800;white-space:nowrap;display:flex;align-items:center;gap:6px}
-.c-bat{background:#E3E5EE;border-radius:14px;padding:8px 10px;font-size:16px;font-weight:800;
+  font-size:16px;font-weight:${f.peso};white-space:nowrap;display:flex;align-items:center;gap:6px}
+.c-bat{background:#E3E5EE;border-radius:14px;padding:8px 10px;font-size:16px;font-weight:${f.peso};
   display:flex;align-items:center;gap:5px;white-space:nowrap}
 .c-ico{width:18px;height:18px;flex:none}
 .c-sp{flex-grow:1}
 .c-efec{display:flex;flex-direction:column}
-.c-efec-lbl{font-size:15px;font-weight:700;color:#3E3E52}
-.c-efec-val{font-weight:800;color:${color};line-height:1;white-space:nowrap}
+.c-efec-lbl{font-size:15px;font-weight:${f.medio};color:#3E3E52}
+.c-efec-val{font-weight:${f.peso};color:${color};line-height:1;white-space:nowrap}
 .c-tar{background:#000;color:#fff;border-radius:14px;padding:8px 12px;
   display:flex;align-items:center;justify-content:space-between;gap:8px}
 .c-tar-izq{display:flex;flex-direction:column}
-.c-tar-top{font-size:17px;font-weight:800;white-space:nowrap}
-.c-tar-sub{font-size:15px;font-weight:600;color:#E2E2EA;white-space:nowrap}
-.c-tar-val{font-weight:800;white-space:nowrap}
+.c-tar-top{font-size:17px;font-weight:${f.peso};white-space:nowrap}
+.c-tar-sub{font-size:15px;font-weight:${f.medio};color:#E2E2EA;white-space:nowrap}
+.c-tar-val{font-weight:${f.peso};white-space:nowrap}
 /* Solo en la vista previa: se ven los bordes de cada hoja. Al imprimir no. */
 @media screen{
   body{background:#e9e9ee}
   .hoja{background:#fff;margin:0 auto 14px;box-shadow:0 2px 10px rgba(0,0,0,.18)}
 }`;
+}
+
+// La dirección de Google Fonts de la fuente elegida. La usan los dos tipos de
+// cartel, así que vive acá.
+function cartFuenteWeb() {
+  return 'https://fonts.googleapis.com/css2?family=' + cartFuente().web + '&display=swap';
 }
 
 // El documento entero, el mismo para la vista previa y para la impresora.
@@ -317,7 +346,7 @@ function cartDocumento(lista, cfg) {
 <title>Carteles — TechPoint</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="${cartFuenteWeb()}">
 <style>${_cartCss(c.color || CART_DEF.color)}</style></head><body>
 ${cuerpo}
 </body></html>`;
@@ -508,6 +537,28 @@ function cartColor(c) {
   cartPintarPreview();
 }
 
+// La fuente es una sola para los dos tipos de cartel: se elige una vez.
+function cartPintarFuentes(cont, alCambiar) {
+  const el = typeof cont === 'string' ? document.getElementById(cont) : cont;
+  if (!el) return;
+  el.innerHTML = Object.keys(CART_FUENTES).map(k => {
+    const f = CART_FUENTES[k];
+    return `<button type="button" class="cart-fuente${k === (CART_CFG.fuente || CART_FUENTE_DEF) ? ' cart-fuente--on' : ''}"
+      onclick="cartFuenteElegir('${k}')"><b>${f.lbl}</b><small>${f.sub}</small></button>`;
+  }).join('');
+  if (alCambiar) el.dataset.alCambiar = alCambiar;
+}
+
+function cartFuenteElegir(k) {
+  if (!CART_FUENTES[k]) return;
+  CART_CFG.fuente = k;
+  cartGuardarCfg();
+  // Repinta donde esté abierto: los dos cuadros usan la misma fuente.
+  document.querySelectorAll('.cart-fuentes').forEach(el => cartPintarFuentes(el));
+  if (typeof cartPintarPreview === 'function') cartPintarPreview();
+  if (typeof accPintarPreview === 'function') accPintarPreview();
+}
+
 function cartGuardarGarantias() {
   CART_CFG.garNuevo = _cartV('cart-gar-nuevo') || CART_DEF.garNuevo;
   CART_CFG.garUsado = _cartV('cart-gar-usado') || CART_DEF.garUsado;
@@ -518,6 +569,7 @@ function cartGuardarGarantias() {
 
 function cartAjustesToggle() {
   document.getElementById('carteles-ajustes')?.classList.toggle('hidden');
+  cartPintarFuentes('carteles-fuentes');
   const r = document.getElementById('carteles-recargo');
   if (r) r.textContent = `Recargo de 3 cuotas: ${cartRecargo()}% — se cambia en ⚙️ Configuración, junto con el de la ficha del equipo.`;
 }

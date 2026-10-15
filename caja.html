@@ -643,7 +643,21 @@
       <button type="button" onclick="accMedidaTodos('chico')">Chico</button>
       <button type="button" onclick="accMedidaTodos('mediano')">Mediano</button>
       <button type="button" onclick="accMedidaTodos('grande')">Grande</button>
+      <button type="button" onclick="accAjustesToggle()">&#9881;&#65039;</button>
     </span>
+  </div>
+
+  <div id="cartacc-ajustes" class="cart-ajustes hidden">
+    <label class="fl">C&oacute;mo sale el precio</label>
+    <div class="acc-estilos">
+      <button type="button" id="acc-estilo-liviano" class="acc-estilo" onclick="accEstilo('liviano')">
+        <b>Liviano</b><small>Precio en color, sin fondo. Mucha menos tinta.</small></button>
+      <button type="button" id="acc-estilo-lleno" class="acc-estilo" onclick="accEstilo('lleno')">
+        <b>Bloque de color</b><small>Se ve de m&aacute;s lejos, gasta m&aacute;s tinta.</small></button>
+    </div>
+    <label class="fl" style="margin-top:8px">Tipograf&iacute;a</label>
+    <p class="fi-helper">Es la misma para los carteles de equipos.</p>
+    <div id="cartacc-fuentes" class="cart-fuentes"></div>
   </div>
 
   <div class="lwa-sel" id="cartacc-lista"></div>

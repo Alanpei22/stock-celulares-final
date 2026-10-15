@@ -6499,3 +6499,19 @@ body.dark .rep-pend-barra { background: #1a1d21; border-top-color: #2a2e34; }
 }
 .acc-med--on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .acc-barra-med { font-size: .74rem; }
+/* Elegir tipografía y estilo: botones anchos con el nombre y para qué sirve. */
+.cart-fuentes, .acc-estilos { display: flex; flex-wrap: wrap; gap: 6px; }
+.cart-fuente, .acc-estilo {
+ flex: 1 1 140px; min-width: 0; text-align: left; cursor: pointer;
+ padding: 8px 10px; border-radius: 10px;
+ border: 1px solid var(--border); background: var(--card); color: var(--text);
+}
+.cart-fuente b, .acc-estilo b { display: block; font-size: .82rem; }
+.cart-fuente small, .acc-estilo small { display: block; font-size: .68rem; color: var(--text3); }
+.cart-fuente--on, .acc-estilo--on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+/* Cada botón muestra su propia letra: es lo único que importa al elegirla. */
+.cart-fuente:nth-child(1) b { font-family: 'Archivo', sans-serif; }
+.cart-fuente:nth-child(2) b { font-family: 'Oswald', sans-serif; }
+.cart-fuente:nth-child(3) b { font-family: 'Figtree', sans-serif; }
+.cart-fuente:nth-child(4) b { font-family: 'Outfit', sans-serif; }
+.cart-fuente:nth-child(5) b { font-family: 'Baloo 2', sans-serif; }

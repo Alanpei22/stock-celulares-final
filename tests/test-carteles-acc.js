@@ -204,7 +204,8 @@ ok(/grid-column:1\/span 3;grid-row:1\/span 2/.test(doc), 'el grande ocupa sus ca
 ok(/grid-column:1\/span 1;grid-row:3\/span 1/.test(doc), 'y el chico, el suyo', doc.match(/grid-column:[^"]*/g));
 ok(/1px dashed #9A9AA8/.test(doc), 'las líneas de corte');
 ok(/print-color-adjust:exact/.test(doc) && /-webkit-print-color-adjust:exact/.test(doc), 'los colores salen impresos');
-ok(/Baloo\+2/.test(doc), 'la misma tipografía que los carteles de equipos');
+ok(doc.indexOf(call('cartFuente').web) > 0,
+   'la misma tipografía que los carteles de equipos', doc.match(/family=[^&"]*/));
 ok(/-webkit-line-clamp:2/.test(doc), 'el nombre nunca pasa de dos renglones');
 const reglaA = sel => { const i = doc.indexOf(sel + '{'); return i < 0 ? '' : doc.slice(i, doc.indexOf('}', i) + 1); };
 ok(/line-height:1\.0/.test(reglaA('.cartelA')),
@@ -217,6 +218,36 @@ run("CART_CFG = { ...CART_CFG, color: '#008C3A' }");
 const verde = call('cartAccDocumento', [{ ...P.funda, medida: 'chico' }]);
 ok(/#008C3A/.test(verde) && !/#0040FF/.test(verde), 'usa el color elegido para los carteles, no uno propio');
 run("CART_CFG = { ...CART_CFG, color: '#0040FF' }");
+
+console.log('\n5b) Liviano o bloque de color');
+// Dieciocho carteles por hoja con el bloque pintado es mucha tinta. El
+// liviano es la misma barra sin pintar, con el precio en color.
+run("CART_CFG = { ...CART_CFG, estiloAcc: 'liviano' }");
+const liv = call('cartAccDocumento', [{ ...P.funda, medida: 'chico' }]);
+ok(/cartelA--liviano/.test(liv), 'el liviano se marca en el cartel');
+ok(/\.cartelA--liviano \.ca-barra\{background:#fff/.test(liv), 'y la barra queda sin pintar', liv.slice(liv.indexOf('.cartelA--liviano'), liv.indexOf('.cartelA--liviano') + 120));
+run("CART_CFG = { ...CART_CFG, estiloAcc: 'lleno' }");
+const lle = call('cartAccDocumento', [{ ...P.funda, medida: 'chico' }]);
+ok(/cartelA--lleno/.test(lle) && !/cartelA--liviano/.test(lle.match(/<article[^>]*>/)[0]),
+   'y el lleno sigue estando para cuando lo querés', lle.match(/<article[^>]*>/)[0]);
+// Las dos formas miden igual: cambiar el estilo no mueve ninguna letra.
+run("CART_CFG = { ...CART_CFG, estiloAcc: 'liviano' }");
+const e1 = call('cartAccEscala', { ...P.funda, medida: 'chico' });
+run("CART_CFG = { ...CART_CFG, estiloAcc: 'lleno' }");
+const e2 = call('cartAccEscala', { ...P.funda, medida: 'chico' });
+ok(e1.tamPrecio === e2.tamPrecio && e1.tamNombre === e2.tamNombre,
+   'y las letras son las mismas en los dos', [e1.tamPrecio, e2.tamPrecio]);
+run("CART_CFG = { ...CART_CFG, estiloAcc: 'liviano' }");
+
+// La tipografía la manda carteles.js y acá se usa su ancho de letra: con una
+// más angosta entra más texto al mismo tamaño.
+const _fa = run('CART_CFG.fuente');
+run("CART_CFG = { ...CART_CFG, fuente: 'archivo' }");
+const nArch = call('cartAccEscala', { nombre: 'Cargador 20W tipo C con cable', precioVenta: 28000, medida: 'chico' }).tamNombre;
+run("CART_CFG = { ...CART_CFG, fuente: 'oswald' }");
+const nOsw = call('cartAccEscala', { nombre: 'Cargador 20W tipo C con cable', precioVenta: 28000, medida: 'chico' }).tamNombre;
+ok(nOsw > nArch, 'con Oswald (angosta) el nombre sale más grande', [nArch, nOsw]);
+run(`CART_CFG = { ...CART_CFG, fuente: '${_fa}' }`);
 
 console.log('\n6) Elegir y medir en el cuadro');
 ctx.__prods = [P.funda, P.vidrio, P.cable, P.sinPr, P.baja];
@@ -259,7 +290,7 @@ call('cartAccImprimir');
 ok(IMPRESO.length === 0, 'sin nada tildado no imprime');
 call('accTocar', 'f1');
 call('cartAccImprimir');
-ok(IMPRESO.length === 1 && /class="cartelA"/.test(IMPRESO[0]), 'con uno tildado, sale');
+ok(IMPRESO.length === 1 && /class="cartelA /.test(IMPRESO[0]), 'con uno tildado, sale');
 ok(els['cartacc-preview'].srcdoc === IMPRESO[0], 'y la vista previa es exactamente lo que se imprime');
 ok(ESCRITO.length === 0, 'no se escribió nada en la base: los datos salen del inventario', ESCRITO);
 

@@ -117,18 +117,20 @@ function cartAccEscala(it) {
   const nombre = String(it.nombre || '').trim() || 'Producto';
   const largo = nombre.length || 1;
   const libreAlto = caja.h - barra - pad * 2;
-  const una = Math.min(Math.floor(libreAlto / 1.25), Math.floor(util / (0.55 * largo)));
-  const dos = Math.min(Math.floor(libreAlto / 2.3), Math.floor((util * 1.7) / (0.55 * largo)));
+  const em = (typeof cartFuente === 'function') ? cartFuente().em : 0.55;
+  const una = Math.min(Math.floor(libreAlto / 1.25), Math.floor(util / (em * largo)));
+  const dos = Math.min(Math.floor(libreAlto / 2.3), Math.floor((util * 1.7) / (em * largo)));
   const tamNombre = Math.max(11, Math.max(una, dos));
 
   // El precio llena la barra, menos lo que ocupa el "TECHPOINT" de la
   // izquierda. Es lo que se mira primero: nunca más chico que el nombre.
   const txt = cartAccPrecioTxt(it);
   const biz = Math.max(8, Math.round(barra * 0.13));
+  const emNum = (typeof cartFuente === 'function') ? cartFuente().emNum : 0.58;
   const libre = util - (biz * 6.2) - (g ? 16 : 8);   // 6.2 = lo que mide "TECHPOINT"
   const tamPrecio = Math.max(13, Math.min(
     Math.round(barra * 0.66),
-    Math.floor(libre / (0.58 * (txt.length || 1)))));
+    Math.floor(libre / (emNum * (txt.length || 1)))));
 
   return { caja, barra, pad, biz, tamNombre, tamPrecio, grande: g };
 }
@@ -153,11 +155,19 @@ function cartAccPrecioTxt(it) {
 // El nombre arriba, ocupando lo que haya, y el precio en una barra de color
 // abajo a todo el ancho: es lo que se mira de lejos y lo que le saca el vacío
 // del medio que tenía la primera versión.
+// Lleno = la barra del precio pintada; liviano = la misma barra en blanco, con
+// el precio en color y una línea arriba. Dieciocho carteles por hoja con el
+// bloque lleno es mucha tinta, y el liviano se lee igual de lejos.
+function cartAccEstilo() {
+  const e = (typeof CART_CFG !== 'undefined' && CART_CFG.estiloAcc) || 'liviano';
+  return e === 'lleno' ? 'lleno' : 'liviano';
+}
+
 function cartelAccHtml(it) {
   const e = cartAccEscala(it);
   const esc = (typeof _cartEsc === 'function') ? _cartEsc : (s => String(s == null ? '' : s));
   const nombre = String(it.nombre || '').trim() || 'Producto';
-  return `<article class="cartelA${e.grande ? ' cartelA--g' : ''}">
+  return `<article class="cartelA cartelA--${cartAccEstilo()}${e.grande ? ' cartelA--g' : ''}">
     <div class="ca-cuerpo">
       <div class="ca-nom" style="font-size:${e.tamNombre}px">${esc(nombre)}</div>
     </div>
@@ -169,11 +179,13 @@ function cartelAccHtml(it) {
 }
 
 function _cartAccCss(color) {
+  const f = (typeof cartFuente === 'function') ? cartFuente()
+          : { fam: "'Segoe UI'", peso: 800, medio: 600 };
   return `
 @page{size:A4 portrait;margin:0}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{font-family:'Baloo 2','Segoe UI',system-ui,sans-serif;color:#16161D;background:#fff;
+body{font-family:${f.fam},'Segoe UI',system-ui,sans-serif;color:#16161D;background:#fff;
   print-color-adjust:exact;-webkit-print-color-adjust:exact}
 /* La hoja: 210×297mm. El alto va un pelo corto porque a la medida exacta
    Chrome a veces se pasa un pixel y manda una hoja en blanco atrás. */
@@ -188,15 +200,20 @@ body{font-family:'Baloo 2','Segoe UI',system-ui,sans-serif;color:#16161D;backgro
 /* El nombre, centrado en lo que queda arriba de la barra. */
 .ca-cuerpo{flex:1;min-height:0;display:flex;align-items:center;padding:6px 11px}
 .cartelA--g .ca-cuerpo{padding:14px 22px}
-.ca-nom{font-weight:800;letter-spacing:-.01em;
+.ca-nom{font-weight:${f.peso};letter-spacing:-.01em;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* La barra del precio: lo que se ve de lejos. Va a todo el ancho porque ahí
    el número entra más grande que en cualquier rincón. */
 .ca-barra{flex:none;height:42%;background:${color};color:#fff;display:flex;
   align-items:center;justify-content:space-between;gap:8px;padding:0 11px}
 .cartelA--g .ca-barra{padding:0 20px;gap:16px}
-.ca-biz{font-weight:800;letter-spacing:.1em;opacity:.9;flex:none}
-.ca-precio{font-weight:800;line-height:1;white-space:nowrap}
+.ca-biz{font-weight:${f.peso};letter-spacing:.1em;opacity:.9;flex:none}
+.ca-precio{font-weight:${f.peso};line-height:1;white-space:nowrap}
+/* Liviano: la misma barra pero sin pintar. Se lee igual y gasta mucha menos
+   tinta cuando salen 18 carteles en una hoja. */
+.cartelA--liviano .ca-barra{background:#fff;color:${color};border-top:2px solid ${color}}
+.cartelA--liviano .ca-biz{color:#6B6B7B;opacity:1}
+.cartelA--g.cartelA--liviano .ca-barra{border-top-width:3px}
 /* Solo en la vista previa: se ven los bordes de cada hoja. Al imprimir no. */
 @media screen{
   body{background:#e9e9ee}
@@ -218,7 +235,7 @@ function cartAccDocumento(items, cfg) {
 <title>Carteles de accesorios — TechPoint</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="${typeof cartFuenteWeb === 'function' ? cartFuenteWeb() : ''}">
 <style>${_cartAccCss(c.color || '#0040FF')}</style></head><body>
 ${cuerpo}
 </body></html>`;
@@ -295,6 +312,30 @@ function _accCatSelect() {
 }
 
 function accFiltrar() { accRender(); }
+
+// Ajustes del cuadro: la tipografía (la misma para los dos tipos de cartel) y
+// si el precio va en bloque pintado o liviano.
+function accAjustesToggle() {
+  document.getElementById('cartacc-ajustes')?.classList.toggle('hidden');
+  if (typeof cartPintarFuentes === 'function') cartPintarFuentes('cartacc-fuentes');
+  accPintarEstilo();
+}
+
+function accPintarEstilo() {
+  const act = cartAccEstilo();
+  ['liviano', 'lleno'].forEach(k => {
+    const b = document.getElementById('acc-estilo-' + k);
+    if (b) b.classList.toggle('acc-estilo--on', k === act);
+  });
+}
+
+function accEstilo(k) {
+  if (typeof CART_CFG === 'undefined') return;
+  CART_CFG.estiloAcc = k === 'lleno' ? 'lleno' : 'liviano';
+  if (typeof cartGuardarCfg === 'function') cartGuardarCfg();
+  accPintarEstilo();
+  accPintarPreview();
+}
 
 function accTocar(id) {
   const i = _accSel.indexOf(id);
