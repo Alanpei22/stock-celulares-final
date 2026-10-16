@@ -289,3 +289,18 @@
 .pub-aviso.hidden { display: none; }
 .pub-aviso--ok { background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.35); }
 body.dark .pub-aviso { color: #e8eaed; }
+
+/* Tarjetas que abren su detalle (dashDetalle en app.js). Antes no tenían
+   destino y tocarlas no hacía nada. */
+.d-tocable { cursor: pointer; transition: transform .12s, border-color .12s; }
+.d-tocable:hover { border-color: rgba(34, 211, 238, .45); }
+.d-tocable:active { transform: scale(.985); }
+tr.d-tocable:hover td { background: rgba(255, 255, 255, .04); }
+.d-det-caja { background: var(--d-card, #0F1318); color: var(--d-tx, #E8EDF2); border: 1px solid var(--d-bd-2, rgba(255,255,255,.12)); }
+.d-det-caja .emp-ayuda, .d-det-caja .d-sub { color: var(--d-mut, #6B7683); }
+.d-det-caja .d-det-fila { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-top: 1px solid var(--d-bd, rgba(255,255,255,.07)); font-size: 14px; }
+.d-det-cuando { min-width: 46px; font-size: 12px; opacity: .7; }
+.d-det-que { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.d-det-monto { text-align: right; font-weight: 700; white-space: nowrap; }
+.d-det-pie { margin-top: 14px; display: flex; justify-content: flex-end; }
+

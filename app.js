@@ -992,17 +992,17 @@ function _renderKPIs() {
 
   const cards = [
     { lbl: 'Ingresos totales', val: _dMoney(tIng), usd: _dUsd(tIng), micro: ing.length + ' ops',
-      color: '#22D3EE', serie: _serieDiaria(m => m.tipo === 'ingreso' ? (Number(m.monto) || 0) : 0) },
+      click: "dashDetalle('ingresos')", color: '#22D3EE', serie: _serieDiaria(m => m.tipo === 'ingreso' ? (Number(m.monto) || 0) : 0) },
     { lbl: 'Ganancia bruta', val: _dMoney(bruta), usd: _dUsd(bruta),
       micro: tIng > 0 ? Math.round((bruta / tIng) * 100) + '% margen' : '—',
-      color: '#22C55E', serie: _serieDiaria(m => m.tipo === 'ingreso' ? gan(m) : 0) },
+      click: "dashDetalle('ganancia')", color: '#22C55E', serie: _serieDiaria(m => m.tipo === 'ingreso' ? gan(m) : 0) },
     { lbl: 'Egresos', val: _dMoney(tEg), usd: _dUsd(tEg),
       micro: tIng > 0 ? Math.round((tEg / tIng) * 100) + '% ingresos' : '—',
-      color: '#F43F5E', serie: _serieDiaria(m => (m.tipo === 'egreso' && m.categoria !== RETIRO_CAT_DASH) ? (Number(m.monto) || 0) : 0) },
+      click: "dashDetalle('egresos')", color: '#F43F5E', serie: _serieDiaria(m => (m.tipo === 'egreso' && m.categoria !== RETIRO_CAT_DASH) ? (Number(m.monto) || 0) : 0) },
     { lbl: 'Ticket promedio', val: _dMoney(ticket), usd: _dUsd(ticket), micro: ing.length + ' ventas',
-      color: '#8B5CF6', serie: _serieDiaria(m => m.tipo === 'ingreso' ? (Number(m.monto) || 0) : 0) },
+      click: "dashDetalle('ingresos')", color: '#8B5CF6', serie: _serieDiaria(m => m.tipo === 'ingreso' ? (Number(m.monto) || 0) : 0) },
     { lbl: 'Retiro dueño', val: _dMoney(tRet), usd: _dUsd(tRet), micro: 'no es gasto',
-      color: '#F5C518', serie: _serieDiaria(m => (m.tipo === 'egreso' && m.categoria === RETIRO_CAT_DASH) ? (Number(m.monto) || 0) : 0) },
+      click: "dashDetalle('retiros')", color: '#F5C518', serie: _serieDiaria(m => (m.tipo === 'egreso' && m.categoria === RETIRO_CAT_DASH) ? (Number(m.monto) || 0) : 0) },
     { lbl: 'Necesitan acción', val: String(accion), usd: '', micro: accion ? 'pendientes' : 'todo al día',
       color: accion ? '#F43F5E' : '#22C55E', serie: null, click: "switchSection('repairs')" },
   ];
@@ -1010,7 +1010,7 @@ function _renderKPIs() {
   const grid = document.getElementById('d-kpi-grid');
   if (!grid) return;
   grid.innerHTML = cards.map((c, i) =>
-    '<div class="d-kpi"' + (c.click ? ' onclick="' + c.click + '" style="cursor:pointer"' : '') + '>' +
+    '<div class="d-kpi' + (c.click ? ' d-tocable' : '') + '"' + (c.click ? ' onclick="' + c.click + '" role="button" tabindex="0"' : '') + '>' +
       '<div class="d-kpi-head"><span class="d-label">' + c.lbl + '</span>' +
       '<span class="d-kpi-micro">' + c.micro + '</span></div>' +
       '<span class="d-num">' + c.val + '</span>' +
@@ -1027,25 +1027,7 @@ function _renderDashCats() {
   const stock = typeof STOCK !== 'undefined' ? STOCK : [];
   const ing = _dashMovs.filter(m => m.tipo === 'ingreso');
   const acc = { nuevos: [0, 0], usados: [0, 0], access: [0, 0], repar: [0, 0], repues: [0, 0] };
-  const add = (k, monto) => { acc[k][0] += 1; acc[k][1] += monto; };
-
-  ing.forEach(m => {
-    const monto = Number(m.monto) || 0;
-    if (m.categoria === 'Reparación') { add('repar', monto); return; }
-    const itemEq = Array.isArray(m.items) ? m.items.find(i => i.source === 'equipo') : null;
-    const eqId = m.stockId || (itemEq ? itemEq.id : null);
-    if (eqId) {
-      const p = stock.find(x => x.id === eqId);
-      add((p && p.estado === 'Nuevo') ? 'nuevos' : 'usados', monto);
-      return;
-    }
-    if (Array.isArray(m.items) && m.items.length) {
-      if (m.items.some(i => i.source === 'repuesto')) { add('repues', monto); return; }
-      add('access', monto); return;
-    }
-    if (m.categoria === 'Venta equipo') { add('usados', monto); return; }
-    add('access', monto);
-  });
+  ing.forEach(m => { const k = _dashCatDe(m, stock); acc[k][0] += 1; acc[k][1] += Number(m.monto) || 0; });
 
   const tiles = [
     { k: 'nuevos', ico: '📱', lbl: 'Teléfonos nuevos' },
@@ -1055,12 +1037,15 @@ function _renderDashCats() {
     { k: 'repues', ico: '⬡',  lbl: 'Repuestos' },
   ];
   const top = tiles.slice().sort((a, b) => acc[b.k][1] - acc[a.k][1])[0];
+  const titulo = {};
+  tiles.forEach(t => { titulo[t.k] = t.ico + ' ' + t.lbl; });
+  _dashCatTitulos = titulo;
   const hayTop = top && acc[top.k][1] > 0;
 
   cont.innerHTML = tiles.map(t => {
     const n = acc[t.k][0], monto = acc[t.k][1];
     const usd = _dUsd(monto);
-    return '<div class="d-cat">' +
+    return '<div class="d-cat d-tocable" role="button" tabindex="0" onclick="dashDetalle(\'cat\', \'' + t.k + '\')">' +
       (hayTop && t.k === top.k ? '<span class="d-cat-top">TOP</span>' : '') +
       '<span class="d-cat-ico">' + t.ico + '</span>' +
       '<div class="d-cat-body">' +
@@ -1071,12 +1056,35 @@ function _renderDashCats() {
   }).join('');
 }
 
+// A qué rubro va una venta (las tarjetas de categoría y su detalle usan la misma cuenta)
+let _dashCatTitulos = {};
+function _dashCatDe(m, stock) {
+  stock = stock || (typeof STOCK !== 'undefined' ? STOCK : []);
+  if (m.categoria === 'Reparación') return 'repar';
+  const itemEq = Array.isArray(m.items) ? m.items.find(i => i.source === 'equipo') : null;
+  const eqId = m.stockId || (itemEq ? itemEq.id : null);
+  if (eqId) {
+    const p = stock.find(x => x.id === eqId);
+    return (p && p.estado === 'Nuevo') ? 'nuevos' : 'usados';
+  }
+  if (Array.isArray(m.items) && m.items.length) {
+    return m.items.some(i => i.source === 'repuesto') ? 'repues' : 'access';
+  }
+  if (m.categoria === 'Venta equipo') return 'usados';
+  return 'access';
+}
+
 // ── Top productos ──
 function _setTopMode(m) {
   _dashTopMode = m;
   document.querySelectorAll('#d-top-seg button').forEach(b =>
     b.classList.toggle('sel', b.dataset.mode === m));
   _renderTopProductos();
+}
+function _dashNomItem(it) { return String((it && it.nombre) || 'Venta').trim(); }
+function _dashItemsDe(m) {
+  return (Array.isArray(m.items) && m.items.length) ? m.items
+    : [{ nombre: m.itemNombre || m.descripcion || m.categoria || 'Venta', qty: 1, precioUnit: Number(m.monto) || 0 }];
 }
 function _renderTopProductos() {
   const el = document.getElementById('d-top-body');
@@ -1086,12 +1094,10 @@ function _renderTopProductos() {
   _dashMovs.filter(m => m.tipo === 'ingreso').forEach(m => {
     const monto = Number(m.monto) || 0;
     totalVentas += monto;
-    const items = (Array.isArray(m.items) && m.items.length)
-      ? m.items
-      : [{ nombre: m.itemNombre || m.descripcion || m.categoria || 'Venta', qty: 1, precioUnit: monto }];
+    const items = _dashItemsDe(m);
     const gTot = Number(m.gananciaARS) || 0;
     items.forEach(it => {
-      const nom = String(it.nombre || 'Venta').trim();
+      const nom = _dashNomItem(it);
       const sub = ((Number(it.precioUnit) || 0) * (Number(it.qty) || 1)) || (items.length === 1 ? monto : 0);
       if (!map[nom]) map[nom] = { nom: nom, u: 0, venta: 0, gan: 0 };
       map[nom].u += Number(it.qty) || 1;
@@ -1108,7 +1114,7 @@ function _renderTopProductos() {
     '<th class="r">' + (_dashTopMode === 'ganancia' ? 'Ganancia' : 'Venta total') + '</th>' +
     '<th class="r">% ventas</th></tr></thead><tbody>' +
     arr.map((p, i) =>
-      '<tr><td class="d-rank">' + (i + 1) + '</td>' +
+      '<tr class="d-tocable" onclick="dashDetalle(\'prod\', ' + esc(JSON.stringify(p.nom)).replace(/"/g, '&quot;') + ')"><td class="d-rank">' + (i + 1) + '</td>' +
       '<td class="d-prod">' + esc(p.nom) + '</td>' +
       '<td class="r">' + p.u + '</td>' +
       '<td class="r">' + _dMoney(_dashTopMode === 'ganancia' ? p.gan : p.venta) + '</td>' +
@@ -1140,6 +1146,63 @@ function _renderDashReps() {
   }).join('');
   if (reps.length > 7) el.innerHTML += '<p class="d-empty">+ ' + (reps.length - 7) + ' más</p>';
 }
+
+// ── Detalle de una tarjeta del dashboard ──
+// Antes las tarjetas mostraban el número y nada más: tocabas "Ingresos" o
+// "Accesorios" y no pasaba nada. Ahora abren la lista de movimientos que
+// forman ese número, del mismo período. Sale de lo que ya está cargado
+// (_dashMovs): no gasta lecturas de Firestore.
+function _dashDetalleLista(tipo, valor, movs) {
+  movs = movs || _dashMovs;
+  const ing = movs.filter(m => m.tipo === 'ingreso');
+  const egr = movs.filter(m => m.tipo === 'egreso' && m.categoria !== RETIRO_CAT_DASH);
+  if (tipo === 'ingresos') return { titulo: '💵 Ingresos', lista: ing };
+  if (tipo === 'ganancia') return { titulo: '📈 Ganancia por venta', lista: ing.slice().sort((a, b) => (Number(b.gananciaARS) || 0) - (Number(a.gananciaARS) || 0)), ganancia: true };
+  if (tipo === 'egresos')  return { titulo: '💸 Egresos', lista: egr };
+  if (tipo === 'retiros')  return { titulo: '👛 Retiros del dueño', lista: movs.filter(m => m.tipo === 'egreso' && m.categoria === RETIRO_CAT_DASH) };
+  if (tipo === 'neta')     return { titulo: '🧮 Ganancia neta: ventas y gastos', lista: ing.concat(egr), ganancia: true };
+  if (tipo === 'cat')      return { titulo: _dashCatTitulos[valor] || 'Ventas', lista: ing.filter(m => _dashCatDe(m) === valor) };
+  if (tipo === 'prod')     return { titulo: '🏷️ ' + valor, lista: ing.filter(m => _dashItemsDe(m).some(it => _dashNomItem(it) === valor)) };
+  return { titulo: '', lista: [] };
+}
+
+function dashDetalle(tipo, valor) {
+  const d = _dashDetalleLista(tipo, valor);
+  const lista = d.lista.slice().sort((a, b) =>
+    (d.ganancia && tipo === 'ganancia') ? 0 : String(b.createdAt || b.fecha || '').localeCompare(String(a.createdAt || a.fecha || '')));
+  const total = lista.reduce((s, m) => s + (m.tipo === 'egreso' ? -1 : 1) * (Number(m.monto) || 0), 0);
+  const gan = lista.reduce((s, m) => s + (m.tipo === 'ingreso' ? (Number(m.gananciaARS) || 0) : -(Number(m.monto) || 0)), 0);
+  const rango = document.getElementById('d-period-range')?.textContent || '';
+  const fila = m => {
+    const f = String(m.fecha || '');
+    const hora = /T(\d\d:\d\d)/.exec(String(m.createdAt || '')) ? new Date(m.createdAt).toLocaleTimeString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit' }) : '';
+    const que = (Array.isArray(m.items) && m.items.length) ? m.items.map(it => (Number(it.qty) > 1 ? it.qty + '× ' : '') + _dashNomItem(it)).join(', ')
+      : (m.itemNombre || m.descripcion || m.categoria || '—');
+    const signo = m.tipo === 'egreso' ? '−' : '';
+    const click = m.repairId && typeof openRepairDetail === 'function'
+      ? ' class="d-det-fila d-tocable" onclick="_dashDetCerrar(); openRepairDetail(\'' + esc(m.repairId) + '\')"' : ' class="d-det-fila"';
+    return '<div' + click + '>' +
+      '<div class="d-det-cuando">' + (f ? f.slice(8, 10) + '/' + f.slice(5, 7) : '') + (hora ? '<br>' + hora : '') + '</div>' +
+      '<div class="d-det-que"><div>' + esc(que) + '</div><div class="d-sub">' + esc([m.categoria, m.metodoPago].filter(Boolean).join(' · ')) + '</div></div>' +
+      '<div class="d-det-monto">' + signo + _dMoney(m.monto) +
+        (d.ganancia && m.tipo === 'ingreso' ? '<div class="d-sub">gan. ' + _dMoney(m.gananciaARS) + '</div>' : '') + '</div>' +
+    '</div>';
+  };
+  _dashDetCerrar();
+  const ov = document.createElement('div');
+  ov.id = 'd-det-modal';
+  ov.className = 'emp-ov';
+  ov.innerHTML = '<div class="emp-caja d-det-caja" role="dialog" aria-label="Detalle">' +
+    '<div class="emp-cab"><h3>' + esc(d.titulo) + '</h3><button type="button" class="emp-x" onclick="_dashDetCerrar()">✕</button></div>' +
+    '<p class="emp-ayuda">' + esc(rango.replace(/^·\s*/, '')) + ' · ' + lista.length + ' movimiento' + (lista.length === 1 ? '' : 's') +
+      ' · total ' + (d.ganancia ? 'ganancia ' + _dMoney(gan) : _dMoney(Math.abs(total))) + '</p>' +
+    (lista.length ? lista.map(fila).join('') : '<p class="emp-vacio">No hay movimientos en este período.</p>') +
+    '<div class="d-det-pie"><button type="button" class="btn-secondary" onclick="location.href=\'caja.html\'">Ir a la caja</button></div>' +
+  '</div>';
+  ov.addEventListener('click', e => { if (e.target === ov) _dashDetCerrar(); });
+  document.body.appendChild(ov);
+}
+function _dashDetCerrar() { document.getElementById('d-det-modal')?.remove(); }
 
 // ── Sidebar (solo escritorio) ──
 function toggleSidebar() { document.body.classList.toggle('sb-collapsed'); }

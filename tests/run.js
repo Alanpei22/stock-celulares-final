@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-dash-detalle.js':   'Dashboard: tocar una tarjeta abre los movimientos que forman ese número',
   'test-horas.js':          'Horas del personal: fichar desde el celu, cierre 19:30, sin trampas, aviso por Telegram',
   'test-carteles-acc.js':   'Carteles de accesorios: apaisados, tres medidas que se mezclan en la misma hoja',
   'test-carteles.js':       'Carteles de vidriera: A7, 8 por hoja A4, con el recargo de 3 cuotas de la app',
