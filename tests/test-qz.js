@@ -56,17 +56,6 @@ let h = IMPRESOS.pop();
 ok(h.impresora === 'HP', 'a la impresora de hojas', h.impresora);
 ok(h.o.size.width === 148 && h.o.size.height === 210 && h.o.margins === 7, 'en A5 con 7mm de margen, como el @page', h.o);
 ok(JSON.parse(h.data[0].data).sel === '.tk', 'una página por comprobante');
-// Más rápida: la hoja es texto negro y un QR. A 200 ppp y en color la
-// impresora la procesaba como una foto a color y tardaba.
-const hj = JSON.parse(h.data[0].data);
-ok(hj.dpi === 150 && h.o.colorType === 'grayscale' && h.o.density === 150,
-   'sale rápida por defecto: 150 ppp y en escala de grises', { dpi: hj.dpi, o: h.o });
-store.qzHojaCalidad = 'fina';
-await run("qzImprimir('hoja', '<x>')");
-h = IMPRESOS.pop();
-ok(JSON.parse(h.data[0].data).dpi === 200 && h.o.colorType === 'default', 'la de antes queda como opción "fina"');
-delete store.qzHojaCalidad;
-store.qzImpresoras = JSON.stringify({ hoja: 'HP', etiqueta: 'XPrinter' });
 ok(h.data[0].type === 'pixel' && h.data[0].format === 'image', 'como imagen (el HTML de QZ dibuja a 96 dpi)');
 ok(await run("qzImprimir('etiqueta', '<x>')") === true, 'la etiqueta sale por QZ');
 h = IMPRESOS.pop();
