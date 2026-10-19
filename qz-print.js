@@ -35,6 +35,25 @@ function _qzGuardar(c) {
 }
 function qzActivo(tipo) { return !!qzImpresoras()[tipo]; }
 
+// ── Calidad de la hoja A5 ───────────────────────────────────
+// Antes la hoja salía a 200 ppp y EN COLOR: la impresora la trataba como una
+// foto a color (más datos para mandar, y en color se toma su tiempo) aunque
+// la hoja es toda negra. Ahora sale por defecto en 'rapida': 150 ppp y escala
+// de grises, que para texto y el QR de 25mm alcanza de sobra y se imprime
+// bastante más rápido. 'fina' es la de antes, por si algún día hace falta.
+const QZ_CALIDADES = {
+  rapida: { dpi: 150, color: 'grayscale', nombre: 'Rápida (150 ppp, blanco y negro)' },
+  fina:   { dpi: 200, color: 'default',   nombre: 'Fina (200 ppp, color)' },
+};
+function qzCalidadHoja() {
+  let c = '';
+  try { c = localStorage.getItem('qzHojaCalidad') || ''; } catch {}
+  return QZ_CALIDADES[c] ? c : 'rapida';
+}
+function qzSetCalidadHoja(c) {
+  try { localStorage.setItem('qzHojaCalidad', QZ_CALIDADES[c] ? c : 'rapida'); } catch {}
+}
+
 // ── Conexión ────────────────────────────────────────────────
 // qz-tray.js se carga recién cuando hace falta: en los dispositivos sin QZ
 // Tray no se baja nunca.
@@ -168,7 +187,8 @@ async function qzImprimir(tipo, html) {
   if (!impresora) return false;
   let pag;
   if (tipo === 'hoja') {
-    pag = { selector: '.tk', ancho: 134, alto: 196, papelAncho: 148, papelAlto: 210, margen: 7, dpi: 200, byn: false };
+    const cal = QZ_CALIDADES[qzCalidadHoja()];
+    pag = { selector: '.tk', ancho: 134, alto: 196, papelAncho: 148, papelAlto: 210, margen: 7, dpi: cal.dpi, byn: false, color: cal.color };
   } else if (tipo === 'ticket') {
     // Rollo de 58mm: 48mm útiles y el largo que haga falta.
     pag = { selector: '.tkt', ancho: 48, alto: 'auto', papelAncho: 58, margen: 0, dpi: 203, byn: true };
@@ -189,7 +209,9 @@ async function qzImprimir(tipo, html) {
       // El ticket va centrado en el rollo: 5mm a cada lado de los 48 útiles.
       margins: tipo === 'ticket' ? { top: 0, right: 5, bottom: 0, left: 5 } : pag.margen,
       scaleContent: true,
-      colorType: pag.byn ? 'blackwhite' : 'default',
+      colorType: pag.byn ? 'blackwhite' : (pag.color || 'default'),
+      // La resolución a la que viene la imagen: así el driver no la re-escala
+      density: pag.dpi,
       interpolation: 'nearest-neighbor',
       jobName: 'TechPoint · ' + tipo,
     });
@@ -243,6 +265,12 @@ async function configurarImpresoras() {
   const ticket = elegir('los TICKETS de venta (58mm)', actual.ticket);
   if (ticket === null) return;
   _qzGuardar({ hoja, etiqueta, ticket });
+  if (hoja) {
+    const ahora = qzCalidadHoja();
+    const r = prompt('Calidad de las HOJAS A5:\n\n1. ' + QZ_CALIDADES.rapida.nombre + ' — recomendada, sale más rápido\n' +
+                     '2. ' + QZ_CALIDADES.fina.nombre + ' — la de antes\n\nNúmero:', ahora === 'fina' ? '2' : '1');
+    if (r !== null) qzSetCalidadHoja(String(r).trim() === '2' ? 'fina' : 'rapida');
+  }
   if (typeof toast === 'function') {
     toast('🖨️ Hojas: ' + (hoja || 'diálogo') + ' · Etiquetas: ' + (etiqueta || 'diálogo') +
           ' · Tickets: ' + (ticket || 'diálogo'), 'success');
