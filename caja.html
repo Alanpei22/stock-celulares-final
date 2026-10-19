@@ -877,6 +877,7 @@
     <div class="modal-footer">
       <button class="btn-danger" id="inv-form-del" style="display:none" onclick="deleteProducto(_invEditingId)">🗑</button>
       <button class="btn-secondary" id="inv-form-etq" style="display:none" onclick="imprimirEtiquetaProducto()" title="Imprimir etiqueta">🏷️</button>
+      <button class="btn-secondary" id="inv-form-hist" style="display:none" onclick="historialStock('accesorio', _invEditingId, document.getElementById('inv-fi-nom').value)" title="Historial de stock de este artículo">📜</button>
       <button class="btn-secondary" id="inv-form-rotura" style="display:none" onclick="invRotura()" title="Dar de baja por rotura">📉</button>
       <button class="btn-secondary" id="inv-form-cancel" style="flex:1">Cancelar</button>
       <button class="btn-primary" id="inv-form-save" style="flex:2">💾 Guardar</button>
@@ -1104,6 +1105,7 @@
 <script src="carteles.js"></script>
 <script src="carteles-acc.js"></script>
 <script src="inventario.js"></script>
+<script src="movstock.js"></script>
 <script src="finanzas-report.js"></script>
 <script src="modulos_catalog.js"></script>
 <script src="precios.js"></script>

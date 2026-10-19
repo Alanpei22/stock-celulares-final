@@ -132,6 +132,10 @@ async function guardarRotura() {
       [cfg.campoStock]: firebase.firestore.FieldValue.increment(-Math.min(n, hay)),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
+    // 📜 registro de stock
+    if (typeof movStock === 'function') movStock({ tipo: cfg.coleccion === 'productos' ? 'accesorio' : 'repuesto', id: it.id, doc: it,
+      cant: -Math.min(n, hay), antes: hay, despues: hay - Math.min(n, hay), motivo: 'rotura',
+      detalle: [rotMotivo(_rotMotivoElegido).label, (document.getElementById('rot-nota')?.value || '').trim()].filter(Boolean).join(' · ') });
     cerrarRotura();
     if (typeof cfg.alTerminar === 'function') cfg.alTerminar();
     toast(`📉 ${n} ${n === 1 ? 'unidad dada' : 'unidades dadas'} de baja · ${rotMotivo(_rotMotivoElegido).label}`, 'success');

@@ -104,7 +104,7 @@ const sig = inv.slice(inv.indexOf('function _invSiguiente'), inv.indexOf('functi
 ok(/_invEditingId = null/.test(sig), 'queda listo para un artículo nuevo, no editando el anterior');
 ok(/if \(cat\) document\.getElementById\('inv-fi-cat'\)\.value = cat/.test(sig),
    'conservando la categoría: en una tanda suelen ser todos del mismo rubro');
-ok(/cod\.focus\(\)/.test(inv.slice(inv.indexOf('function _invSiguiente'), inv.indexOf('function _invSiguiente') + 1100)),
+ok(/cod\.focus\(\)/.test(inv.slice(inv.indexOf('function _invSiguiente'), inv.indexOf('function _invSiguiente') + 1400)),
    'y con el foco en el código, que es donde escribe el lector de mano');
 // La cantidad se borra (cada articulo tiene la suya) pero el minimo se repite
 // en toda la tanda: volver a escribirlo 150 veces no tiene sentido.

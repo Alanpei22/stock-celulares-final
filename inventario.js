@@ -318,6 +318,8 @@ function openProductoForm(id, precodigo) {
   // todavía no tiene ni código ni precio.
   const etqBtn = document.getElementById('inv-form-etq');
   if (etqBtn) etqBtn.style.display = id ? '' : 'none';
+  const histBtn = document.getElementById('inv-form-hist');
+  if (histBtn) histBtn.style.display = id ? '' : 'none';
   // "Guardar y cargar otro" solo al dar de alta: editando no tiene sentido.
   const rotBtn = document.getElementById('inv-form-rotura');
   if (rotBtn) rotBtn.style.display = id ? '' : 'none';
@@ -462,11 +464,16 @@ async function saveProducto(opts) {
     if (typeof _cajaOwnerRenovar === 'function') _cajaOwnerRenovar();
 
     if (_invEditingId) {
+      // 📜 si cambió la cantidad a mano, queda anotado (antes de guardar: el
+      // listener todavía tiene la cantidad vieja)
+      const viejo = PRODUCTOS.find(x => x.id === _invEditingId);
+      if (viejo) if (typeof movStockDiff === 'function') movStockDiff({ tipo: 'accesorio', id: _invEditingId, nombre: nom, codigo }, viejo.stock, stock);
       await db.collection('productos').doc(_invEditingId).update(data);
       toast('✅ Producto actualizado', 'success');
     } else {
       data.fechaAlta = firebase.firestore.FieldValue.serverTimestamp();
       const ref = await db.collection('productos').add(data);
+      if (ref && typeof movStock === 'function') movStock({ tipo: 'accesorio', id: ref.id, nombre: nom, codigo, cant: stock, antes: 0, despues: stock, motivo: 'alta' });
       alGuardar({ ...data, id: ref && ref.id });
       toast('✅ Producto guardado' + (!cod && codigo ? ' · ' + codigo : ''), 'success');
     }
@@ -504,7 +511,9 @@ async function deleteProducto(id) {
   const pedir = _invBorraEmpleado() ? ((cb) => { if (confirm('¿Eliminar este producto?')) cb(); }) : _invRequirePin;
   pedir(async () => {
     try {
+      const viejo = PRODUCTOS.find(x => x.id === id);
       await db.collection('productos').doc(id).delete();
+      if (viejo && typeof movStock === 'function') movStock({ tipo: 'accesorio', id, doc: viejo, cant: -(Number(viejo.stock) || 0), antes: Number(viejo.stock) || 0, despues: 0, motivo: 'baja' });
       closeProductoForm();
       toast('Producto eliminado', 'success');
     } catch(e) {
@@ -616,7 +625,12 @@ function toggleInvMenu() {
       onClick: () => { closeInvMenu(); abrirRoturas(); } },
     { icon: '💵', label: 'Cargar costos', sub: 'En dólares, todos en una lista (modo dueño)',
       onClick: () => { closeInvMenu(); abrirCostosInv(); } },
-    { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },
+    // Juntos: el menú no pasa de ocho renglones (tests/test-carga-inventario.js)
+    sheetGrupo(toggleInvMenu, 'Movimientos y datos', '📜', 'Movimientos y datos', 'Qué entró y salió · exportar', [
+      { icon: '📜', label: 'Movimientos de stock', sub: 'Qué entró y salió, quién y por qué',
+        onClick: () => { closeInvMenu(); if (typeof abrirMovStock === 'function') abrirMovStock('accesorio'); } },
+      { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },
+    ]),
   ]);
 }
 
@@ -658,6 +672,8 @@ function _invSiguiente(cat) {
   if (del) del.style.display = 'none';
   const etq = document.getElementById('inv-form-etq');
   if (etq) etq.style.display = 'none';
+  const hist = document.getElementById('inv-form-hist');
+  if (hist) hist.style.display = 'none';
   // Las copias son de cada artículo; la casilla queda tildada para la tanda
   const cop = document.getElementById('inv-fi-etq-copias');
   if (cop) cop.value = '';
@@ -877,6 +893,7 @@ async function _invWizSaveNext() {
   }
   try {
     await db.collection('productos').doc(p.id).set(update, { merge: true });
+    if ('stock' in update) if (typeof movStockDiff === 'function') movStockDiff({ tipo: 'accesorio', id: p.id, doc: p, motivo: 'control', detalle: 'control de stock guiado' }, p.stock, update.stock);
     Object.assign(p, update);
     _invWizStats.actualizados++;
     _invWizIdx++;
@@ -1155,6 +1172,9 @@ function _invNuevoStock(txt, actual) {
 
 // Escribe los cambios en tandas (Firestore acepta hasta 500 por tanda).
 async function _invSelGuardar(cambios, borrar) {
+  // 📜 lo que había antes de tocar nada (el listener se actualiza al guardar)
+  const antes = {};
+  cambios.forEach(c => { const p = PRODUCTOS.find(x => x.id === c.id); if (p) antes[c.id] = p; });
   for (let i = 0; i < cambios.length; i += 450) {
     const batch = db.batch();
     cambios.slice(i, i + 450).forEach(c => {
@@ -1164,6 +1184,13 @@ async function _invSelGuardar(cambios, borrar) {
     });
     await batch.commit();
   }
+  if (typeof movStock !== 'function') return;
+  cambios.forEach(c => {
+    const p = antes[c.id];
+    if (!p) return;
+    if (borrar) movStock({ tipo: 'accesorio', id: c.id, doc: p, cant: -(Number(p.stock) || 0), antes: Number(p.stock) || 0, despues: 0, motivo: 'baja', detalle: 'borrado de a varios' });
+    else if (c.data && 'stock' in c.data) movStockDiff({ tipo: 'accesorio', id: c.id, doc: p, motivo: 'ajuste', detalle: 'cambio de a varios' }, p.stock, c.data.stock);
+  });
 }
 
 async function _invSelAplicar(cambios, mensaje, borrar) {

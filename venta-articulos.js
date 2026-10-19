@@ -97,7 +97,7 @@ function vaCuantos()    { return VA_ITEMS.reduce((s, it) => s + it.qty, 0); }
 
 // Un descuento de stock por artículo, para hacerlo con el resto del guardado.
 function vaStockUpdates() {
-  return VA_ITEMS.filter(it => it.id).map(it => ({ id: it.id, qty: it.qty }));
+  return VA_ITEMS.filter(it => it.id).map(it => ({ id: it.id, qty: it.qty, nombre: it.nombre }));
 }
 
 // Falta ponerle precio a alguno: cobrar eso en cero es plata que no entra.

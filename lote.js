@@ -331,6 +331,8 @@ async function loteGuardar() {
     });
 
     await batch.commit();
+    // 📜 registro de stock: un renglón por equipo (cada uno tiene su IMEI)
+    if (typeof movStock === 'function') docs.forEach(d => movStock({ tipo: 'equipo', id: d.id, doc: d, cant: 1, motivo: 'alta', detalle: 'carga en lote' }));
 
     const n = docs.length;
     // Los equipos van al cajón: sin etiqueta hay que buscar el precio en la app

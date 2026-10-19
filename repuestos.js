@@ -142,11 +142,16 @@ async function saveBulk() {
     const CHUNK = 400; // Firestore batch limit 500, usamos 400 para seguridad
     for (let i = 0; i < items.length; i += CHUNK) {
       const batch = db.batch();
+      const tanda = [];
       items.slice(i, i + CHUNK).forEach(item => {
         const ref = db.collection('repuestos').doc();
         batch.set(ref, { id: ref.id, ...item });
+        tanda.push({ id: ref.id, ...item });
       });
       await batch.commit();
+      // 📜 registro de stock: cada repuesto importado entra con su cantidad
+      if (typeof movStock === 'function') tanda.forEach(x => movStock({ tipo: 'repuesto', id: x.id, doc: x,
+        cant: Number(x.cantidad) || 0, antes: 0, despues: Number(x.cantidad) || 0, motivo: 'alta', detalle: 'importado' }));
     }
     toast(`✅ ${items.length} repuestos guardados`, 'success');
     closeBulkImport();
@@ -443,9 +448,13 @@ function changeQty(id, delta) {
   const r = REPUESTOS.find(x => x.id === id);
   if (!r) return;
   const nueva = Math.max(0, (r.cantidad || 0) + delta);
+  const antes = r.cantidad || 0;
   db.collection('repuestos').doc(id)
     .update({ cantidad: nueva })
-    .then(() => toast(delta > 0 ? '＋1 unidad' : '−1 unidad', 'success'))
+    .then(() => {
+      if (typeof movStockDiff === 'function') movStockDiff({ tipo: 'repuesto', id, doc: r, motivo: 'ajuste', detalle: 'botón ＋/−' }, antes, nueva);
+      toast(delta > 0 ? '＋1 unidad' : '−1 unidad', 'success');
+    })
     .catch(() => toast('Error al actualizar', 'error'));
 }
 
@@ -459,6 +468,8 @@ function openRepuestoForm(id) {
   // no tiene código ni precio.
   const etqBtn = document.getElementById('rep2-form-etq');
   if (etqBtn) etqBtn.style.display = id ? '' : 'none';
+  const histBtn = document.getElementById('rep2-form-hist');
+  if (histBtn) histBtn.style.display = id ? '' : 'none';
   // "Cargar otro" solo tiene sentido dando de alta, no editando uno viejo.
   const otroBtn = document.getElementById('rep2-form-save-otro');
   if (otroBtn) otroBtn.style.display = id ? 'none' : '';
@@ -681,6 +692,8 @@ async function _repuSelBorrar(lista) {
     lista.slice(i, i + 450).forEach(r => batch.delete(db.collection('repuestos').doc(r.id)));
     await batch.commit();
   }
+  if (typeof movStock === 'function') lista.forEach(r => movStock({ tipo: 'repuesto', id: r.id, doc: r,
+    cant: -(Number(r.cantidad) || 0), antes: Number(r.cantidad) || 0, despues: 0, motivo: 'baja', detalle: 'borrado de a varios' }));
 }
 
 function repuSelEliminar() {
@@ -847,12 +860,16 @@ async function _guardarRepuesto(data, teniaCodigo, opts) {
       }
     }
     if (editingRepuestoId) {
+      // 📜 cantidad cambiada a mano: queda anotado (lo de antes, del listener)
+      const viejo = REPUESTOS.find(x => x.id === editingRepuestoId);
+      if (viejo && typeof movStockDiff === 'function') movStockDiff({ tipo: 'repuesto', id: editingRepuestoId, doc: Object.assign({}, viejo, data) }, viejo.cantidad, data.cantidad);
       await db.collection('repuestos').doc(editingRepuestoId).set(data, { merge: true });
       toast('Repuesto actualizado ✅', 'success');
     } else {
       const ref = db.collection('repuestos').doc();
       const nuevo = { id: ref.id, ...data, fechaAlta: new Date().toISOString() };
       await ref.set(nuevo);
+      if (typeof movStock === 'function') movStock({ tipo: 'repuesto', id: ref.id, doc: nuevo, cant: Number(nuevo.cantidad) || 0, antes: 0, despues: Number(nuevo.cantidad) || 0, motivo: 'alta' });
       if (opts && opts.alGuardar) opts.alGuardar(nuevo);
       toast('Repuesto agregado ✅' + (!teniaCodigo && data.codigo ? ' · ' + data.codigo : ''), 'success');
     }
@@ -880,6 +897,8 @@ function _repuSiguiente(data) {
   });
   const etq = document.getElementById('rep2-form-etq');
   if (etq) etq.style.display = 'none';
+  const hist = document.getElementById('rep2-form-hist');
+  if (hist) hist.style.display = 'none';
   // Las copias son de cada repuesto; la casilla queda tildada para la tanda
   const cop = document.getElementById('rep2-fi-etq-copias');
   if (cop) cop.value = '';
@@ -894,8 +913,13 @@ function deleteRepuesto(id) {
   if (!id) return;
   if (typeof tpFrenar === 'function' && tpFrenar('borrar', 'borrar repuestos')) return;
   if (!confirm('¿Eliminar este repuesto del sistema?')) return;
+  const viejo = REPUESTOS.find(x => x.id === id);
   db.collection('repuestos').doc(id).delete()
-    .then(() => { toast('Repuesto eliminado', 'success'); closeRepuestoForm(); })
+    .then(() => {
+      if (viejo && typeof movStock === 'function') movStock({ tipo: 'repuesto', id, doc: viejo,
+        cant: -(Number(viejo.cantidad) || 0), antes: Number(viejo.cantidad) || 0, despues: 0, motivo: 'baja' });
+      toast('Repuesto eliminado', 'success'); closeRepuestoForm();
+    })
     .catch(() => toast('Error al eliminar', 'error'));
 }
 
@@ -1153,6 +1177,7 @@ async function _stockwizSaveNext() {
 
   try {
     await db.collection('repuestos').doc(r.id).set(update, { merge: true });
+    if ('cantidad' in update && typeof movStockDiff === 'function') movStockDiff({ tipo: 'repuesto', id: r.id, doc: r, motivo: 'control', detalle: 'control de stock guiado' }, r.cantidad, update.cantidad);
     Object.assign(r, update);
     _stockwizStats.actualizados++;
     _stockwizIdx++;

@@ -673,7 +673,9 @@ function toggleHdrMenu() {
     ]),
     { icon: '📊', label: 'Estadísticas', hide: !_puede('reporte'), onClick: () => document.getElementById('stats-btn')?.click() },
     { icon: '⚙️', label: 'Configuración', hide: _soloDueno(), onClick: () => document.getElementById('settings-btn')?.click() },
-    sheetGrupo(toggleHdrMenu, 'Datos', '💾', 'Exportar y backup', 'Bajarte el stock o una copia de todo', [
+    sheetGrupo(toggleHdrMenu, 'Datos', '💾', 'Exportar y backup', 'Movimientos de stock, exportar, backup', [
+      { icon: '📜', label: 'Movimientos de stock', sub: 'Qué entró y salió: equipos, repuestos y accesorios',
+        onClick: () => (typeof abrirMovStock === 'function') && abrirMovStock('equipo') },
       { icon: '💾', label: 'Exportar stock', hide: _soloDueno(), onClick: () => document.getElementById('export-btn')?.click() },
       { icon: '🛟', label: 'Descargar backup', hide: _soloDueno(), onClick: downloadBackup },
     ]),
@@ -735,6 +737,8 @@ function toggleRep2Menu() {
     { icon: '📉', label: 'Roturas del mes', sub: 'Lo que se rompió o vino roto',
       onClick: () => (typeof tpAbrirRoturas === 'function') && tpAbrirRoturas() },
     { icon: '📋', label: 'Pedido de mercadería', onClick: () => (typeof openPedidosModal === 'function') && openPedidosModal() },
+    { icon: '📜', label: 'Movimientos de stock', sub: 'Qué entró y salió, quién y por qué',
+      onClick: () => (typeof abrirMovStock === 'function') && abrirMovStock('repuesto') },
     { divider: true },
     { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
   ]);
@@ -1598,6 +1602,7 @@ async function savePhone() {
       if (typeof catFormCampos === 'function') Object.assign(newDoc, catFormCampos());
       await db.collection('stock').doc(id).set(newDoc);
       if (typeof catSubirPendientes === 'function') catSubirPendientes(id);
+      if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc: newDoc, cant: 1, motivo: 'alta' });   // 📜 registro
       toast('Equipo agregado al stock ✅', 'success');
       // 📨 Aviso Telegram: equipo cargado para la venta
       if (typeof tgNotify === 'function') {
@@ -1679,6 +1684,7 @@ function openDetail(id) {
   document.getElementById('det-actions').innerHTML = `
     ${!p.vendido ? `<button class="btn-whatsapp" onclick="shareWhatsApp('${p.id}')">🟢 WhatsApp</button>` : ''}
     <button class="btn-copy" onclick="copyInfo('${p.id}')">📋 Copiar</button>
+    <button class="btn-copy" onclick="historialStock('equipo','${p.id}', ${esc(JSON.stringify((p.marca || '') + ' ' + (p.modelo || ''))).replace(/"/g, '&quot;')})" title="Altas, ventas, reservas de este equipo">📜 Historial</button>
     ${p.vendido ? `<button class="btn-edit" onclick="printVentaTicket('${p.id}','','A5')">📄 Comprobante A5</button>
                 <button class="btn-edit" onclick="printVentaTicket('${p.id}','','80mm')">🖨 Ticket 80mm</button>` : ''}
     ${!p.vendido ? `<button class="btn-edit" onclick="etiquetaDe('${p.id}')">🏷️ Etiqueta</button>` : ''}
@@ -1861,6 +1867,7 @@ async function markUnsold(id) {
   delete updated.garantiaHasta;
   try {
     await db.collection('stock').doc(id).set(updated);
+    if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc: p, cant: 1, motivo: 'reactivado', detalle: revertedCaja ? 'con la venta anulada en caja' : '' });
     closeDetail();
     toast(revertedCaja ? 'Reactivado · caja revertida ✅' : 'Reactivado al stock ✅', 'success');
   } catch (e) {
@@ -1890,6 +1897,8 @@ async function deletePhone(id) {
       }
     }
     await db.collection('stock').doc(id).delete();
+    // Uno vendido ya no estaba en el stock: borrarlo no saca nada
+    if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc: p, cant: p.vendido ? 0 : -1, motivo: 'baja', detalle: p.vendido ? 'ya estaba vendido' : '' });
     // Las fotos del equipo se borran de Storage con él
     if (typeof catBorrarFotosDe === 'function') catBorrarFotosDe(p);
     closeDetail();
@@ -2018,6 +2027,8 @@ async function confirmSell() {
 
     // BUG-FIX: await + propagación de error (no swallow silencioso)
     await batch.commit();
+    if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc: p, cant: -1, motivo: 'venta', movId: movRefId,
+      detalle: [formaPago, cliNombre].filter(Boolean).join(' · ') });
 
     // El comprador va al CRM, igual que en la venta desde la caja. Fuera del
     // batch a propósito: si falla, la venta ya quedó registrada igual.
@@ -2159,6 +2170,7 @@ async function confirmReserva() {
     });
 
     await batch.commit();
+    if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc: p, cant: 0, motivo: 'reserva', detalle: cliente + (sena > 0 ? ' · seña $' + sena.toLocaleString('es-AR') : '') });
     closeReservarModal();
     closeDetail();
     toast('⏳ Equipo reservado para ' + cliente, 'success');
@@ -2231,6 +2243,7 @@ async function cancelarReserva(id) {
     movs.docs.forEach(d => batch.delete(d.ref));
 
     await batch.commit();
+    if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc: p, cant: 0, motivo: 'liberado', detalle: p.reservaCliente || '' });
     closeDetail();
     toast('Reserva cancelada' + (movs.size > 0 ? ' · seña revertida' : ''), 'info');
   } catch (e) {
@@ -3211,6 +3224,7 @@ async function saveFromAI() {
         notas: d.notas || '', ubicacion: '', fecha: new Date().toISOString(), vendido: false };
       if (d.bateria) doc.bateria = d.bateria;
       await db.collection('stock').doc(id).set(doc);
+      if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc, cant: 1, motivo: 'alta', detalle: 'cargado con IA' });
       toast('Equipo agregado al stock ✅', 'success');
     } else {
       if (!d.nombre || !d.marca || !d.tipo) { toast('La IA no pudo extraer todos los campos. Usá el formulario.', 'error'); return; }
@@ -3219,6 +3233,8 @@ async function saveFromAI() {
         tipo: d.tipo, cantidad: d.cantidad || 1, stockMin: d.stockMin || 2,
         precioCompra: d.precioCompra || 0, proveedor: d.proveedor || '', notas: d.notas || '',
         fechaAlta: new Date().toISOString() });
+      if (typeof movStock === 'function') movStock({ tipo: 'repuesto', id: ref.id, nombre: [d.tipo, d.nombre, d.marca, d.modelo].filter(Boolean).join(' '),
+        cant: d.cantidad || 1, antes: 0, despues: d.cantidad || 1, motivo: 'alta', detalle: 'cargado con IA' });
       toast('Repuesto agregado ✅', 'success');
     }
     closeAIAdd();
@@ -3372,6 +3388,7 @@ async function saveBulkAI() {
 
     try {
       await db.collection('stock').doc(id).set(doc);
+      if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc, cant: 1, motivo: 'alta', detalle: 'carga de lista' });
       saved++;
     } catch(e) { errors++; }
     await new Promise(r => setTimeout(r, 80));

@@ -1614,6 +1614,7 @@ async function confirmPlan() {
           reservaCreadaEn: ahora,
           planId: ref.id,
         });
+        if (typeof movStock === 'function') movStock({ tipo: 'equipo', id: _planStockId, cant: 0, motivo: 'reserva', detalle: 'plan ahorro N°' + (plan.nro || '') + ' · ' + nombre });
       } catch (e) { console.error('reservar equipo del plan:', e); toast('Plan creado, pero no pude reservar el equipo', 'error'); }
     }
 
@@ -1858,6 +1859,7 @@ async function entregarPlan() {
         reservaSena: firebase.firestore.FieldValue.delete(),
         reservaFechaLimite: firebase.firestore.FieldValue.delete(),
       });
+      if (typeof movStock === 'function') movStock({ tipo: 'equipo', id: p.equipo.stockId, nombre: p.equipo.nombre || '', cant: -1, motivo: 'venta', detalle: 'plan ahorro N°' + p.nro + ' · ' + (p.cliente?.nombre || '') });
     }
     _planLog(p, `Plan N°${p.nro} completado y entregado — ${p.cliente?.nombre || ''}`);
     closePlanDetalle();
@@ -1910,6 +1912,7 @@ async function cancelarPlan() {
         reservaFechaLimite: firebase.firestore.FieldValue.delete(),
         planId: firebase.firestore.FieldValue.delete(),
       });
+      if (typeof movStock === 'function') movStock({ tipo: 'equipo', id: p.equipo.stockId, nombre: p.equipo.nombre || '', cant: 0, motivo: 'liberado', detalle: 'plan ahorro N°' + p.nro + ' cancelado' });
     }
     _planLog(p, `Plan N°${p.nro} cancelado — crédito ${fmt(credito)} a favor de ${p.cliente?.nombre || ''}`);
     closePlanDetalle();
@@ -2123,7 +2126,10 @@ async function confirmVentaEquipo() {
         upd.garantiaMeses = d.garantiaMeses;
         upd.garantiaHasta = fh.toISOString();
       }
-      try { await db.collection('stock').doc(_veStockId).update(upd); }
+      try {
+        await db.collection('stock').doc(_veStockId).update(upd);
+        if (typeof movStock === 'function') movStock({ tipo: 'equipo', id: _veStockId, cant: -1, motivo: 'venta', movId, detalle: [d.forma_pago || metodo, d.clienteNombre].filter(Boolean).join(' · ') });
+      }
       catch (e) { console.error('marcar vendido:', e); toast('Venta registrada, pero no pude marcar el equipo como vendido', 'error'); }
     }
 
@@ -2136,6 +2142,7 @@ async function confirmVentaEquipo() {
     let bajaron = 0;
     for (const su of artStock) {
       try {
+        if (typeof movStock === 'function') movStock({ tipo: 'accesorio', id: su.id, nombre: su.nombre, cant: -su.qty, motivo: 'venta', movId, detalle: 'junto con un equipo' });
         await db.collection('productos').doc(su.id)
           .update({ stock: firebase.firestore.FieldValue.increment(-su.qty) });
         bajaron += su.qty;
@@ -3781,7 +3788,7 @@ async function saveMov() {
         const collection = it.source === 'producto' ? 'productos' : 'repuestos';
         const stockField = it.source === 'producto' ? 'stock' : 'cantidad';
         // CRIT-03: increment atómico para evitar race conditions
-        stockUpdates.push({ collection, id: it.id, stockField, qty });
+        stockUpdates.push({ collection, id: it.id, stockField, qty, nombre: it.nombre });
       }
     }
     data.items         = items;
@@ -3924,6 +3931,7 @@ async function saveMov() {
               ventaMovId: movRef.id,
             });
             vendidos++;
+            if (typeof movStock === 'function') movStock({ tipo: 'equipo', id: eqId, nombre: ((data.items || []).find(x => x.id === eqId) || {}).nombre, cant: -1, motivo: 'venta', movId: movRef.id, detalle: data.metodoPago || '' });
           } catch (eqErr) {
             console.error('Marcar equipo vendido:', eqErr);
             toast('Movimiento guardado, pero falló marcar un equipo como vendido', 'error');
@@ -3981,6 +3989,11 @@ async function saveMov() {
         let totalU = 0;
         for (const su of stockUpdates) {
           try {
+            // 📜 se anota ANTES: la cantidad "antes" sale del listener, que
+            // todavía no trajo el descuento
+            if (typeof movStock === 'function') movStock({ tipo: su.collection === 'productos' ? 'accesorio' : 'repuesto', id: su.id, nombre: su.nombre,
+              cant: -su.qty, motivo: data.repairId ? 'reparacion' : 'venta', movId: movRef.id, repairId: data.repairId || null,
+              detalle: data.repairNOrden ? 'reparación #' + data.repairNOrden : (data.metodoPago || '') });
             await db.collection(su.collection).doc(su.id).update({
               [su.stockField]: firebase.firestore.FieldValue.increment(-su.qty)
             });
@@ -4051,6 +4064,7 @@ function deleteMov() {
             try {
               await db.collection('stock').doc(it.id).update({ vendido: false, ventaMovId: null });
               equiposRevert.push(it.id);
+              if (typeof movStock === 'function') movStock({ tipo: 'equipo', id: it.id, nombre: it.nombre, cant: 1, motivo: 'anulacion', movId: id, detalle: 'se borró la venta de la caja' });
             } catch (eqErr) { console.error('Equipo revert:', eqErr); }
             continue;
           }
@@ -4058,6 +4072,7 @@ function deleteMov() {
           const coll  = it.source === 'producto' ? 'productos' : 'repuestos';
           const field = it.source === 'producto' ? 'stock' : 'cantidad';
           try {
+            if (typeof movStock === 'function') movStock({ tipo: coll === 'productos' ? 'accesorio' : 'repuesto', id: it.id, nombre: it.nombre, cant: it.qty, motivo: 'anulacion', movId: id, detalle: 'se borró la venta de la caja' });
             await db.collection(coll).doc(it.id).update({
               [field]: firebase.firestore.FieldValue.increment(it.qty)
             });
@@ -4133,12 +4148,14 @@ function deleteMov() {
           try {
             await db.collection('caja_movimientos').doc(id).set(movData);
             for (const rr of restored) {
+              if (typeof movStock === 'function') movStock({ tipo: rr.coll === 'productos' ? 'accesorio' : 'repuesto', id: rr.id, cant: -rr.qty, motivo: 'venta', movId: id, detalle: 'se deshizo el borrado' });
               await db.collection(rr.coll).doc(rr.id).update({
                 [rr.field]: firebase.firestore.FieldValue.increment(-rr.qty)
               });
             }
             for (const eqId of equiposRevert) {
               await db.collection('stock').doc(eqId).update({ vendido: true, ventaMovId: id });
+              if (typeof movStock === 'function') movStock({ tipo: 'equipo', id: eqId, cant: -1, motivo: 'venta', movId: id, detalle: 'se deshizo el borrado' });
             }
             if (senaReverted > 0) {
               await db.collection('repairs').doc(movData.repairId).update({

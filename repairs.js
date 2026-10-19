@@ -2650,7 +2650,11 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}, opts = {}) {
             db.collection('repuestos').doc(repuestoId).update({ cantidad: nueva }),
             db.collection('repairs').doc(id).update(repairUpdate)
           ])
-            .then(() => toast(`🔩 −1 ${rep.nombre}`, 'success'))
+            .then(() => {
+              if (typeof movStock === 'function') movStock({ tipo: 'repuesto', id: repuestoId, doc: rep, cant: nueva - (rep.cantidad || 0),
+                antes: rep.cantidad || 0, despues: nueva, motivo: 'reparacion', repairId: id, detalle: 'reparación #' + (r.nOrden || '') });
+              toast(`🔩 −1 ${rep.nombre}`, 'success');
+            })
             .catch(() => toast('Error al descontar repuesto', 'error'));
         }
       }
@@ -2993,6 +2997,7 @@ async function confirmarCobro() {
     let bajaron = 0;
     for (const su of artStock) {
       try {
+        if (typeof movStock === 'function') movStock({ tipo: 'accesorio', id: su.id, nombre: su.nombre, cant: -su.qty, motivo: 'venta', repairId: r.id, detalle: 'con el cobro de la reparación #' + (r.nOrden || '') });
         await db.collection('productos').doc(su.id)
           .update({ stock: firebase.firestore.FieldValue.increment(-su.qty) });
         bajaron += su.qty;
@@ -5086,6 +5091,8 @@ async function confirmCostoRequerido() {
     try {
       const nueva = Math.max(0, (rep.cantidad || 0) - 1);
       await db.collection('repuestos').doc(rep.id).update({ cantidad: nueva });
+      if (typeof movStock === 'function') movStock({ tipo: 'repuesto', id: rep.id, doc: rep, cant: nueva - (rep.cantidad || 0), antes: rep.cantidad || 0, despues: nueva,
+        motivo: 'reparacion', repairId: r.id, detalle: 'reparación #' + (r.nOrden || '') });
     } catch (e) {
       console.error('Stock decrement:', e);
     }

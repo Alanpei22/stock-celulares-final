@@ -6539,3 +6539,16 @@ body.dark .rep-pend-barra { background: #1a1d21; border-top-color: #2a2e34; }
 .horas-acc { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .horas-acc button { flex: 1; min-width: 150px; }
 
+/* 📜 Movimientos de stock (movstock.js): usa la caja de 👥 Empleados */
+.ms-filtros { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.ms-filtros input { grid-column: 1 / -1; }
+.ms-resumen { font-size: 13px; color: var(--text3, #666); margin-bottom: 6px; }
+.ms-fila { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-top: 1px solid var(--border, #eee); font-size: 14px; }
+.ms-fila.d-tocable { cursor: pointer; }
+.ms-cuando { min-width: 44px; font-size: 12px; color: var(--text3, #666); }
+.ms-que { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ms-sub { font-size: 12px; color: var(--text3, #666); font-weight: 400; }
+.ms-cant { text-align: right; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ms-mas { color: #16a34a; }
+.ms-menos { color: #dc2626; }
+

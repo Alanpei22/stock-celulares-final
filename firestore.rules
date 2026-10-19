@@ -85,7 +85,8 @@ service cloud.firestore {
         'caja_chequeos_detalle',    // esperado vs contado de cada chequeo
         'backups',
         'accessLogs',
-        'fichadas'                  // horas del personal: ver su bloque
+        'fichadas',                 // horas del personal: ver su bloque
+        'stock_movimientos'         // registro de stock: ver su bloque
       ];
     }
 
@@ -205,6 +206,15 @@ service cloud.firestore {
                    && !('tsCorregido' in request.resource.data)
                    && !('manual' in request.resource.data));
       allow update, delete: if esDueno();
+    }
+
+    // ── Movimientos de stock (📜, movstock.js) ──
+    // Cada cambio de stock deja un renglón. Lo anota quien hace el cambio
+    // (empleado o dueño) y lo leen todos, pero NADIE lo edita ni lo borra:
+    // un registro que se puede tocar no sirve para saber qué pasó.
+    match /stock_movimientos/{doc} {
+      allow read, create: if isAllowed();
+      allow update, delete: if false;
     }
 
     // ── Registro de accesos ──

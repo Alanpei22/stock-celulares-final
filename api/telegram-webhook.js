@@ -288,7 +288,21 @@ async function qSumarStock(db, cant, texto) {
     }
   }
   await m.ref.update(upd);
+  await anotarMovStock(db, { tipo: m.campo === 'stock' ? 'accesorio' : 'repuesto', itemId: m.ref.id, nombre: m.nombre,
+    cant, antes: m.stock, despues: m.stock + cant, motivo: 'compra' });
   return `✅ <b>+${cant} u.</b> → ${m.tipo} <b>${esc(m.nombre)}</b>\nStock: ${m.stock} → <b>${m.stock + cant}</b>${costoNota}`;
+}
+
+// 📜 Registro de stock (movstock.js en la app): lo que se suma por Telegram
+// también queda anotado. Si falla, no frena: el stock ya se actualizó.
+async function anotarMovStock(db, r) {
+  try {
+    await db.collection('stock_movimientos').add(Object.assign({
+      detalle: 'por Telegram', quien: 'Telegram',
+      fecha: new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10),
+      ts: admin.firestore.FieldValue.serverTimestamp(),
+    }, r));
+  } catch (e) { console.error('movstock (telegram):', e); }
 }
 
 // ── Crear un producto (accesorio) nuevo ──
@@ -309,13 +323,14 @@ async function qNuevoProducto(db, texto) {
   const ya = dup.docs.find(d => (d.data().nombre || '').toLowerCase() === nombre.toLowerCase());
   if (ya) return `Ya existe <b>${esc(nombre)}</b> — usá <b>sumar ${cant} ${esc(nombre)}</b> para agregarle stock.`;
 
-  await db.collection('productos').add({
+  const nuevoRef = await db.collection('productos').add({
     codigo: '', nombre, categoria: '',
     precioVenta: precio, precioCosto: costo,
     stock: cant, stockMin: 0, activo: true,
     fechaAlta: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+  await anotarMovStock(db, { tipo: 'accesorio', itemId: nuevoRef.id, nombre, cant, antes: 0, despues: cant, motivo: 'alta' });
   return `✅ <b>Producto creado</b>\n📦 ${esc(nombre)} · venta ${fmt(precio)}${costo > 0 ? ` · costo ${fmt(costo)} · 📈 margen ${fmt(precio - costo)}` : ''} · stock ${cant}\n(Queda en Accesorios${costo > 0 ? '' : '; el costo lo cargás después si querés'})`;
 }
 
