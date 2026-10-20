@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-sin-cargo.js':      'Sin cargo: el cargador regalado con el equipo va en $0 y se descuenta del stock',
   'test-retiro-con-accesorio.js': 'Retirar una reparación y sumar un vidrio o funda en el mismo cobro',
   'test-movstock.js':       'Movimientos de stock: cada cambio de equipos, repuestos y accesorios queda anotado',
   'test-dash-detalle.js':   'Dashboard: tocar una tarjeta abre los movimientos que forman ese número',

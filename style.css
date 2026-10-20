@@ -6552,3 +6552,9 @@ body.dark .rep-pend-barra { background: #1a1d21; border-top-color: #2a2e34; }
 .ms-mas { color: #16a34a; }
 .ms-menos { color: #dc2626; }
 
+/* 🎁 Sin cargo (caja.js _toggleRegalo / venta-articulos.js _vaRegalo): el
+   cargador que se regala con el equipo, en $0 pero descontado del stock */
+.cart-regalo-btn, .va-regalo { border: 1px solid var(--border, #ddd); background: transparent; border-radius: 10px; padding: 4px 8px; font-size: 16px; cursor: pointer; line-height: 1; }
+.cart-line-regalo b, .va-regalo--on { color: #16a34a; }
+.va-regalo--on { font-size: 13px; font-weight: 700; border-color: #16a34a; }
+

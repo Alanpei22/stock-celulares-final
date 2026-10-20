@@ -2059,7 +2059,7 @@ async function confirmVentaEquipo() {
   const artCosto = (typeof vaCostoTotal === 'function') ? vaCostoTotal() : 0;
   const artStock = (typeof vaStockUpdates === 'function') ? vaStockUpdates() : [];
   if (arts.length && typeof vaSinPrecio === 'function' && vaSinPrecio()) {
-    toast('Hay un artículo sin precio', 'error'); return;
+    toast('Hay un artículo sin precio: poné el precio o tocá 🎁 si va sin cargo', 'error'); return;
   }
   // El total de la venta: el equipo más lo que se lleve. Es lo que entra a la
   // caja y lo que sale impreso en el comprobante.
@@ -2142,7 +2142,7 @@ async function confirmVentaEquipo() {
     let bajaron = 0;
     for (const su of artStock) {
       try {
-        if (typeof movStock === 'function') movStock({ tipo: 'accesorio', id: su.id, nombre: su.nombre, cant: -su.qty, motivo: 'venta', movId, detalle: 'junto con un equipo' });
+        if (typeof movStock === 'function') movStock({ tipo: 'accesorio', id: su.id, nombre: su.nombre, cant: -su.qty, motivo: 'venta', movId, detalle: su.regalo ? '🎁 sin cargo con un equipo' : 'junto con un equipo' });
         await db.collection('productos').doc(su.id)
           .update({ stock: firebase.firestore.FieldValue.increment(-su.qty) });
         bajaron += su.qty;
@@ -3232,11 +3232,12 @@ function _cartTotal() {
 
 function _cartSummary() {
   if (!_cart.length) return '';
+  const sc = it => it.regalo ? ' (sin cargo)' : '';
   if (_cart.length === 1) {
     const it = _cart[0];
-    return it.qty > 1 ? `${it.nombre} x${it.qty}` : it.nombre;
+    return (it.qty > 1 ? `${it.nombre} x${it.qty}` : it.nombre) + sc(it);
   }
-  return _cart.map(it => `${it.nombre} x${it.qty}`).join(', ');
+  return _cart.map(it => `${it.nombre} x${it.qty}${sc(it)}`).join(', ');
 }
 
 // Parte del cobro que va a la reparación. Sin carrito el monto entero es de la
@@ -3398,7 +3399,8 @@ function _renderCart() {
     const isEquipo = it.source === 'equipo';
     const precio = Number(it.precio) || 0;
     const sub = precio * it.qty;
-    const sinPrecio = precio <= 0;
+    const regalo = !!it.regalo;
+    const sinPrecio = precio <= 0 && !regalo;
 
     // Renglón chico de la izquierda: qué es y cuánto queda
     let meta;
@@ -3429,7 +3431,12 @@ function _renderCart() {
               <span class="cart-qty-val">${it.qty}</span>
               <button type="button" class="qty-btn" onclick="_changeCartQty(${i},1)">+</button>
             </div>
-            ${sinPrecio ? `
+            ${regalo ? `
+              <button type="button" class="cart-line-precio cart-line-regalo" onclick="_toggleRegalo(${i})" title="Tocá para cobrarlo">
+                <small>se descuenta del stock</small>
+                <b>🎁 Sin cargo</b>
+              </button>`
+            : sinPrecio ? `
               <div class="cart-precio-edit">
                 <input type="number" class="cart-price-input" min="0" inputmode="numeric"
                        value="" placeholder="$ precio c/u" onchange="_setCartPrice(${i}, this.value)">
@@ -3440,8 +3447,9 @@ function _renderCart() {
                 <b>${fmt(sub)} <span class="cart-precio-lapiz">✏️</span></b>
               </button>
               ${hecho ? `<button type="button" class="cart-precio-volver" onclick="_volverPrecioLista(${i})" title="Volver al precio de la lista">↩</button>` : ''}`}
+            ${!isEquipo && !regalo ? `<button type="button" class="cart-regalo-btn" onclick="_toggleRegalo(${i})" title="Sin cargo: va en $0 y se descuenta del stock">🎁</button>` : ''}
           </div>
-          ${sinPrecio ? '<div class="sale-item-warn sale-item-warn--precio">⚠️ Falta el precio — no se puede cobrar así</div>' : ''}
+          ${sinPrecio ? '<div class="sale-item-warn sale-item-warn--precio">⚠️ Falta el precio — poné el precio o tocá 🎁 si va sin cargo</div>' : ''}
           ${it.stock <= 0 && !isLibre && !isEquipo ? '<div class="sale-item-warn">⚠️ Sin stock — pedido especial</div>' : ''}
           ${isLibre ? `<div class="cart-libre-inputs">
             <input type="number" class="cart-price-input cart-costo-input" min="0" inputmode="numeric"
@@ -3482,7 +3490,28 @@ function _editarPrecioLinea(i) {
 
 // ¿Hay algo en el carrito sin precio? Bloquea el cobro: si no, se vendía en $0.
 function _cartSinPrecio() {
-  return _cart.some(it => (Number(it.precio) || 0) <= 0);
+  // Lo marcado 🎁 sin cargo va en $0 a propósito: no cuenta como "falta precio"
+  return _cart.some(it => !it.regalo && (Number(it.precio) || 0) <= 0);
+}
+
+// 🎁 Sin cargo: el cargador que se regala con el equipo. Antes, en $0 no se
+// podía cobrar ("falta el precio") y había que sacarlo del carrito, así que
+// no se descontaba del stock. Ahora va en $0, el stock baja igual y su costo
+// cuenta en la ganancia de la venta (regalarlo cuesta plata).
+function _toggleRegalo(i) {
+  const it = _cart[i];
+  if (!it || it.source === 'equipo') return;
+  if (!it.regalo) {
+    it._precioAntes = Number(it.precio) || Number(it.precioLista) || 0;
+    it.precio = 0;
+    it.regalo = true;
+  } else {
+    it.regalo = false;
+    it.precio = it._precioAntes || Number(it.precioLista) || 0;
+  }
+  _syncMontoFromCart();
+  _renderCart();
+  _updateMovResumen();
 }
 
 // Línea de la reparación dentro del carrito, con su monto editable aparte.
@@ -3787,6 +3816,7 @@ async function saveMov() {
         precioUnit: Number(it.precio) || 0,
         costoUSDUnit: it.costoUSD || 0,
         costoARSUnit,
+        ...(it.regalo ? { regalo: true } : {}),   // 🎁 sin cargo (comprobante y registro)
       });
       if (esEquipo) {
         // Equipo del stock → se marca como vendido (no descuenta cantidad)
@@ -3801,7 +3831,7 @@ async function saveMov() {
         const collection = it.source === 'producto' ? 'productos' : 'repuestos';
         const stockField = it.source === 'producto' ? 'stock' : 'cantidad';
         // CRIT-03: increment atómico para evitar race conditions
-        stockUpdates.push({ collection, id: it.id, stockField, qty, nombre: it.nombre });
+        stockUpdates.push({ collection, id: it.id, stockField, qty, nombre: it.nombre, regalo: !!it.regalo });
       }
     }
     data.items         = items;
@@ -4006,7 +4036,7 @@ async function saveMov() {
             // todavía no trajo el descuento
             if (typeof movStock === 'function') movStock({ tipo: su.collection === 'productos' ? 'accesorio' : 'repuesto', id: su.id, nombre: su.nombre,
               cant: -su.qty, motivo: data.repairId ? 'reparacion' : 'venta', movId: movRef.id, repairId: data.repairId || null,
-              detalle: data.repairNOrden ? 'reparación #' + data.repairNOrden : (data.metodoPago || '') });
+              detalle: (su.regalo ? '🎁 sin cargo · ' : '') + (data.repairNOrden ? 'reparación #' + data.repairNOrden : (data.metodoPago || '')) });
             await db.collection(su.collection).doc(su.id).update({
               [su.stockField]: firebase.firestore.FieldValue.increment(-su.qty)
             });

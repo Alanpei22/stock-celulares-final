@@ -32,7 +32,7 @@ function _cvRenglones(mov) {
   const r = items.map(it => {
     const qty = Math.max(1, Number(it.qty) || 1);
     const unit = Number(it.precioUnit) || 0;
-    return { nombre: it.nombre || 'Artículo', qty, unit, total: qty * unit };
+    return { nombre: (it.nombre || 'Artículo') + (it.regalo ? ' (sin cargo)' : ''), qty, unit, total: qty * unit };
   });
   // Venta mixta: la parte de la reparación también va escrita.
   const rep = Number(mov.montoReparacion) || 0;

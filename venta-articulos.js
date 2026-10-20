@@ -89,6 +89,7 @@ function vaItems() {
     precioUnit: Number(it.precio) || 0,
     costoUSDUnit: Number(it.costoUSD) || 0,
     costoARSUnit: Number(it.costoARS) || 0,
+    ...(it.regalo ? { regalo: true } : {}),
   }));
 }
 function vaTotal()      { return VA_ITEMS.reduce((s, it) => s + (Number(it.precio) || 0) * it.qty, 0); }
@@ -97,12 +98,24 @@ function vaCuantos()    { return VA_ITEMS.reduce((s, it) => s + it.qty, 0); }
 
 // Un descuento de stock por artículo, para hacerlo con el resto del guardado.
 function vaStockUpdates() {
-  return VA_ITEMS.filter(it => it.id).map(it => ({ id: it.id, qty: it.qty, nombre: it.nombre }));
+  return VA_ITEMS.filter(it => it.id).map(it => ({ id: it.id, qty: it.qty, nombre: it.nombre, regalo: !!it.regalo }));
 }
 
 // Falta ponerle precio a alguno: cobrar eso en cero es plata que no entra.
 function vaSinPrecio() {
-  return VA_ITEMS.some(it => !(Number(it.precio) > 0));
+  // 🎁 sin cargo va en $0 a propósito
+  return VA_ITEMS.some(it => !it.regalo && !(Number(it.precio) > 0));
+}
+
+// 🎁 Sin cargo: el cargador que se regala con el equipo. Va en $0, pero se
+// descuenta del stock y su costo cuenta en la ganancia. Antes en $0 no se
+// podía guardar, y sacándolo de la venta el stock quedaba mal.
+function _vaRegalo(i) {
+  const it = VA_ITEMS[i];
+  if (!it) return;
+  if (!it.regalo) { it._precioAntes = Number(it.precio) || 0; it.precio = 0; it.regalo = true; }
+  else { it.regalo = false; it.precio = it._precioAntes || 0; }
+  _vaRender();
 }
 
 // ── Buscador ──────────────────────────────────────────────
@@ -181,8 +194,11 @@ function _vaRender() {
         <button type="button" class="va-qty-btn" onclick="_vaQty(${i},-1)">−</button>
         <span class="va-qty">${it.qty}</span>
         <button type="button" class="va-qty-btn" onclick="_vaQty(${i},1)">+</button>
-        <input class="va-precio" type="number" inputmode="numeric" min="0" value="${it.precio}"
+        ${it.regalo
+          ? `<button type="button" class="va-regalo va-regalo--on" onclick="_vaRegalo(${i})" title="Tocá para cobrarlo">🎁 Sin cargo</button>`
+          : `<input class="va-precio" type="number" inputmode="numeric" min="0" value="${it.precio}"
                onchange="_vaPrecio(${i}, this.value)" title="Precio por unidad">
+        <button type="button" class="va-regalo" onclick="_vaRegalo(${i})" title="Sin cargo: va en $0 y se descuenta del stock">🎁</button>`}
         <button type="button" class="va-quitar" onclick="_vaQuitar(${i})" title="Quitar">✕</button>
       </div>
     </div>`;

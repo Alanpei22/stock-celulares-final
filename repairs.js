@@ -2997,7 +2997,7 @@ async function confirmarCobro() {
     let bajaron = 0;
     for (const su of artStock) {
       try {
-        if (typeof movStock === 'function') movStock({ tipo: 'accesorio', id: su.id, nombre: su.nombre, cant: -su.qty, motivo: 'venta', repairId: r.id, detalle: 'con el cobro de la reparación #' + (r.nOrden || '') });
+        if (typeof movStock === 'function') movStock({ tipo: 'accesorio', id: su.id, nombre: su.nombre, cant: -su.qty, motivo: 'venta', repairId: r.id, detalle: (su.regalo ? '🎁 sin cargo · ' : '') + 'con el cobro de la reparación #' + (r.nOrden || '') });
         await db.collection('productos').doc(su.id)
           .update({ stock: firebase.firestore.FieldValue.increment(-su.qty) });
         bajaron += su.qty;

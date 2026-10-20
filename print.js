@@ -1013,7 +1013,7 @@ function _ventaA5Body(d, label) {
     ${permutaVal > 0 ? `<tr><td class="a">Valor tomado</td><td>− ${_prMoney(permutaVal)}</td></tr>` : ''}
     ${Array.isArray(p.articulos) && p.articulos.length ? `
       <tr><td class="a">${_pr(p.marca)} ${_pr(p.modelo)}</td><td>${_prMoney(p.precio)}</td></tr>
-      ${p.articulos.map(a => `<tr><td class="a">${_pr(a.nombre)}${a.qty > 1 ? ` x${a.qty}` : ''}</td><td>${_prMoney((a.precioUnit || 0) * (a.qty || 1))}</td></tr>`).join('')}` : ''}
+      ${p.articulos.map(a => `<tr><td class="a">${_pr(a.nombre)}${a.qty > 1 ? ` x${a.qty}` : ''}</td><td>${a.regalo ? 'Sin cargo' : _prMoney((a.precioUnit || 0) * (a.qty || 1))}</td></tr>`).join('')}` : ''}
     <tr class="hl"><td class="a">TOTAL</td><td>${_prMoney(p.precioTotal || p.precio)}</td></tr>
     ${saldoAb > 0 ? `<tr class="hl"><td class="a">SALDO ABONADO</td><td>${_prMoney(saldoAb)}</td></tr>` : ''}
   </table>
@@ -1122,7 +1122,7 @@ function printVentaTicket(stockId, extra, formato = 'A5') {
       ${Array.isArray(p.articulos) && p.articulos.length ? `
         <div class="arts-box">
           <div class="arts-fila"><span>${_pr(p.marca)} ${_pr(p.modelo)}</span><b>${_prMoney(p.precio)}</b></div>
-          ${p.articulos.map(a => `<div class="arts-fila"><span>${_pr(a.nombre)}${a.qty > 1 ? ' x' + a.qty : ''}</span><b>${_prMoney((a.precioUnit || 0) * (a.qty || 1))}</b></div>`).join('')}
+          ${p.articulos.map(a => `<div class="arts-fila"><span>${_pr(a.nombre)}${a.qty > 1 ? ' x' + a.qty : ''}</span><b>${a.regalo ? 'Sin cargo' : _prMoney((a.precioUnit || 0) * (a.qty || 1))}</b></div>`).join('')}
         </div>` : ''}
       <div class="precio-box">
         <span class="precio-lbl">${Array.isArray(p.articulos) && p.articulos.length ? 'Total' : 'Precio'}</span>
