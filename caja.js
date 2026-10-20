@@ -3341,7 +3341,11 @@ function _addToCart(r) {
       icon: r.icon || '📦', stock: r.stock, qty: 1,
       extra: r.extra || '',
     });
-    selectCat('Venta producto');
+    // Con una reparación vinculada (retiro + un vidrio, por ejemplo) la
+    // categoría sigue siendo Reparación/Seña: el cobro es el de la reparación
+    // y los productos van aparte en montoProductos. Antes pasaba a "Venta
+    // producto" y el retiro dejaba de contar como reparación en el desglose.
+    if (!_selectedRepairItem) selectCat('Venta producto');
   }
   // Limpiar el buscador para poder agregar otro producto
   const input = document.getElementById('mov-fi-desc');
@@ -3584,7 +3588,15 @@ function _selectRepairMode(mode) {
     // Pre-llenar con el saldo pendiente (o total si no hay seña)
     _repairAmt = saldo > 0 ? saldo : (Number(repair.monto) || 0);
   }
-  if (descEl) descEl.value = _repairDescAuto;
+  // El buscador queda VACÍO y listo para lo que se lleve además (vidrio,
+  // funda…). Antes se llenaba con "Reparación N°… — cliente — equipo": al
+  // escribir "vidrio" quedaba pegado a ese texto y no encontraba nada, así que
+  // no se podía sumar un accesorio al retiro. La descripción del movimiento no
+  // se pierde: _descripcionVenta usa _repairDescAuto cuando el campo está vacío.
+  if (descEl) {
+    descEl.value = '';
+    descEl.placeholder = '➕ ¿Se lleva algo más? Buscá vidrio, funda, cargador…';
+  }
   // Sin carrito, el monto del movimiento es todo de la reparación (flujo de siempre).
   // Con carrito, el total lo arma _syncMontoFromCart (reparación + productos).
   if (!_cart.length) {
@@ -3633,6 +3645,7 @@ function _clearRepairItem(clearText = true) {
     if (descEl) descEl.value = '';
   }
   _repairDescAuto = '';
+  if (descEl) descEl.placeholder = 'Buscá producto / repuesto o escribí qué fue *';
   _renderCart();            // el carrito sobrevive: se re-dibuja sin la línea de reparación
   _syncMontoFromCart();
   _updateMovResumen();

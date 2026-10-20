@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-retiro-con-accesorio.js': 'Retirar una reparación y sumar un vidrio o funda en el mismo cobro',
   'test-movstock.js':       'Movimientos de stock: cada cambio de equipos, repuestos y accesorios queda anotado',
   'test-dash-detalle.js':   'Dashboard: tocar una tarjeta abre los movimientos que forman ese número',
   'test-horas.js':          'Horas del personal: fichar desde el celu, cierre 19:30, sin trampas, aviso por Telegram',
