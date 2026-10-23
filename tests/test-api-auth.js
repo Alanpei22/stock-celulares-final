@@ -84,7 +84,7 @@ const tg = sinComentarios(leer('api/telegram-notify.js'));
 ok(/import\s*\{[^}]*exigirSesion[^}]*\}\s*from\s*'\.\/_auth\.js'/.test(tg),
    'telegram-notify importa el guardia');
 // El guardia tiene que estar ANTES de leer el token del bot, no después.
-ok(antesQue(tg, 'exigirSesion(req, res)', 'process.env.TELEGRAM_BOT_TOKEN'),
+ok(antesQue(tg, 'exigirSesion(req, res', 'process.env.TELEGRAM_BOT_TOKEN'),
    'telegram-notify corta antes de tocar las credenciales del bot');
 
 const ai = sinComentarios(leer('api/ai.js'));

@@ -48,5 +48,10 @@ ok(leer('Te transfirieron dinero', 'Sin monto en el texto').monto === '',
 const r2 = leer('Juan te transfirió $ 25.000', 'Juan te transfirió $ 25.000 el 03/08');
 ok(r2 && r2.monto === '$25.000', 'toma el primer monto que aparece', r2 && r2.monto);
 
+console.log('\n4) También llega por Telegram');
+ok(/\/api\/telegram-notify/.test(SRC) && /Transferencia recibida/.test(SRC), 'el script manda el aviso a Telegram además del push');
+const tgApi = fs.readFileSync(require('path').join(__dirname, '..', 'api', 'telegram-notify.js'), 'utf8');
+ok(/exigirSesion\(req, res, \{ permitirCron: true \}\)/.test(tgApi), 'y /api/telegram-notify acepta el CRON_SECRET del script (sigue cerrado para el resto)');
+
 console.log(fails ? `\n${fails} FALLARON` : '\nTodo OK');
 process.exit(fails ? 1 : 0);

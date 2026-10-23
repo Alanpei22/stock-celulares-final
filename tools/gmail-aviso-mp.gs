@@ -1,5 +1,5 @@
 /**
- * AVISO DE TRANSFERENCIA DE MERCADOPAGO → notificación en todos los dispositivos
+ * AVISO DE TRANSFERENCIA DE MERCADOPAGO → Telegram + notificación en los celulares
  * ─────────────────────────────────────────────────────────────────────────────
  * Por qué esto y no un webhook de MercadoPago: MP solo notifica COBROS
  * (QR, link, Point). Las transferencias que te mandan al alias/CVU no tienen
@@ -99,6 +99,19 @@ function enviarAviso(d) {
   });
 
   Logger.log('Aviso enviado: ' + titulo + ' → ' + respuesta.getResponseCode());
+
+  // Y por Telegram, que es donde llegan todos los avisos del local
+  var tg = UrlFetchApp.fetch(URL_APP + '/api/telegram-notify', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + SECRETO },
+    muteHttpExceptions: true,
+    payload: JSON.stringify({
+      text: '💸 <b>Transferencia recibida' + (d.monto ? ' · ' + d.monto : '') + '</b>\n' +
+            (d.quien ? 'De: ' + d.quien.replace(/[<>&]/g, '') + '\n' : '') + 'MercadoPago',
+    }),
+  });
+  Logger.log('Telegram → ' + tg.getResponseCode());
 }
 
 /**
