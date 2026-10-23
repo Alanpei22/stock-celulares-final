@@ -2954,31 +2954,35 @@ async function confirmarCobro() {
         repairId: r.id,
         ...(typeof tpFirma === 'function' ? tpFirma() : {}),   // quién lo cobró
       };
+      // Borrar este movimiento tiene que destrabar la orden: la plata dejó
+      // de existir, no puede seguir figurando cobrada. Sin esta marca, el
+      // borrado de la caja no lo hacía (ver deleteMov en caja.js).
+      datos.esCobro = true;
+      // ── La ganancia de la reparación ──────────────────────
+      // El costo del repuesto se cuenta CUANDO SE USA, y la reparación es
+      // acá. Antes salía como un egreso en efectivo aparte, y eso rompía dos
+      // cosas: el cierre de caja esperaba menos efectivo del que había (de la
+      // caja no salió un peso ese día, el repuesto se pagó al comprarlo), y
+      // el tablero mostraba la reparación como pérdida — una de $40.000 con
+      // $10.000 de repuesto figuraba -$10.000 en vez de +$30.000.
+      //
+      // La ganancia es la de la ORDEN ENTERA, no la del saldo: la seña ya
+      // entró a la caja en su momento, con su propio movimiento y sin
+      // ganancia. Por eso acá puede quedar una ganancia mayor que el monto.
+      // (Si la seña cubrió todo no se crea movimiento y esa ganancia no entra
+      // al tablero; el informe de finanzas la cuenta igual, sale de la orden.)
+      const precioRep = repAmt + (Number(r.sena) || 0);
+      datos.costoARSTotal = costo + artCosto;
+      datos.gananciaARS   = (precioRep - costo) + (artTotal - artCosto);
+      if (costo <= 0) datos.sinCosto = true;   // para poder listar las que faltan
       // Venta mixta: los mismos campos que usa la caja, para que los informes
       // y el resumen de Telegram la lean igual que cualquier otra.
       if (arts.length) {
         datos.items            = arts;
         datos.montoReparacion  = repAmt;
         datos.montoProductos   = artTotal;
-        datos.costoARSTotal    = artCosto;
-        datos.gananciaARS      = artTotal - artCosto;
       }
       batch.set(ingRef, datos);
-    }
-
-    // ── Egreso: costo del repuesto (si tiene costo cargado) ─
-    if (costo > 0) {
-      const egreRef = db.collection('caja_movimientos').doc();
-      batch.set(egreRef, {
-        tipo: 'egreso',
-        categoria: 'Repuesto',
-        descripcion: `Repuesto: N°${r.nOrden} ${r.marca} ${r.modelo}`.trim(),
-        monto: costo,
-        metodoPago: 'Efectivo',
-        fecha: hoy,
-        createdAt: ahora,
-        repairId: r.id
-      });
     }
 
     // ── Marcar reparación como cobrada ────────────────────

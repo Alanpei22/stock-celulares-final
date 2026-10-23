@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-costo-reparacion.js':'El costo del repuesto: contra la ganancia de la reparacion, no como egreso de caja',
   'test-arqueo-suma.js':    'Arqueo: escribir la cantidad de billetes suma el total (no solo los botones)',
   'test-sin-cargo.js':      'Sin cargo: el cargador regalado con el equipo va en $0 y se descuenta del stock',
   'test-retiro-con-accesorio.js': 'Retirar una reparación y sumar un vidrio o funda en el mismo cobro',

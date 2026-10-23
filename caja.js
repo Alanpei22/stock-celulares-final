@@ -2045,6 +2045,31 @@ function _veDatos() {
   return d;
 }
 
+// La ganancia de una venta de equipo (con lo que se lleve en la misma venta).
+//
+// Sin el costo del equipo cargado no se puede saber cuánto se ganó con él, y
+// contar su precio entero como ganancia sería mentir para el lado caro. Pero
+// la de los artículos SÍ se conoce: antes se perdían las dos, y una venta de
+// celular con funda y vidrio aportaba cero al tablero.
+function _ventaEqGanancia(precioEq, costoEq, artTotal, artCosto, hayEquipo) {
+  const pEq = Number(precioEq) || 0, cEq = Number(costoEq) || 0;
+  const pArt = Number(artTotal) || 0, cArt = Number(artCosto) || 0;
+  const out = {};
+  if (cEq > 0) {
+    out.costoARSTotal = cEq + cArt;
+    out.gananciaARS   = (pEq - cEq) + (pArt - cArt);
+  } else {
+    // Solo la parte que se conoce. El equipo queda marcado para poder listar
+    // después lo que falta cargar.
+    if (hayEquipo) out.sinCosto = true;
+    if (pArt > 0 || cArt > 0) {
+      out.costoARSTotal = cArt;
+      out.gananciaARS   = pArt - cArt;
+    }
+  }
+  return out;
+}
+
 async function confirmVentaEquipo() {
   const btn = document.getElementById('ve-confirm');
   const d = _veDatos();
@@ -2091,18 +2116,14 @@ async function confirmVentaEquipo() {
         _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
       };
       if (_veStockId) { data.itemId = _veStockId; data.itemSource = 'equipo'; data.itemQty = 1; data.itemNombre = equipo; }
-      if (stock && Number(stock.costo) > 0) {
-        data.costoARSTotal = Number(stock.costo);
-        data.gananciaARS   = d.precio - Number(stock.costo);
-      }
+      Object.assign(data, _ventaEqGanancia(
+        d.precio, (stock && Number(stock.costo)) || 0, artTotal, artCosto, !!_veStockId));
       // Venta mixta: los mismos campos que usa el cobro de la caja, para que
       // los informes y el resumen de Telegram la lean igual que cualquier otra.
       if (arts.length) {
         data.items           = arts;
         data.montoEquipo     = d.precio;
         data.montoProductos  = artTotal;
-        data.costoARSTotal   = (Number(data.costoARSTotal) || 0) + artCosto;
-        if (data.gananciaARS !== undefined) data.gananciaARS += (artTotal - artCosto);
       }
       if (d.clienteNombre) data.clienteNombre = d.clienteNombre;
       if (d.clienteTel)    data.clienteTel    = d.clienteTel;

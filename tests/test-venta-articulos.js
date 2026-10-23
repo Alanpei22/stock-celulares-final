@@ -204,7 +204,13 @@ ok(movR.data.montoReparacion === 40000 && movR.data.montoProductos === 4500,
    'con las dos partes separadas, como las ventas mixtas de la caja', movR.data);
 ok(Array.isArray(movR.data.items) && movR.data.items.length === 1 &&
    movR.data.items[0].id === 'p2', 'y el artículo adentro, con su id', movR.data.items);
-ok(movR.data.gananciaARS === 3000, 'la ganancia es la del artículo (4.500 − 1.500)', movR.data.gananciaARS);
+// La ganancia es la de la orden entera más la del artículo: 50.000 de la
+// reparación (sin costo cargado) + 3.000 del vidrio. Antes el cobro de la
+// reparación no aportaba nada y su repuesto salía como egreso aparte: el
+// tablero mostraba cada arreglo como pérdida (ver test-costo-reparacion.js).
+ok(movR.data.gananciaARS === 53000, 'la ganancia suma la reparación y el artículo', movR.data.gananciaARS);
+ok(!WRITES2.set.some(w => w.data && w.data.tipo === 'egreso'),
+   'y el repuesto no sale como un egreso de caja', WRITES2.set.map(w => w.data && w.data.tipo));
 ok(/Vidrio templado/.test(movR.data.descripcion), 'la descripción lo nombra', movR.data.descripcion);
 ok(movR.data.categoria === 'Reparación' && movR.data.repairId === 'r1',
    'sigue siendo el cobro de esa reparación', movR.data);
