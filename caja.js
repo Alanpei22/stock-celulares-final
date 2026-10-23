@@ -3834,7 +3834,13 @@ async function saveMov() {
         qty = it.stock;
       }
       const costoARSUnit = Number(it.costoARS) || 0;
-      costoTotal += costoARSUnit * qty;
+      // El costo del REPUESTO no se resta acá: ese ya se cargó como gasto el
+      // día que se compró ("Compra repuesto"), así que restarlo otra vez al
+      // venderlo sería contarlo dos veces en la caja del día. El accesorio sí
+      // lo resta: su costo no pasó por la caja.
+      // (Distinto del repuesto USADO en una reparación, que se cuenta contra
+      // la ganancia de esa orden — ver confirmarCobro en repairs.js.)
+      if (it.source !== 'repuesto') costoTotal += costoARSUnit * qty;
       items.push({
         id: it.id || null, source: it.source, nombre: it.nombre, qty,
         precioUnit: Number(it.precio) || 0,

@@ -117,8 +117,9 @@ const REPAIR = { id:'r1', nOrden:123, nombre:'Juan', marca:'Samsung', modelo:'A5
                  arreglo:'Pantalla', monto:50000, sena:10000, estado:'listo' };
 const FUNDA   = { source:'producto', id:'p1', nombre:'Funda', precio:5000, costoARS:2000, stock:10, icon:'📦' };
 const VIDRIO  = { source:'producto', id:'p2', nombre:'Vidrio', precio:3000, costoARS:1000, stock:10, icon:'📦' };
+const PANTALLA = { source:'repuesto', id:'rp1', nombre:'Módulo A54', precio:60000, costoARS:38000, stock:3, icon:'🔧' };
 const mov = () => WRITES.adds[0] && WRITES.adds[0][1];
-ctx.__REPAIR = REPAIR; ctx.__FUNDA = FUNDA; ctx.__VIDRIO = VIDRIO;
+ctx.__REPAIR = REPAIR; ctx.__FUNDA = FUNDA; ctx.__VIDRIO = VIDRIO; ctx.__PANTALLA = PANTALLA;
 // Atajos que corren DENTRO del contexto (los let de caja.js no son props del sandbox)
 const linkRepair = mode => run(`_pendingRepairLink = __REPAIR; _selectRepairMode('${mode}')`);
 const addCart    = what => run(`_addToCart(Object.assign({}, __${what}))`);
@@ -367,6 +368,33 @@ const edit = cajaSrc.slice(cajaSrc.indexOf('function _editarPrecioLinea'), cajaS
 ok(/oninput="_setCartPrecioVivo/.test(edit), 'el precio vale mientras se tipea', edit.slice(0, 300));
 ok(!/onchange=/.test(edit), 'y no hace falta salir del campo para que valga');
 ok(/Enter/.test(edit) && /this.blur\(\)/.test(edit), 'Enter confirma y baja el teclado');
+
+console.log('\n14) El costo del repuesto vendido no se resta en la caja del día');
+// Decisión de Alan: el repuesto ya se cargó como gasto el día que se compró
+// ("Compra repuesto"). Restarle el costo otra vez al venderlo sería contarlo
+// dos veces en la caja del día. El accesorio sí lo resta: su costo no pasó
+// por la caja.
+// (Distinto del repuesto USADO en una reparación: ese se cuenta contra la
+// ganancia de esa orden — ver test-costo-reparacion.js.)
+reset();
+addCart('PANTALLA');
+await save();
+ok(mov().monto === 60000, 'se cobra el repuesto', mov().monto);
+ok(mov().gananciaARS === 60000, 'y la ganancia del día es todo lo cobrado', mov().gananciaARS);
+ok(mov().costoARSTotal === 0, 'sin restar su costo', mov().costoARSTotal);
+// El costo igual no se pierde: queda en el renglón, que es de donde sale el
+// informe de finanzas.
+ok(mov().items[0].costoARSUnit === 38000, 'el costo queda anotado en el renglón', mov().items);
+ok(WRITES.updates.some(u => u[0] === 'repuestos' && u[1] === 'rp1'), 'y el stock se descuenta igual');
+
+// Un accesorio en la misma venta sí resta el suyo.
+reset();
+addCart('PANTALLA');
+addCart('FUNDA');
+await save();
+ok(mov().monto === 65000, 'repuesto + accesorio', mov().monto);
+ok(mov().costoARSTotal === 2000, 'solo el costo del accesorio', mov().costoARSTotal);
+ok(mov().gananciaARS === 63000, 'y la ganancia descuenta solo ese', mov().gananciaARS);
 
 console.log(fails ? `\n${fails} FALLARON` : '\nTodo OK');
 process.exit(fails ? 1 : 0);
