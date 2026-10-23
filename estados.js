@@ -66,6 +66,12 @@ async function estGuardar(parche) {
   await db.collection('config').doc(EST_DOC).set(EST_CFG, { merge: true });
 }
 
+// El nombre del local, para cuando todavía no cargaron el logo en
+// ⚙️ Configuración. Un recuadro vacío no se puede subir a una historia.
+function _estNombre() {
+  return (typeof window !== 'undefined' && window._DAKI_NAME) || 'TECHPOINT';
+}
+
 // ── El dibujo ─────────────────────────────────────────────
 function _estEsc(v) {
   return String(v == null ? '' : v)
@@ -91,7 +97,8 @@ function estStoryHtml(dia, cfg) {
   // botones y taparían lo que se escriba.
   return `<div class="st${abierto ? '' : ' st--cerrado'}">
     <div class="st-top">HOY ES</div>
-    ${logo ? `<img class="st-logo" src="${logo}" alt="">` : '<div class="st-logo st-logo--falta"></div>'}
+    ${logo ? `<img class="st-logo" src="${logo}" alt="">`
+           : `<div class="st-logo st-logo--texto">${_estEsc(_estNombre())}</div>`}
     <div class="st-cartel">
       <div class="st-cartel-cara" style="font-size:${_estTam(dia.lbl, 128, 620, 0.58)}px">${_estEsc(dia.lbl.toUpperCase())}</div>
       <div class="st-cartel-palo"></div>
@@ -117,7 +124,8 @@ body{width:${EST_W}px;height:${EST_H}px;background:#fff}
 /* El logo y el cartel se superponen a propósito: el cartel sale de abajo del
    logo, como si lo estuviera sosteniendo. */
 .st-logo{width:420px;height:420px;object-fit:contain;margin-top:30px}
-.st-logo--falta{border:6px dashed rgba(255,255,255,.4);border-radius:40px}
+.st-logo--texto{display:flex;align-items:center;justify-content:center;
+  font-size:74px;font-weight:800;letter-spacing:-.02em;line-height:1.05}
 .st-cartel{position:relative;margin-top:-56px;transform:rotate(-5deg)}
 .st-cartel-cara{background:#fff;color:#16161D;font-weight:800;line-height:1;
   border-radius:26px;padding:34px 46px;min-width:620px;
