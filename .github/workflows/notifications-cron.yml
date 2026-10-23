@@ -60,9 +60,12 @@ jobs:
     if: github.event.schedule == '0 * * * *'
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger /api/estado-dia
+      - name: Trigger /api/cron-cierre-pendiente (estado del día)
         env:
           BASE_URL: ${{ secrets.BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsSL -X POST "$BASE_URL/api/estado-dia"             -H "Authorization: Bearer $CRON_SECRET"             -H "Content-Type: application/json"             --data '{}'
+          curl -fsSL -X POST "$BASE_URL/api/cron-cierre-pendiente" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{"estado":true}'

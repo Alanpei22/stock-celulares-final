@@ -84,11 +84,14 @@ ok(call('_estTam', 'UNA FRASE MUCHO MÁS LARGA QUE LA OTRA', 86, 940, 0.56) >= 2
 console.log('\n6) A quién le toca salir, y cuándo');
 // Esta parte vive en la función del server: el cron pega cada hora y ella
 // decide. Se saca el pedazo y se corre suelto, sin firebase.
-const api = leer('api/estado-dia.js');
+//
+// Vive adentro de cron-cierre-pendiente.js y no en un archivo propio: sumar
+// una función más en /api volteó el deploy entero de Vercel (hay un tope).
+const api = leer('api/cron-cierre-pendiente.js');
 const apiCtx = { console, Date, Number, Math };
 apiCtx.globalThis = apiCtx;
 vm.createContext(apiCtx);
-vm.runInContext(api.slice(api.indexOf('export const EST_DIAS'), api.indexOf('export default'))
+vm.runInContext(api.slice(api.indexOf('export const EST_DIAS'), api.indexOf('async function mandarEstado'))
                    .replace(/export /g, ''), apiCtx, { filename: 'estado-dia.js' });
 const toca = (cfg, h, d) => { apiCtx.__c = cfg; apiCtx.__a = { hora: h, dia: d }; return vm.runInContext('estLeToca(__c, __a)', apiCtx); };
 const URLS = { urls: { lun: 'https://x/lun.jpg' }, hora: 10, activo: true };
@@ -118,10 +121,11 @@ ok(/allow read: if true/.test(leer('storage.rules').split('match /estados/')[1].
    'y se pueden leer por la URL, que es como las baja Telegram');
 const wf = leer('.github/workflows/notifications-cron.yml');
 ok(/cron: '0 \* \* \* \*'/.test(wf), 'el cron pega cada hora');
-ok(/api\/estado-dia/.test(wf), 'contra la función del estado');
+ok(/estado.*true/.test(wf), 'pidiendo el estado del día', (wf.match(/--data.*/g) || []));
+ok(!/api\/estado-dia/.test(wf), 'y no contra una función propia: no entra una más en Vercel');
 // Sin el secreto, cualquiera con la URL te manda estados al Telegram.
-ok(/CRON_SECRET/.test(api) && /exigirSesion/.test(api),
-   'y la función pide el secreto del cron o sesión de la app');
+ok(/auth !== `Bearer \$\{process\.env\.CRON_SECRET\}`/.test(api),
+   'y la función no hace nada sin el secreto del cron', (api.match(/auth !== .*/) || [])[0]);
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

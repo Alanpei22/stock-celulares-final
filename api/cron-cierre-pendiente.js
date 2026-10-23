@@ -5,6 +5,10 @@
 // Con body { fichadas: true } (GitHub Actions, 20:00 AR) hace otra cosa:
 // avisa por Telegram quién no fichó la salida. Va en este mismo archivo para
 // no sumar otra función a Vercel.
+//
+// Y con { estado: true } (cada hora) manda el estado del día, si a esa hora le
+// toca. Misma razón para que viva acá: sumar un archivo más en /api volteaba
+// el deploy entero.
 
 import admin from 'firebase-admin';
 
@@ -57,11 +61,74 @@ async function avisarSinSalida(db, today) {
   return { ok: !!data.ok, sinSalida: quienes.length };
 }
 
+// ── Estado del día ───────────────────────────────────────
+// "Hoy lunes, ya estamos abiertos". Las siete imágenes ya están hechas y
+// subidas desde la app (estados.js): acá solo se elige la de hoy y se manda
+// por Telegram. Por eso esto no dibuja nada.
+export const EST_DIAS = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'];
+export const EST_NOMBRE = {
+  dom: 'domingo', lun: 'lunes', mar: 'martes', mie: 'miércoles',
+  jue: 'jueves', vie: 'viernes', sab: 'sábado',
+};
+
+// Argentina es UTC-3 todo el año. Con la hora del server el estado saldría
+// tres horas antes, y un domingo a las 23:30 saldría el del lunes.
+export function estAhoraAR(ms = Date.now()) {
+  const d = new Date(ms - 3 * 3600e3);
+  return { dia: EST_DIAS[d.getUTCDay()], hora: d.getUTCHours() };
+}
+
+// El cron pega todas las horas: acá se decide si a esta le toca.
+export function estLeToca(cfg, ahora) {
+  if (!cfg || !cfg.activo) return { ok: false, por: 'apagado' };
+  if (Number(cfg.hora) !== ahora.hora) return { ok: false, por: 'no es la hora' };
+  const url = cfg.urls && cfg.urls[ahora.dia];
+  if (!url) return { ok: false, por: 'falta generar la imagen de ' + EST_NOMBRE[ahora.dia] };
+  return { ok: true, url };
+}
+
+async function mandarEstado(db, forzar) {
+  const token = process.env.TELEGRAM_BOT_TOKEN, chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return { skipped: 'telegram sin configurar' };
+  const snap = await db.collection('config').doc('estados').get();
+  const cfg = snap.exists ? snap.data() : null;
+  const ahora = estAhoraAR();
+  let url;
+  if (forzar) {
+    url = cfg && cfg.urls && cfg.urls[ahora.dia];
+    if (!url) return { ok: false, error: 'todavía no están generadas' };
+  } else {
+    const toca = estLeToca(cfg, ahora);
+    if (!toca.ok) return { ok: true, skipped: toca.por };
+    url = toca.url;
+  }
+  const caption = `📅 <b>Estado de hoy ${EST_NOMBRE[ahora.dia]}</b>\n`
+    + 'Guardala y subila a WhatsApp, Instagram o TikTok.';
+  // Telegram baja la imagen de la URL solo: no hay que mandarle el archivo.
+  const r = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, photo: url, caption, parse_mode: 'HTML' }),
+  });
+  const data = await r.json();
+  if (!data.ok) console.error('estado-dia:', data);
+  return { ok: !!data.ok, dia: ahora.dia, error: data.description };
+}
+
 export default async function handler(req, res) {
   // Authorization
   const auth = req.headers.authorization || '';
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'unauthorized' });
+  }
+
+  if (req.body && req.body.estado) {
+    try {
+      return res.status(200).json(await mandarEstado(getAdmin().firestore(), !!req.body.forzar));
+    } catch (e) {
+      console.error('cron-cierre (estado):', e);
+      return res.status(500).json({ error: e.message });
+    }
   }
 
   if (req.body && req.body.fichadas) {

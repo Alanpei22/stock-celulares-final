@@ -330,26 +330,3 @@ async function estDescargar() {
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   } catch (e) { toast('No se pudo bajar: ' + (e.message || e), 'error'); }
 }
-
-// Pedirle al server que mande la de hoy por Telegram, para probar el aviso.
-async function estProbarAviso(btn) {
-  const url = EST_CFG.urls && EST_CFG.urls[estDiaDe().k];
-  if (!url) { toast('Generá las 7 primero', 'info'); return; }
-  try {
-    if (btn) btn.disabled = true;
-    const r = await _estPost('/api/estado-dia', { probar: true });
-    toast(r && r.ok ? '📲 Te lo mandé por Telegram' : 'No salió: ' + ((r && r.error) || ''), r && r.ok ? 'success' : 'error');
-  } catch (e) { toast('No se pudo: ' + (e.message || e), 'error'); }
-  finally { if (btn) btn.disabled = false; }
-}
-
-async function _estPost(url, body) {
-  const u = firebase.auth().currentUser;
-  const tok = u ? await u.getIdToken() : '';
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
-    body: JSON.stringify(body || {}),
-  });
-  return r.json();
-}
