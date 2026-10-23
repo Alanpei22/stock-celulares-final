@@ -26,6 +26,17 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
 
+    // Las 7 imágenes del estado del día ("hoy lunes, ya estamos abiertos").
+    // Lectura abierta porque Telegram e Instagram las bajan por la URL, sin
+    // cuenta. Son un cartel con el horario: no hay nada privado adentro.
+    match /estados/{filename} {
+      allow read: if true;
+      allow delete: if esDelNegocio();
+      allow create, update: if esDelNegocio()
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
     // Cualquier otra ruta: bloqueada por defecto.
     match /{allPaths=**} {
       allow read, write: if false;

@@ -8,6 +8,9 @@ on:
     - cron: '0 13 * * *'
     # Quién no fichó la salida (Telegram): 20:00 AR = 23:00 UTC
     - cron: '0 23 * * *'
+    # Estado del día: cada hora en punto. La función decide si le toca, según
+    # la hora configurada en la app.
+    - cron: '0 * * * *'
   workflow_dispatch: {} # permite disparar manualmente desde GitHub UI
 
 jobs:
@@ -52,3 +55,14 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
             --data '{"fichadas":true}'
+
+  estado-del-dia:
+    if: github.event.schedule == '0 * * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/estado-dia
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsSL -X POST "$BASE_URL/api/estado-dia"             -H "Authorization: Bearer $CRON_SECRET"             -H "Content-Type: application/json"             --data '{}'

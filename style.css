@@ -6499,6 +6499,23 @@ body.dark .rep-pend-barra { background: #1a1d21; border-top-color: #2a2e34; }
 }
 .acc-med--on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .acc-barra-med { font-size: .74rem; }
+/* ── Estado del día ── */
+.est-dias { display: flex; gap: 5px; margin: 8px 0; }
+.est-dia {
+ flex: 1; padding: 8px 0; border-radius: 9px; cursor: pointer;
+ border: 1px solid var(--border); background: var(--card);
+ color: var(--text2); font-size: .74rem; font-weight: 700;
+}
+.est-dia--on { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* La historia es angosta y alta: el marco se achica a lo que entre. */
+.est-prev-wrap { max-width: 260px; margin-left: auto; margin-right: auto; }
+.est-prev { width: 1080px; }
+.est-horarios { display: flex; flex-direction: column; gap: 5px; }
+.est-hfila { display: flex; align-items: center; gap: 8px; }
+.est-hfila span { flex: 0 0 86px; font-size: .78rem; color: var(--text2); }
+.est-hfila .fi { flex: 1; min-width: 0; }
+.est-hora-fila { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: .8rem; }
+.est-hora-fila .fi { width: 80px; text-align: center; }
 /* Elegir tipografía y estilo: botones anchos con el nombre y para qué sirve. */
 .cart-fuentes, .acc-estilos { display: flex; flex-wrap: wrap; gap: 6px; }
 .cart-fuente, .acc-estilo {

@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-estado-dia.js':     'El estado de cada dia (hoy lunes, ya abrimos) y a que hora sale',
   'test-costo-reparacion.js':'El costo del repuesto: contra la ganancia de la reparacion, no como egreso de caja',
   'test-arqueo-suma.js':    'Arqueo: escribir la cantidad de billetes suma el total (no solo los botones)',
   'test-sin-cargo.js':      'Sin cargo: el cargador regalado con el equipo va en $0 y se descuenta del stock',
