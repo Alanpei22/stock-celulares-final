@@ -444,7 +444,10 @@ function renderArqueoRows() {
         <span class="arqueo-denom">${label}</span>
         <div class="arqueo-counter">
           <button class="arqueo-btn" onclick="changeArqueoBillete(${denom}, -1)">−</button>
-          <input class="arqueo-input" id="billete-${denom}" type="number" value="0" min="0" inputmode="numeric">
+          <!-- oninput: antes solo sumaban los botones − / +; escribiendo la
+               cantidad el total quedaba en $0 y había que sumar a mano -->
+          <input class="arqueo-input" id="billete-${denom}" type="number" value="0" min="0" inputmode="numeric"
+                 oninput="updateArqueoTotal()" onfocus="this.select()">
           <button class="arqueo-btn" onclick="changeArqueoBillete(${denom}, 1)">+</button>
         </div>
         <span class="arqueo-subtotal" id="sub-${denom}">$0</span>
@@ -4333,7 +4336,7 @@ function renderCierreArqueoRows() {
       <span class="arqueo-denom">$${d.toLocaleString('es-AR')}</span>
       <div class="arqueo-counter">
         <button class="arqueo-btn" onclick="changeCierreBillete(${d},-1)">−</button>
-        <input class="arqueo-input" id="cierre-b-${d}" type="number" value="0" min="0" inputmode="numeric" oninput="updateCierreTotal()">
+        <input class="arqueo-input" id="cierre-b-${d}" type="number" value="0" min="0" inputmode="numeric" oninput="updateCierreTotal()" onfocus="this.select()">
         <button class="arqueo-btn" onclick="changeCierreBillete(${d},1)">+</button>
       </div>
       <span class="arqueo-subtotal" id="cierre-s-${d}">$0</span>
@@ -4354,7 +4357,7 @@ function renderCierreUsdRows() {
       <span class="arqueo-denom">u$${d}</span>
       <div class="arqueo-counter">
         <button class="arqueo-btn" onclick="changeCierreUsdBillete(${d},-1)">−</button>
-        <input class="arqueo-input" id="cierre-usd-b-${d}" type="number" value="0" min="0" inputmode="numeric" oninput="updateCierreUsdTotal()">
+        <input class="arqueo-input" id="cierre-usd-b-${d}" type="number" value="0" min="0" inputmode="numeric" oninput="updateCierreUsdTotal()" onfocus="this.select()">
         <button class="arqueo-btn" onclick="changeCierreUsdBillete(${d},1)">+</button>
       </div>
       <span class="arqueo-subtotal" id="cierre-usd-s-${d}">u$0</span>
