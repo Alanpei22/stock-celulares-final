@@ -644,6 +644,78 @@ function imeiConfirmar(valor, etiqueta) {
   return confirm(`⚠️ El ${etiqueta || 'IMEI'} no parece válido:\n${e.msg}\n\n`
     + 'Marcá *#06# en el equipo para verlo.\n\n¿Guardar igual?');
 }
+// ══════════════════════════════════════════════════════════════
+//  💳 Comisión de tarjetas (Getnet)
+// ══════════════════════════════════════════════════════════════
+// En la caja se anota lo que paga el cliente (con el recargo de tarjeta),
+// pero Getnet no deposita eso: se queda con su comisión. Antes la ganancia
+// de una venta con tarjeta salía inflada y no había forma de saber cuánto
+// iba a entrar de verdad.
+//
+// El dueño carga una vez cuánto le descuenta Getnet (💳 en el menú de la
+// caja). Cada cobro con tarjeta guarda:
+//   comisionTarjeta  → lo que se queda Getnet
+//   netoTarjeta      → lo que te depositan de la parte con tarjeta
+// y a la ganancia del movimiento se le resta la comisión.
+//
+// Config: `config/tarjetas` { debito: %, credito: % }. Se lee una vez por
+// sesión y queda guardada en el dispositivo (para cobrar sin esperar).
+const TP_TARJETA_METODOS = { 'Tarjeta débito': 'debito', 'Tarjeta crédito': 'credito' };
+let _tpTarjetasLeidas = false;
+
+function tarjetaCfg() {
+  try {
+    const c = JSON.parse(localStorage.getItem('tpTarjetas') || 'null');
+    if (c && typeof c === 'object') return { debito: Number(c.debito) || 0, credito: Number(c.credito) || 0 };
+  } catch {}
+  return { debito: 0, credito: 0 };
+}
+
+function tarjetaCargar() {
+  if (_tpTarjetasLeidas || typeof db === 'undefined' || !db) return Promise.resolve(tarjetaCfg());
+  _tpTarjetasLeidas = true;
+  return db.collection('config').doc('tarjetas').get().then(d => {
+    if (d.exists) {
+      const c = d.data() || {};
+      try { localStorage.setItem('tpTarjetas', JSON.stringify({ debito: Number(c.debito) || 0, credito: Number(c.credito) || 0 })); } catch {}
+    }
+    return tarjetaCfg();
+  }).catch(() => tarjetaCfg());
+}
+
+// Cuánto se queda Getnet de un movimiento. Contempla el pago dividido
+// (parte en efectivo y parte con tarjeta): solo la parte con tarjeta paga.
+function tarjetaCalculo(mov, cfg) {
+  cfg = cfg || tarjetaCfg();
+  const monto = Number(mov && mov.monto) || 0;
+  const m2 = Number(mov && mov.monto2) || 0;
+  const partes = [[mov && mov.metodoPago, monto - (mov && mov.metodoPago2 ? m2 : 0)]];
+  if (mov && mov.metodoPago2 && m2 > 0) partes.push([mov.metodoPago2, m2]);
+  let cobrado = 0, comision = 0;
+  partes.forEach(([met, plata]) => {
+    const k = TP_TARJETA_METODOS[met];
+    if (!k || !(plata > 0)) return;
+    cobrado += plata;
+    comision += plata * (Number(cfg[k]) || 0) / 100;
+  });
+  comision = Math.round(comision);
+  return { cobrado, comision, neto: cobrado - comision };
+}
+
+// Se llama justo antes de guardar un ingreso en la caja. Cambia `mov`.
+function tarjetaAplicar(mov) {
+  try {
+    if (!mov || mov.tipo === 'egreso') return mov;
+    tarjetaCargar();   // para la próxima, si todavía no se leyó
+    const r = tarjetaCalculo(mov);
+    if (!(r.cobrado > 0) || !(r.comision > 0)) return mov;
+    mov.comisionTarjeta = r.comision;
+    mov.netoTarjeta = r.neto;
+    if (typeof mov.gananciaARS === 'number') mov.gananciaARS -= r.comision;
+  } catch (e) { console.warn('[tarjeta]', e); }
+  return mov;
+}
+
 
 // ══════════════════════════════════════════════════════════
 //  COTIZACIÓN DEL BLUE — para MOSTRAR
@@ -763,4 +835,3 @@ function waAbrir(url) {
   }
   return window.open(u, '_blank');
 }
-

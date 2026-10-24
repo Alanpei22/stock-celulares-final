@@ -2260,6 +2260,7 @@ function _senaAlIngresoACaja(rep) {
     const vend = localStorage.getItem('cajaVendedor');
     if (vend) mov.vendedor = vend;
   } catch {}
+  if (typeof tarjetaAplicar === 'function') tarjetaAplicar(mov);   // 💳 lo que se queda Getnet
   const p = db.collection('caja_movimientos').add(mov);
   p.then(() => toast(`💵 Seña de $${sena.toLocaleString('es-AR')} anotada en la caja`, 'success'))
    .catch(e => {
@@ -2854,6 +2855,7 @@ function _saldoACobrar(r) {
 }
 
 function openCobroModal(r) {
+  if (typeof tarjetaCargar === 'function') tarjetaCargar();   // 💳 comisión de Getnet al día (1 lectura por sesión)
   // Siempre la versión más nueva: la seña o el cobro pueden haber entrado
   // desde la caja (otro dispositivo) después de dibujar la card.
   r = REPAIRS.find(x => x.id === r?.id) || r;
@@ -2982,6 +2984,7 @@ async function confirmarCobro() {
         datos.montoReparacion  = repAmt;
         datos.montoProductos   = artTotal;
       }
+      if (typeof tarjetaAplicar === 'function') tarjetaAplicar(datos);   // 💳 lo que se queda Getnet
       batch.set(ingRef, datos);
     }
 

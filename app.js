@@ -965,13 +965,18 @@ function _renderKPIs() {
   const tRet = ret.reduce((s, m) => s + (Number(m.monto) || 0), 0);
   const gan  = m => (Number(m.gananciaARS) || 0);
   const bruta = ing.reduce((s, m) => s + gan(m), 0);
-  const neta = bruta - tEg;
+  // 💳 La comisión de Getnet ya está restada en la ganancia de cada venta;
+  // en los cobros sin ganancia calculada (reparaciones) se resta acá.
+  const comTarj = ing.filter(m => typeof m.gananciaARS !== 'number')
+    .reduce((s, m) => s + (Number(m.comisionTarjeta) || 0), 0);
+  const neta = bruta - tEg - comTarj;
   const ticket = ing.length ? tIng / ing.length : 0;
 
   const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
   set('d-neta', _dMoney(neta));
   set('d-neta-usd', _dUsd(neta));
-  set('d-neta-formula', 'Ganancia bruta ' + _dMoney(bruta) + ' − Egresos ' + _dMoney(tEg));
+  set('d-neta-formula', 'Ganancia bruta ' + _dMoney(bruta) + ' − Egresos ' + _dMoney(tEg)
+    + (comTarj > 0 ? ' − Comisión tarjetas ' + _dMoney(comTarj) : ''));
   const bEl = document.getElementById('d-neta-badge');
   if (bEl) {
     bEl.textContent = neta >= 0 ? 'Positivo' : 'Negativo';
@@ -1913,6 +1918,7 @@ async function deletePhone(id) {
 
 // ── Modal Venta ───────────────────────────────────────────
 function openSellModal(id) {
+  if (typeof tarjetaCargar === 'function') tarjetaCargar();   // 💳 comisión de Getnet al día (1 lectura por sesión)
   pendingSellId = id;
   const selV = document.getElementById('sell-vendedor');
   const selP = document.getElementById('sell-pago');
@@ -2013,6 +2019,7 @@ async function confirmSell() {
         movData.gananciaARS = p.precio - p.costo;
       }
       if (yaEntregado > 0) movData.senaPrevia = yaEntregado;
+      if (typeof tarjetaAplicar === 'function') tarjetaAplicar(movData);   // 💳 lo que se queda Getnet
       batch.set(movRef, movData);
     }
 

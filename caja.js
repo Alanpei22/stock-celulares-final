@@ -868,8 +868,15 @@ function _metodoInfo(metodo) {
   return map[canon] || { icon: '💰', cls: 'metodo-otro', short: metodo || 'Efectivo' };
 }
 
-// Badge(s) de método para una tarjeta (contempla pago dividido)
+// Badge(s) de método para una tarjeta (contempla pago dividido) + lo que
+// te deposita Getnet si se pagó con tarjeta (💳, ver tarjetaAplicar en utils.js)
 function _metodoBadges(m) {
+  const base = _metodoBadgesBase(m);
+  const com = Number(m.comisionTarjeta) || 0;
+  if (!(com > 0) || m.tipo === 'egreso') return base;
+  return base + `<span class="mov-metodo-badge metodo-otro" title="Getnet se queda $${com.toLocaleString('es-AR')}">🏦 te depositan $${(Number(m.netoTarjeta) || 0).toLocaleString('es-AR')}</span>`;
+}
+function _metodoBadgesBase(m) {
   const inf = _metodoInfo(metodoCanonico(m.metodoPago));
   if (m.metodoPago === 'Dólares') {
     const usd = Number(m.montoUSD) || 0;
@@ -898,10 +905,16 @@ function _renderMetodoResumen() {
   });
   const entries = Object.entries(tot).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   if (!entries.length) return '';
+  // 💳 Lo que de verdad deposita Getnet de las tarjetas del día
+  const ing = MOVIMIENTOS.filter(m => m.tipo === 'ingreso');
+  const comision = ing.reduce((s, m) => s + (Number(m.comisionTarjeta) || 0), 0);
+  const neto = ing.reduce((s, m) => s + (Number(m.netoTarjeta) || 0), 0);
   return `<div class="mov-metodo-resumen">` + entries.map(([met, v]) => {
     const inf = _metodoInfo(met);
     return `<span class="mov-mr-item ${inf.cls}">${inf.icon} ${inf.short} <b>${fmt(v)}</b></span>`;
-  }).join('') + `</div>`;
+  }).join('') + (comision > 0
+    ? `<span class="mov-mr-item metodo-otro" title="Lo que se queda Getnet: ${fmt(comision)}">🏦 Getnet te deposita <b>${fmt(neto)}</b> (−${fmt(comision)})</span>`
+    : '') + `</div>`;
 }
 
 function renderMovimientos() {
@@ -1050,11 +1063,39 @@ function toggleCajaMenu() {
       onClick: () => (typeof toggleWaApp === 'function') && toggleWaApp() },
     { divider: true, hide: !isOwner },
     { icon: '📦', label: 'Caja Dueño', hide: !isOwner, onClick: openCajaDueno },
+    { icon: '💳', label: 'Comisión de tarjetas (Getnet)', sub: (() => { const c = (typeof tarjetaCfg === 'function') ? tarjetaCfg() : {}; return (c.debito || c.credito) ? `Débito ${c.debito}% · Crédito ${c.credito}%` : 'Cuánto te descuenta Getnet de cada cobro'; })(),
+      hide: !isOwner, onClick: configurarComisionTarjetas },
     { divider: true },
     { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
   ]);
 }
 function closeCajaMenu() { closeSheet(); }
+
+// 💳 Cuánto se queda Getnet. Se carga una vez (y cuando cambie la comisión)
+// y vale para todos los dispositivos. Solo el dueño (modo dueño).
+async function configurarComisionTarjetas() {
+  closeCajaMenu();
+  const act = (typeof tarjetaCfg === 'function') ? tarjetaCfg() : { debito: 0, credito: 0 };
+  const pedir = (txt, v) => {
+    const r = prompt(txt, v ? String(v).replace('.', ',') : '');
+    if (r === null) return null;
+    const n = parseFloat(String(r).replace('%', '').replace(',', '.').trim());
+    return isNaN(n) || n < 0 || n > 50 ? NaN : n;
+  };
+  const deb = pedir('💳 ¿Qué % te descuenta Getnet en DÉBITO?\n(comisión + IVA + retenciones, mirá una liquidación)\nEj: 1,8', act.debito);
+  if (deb === null) return;
+  const cre = pedir('💳 ¿Qué % te descuenta Getnet en CRÉDITO?\nEj: 3,5', act.credito);
+  if (cre === null) return;
+  if (isNaN(deb) || isNaN(cre)) { toast('Porcentaje inválido: escribilo como 1,8', 'error'); return; }
+  try {
+    await db.collection('config').doc('tarjetas').set({ debito: deb, credito: cre, actualizado: new Date().toISOString() });
+    try { localStorage.setItem('tpTarjetas', JSON.stringify({ debito: deb, credito: cre })); } catch {}
+    toast(`💳 Guardado: débito ${deb}% · crédito ${cre}%. Vale para los cobros de ahora en adelante.`, 'success');
+  } catch (e) {
+    console.error('comisión tarjetas:', e);
+    toast('No se pudo guardar', 'error');
+  }
+}
 
 // ══════════════════════════════════════════
 //  BUSCAR EN VENTAS — todas las fechas (no solo el día que estás viendo)
@@ -1722,7 +1763,7 @@ function closePlanPago() {
 // exacto y no otro del mismo importe.
 async function _planMovCaja(plan, monto, metodo, cuando) {
   const eq = `${plan.equipo?.marca || ''} ${plan.equipo?.modelo || ''}`.trim();
-  await db.collection('caja_movimientos').add({
+  const movPlan = {
     tipo: 'ingreso',
     categoria: 'Plan ahorro',
     descripcion: `Plan N°${plan.nro} — ${plan.cliente?.nombre || ''}${eq ? ' · ' + eq : ''}`,
@@ -1736,7 +1777,9 @@ async function _planMovCaja(plan, monto, metodo, cuando) {
     clienteTel: plan.cliente?.tlf || null,
     vendedor: plan.vendedor || null,
     _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
-  });
+  };
+  if (typeof tarjetaAplicar === 'function') tarjetaAplicar(movPlan);   // 💳 lo que se queda Getnet
+  await db.collection('caja_movimientos').add(movPlan);
 }
 
 // Le saca a un plan una entrega que se borró de la caja. Se lee el documento
@@ -2128,6 +2171,7 @@ async function confirmVentaEquipo() {
       if (d.clienteNombre) data.clienteNombre = d.clienteNombre;
       if (d.clienteTel)    data.clienteTel    = d.clienteTel;
       if (d.vendedor)      data.vendedor      = d.vendedor;
+      if (typeof tarjetaAplicar === 'function') tarjetaAplicar(data);   // 💳 lo que se queda Getnet
       const movRef = await db.collection('caja_movimientos').add(
         { ...data, ...(typeof tpFirma === 'function' ? tpFirma() : {}) });   // quién lo cargó
       movId = movRef.id;
@@ -2380,6 +2424,7 @@ function _resetClienteFields(mov) {
 }
 
 function openMovForm(id) {
+  if (typeof tarjetaCargar === 'function') tarjetaCargar();   // 💳 comisión de Getnet al día (1 lectura por sesión)
   if (typeof tpFrenar === 'function' && tpFrenar('caja', 'usar la caja')) return;
   closeFabMenu();
   // Si se abre el modal de cobro es porque se va a vender: acá ya hacen falta
@@ -3950,9 +3995,13 @@ async function saveMov() {
         data.costoARSTotal = Number(prevMov.costoARSTotal) || 0;
         data.gananciaARS   = (Number(monto) || 0) - data.costoARSTotal;
       }
+      // 💳 recalcular la comisión (pudo cambiar el monto o el método)
+      if (data.tipo === 'ingreso') { data.comisionTarjeta = 0; data.netoTarjeta = 0; }
+      if (typeof tarjetaAplicar === 'function') tarjetaAplicar(data);
       await db.collection('caja_movimientos').doc(editingMovId).update(data);
       toast('Movimiento actualizado', 'success');
     } else {
+      if (typeof tarjetaAplicar === 'function') tarjetaAplicar(data);   // 💳 lo que se queda Getnet
       const movRef = await db.collection('caja_movimientos').add({
         ...data,
         createdAt: new Date().toISOString(),
