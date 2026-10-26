@@ -13,7 +13,7 @@
 
 // ── 1. COMPLETAR ESTOS DOS VALORES ──────────────────────────────────────────
 var URL_APP = 'https://stock-celulares-final.vercel.app';
-var SECRETO = 'PEGAR_ACA_EL_CRON_SECRET';   // el mismo CRON_SECRET que está en Vercel
+var SECRETO = 'PEGAR_ACA_LA_CLAVE';   // la misma que pusiste en Vercel como AVISOS_SECRET
 // ────────────────────────────────────────────────────────────────────────────
 
 // Etiqueta que se le pone al mail ya avisado, para no avisar dos veces
@@ -127,8 +127,10 @@ function probarAviso() {
 
    1. Entrá a script.google.com con la cuenta de Gmail que recibe los mails de
       MercadoPago → "Nuevo proyecto" → borrá lo que haya y pegá todo esto.
-   2. Completá SECRETO con el CRON_SECRET que ya tenés en Vercel
-      (Vercel → el proyecto → Settings → Environment Variables).
+   2. Inventá una clave larga (20 letras y números, mínimo) y ponela en dos
+      lugares: en Vercel (el proyecto → Settings → Environment Variables →
+      Add: nombre AVISOS_SECRET, valor tu clave → Save; después Deployments →
+      los tres puntitos del último → Redeploy) y acá en SECRETO.
    3. Guardá (💾) y ponele un nombre al proyecto.
    4. Arriba, elegí la función "probarAviso" y tocá "Ejecutar".
       La primera vez te va a pedir permiso para leer Gmail: aceptá.

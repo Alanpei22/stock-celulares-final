@@ -47,10 +47,17 @@ export function getAdmin() {
 
 // ¿La llamada viene de uno de los crons? Los crons corren en el server, no
 // tienen sesión de Firebase, así que se identifican con CRON_SECRET.
+// También vale AVISOS_SECRET: es la clave del script de Gmail que avisa las
+// transferencias de MercadoPago (tools/gmail-aviso-mp.gs). Va aparte porque
+// el CRON_SECRET de Vercel está oculto y no se puede copiar, y porque así,
+// si la del script se filtra, se cambia sola sin tocar los crons. Solo sirve
+// donde se usa esto: mandar push y mandar Telegram.
 export function esCron(req) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  return (req.headers.authorization || '') === `Bearer ${secret}`;
+  const auth = req.headers.authorization || '';
+  const cron = process.env.CRON_SECRET, avisos = process.env.AVISOS_SECRET;
+  if (cron && auth === `Bearer ${cron}`) return true;
+  // una clave corta se adivina: la del script tiene que ser larga
+  return !!(avisos && avisos.length >= 16 && auth === `Bearer ${avisos}`);
 }
 
 // ¿La llamada viene del navegador con una sesión abierta y autorizada?
