@@ -784,9 +784,12 @@ function switchSection(section) {
   // El dashboard tiene dos vistas: 📊 Números y 🔧 Taller (taller.js). La
   // compu del local queda en la que se usó la última vez.
   if (section === 'dash') {
-    if (typeof tallerModo === 'function' && tallerModoGuardado() === 'taller') tallerModo('taller');
+    if (typeof tallerModo === 'function' && tallerModoGuardado() !== 'numeros') tallerModo(tallerModoGuardado());
     else { if (typeof tallerModo === 'function' && tallerActivo()) tallerModo('numeros'); else renderDashboard(); }
-  } else if (typeof _tlDejar === 'function') _tlDejar();   // no escuchar fichadas sin mirar el tablero
+  } else {
+    if (typeof _tlDejar === 'function') _tlDejar();   // no escuchar fichadas sin mirar el tablero
+    if (typeof oficinaDejar === 'function') oficinaDejar();
+  }
   // CUPO: los repuestos son una colección entera; se leen recién cuando se
   // entra a la sección, no en cada apertura de la app.
   if (section === 'repuestos' && typeof listenRepuestos === 'function') listenRepuestos();
@@ -851,6 +854,8 @@ function _refreshDashIfVisible() {
   if (!s || s.classList.contains('section-hidden')) return;
   // En la vista 🔧 Taller se redibuja el tablero (cambió una reparación)
   if (typeof tallerActivo === 'function' && tallerActivo()) { tallerRender(); return; }
+  // En 🏢 Oficina los personajes vuelven a mirar (cambió algo)
+  if (typeof oficinaActiva === 'function' && oficinaActiva()) { oficinaRender(); return; }
   _renderDashReps();
   _renderKPIs();
   _renderDashCats();

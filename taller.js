@@ -227,25 +227,33 @@ function _tlDejar() {
 
 // Cambia entre 📊 Números y 🔧 Taller. Se recuerda en el dispositivo: la
 // compu del local queda siempre en el tablero.
+// Las vistas del dashboard: 📊 Números · 🔧 Taller · 🏢 Oficina (oficina.js)
+const TL_MODOS = ['numeros', 'taller', 'oficina'];
 function tallerModo(modo) {
-  _tlModo = modo === 'taller' ? 'taller' : 'numeros';
+  _tlModo = TL_MODOS.includes(modo) ? modo : 'numeros';
   try { localStorage.setItem('dashModo', _tlModo); } catch {}
-  if (_tlModo === 'taller') _tlEstilos();   // antes de esconder los números
+  _tlEstilos();   // antes de esconder los números
+  if (_tlModo === 'oficina' && typeof _ofEstilos === 'function') _ofEstilos();
   const sec = document.getElementById('dash-section');
-  if (sec) sec.classList.toggle('modo-taller', _tlModo === 'taller');
+  if (sec) {
+    sec.classList.toggle('modo-taller', _tlModo === 'taller');
+    sec.classList.toggle('modo-oficina', _tlModo === 'oficina');
+  }
   document.querySelectorAll('#d-modo button').forEach(b => b.classList.toggle('sel', b.dataset.modo === _tlModo));
   if (_tlModo === 'taller') {
     _tlEscucharFichadas();
     if (!_tlReloj) _tlReloj = setInterval(tallerRender, 60000);   // la hora y los "hace X"
     tallerRender();
-  } else {
-    _tlDejar();
-    if (typeof renderDashboard === 'function') renderDashboard();
-  }
+  } else _tlDejar();
+  if (_tlModo === 'oficina') { if (typeof oficinaMostrar === 'function') oficinaMostrar(); }
+  else if (typeof oficinaDejar === 'function') oficinaDejar();
+  if (_tlModo === 'numeros' && typeof renderDashboard === 'function') renderDashboard();
 }
 
 function tallerModoGuardado() {
-  try { return localStorage.getItem('dashModo') === 'taller' ? 'taller' : 'numeros'; } catch { return 'numeros'; }
+  let m = 'numeros';
+  try { m = localStorage.getItem('dashModo') || 'numeros'; } catch {}
+  return TL_MODOS.includes(m) ? m : 'numeros';
 }
 function tallerActivo() { return _tlModo === 'taller'; }
 

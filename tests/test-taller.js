@@ -62,7 +62,7 @@ const ix = leer('index.html');
 ok(/onclick="tallerModo\('numeros'\)"/.test(ix) && /onclick="tallerModo\('taller'\)"/.test(ix) && /id="d-taller"/.test(ix), 'botones 📊 Números / 🔧 Taller');
 ok(/src="taller\.js"/.test(ix), 'carga taller.js');
 const app = leer('app.js');
-ok(/tallerModoGuardado\(\) === 'taller'/.test(app), 'la compu del local queda en la vista que se usó la última vez');
+ok(/tallerModoGuardado\(\) !== 'numeros'\) tallerModo\(tallerModoGuardado\(\)\)/.test(app), 'la compu del local queda en la vista que se usó la última vez');
 ok(/if \(typeof tallerActivo === 'function' && tallerActivo\(\)\) \{ tallerRender\(\); return; \}/.test(app), 'se actualiza solo cuando cambia una reparación');
 ok(/_tlDejar\(\)/.test(app), 'y deja de escuchar las fichadas al salir del dashboard (cupo)');
 
