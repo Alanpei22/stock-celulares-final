@@ -4,10 +4,13 @@ on:
   schedule:
     # 19:15 AR = 22:15 UTC (Argentina es UTC-3 todo el año, no hay horario de verano)
     - cron: '15 22 * * *'
+    # El parte de la oficina (🏢, firmado por cada personaje): 10:30 AR = 13:30 UTC
+    - cron: '30 13 * * *'
   workflow_dispatch: {} # permite dispararlo a mano desde GitHub para probar
 
 jobs:
   resumen-telegram:
+    if: github.event.schedule == '15 22 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger /api/cron-resumen-telegram
@@ -19,3 +22,18 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
             --data '{}'
+
+  parte-oficina:
+    if: github.event.schedule == '30 13 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/cron-resumen-telegram (parte de la oficina)
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -fsSL -X POST "$BASE_URL/api/cron-resumen-telegram" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            --max-time 90 \
+            --data '{"oficina":true}'

@@ -1,5 +1,13 @@
 {
   "rewrites": [
-    { "source": "/equipos", "destination": "/equipos.html" }
-  ]
+    {
+      "source": "/equipos",
+      "destination": "/equipos.html"
+    }
+  ],
+  "functions": {
+    "api/cron-resumen-telegram.js": {
+      "maxDuration": 60
+    }
+  }
 }

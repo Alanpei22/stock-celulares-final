@@ -126,7 +126,10 @@ ok(/api\/cron-resumen-telegram/.test(wf), 'y llama al endpoint');
 ok(/workflow_dispatch/.test(wf), 'se puede disparar a mano para probarlo sin esperar al horario');
 
 console.log('\n11) El endpoint');
-const vivo = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
+// El parte de la mañana (🏢, { oficina: true }) vive en el mismo archivo y lee
+// más, una vez por día: lo cuida tests/test-parte-oficina.js. Acá, solo la noche.
+const sinParte = src.slice(0, src.indexOf('//  🏢 El parte de la oficina')) + src.slice(src.indexOf('export default'));
+const vivo = sinParte.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
 ok(/CRON_SECRET/.test(vivo), 'exige el secreto del cron: está abierto en internet');
 ok(vivo.indexOf('CRON_SECRET') < vivo.indexOf('TELEGRAM_BOT_TOKEN'),
    'y corta ANTES de tocar las credenciales del bot');

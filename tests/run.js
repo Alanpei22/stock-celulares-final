@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-parte-oficina.js':  'Parte de la oficina por Telegram a las 10:30: cada personaje firma lo suyo y la IA dice por dónde arrancar',
   'test-oficina-ia.js':     'Oficina con IA: cada personaje lo piensa y devuelve plan y mensajes listos (sin teléfonos, sin montos si no hay permiso)',
   'test-oficina.js':        'La oficina: Tito (taller), Rosa (stock), Beto (caja), Lu (ventas) y Marta (personal) avisan y preguntan',
   'test-taller.js':         'Tablero del taller (Dashboard): columnas, quién trabaja, sin montos',
