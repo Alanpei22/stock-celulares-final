@@ -25,7 +25,8 @@
 // · Volumen: pocos avisos por tipo; el resto va en "y N más".
 // · "Más tarde" pospone (en este dispositivo) y vuelve si sigue el problema.
 // · Si una cuenta no puede leer algo (reglas), ese aviso no aparece.
-// · Nada de "piensa con IA" por ahora: reglas fijas, gratis e instantáneas.
+// · Los avisos son reglas fijas, gratis e instantáneas. La IA (✨ Pensalo
+//   con IA) es aparte y solo cuando se la pide: ver más abajo.
 'use strict';
 
 const OF_APERTURA = '10:00';   // desde esta hora Beto reclama el arqueo
@@ -359,6 +360,213 @@ async function oficinaAccion(clave, i) {
 }
 
 // ══════════════════════════════════════════════════════════════
+//  ✨ Pensalo con IA
+// ══════════════════════════════════════════════════════════════
+// Los avisos de arriba son reglas fijas (gratis, al instante). Esto es lo
+// otro: le pedís a un personaje que lo piense y la IA (api/ai.js, acción
+// 'oficina') te devuelve qué haría, en orden, y los mensajes ya escritos.
+// · Solo cuando tocás el botón: cada consulta cuesta (unos centavos de dólar).
+// · A la IA va SOLO lo de ese personaje, resumido; de los clientes, el nombre
+//   de pila (nada de teléfonos: el WhatsApp se arma acá con la orden).
+// · Sin permiso de ver totales, Beto no manda montos.
+// · La última respuesta de cada uno queda guardada unas horas en este
+//   dispositivo, así no se paga dos veces lo mismo.
+const OF_IA_HORAS = 6;
+let _ofIAEstado = null;     // { [pj]: { pensando } | { ia, t, pregunta } | { error } }
+let _ofIAVer = '';          // de quién se muestra la respuesta
+let _ofIAPreg = '';
+let _ofIABorr = [];         // borradores a la vista (los botones usan el índice)
+
+function _ofIACargar() {
+  if (_ofIAEstado) return _ofIAEstado;
+  _ofIAEstado = {};
+  try {
+    const o = JSON.parse(localStorage.getItem('oficinaIA') || '{}') || {};
+    Object.keys(o).forEach(k => { if (o[k] && o[k].ia && Date.now() - o[k].t < OF_IA_HORAS * 3600e3) _ofIAEstado[k] = o[k]; });
+  } catch {}
+  return _ofIAEstado;
+}
+function _ofIAGuardar() {
+  const o = {};
+  Object.keys(_ofIAEstado || {}).forEach(k => { if (_ofIAEstado[k].ia) o[k] = _ofIAEstado[k]; });
+  try { localStorage.setItem('oficinaIA', JSON.stringify(o)); } catch {}
+}
+
+// Lo que cada personaje le cuenta a la IA. PURA (se prueba sola).
+function oficinaDatosIA(pjId, ctx) {
+  const ahora = ctx.ahora || Date.now();
+  const verPlata = ctx.verPlata !== false;
+  const pila = n => String(n || '').trim().split(/\s+/)[0] || '';
+  if (pjId === 'tito') {
+    const abiertas = (ctx.repairs || [])
+      .filter(r => (r.estado === 'reparando' || r.estado === 'listo'))
+      .map(r => ({ r, d: _ofDias(r.fechaIngreso, ahora) }))
+      .filter(x => x.d !== null && x.d <= OF_DIAS_VIEJA)
+      .sort((a, b) => b.d - a.d);
+    const porTecnico = {};
+    abiertas.forEach(({ r }) => { if (r.estado === 'reparando') { const t = r.tecnico || 'sin asignar'; porTecnico[t] = (porTecnico[t] || 0) + 1; } });
+    return {
+      ordenesAbiertas: abiertas.length,
+      enTallerPorTecnico: porTecnico,
+      ordenes: abiertas.slice(0, 40).map(({ r, d }) => {
+        const o = { id: r.id, orden: r.nOrden || null, equipo: _ofEquipo(r), estado: r.estado, diasDesdeIngreso: d };
+        if (r.arreglo) o.arreglo = String(r.arreglo).slice(0, 120);
+        if (r.falla) o.falla = String(r.falla).slice(0, 160);
+        if (r.estado === 'listo') o.diasLista = _ofDias(r.fechaListo || (typeof ctx.desde === 'function' ? ctx.desde(r) : r.fechaIngreso), ahora);
+        if (r.tecnico) o.tecnico = r.tecnico;
+        if (r.nombre) o.cliente = pila(r.nombre);
+        o.tieneWhatsApp = !!r.tlf;
+        if (verPlata && Number(r.presupuesto) > 0) o.presupuesto = Number(r.presupuesto);
+        if (verPlata && Number(r.sena) > 0) o.sena = Number(r.sena);
+        if (r.seguimientoFecha && !r.seguimientoAck) o.seguimientoPendiente = r.seguimientoFecha;
+        return o;
+      }),
+    };
+  }
+  if (pjId === 'rosa') {
+    const cerca = (lista, campo, origen) => (Array.isArray(lista) ? lista : [])
+      .filter(x => x && x.activo !== false)
+      .map(x => ({ x, cant: Number(x[campo]) || 0, min: Number(x.stockMin) || 0 }))
+      .filter(o => o.cant < 0 || (o.min > 0 && o.cant <= o.min * 2) || (o.min === 0 && o.cant <= 0))
+      .sort((a, b) => (a.cant - a.min) - (b.cant - b.min))
+      .slice(0, 60)
+      .map(({ x, cant, min }) => ({
+        nombre: origen === 'repuesto' ? [x.tipo, x.nombre && x.nombre !== x.tipo ? x.nombre : '', x.marca, x.modelo].filter(Boolean).join(' ') : (x.nombre || 'Artículo'),
+        tipo: _ofCategoriaPedido(x), hay: cant, minimo: min,
+      }));
+    return {
+      repuestosBajos: cerca(ctx.repuestos, 'cantidad', 'repuesto'),
+      accesoriosBajos: cerca(ctx.productos, 'stock', 'accesorio'),
+      yaEnElPedido: (ctx.pedidos || []).filter(p => !p.comprado).slice(0, 50)
+        .map(p => ({ nombre: p.nombre, cantidad: p.cantidad || 1, categoria: p.categoria || '' })),
+    };
+  }
+  if (pjId === 'beto') {
+    const caja = ctx.caja || {};
+    const movs = Array.isArray(caja.movs) ? caja.movs : [];
+    const porMetodo = {}, porCategoria = {};
+    let ingresos = 0, egresos = 0;
+    movs.forEach(m => {
+      const metodo = m.metodoPago || 'sin dato', cat = m.categoria || 'sin categoría';
+      porMetodo[metodo] = porMetodo[metodo] || { cantidad: 0 };
+      porMetodo[metodo].cantidad++;
+      porCategoria[cat] = porCategoria[cat] || { cantidad: 0 };
+      porCategoria[cat].cantidad++;
+      if (verPlata) {
+        const n = Number(m.monto) || 0;
+        porMetodo[metodo].total = (porMetodo[metodo].total || 0) + n;
+        porCategoria[cat].total = (porCategoria[cat].total || 0) + (m.tipo === 'egreso' ? -n : n);
+        if (m.tipo === 'egreso') egresos += n; else if (m.tipo === 'ingreso') ingresos += n;
+      }
+    });
+    const o = {
+      cajaAbierta: caja.arqueo, cajaCerrada: caja.cierre,
+      movimientosHoy: movs.length, porMetodoDePago: porMetodo, porCategoria,
+      ventasSinCosto: movs.filter(m => m.tipo === 'ingreso' && m.sinCosto).length,
+      comisionTarjetaCargada: !!((ctx.tarjetas || {}).debito > 0 || (ctx.tarjetas || {}).credito > 0),
+      chequeoPendiente: ctx.chequeoPendiente || null,
+      seVenLosMontos: verPlata,
+    };
+    if (verPlata) {
+      o.ingresosHoy = ingresos; o.egresosHoy = egresos;
+      o.ganancia = movs.reduce((s, m) => s + (Number(m.gananciaARS) || 0), 0);
+      o.comisionTarjetaHoy = movs.reduce((s, m) => s + (Number(m.comisionTarjeta) || 0), 0);
+    }
+    return o;
+  }
+  const pj = OFICINA_PJ.find(p => p.id === pjId);
+  return (pj && typeof pj.datosIA === 'function') ? pj.datosIA(ctx) : {};
+}
+
+async function oficinaIA(id) {
+  const est = _ofIACargar();
+  if (!id) {
+    // Enter en la pregunta: al que estás mirando, o al que tiene más para decir
+    const grupos = oficinaHallazgos(_ofCtx());
+    id = _ofFiltro || _ofIAVer || (grupos.slice().sort((a, b) => b.items.length - a.items.length)[0] || {}).pj?.id || 'tito';
+  }
+  const pj = OFICINA_PJ.find(p => p.id === id);
+  if (!pj || (est[id] && est[id].pensando)) return;
+  const inp = typeof document !== 'undefined' ? document.getElementById('of-ia-preg') : null;
+  const pregunta = String((inp && inp.value) || _ofIAPreg || '').trim().slice(0, 600);
+  const ctx = _ofCtx();
+  const hallazgos = ((oficinaHallazgos(ctx).find(g => g.pj.id === id) || {}).items || []).map(h => h.texto);
+  _ofIAVer = id;
+  _ofIAPreg = '';
+  est[id] = { pensando: true, pregunta, desde: Date.now() };
+  oficinaRender(true);
+  try {
+    const res = await apiFetch('/api/ai', { method: 'POST', body: JSON.stringify({ action: 'oficina', data: { pj: id, pregunta, hallazgos, datos: oficinaDatosIA(id, ctx) } }) });
+    let out;
+    try { out = JSON.parse(await res.text()); } catch { out = {}; }
+    if (!out.ia && !out.error) out.error = res.status === 401 ? 'La sesión venció: salí y volvé a entrar.' : 'No se pudo hablar con la IA (error ' + res.status + ').';
+    est[id] = out.ia ? { ia: out.ia, t: Date.now(), pregunta } : { error: out.error, pregunta };
+    if (out.ia) _ofIAGuardar();
+  } catch (e) {
+    est[id] = { error: 'Sin conexión. Probá de nuevo en un rato.', pregunta };
+  }
+  oficinaRender(true);
+}
+
+function oficinaIACerrar() { _ofIAVer = ''; oficinaRender(true); }
+
+function oficinaIABorrador(i, como) {
+  const b = _ofIABorr[i];
+  if (!b) return;
+  if (como === 'wa' && typeof repairWhatsAppText === 'function') return repairWhatsAppText(b.ref, b.texto);
+  const ok = () => (typeof toast === 'function') && toast('📋 Copiado: pegalo donde quieras', 'success');
+  try { navigator.clipboard.writeText(b.texto).then(ok, () => prompt('Copiá el texto:', b.texto)); }
+  catch { prompt('Copiá el texto:', b.texto); }
+}
+
+function _ofIAHtml(grupos) {
+  const est = _ofIACargar();
+  const pjs = OFICINA_PJ.filter(pj => !_ofFiltro || pj.id === _ofFiltro);
+  const pj = OFICINA_PJ.find(p => p.id === _ofIAVer);
+  const e = pj ? est[pj.id] : null;
+  _ofIABorr = [];
+  let res = '';
+  if (pj && e) {
+    const cab = `<div class="of-item-cab"><span class="of-ava" style="background:${pj.color}">${_ofEsc(pj.nombre[0])}</span><b>${_ofEsc(pj.nombre)}</b>
+      <span class="of-rol">${e.pensando ? 'pensando…' : e.t ? 'lo pensó ' + _ofHace(e.t) : ''}</span>
+      <button type="button" class="of-ia-x" onclick="oficinaIACerrar()" title="Cerrar">✕</button></div>
+      ${e.pregunta ? `<p class="of-ia-preg">Le preguntaste: «${_ofEsc(e.pregunta)}»</p>` : ''}`;
+    if (e.pensando) res = `${cab}<p class="of-ia-pensando">${_ofEsc(pj.nombre)} está pensando<span>.</span><span>.</span><span>.</span> <small>(puede tardar hasta un minuto)</small></p>`;
+    else if (e.error) res = `${cab}<p class="of-ia-error">😕 ${_ofEsc(e.error)}</p>
+      <div class="of-acc"><button type="button" onclick="oficinaIA('${pj.id}')">🔄 Probar de nuevo</button></div>`;
+    else {
+      const repById = id => (typeof REPAIRS !== 'undefined' && Array.isArray(REPAIRS)) ? REPAIRS.find(r => r.id === id) : null;
+      res = `${cab}<p>${_ofEsc(e.ia.respuesta).replace(/\n/g, '<br>')}</p>
+        ${e.ia.pasos.length ? `<ol class="of-ia-pasos">${e.ia.pasos.map(p => `<li>${_ofEsc(p)}</li>`).join('')}</ol>` : ''}
+        ${e.ia.borradores.map(b => {
+          const i = _ofIABorr.push(b) - 1;
+          const r = b.ref ? repById(b.ref) : null;
+          return `<div class="of-ia-borr"><b>✉️ ${_ofEsc(b.titulo || 'Mensaje')}${r ? ` · #${_ofEsc(r.nOrden || '')}` : ''}</b>
+            <div class="of-ia-txt">${_ofEsc(b.texto)}</div>
+            <div class="of-acc">${r && r.tlf ? `<button type="button" onclick="oficinaIABorrador(${i}, 'wa')">🟢 Mandar a ${_ofEsc(String(r.nombre || 'el cliente').split(' ')[0])}</button>` : ''}
+              <button type="button" onclick="oficinaIABorrador(${i}, 'copiar')">📋 Copiar</button></div></div>`;
+        }).join('')}
+        <div class="of-acc"><button type="button" class="of-luego" onclick="oficinaIA('${pj.id}')">🔄 Pensar de nuevo</button></div>`;
+    }
+  }
+  return `<div class="of-ia">
+    <div class="of-ia-cab"><b>✨ Pensalo con IA</b><small>Le paso lo que ve cada uno y te devuelve qué haría y los mensajes ya escritos.</small></div>
+    <input id="of-ia-preg" type="text" maxlength="600" autocomplete="off" placeholder="Preguntale algo (opcional): ¿qué hago primero hoy?"
+      value="${_ofEsc(_ofIAPreg)}" oninput="_ofIAPreg=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();oficinaIA()}">
+    <div class="of-ia-btns">${pjs.map(p => {
+      const s = est[p.id];
+      return `<button type="button" onclick="oficinaIA('${p.id}')" ${s && s.pensando ? 'disabled' : ''}><i style="background:${p.color}"></i>${s && s.pensando ? _ofEsc(p.nombre) + ' piensa…' : '✨ ' + _ofEsc(p.nombre)}</button>`;
+    }).join('')}</div>
+    ${res ? `<div class="of-item of-ia-res">${res}</div>` : ''}
+  </div>`;
+}
+
+function _ofHace(t) {
+  const m = Math.round((Date.now() - t) / 60000);
+  return m < 1 ? 'recién' : m < 60 ? `hace ${m} min` : `hace ${Math.round(m / 60)} h`;
+}
+
+// ══════════════════════════════════════════════════════════════
 //  El dibujo
 // ══════════════════════════════════════════════════════════════
 // Escena vista de frente, cada uno en su escritorio sobre su alfombra.
@@ -432,9 +640,12 @@ function _ofEscenaSvg(grupos, compacto) {
 // ══════════════════════════════════════════════════════════════
 function oficinaFiltrar(id) { _ofFiltro = _ofFiltro === id ? '' : id; oficinaRender(); }
 
-function oficinaRender() {
+function oficinaRender(forzar) {
   const cont = document.getElementById('d-oficina');
   if (!cont || !_ofVisible) return;
+  // Mientras escribís la pregunta para la IA no se redibuja (se perdería
+  // el foco); el refresco de cada minuto espera al próximo.
+  if (forzar !== true && document.activeElement && document.activeElement.id === 'of-ia-preg') return;
   _ofEstilos();
   const compacto = (cont.clientWidth || (typeof innerWidth === 'number' ? innerWidth : 1000)) < 700;
   const grupos = oficinaHallazgos(_ofCtx());
@@ -462,6 +673,7 @@ function oficinaRender() {
         <div class="of-roles">${OFICINA_PJ.map(pj => `<div><span class="of-ava" style="background:${pj.color}">${_ofEsc(pj.nombre[0])}</span><b>${_ofEsc(pj.nombre)}</b> · ${_ofEsc(pj.rol)}<small>${_ofEsc(pj.mira || '')}</small></div>`).join('')}</div>
       </div>
       <div class="of-lista">
+        ${_ofIAHtml(grupos)}
         ${lista.length ? lista.map(({ h, pj }) => `
           <div class="of-item of-item--${h.nivel}">
             <div class="of-item-cab"><span class="of-ava" style="background:${pj.color}">${_ofEsc(pj.nombre[0])}</span>
@@ -547,6 +759,27 @@ function _ofEstilos() {
 .d-oficina .of-acc button { background: var(--d-bd-2); color: var(--d-tx); border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
 .d-oficina .of-acc button:first-child { background: var(--d-cyan); color: #04121a; font-weight: 700; }
 .d-oficina .of-acc .of-luego { background: transparent; color: var(--d-mut); margin-left: auto; }
+.d-oficina .of-ia { background: var(--d-card); border: 1px solid var(--d-bd); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.d-oficina .of-ia-cab b { font-size: 15px; display: block; }
+.d-oficina .of-ia-cab small { color: var(--d-mut); font-size: 12px; }
+.d-oficina .of-ia input { width: 100%; box-sizing: border-box; background: var(--d-bg, transparent); color: var(--d-tx); border: 1px solid var(--d-bd); border-radius: 8px; padding: 9px 10px; font-size: 15px; }
+.d-oficina .of-ia-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.d-oficina .of-ia-btns button { background: var(--d-bd-2); color: var(--d-tx); border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.d-oficina .of-ia-btns button:disabled { opacity: .6; cursor: wait; }
+.d-oficina .of-ia-btns i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.d-oficina .of-ia-res { border-left-color: #a855f7; }
+.d-oficina .of-ia-x { margin-left: auto; background: transparent; border: 0; color: var(--d-mut); cursor: pointer; font-size: 16px; }
+.d-oficina .of-ia-preg { color: var(--d-mut); font-size: 13px !important; font-style: italic; }
+.d-oficina .of-ia-error { color: var(--d-red); }
+.d-oficina .of-ia-pasos { margin: 0 0 8px; padding-left: 22px; font-size: 14px; line-height: 1.45; }
+.d-oficina .of-ia-borr { border: 1px dashed var(--d-bd); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
+.d-oficina .of-ia-borr > b { font-size: 13px; }
+.d-oficina .of-ia-txt { white-space: pre-wrap; font-size: 14px; line-height: 1.4; margin: 6px 0 8px; }
+.d-oficina .of-ia-pensando span { animation: of-punto 1.2s infinite; }
+.d-oficina .of-ia-pensando span:nth-child(2) { animation-delay: .2s; }
+.d-oficina .of-ia-pensando span:nth-child(3) { animation-delay: .4s; }
+.d-oficina .of-ia-pensando small { color: var(--d-mut); }
+@keyframes of-punto { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
 .d-oficina .of-vacio { color: var(--d-mut); text-align: center; padding: 30px 0; }
 `;
   document.head.appendChild(st);
