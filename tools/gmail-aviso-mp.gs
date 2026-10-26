@@ -98,7 +98,7 @@ function enviarAviso(d) {
     }),
   });
 
-  Logger.log('Aviso enviado: ' + titulo + ' → ' + respuesta.getResponseCode());
+  Logger.log('Push → ' + respuesta.getResponseCode() + ' ' + respuesta.getContentText());
 
   // Y por Telegram, que es donde llegan todos los avisos del local
   var tg = UrlFetchApp.fetch(URL_APP + '/api/telegram-notify', {
@@ -111,7 +111,9 @@ function enviarAviso(d) {
             (d.quien ? 'De: ' + d.quien.replace(/[<>&]/g, '') + '\n' : '') + 'MercadoPago',
     }),
   });
-  Logger.log('Telegram → ' + tg.getResponseCode());
+  // El cuerpo también: la app contesta 200 aunque Telegram falle, y el motivo
+  // viene escrito ahí ("sin configurar", "chat not found"...)
+  Logger.log('Telegram → ' + tg.getResponseCode() + ' ' + tg.getContentText());
 }
 
 /**
