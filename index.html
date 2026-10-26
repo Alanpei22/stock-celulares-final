@@ -339,11 +339,19 @@
       <!-- Topbar / breadcrumb -->
       <div class="d-topbar">
         <span class="d-crumb">Principal / <b>Dashboard</b></span>
+        <!-- 📊 Números (con plata) / 🔧 Taller (tablero sin montos, taller.js) -->
+        <div class="d-seg d-modo" id="d-modo">
+          <button type="button" data-modo="numeros" class="sel" onclick="tallerModo('numeros')">📊 Números</button>
+          <button type="button" data-modo="taller" onclick="tallerModo('taller')">🔧 Taller</button>
+        </div>
         <div class="d-topbar-actions">
           <button class="d-icon-btn d-sb-toggle" onclick="toggleSidebar()" title="Colapsar panel">&#9776;</button>
           <button class="d-icon-btn" id="dash-menu-btn" onclick="toggleDashMenu()" title="Opciones">&#8942;</button>
         </div>
       </div>
+
+      <!-- Tablero del taller (vista 🔧 Taller): lo arma taller.js -->
+      <div id="d-taller" class="d-taller"></div>
 
       <!-- Saludo -->
       <div class="d-hello">
@@ -2374,6 +2382,7 @@
 <script defer src="usuarios.js"></script>
 <script defer src="horas.js"></script>
 <script defer src="movstock.js"></script>
+<script defer src="taller.js"></script>
 <script defer src="roturas.js"></script>
 <script defer src="instalar.js"></script>
 <script defer src="barcode.js"></script>

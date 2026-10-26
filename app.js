@@ -781,7 +781,12 @@ function switchSection(section) {
   // La lista de equipos solo tiene sentido mirando el stock
   const fabLista = document.getElementById('lista-fab');
   if (fabLista) fabLista.classList.toggle('hidden', section !== 'stock');
-  if (section === 'dash') renderDashboard();
+  // El dashboard tiene dos vistas: 📊 Números y 🔧 Taller (taller.js). La
+  // compu del local queda en la que se usó la última vez.
+  if (section === 'dash') {
+    if (typeof tallerModo === 'function' && tallerModoGuardado() === 'taller') tallerModo('taller');
+    else { if (typeof tallerModo === 'function' && tallerActivo()) tallerModo('numeros'); else renderDashboard(); }
+  } else if (typeof _tlDejar === 'function') _tlDejar();   // no escuchar fichadas sin mirar el tablero
   // CUPO: los repuestos son una colección entera; se leen recién cuando se
   // entra a la sección, no en cada apertura de la app.
   if (section === 'repuestos' && typeof listenRepuestos === 'function') listenRepuestos();
@@ -844,6 +849,8 @@ async function renderDashboard() {
 function _refreshDashIfVisible() {
   const s = document.getElementById('dash-section');
   if (!s || s.classList.contains('section-hidden')) return;
+  // En la vista 🔧 Taller se redibuja el tablero (cambió una reparación)
+  if (typeof tallerActivo === 'function' && tallerActivo()) { tallerRender(); return; }
   _renderDashReps();
   _renderKPIs();
   _renderDashCats();

@@ -304,3 +304,46 @@ tr.d-tocable:hover td { background: rgba(255, 255, 255, .04); }
 .d-det-monto { text-align: right; font-weight: 700; white-space: nowrap; }
 .d-det-pie { margin-top: 14px; display: flex; justify-content: flex-end; }
 
+/* ══════════════════════════════════════════════════════════════
+   🔧 Tablero del taller (taller.js) — segunda vista del dashboard.
+   SIN MONTOS: en modo taller se esconde todo lo demás del dashboard.
+   ══════════════════════════════════════════════════════════════ */
+#dash-section .d-modo { margin-left: auto; margin-right: 10px; }
+#dash-section .d-modo button { font-size: 13px; padding: 6px 12px; }
+#dash-section .d-taller { display: none; }
+#dash-section.modo-taller .dash-body > *:not(.d-topbar):not(.d-taller) { display: none !important; }
+#dash-section.modo-taller .d-taller { display: block; }
+.d-taller .tl-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 6px 0 16px; }
+.d-taller .tl-reloj b { font-size: 40px; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.d-taller .tl-reloj span { color: var(--d-mut); font-size: 16px; margin-left: 8px; text-transform: capitalize; }
+.d-taller .tl-gente { display: flex; gap: 14px; flex-wrap: wrap; }
+.d-taller .tl-persona { display: flex; align-items: center; gap: 8px; background: var(--d-card); border: 1px solid var(--d-bd); border-radius: 999px; padding: 4px 14px 4px 4px; }
+.d-taller .tl-persona b { display: block; font-size: 15px; }
+.d-taller .tl-persona small { color: var(--d-mut); font-size: 12px; }
+.d-taller .tl-ava { width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 15px; flex: none; box-shadow: 0 0 0 2px rgba(255,255,255,.08); }
+.d-taller .tl-ava--chico { width: 24px; height: 24px; font-size: 11px; }
+.d-taller .tl-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 900px) { .d-taller .tl-cols { grid-template-columns: 1fr; } }
+.d-taller .tl-col { background: var(--d-card); border: 1px solid var(--d-bd); border-radius: var(--d-r); padding: 12px; min-height: 200px; }
+.d-taller .tl-col h3 { margin: 0 0 10px; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+.d-taller .tl-cuenta { margin-left: auto; font-size: 15px; background: var(--d-bd-2); border-radius: 999px; padding: 2px 10px; }
+.d-taller .tl-col--lista h3 { color: var(--d-green); }
+.d-taller .tl-col--dem h3 { color: var(--d-red); }
+.d-taller .tl-col-lista { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 290px); overflow: auto; }
+.d-taller .tl-card { background: var(--d-bg); border: 1px solid var(--d-bd); border-left: 4px solid var(--d-cyan); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+.d-taller .tl-card:hover { border-color: var(--d-bd-2); }
+.d-taller .tl-card--lista { border-left-color: var(--d-green); }
+.d-taller .tl-card--demorada { border-left-color: var(--d-red); }
+.d-taller .tl-card-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--d-mut); }
+.d-taller .tl-orden { font-weight: 800; color: var(--d-tx); }
+.d-taller .tl-card--demorada .tl-hace { color: var(--d-red); font-weight: 700; }
+.d-taller .tl-equipo { font-size: 18px; font-weight: 800; margin: 2px 0; }
+.d-taller .tl-que { font-size: 14px; color: var(--d-mut); }
+.d-taller .tl-fase { color: var(--d-amber); }
+.d-taller .tl-card-pie { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; }
+.d-taller .tl-cli { margin-left: auto; color: var(--d-mut); }
+.d-taller .tl-sin { color: var(--d-mut); font-style: italic; }
+.d-taller .tl-vacio { color: var(--d-mut); text-align: center; padding: 24px 0; }
+.d-taller .tl-pie { margin-top: 14px; color: var(--d-mut); font-size: 16px; }
+.d-taller .tl-pie b { color: var(--d-tx); font-size: 18px; }
+

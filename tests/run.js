@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-taller.js':         'Tablero del taller (Dashboard): columnas, quién trabaja, sin montos',
   'test-comision-tarjeta.js': 'Comisión de Getnet: cada cobro con tarjeta guarda lo que te depositan y la ganancia real',
   'test-estado-dia.js':     'El estado de cada dia (hoy lunes, ya abrimos) y a que hora sale',
   'test-costo-reparacion.js':'El costo del repuesto: contra la ganancia de la reparacion, no como egreso de caja',
