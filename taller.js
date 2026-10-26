@@ -56,15 +56,26 @@ function _tlDemorada(r) {
   return r.estado === 'reparando' && r.fechaIngreso && (Date.now() - new Date(r.fechaIngreso)) / 86400000 > 3;
 }
 
+// Lo que entró hace más de esto no va a las columnas. En la base quedaron
+// órdenes de hace años que nunca se cerraron (102 "listas" en el primer
+// intento, una de hace 945 días): taparían el taller de verdad. Se cuentan
+// aparte, con un aviso para revisarlas en Reparaciones.
+const TL_DIAS_MAX = 60;
+
 // Las tres columnas (aparte para poder probarlo)
-function tallerColumnas(reps) {
+function tallerColumnas(reps, ahora) {
   const lista = Array.isArray(reps) ? reps : [];
+  const corte = (ahora || Date.now()) - TL_DIAS_MAX * 86400e3;
+  const reciente = r => { const t = r.fechaIngreso ? new Date(r.fechaIngreso).getTime() : 0; return t && t >= corte; };
+  const abiertas = lista.filter(r => r.estado === 'reparando' || r.estado === 'listo');
   const viejo = (a, b) => String(_tlDesde(a)).localeCompare(String(_tlDesde(b)));
-  const reparando = lista.filter(r => r.estado === 'reparando');
+  const reparando = abiertas.filter(r => r.estado === 'reparando' && reciente(r));
+  const viejas = abiertas.filter(r => !reciente(r));
   return {
     reparando: reparando.filter(r => !_tlDemorada(r)).sort(viejo),
-    listas: lista.filter(r => r.estado === 'listo').sort(viejo),
+    listas: abiertas.filter(r => r.estado === 'listo' && reciente(r)).sort(viejo),
     demoradas: reparando.filter(r => _tlDemorada(r)).sort(viejo),
+    viejas: { reparando: viejas.filter(r => r.estado === 'reparando').length, listas: viejas.filter(r => r.estado === 'listo').length },
   };
 }
 
@@ -114,10 +125,63 @@ function _tlColumna(titulo, ico, cls, items, tipo, vacio) {
   </section>`;
 }
 
+// Los estilos van ACÁ y no en dashboard.css: el CSS se sirve del caché y se
+// actualiza atrás, así que después de un deploy el celu tenía el programa
+// nuevo con el diseño viejo y el tablero salía como texto suelto (y sin la
+// regla que esconde los montos). Viajando con el JS, llegan juntos.
+function _tlEstilos() {
+  if (document.getElementById('tl-estilos')) return;
+  const st = document.createElement('style');
+  st.id = 'tl-estilos';
+  st.textContent = [
+    '#dash-section .d-modo { margin-left: auto; margin-right: 10px; }',
+    '#dash-section .d-modo button { font-size: 13px; padding: 6px 12px; }',
+    '#dash-section .d-taller { display: none; }',
+    '#dash-section.modo-taller .dash-body > *:not(.d-topbar):not(.d-taller) { display: none !important; }',
+    '#dash-section.modo-taller .d-taller { display: block; }',
+    '.d-taller .tl-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 6px 0 16px; }',
+    '.d-taller .tl-reloj b { font-size: 40px; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; }',
+    '.d-taller .tl-reloj span { color: var(--d-mut); font-size: 16px; margin-left: 8px; text-transform: capitalize; }',
+    '.d-taller .tl-gente { display: flex; gap: 14px; flex-wrap: wrap; }',
+    '.d-taller .tl-persona { display: flex; align-items: center; gap: 8px; background: var(--d-card); border: 1px solid var(--d-bd); border-radius: 999px; padding: 4px 14px 4px 4px; }',
+    '.d-taller .tl-persona b { display: block; font-size: 15px; }',
+    '.d-taller .tl-persona small { color: var(--d-mut); font-size: 12px; }',
+    '.d-taller .tl-ava { width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 15px; flex: none; box-shadow: 0 0 0 2px rgba(255,255,255,.08); }',
+    '.d-taller .tl-ava--chico { width: 24px; height: 24px; font-size: 11px; }',
+    '.d-taller .tl-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }',
+    '@media (max-width: 900px) { .d-taller .tl-cols { grid-template-columns: 1fr; } .d-taller .tl-col-lista { max-height: none; } .d-taller .tl-reloj b { font-size: 30px; } .d-taller .tl-col { min-height: 0; } }',
+    '.d-taller .tl-col { background: var(--d-card); border: 1px solid var(--d-bd); border-radius: var(--d-r); padding: 12px; min-height: 200px; }',
+    '.d-taller .tl-col h3 { margin: 0 0 10px; font-size: 18px; display: flex; align-items: center; gap: 8px; }',
+    '.d-taller .tl-cuenta { margin-left: auto; font-size: 15px; background: var(--d-bd-2); border-radius: 999px; padding: 2px 10px; }',
+    '.d-taller .tl-col--lista h3 { color: var(--d-green); }',
+    '.d-taller .tl-col--dem h3 { color: var(--d-red); }',
+    '.d-taller .tl-col-lista { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 290px); overflow: auto; }',
+    '.d-taller .tl-card { background: var(--d-bg); border: 1px solid var(--d-bd); border-left: 4px solid var(--d-cyan); border-radius: 10px; padding: 10px 12px; cursor: pointer; }',
+    '.d-taller .tl-card:hover { border-color: var(--d-bd-2); }',
+    '.d-taller .tl-card--lista { border-left-color: var(--d-green); }',
+    '.d-taller .tl-card--demorada { border-left-color: var(--d-red); }',
+    '.d-taller .tl-card-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--d-mut); }',
+    '.d-taller .tl-orden { font-weight: 800; color: var(--d-tx); }',
+    '.d-taller .tl-card--demorada .tl-hace { color: var(--d-red); font-weight: 700; }',
+    '.d-taller .tl-equipo { font-size: 18px; font-weight: 800; margin: 2px 0; }',
+    '.d-taller .tl-que { font-size: 14px; color: var(--d-mut); }',
+    '.d-taller .tl-fase { color: var(--d-amber); }',
+    '.d-taller .tl-card-pie { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; }',
+    '.d-taller .tl-cli { margin-left: auto; color: var(--d-mut); }',
+    '.d-taller .tl-sin { color: var(--d-mut); font-style: italic; }',
+    '.d-taller .tl-vacio { color: var(--d-mut); text-align: center; padding: 24px 0; }',
+    '.d-taller .tl-pie { margin-top: 14px; color: var(--d-mut); font-size: 16px; }',
+    '.d-taller .tl-pie b { color: var(--d-tx); font-size: 18px; }',
+    '.d-taller .tl-viejas { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--d-bd-2); border-radius: 10px; color: var(--d-mut); font-size: 14px; }',
+  ].join('\n');
+  document.head.appendChild(st);
+}
+
 const _TL_DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 function tallerRender() {
   const cont = document.getElementById('d-taller');
   if (!cont || _tlModo !== 'taller') return;
+  _tlEstilos();
   const reps = (typeof REPAIRS !== 'undefined' && Array.isArray(REPAIRS)) ? REPAIRS : [];
   const c = tallerColumnas(reps);
   const hoy = tallerHoy(reps);
@@ -138,7 +202,10 @@ function tallerRender() {
       ${_tlColumna('Listas para retirar', '✅', 'lista', c.listas, 'lista', 'Ninguna esperando al cliente')}
       ${_tlColumna('Demoradas', '⚠️', 'dem', c.demoradas, 'demorada', 'Ninguna demorada 👌')}
     </div>
-    <div class="tl-pie">Hoy: entraron <b>${hoy.entraron}</b> · se entregaron <b>${hoy.entregadas}</b></div>`;
+    <div class="tl-pie">Hoy: entraron <b>${hoy.entraron}</b> · se entregaron <b>${hoy.entregadas}</b></div>
+    ${(c.viejas.reparando + c.viejas.listas) ? `<div class="tl-viejas">🗂️ Además hay órdenes abiertas de hace más de ${TL_DIAS_MAX} días que no se muestran acá:
+      ${[c.viejas.listas ? `<b>${c.viejas.listas}</b> listas sin retirar` : '', c.viejas.reparando ? `<b>${c.viejas.reparando}</b> en reparación` : ''].filter(Boolean).join(' y ')}.
+      Conviene revisarlas en Reparaciones y marcarlas como entregadas o que no van.</div>` : ''}`;
 }
 
 // Fichadas de hoy, en vivo (solo mientras se mira el tablero). Las reglas
@@ -163,6 +230,7 @@ function _tlDejar() {
 function tallerModo(modo) {
   _tlModo = modo === 'taller' ? 'taller' : 'numeros';
   try { localStorage.setItem('dashModo', _tlModo); } catch {}
+  if (_tlModo === 'taller') _tlEstilos();   // antes de esconder los números
   const sec = document.getElementById('dash-section');
   if (sec) sec.classList.toggle('modo-taller', _tlModo === 'taller');
   document.querySelectorAll('#d-modo button').forEach(b => b.classList.toggle('sel', b.dataset.modo === _tlModo));
@@ -180,3 +248,6 @@ function tallerModoGuardado() {
   try { return localStorage.getItem('dashModo') === 'taller' ? 'taller' : 'numeros'; } catch { return 'numeros'; }
 }
 function tallerActivo() { return _tlModo === 'taller'; }
+
+// Los estilos del tablero (y el del botón 📊/🔧) desde que carga la página
+if (typeof document !== 'undefined' && document.head) _tlEstilos();

@@ -29,6 +29,10 @@ ok(c.demoradas.map(r => r.id).join() === 'b', 'demoradas: más de 3 días repara
 ok(c.listas.map(r => r.id).join() === 'c', 'listas para retirar', c.listas.map(r => r.id));
 ok(![...c.reparando, ...c.listas, ...c.demoradas].some(r => r.id === 'd' || r.id === 'e'), 'las entregadas y las que no van no ocupan lugar');
 
+// Órdenes de hace años que nunca se cerraron no tapan el taller
+const v = run('tallerColumnas(_v)', [{ id: 'x', estado: 'listo', fechaIngreso: h(945 * 24) }, { id: 'y', estado: 'reparando' }, { id: 'z', estado: 'listo', fechaIngreso: h(20) }]);
+ok(v.listas.length === 1 && v.viejas.listas === 1 && v.viejas.reparando === 1, 'las de hace más de 60 días (o sin fecha) se cuentan aparte', v.viejas);
+
 console.log('\n2) Lo de hoy');
 const hoy = run('tallerHoy(_v)', [{ fechaIngreso: h(0.2), estado: 'reparando' }, { fechaIngreso: h(50), estado: 'entregado', fechaEntrega: h(0.1) }, { fechaIngreso: h(80), estado: 'reparando' }]);
 ok(hoy.entraron === 1 && hoy.entregadas === 1, 'cuántas entraron y cuántas se entregaron hoy', hoy);
@@ -47,8 +51,11 @@ ok(run("tallerColor('Nacho')") === run("tallerColor('nacho ')"), 'cada uno tiene
 console.log('\n4) Sin plata');
 const t = leer('taller.js');
 ok(!/monto|precio|sena|seña|presupuesto|cobrad/i.test(t.replace(/\/\/.*$/gm, '')), 'el tablero no lee ni muestra montos');
-ok(/#dash-section\.modo-taller \.dash-body > \*:not\(\.d-topbar\):not\(\.d-taller\) \{ display: none !important; \}/.test(leer('dashboard.css')),
+ok(/#dash-section\.modo-taller \.dash-body > \*:not\(\.d-topbar\):not\(\.d-taller\) \{ display: none !important; \}/.test(t),
    'en modo taller se esconde todo lo demás del dashboard (ganancia, ventas, top)');
+// Los estilos viajan con el JS: con el CSS del caché viejo el tablero salía
+// como texto suelto en el celu (y sin la regla que esconde los montos).
+ok(/function _tlEstilos\(\)/.test(t) && /_tlEstilos\(\);   \/\/ antes de esconder los números/.test(t), 'los estilos van con el programa, no dependen del CSS guardado');
 
 console.log('\n5) Enganchado en el Dashboard');
 const ix = leer('index.html');
