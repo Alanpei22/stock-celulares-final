@@ -30,7 +30,7 @@ const path = require('path');
 
 const QUE_CUBRE = {
   'test-oficina-ia.js':     'Oficina con IA: cada personaje lo piensa y devuelve plan y mensajes listos (sin teléfonos, sin montos si no hay permiso)',
-  'test-oficina.js':        'La oficina: Tito (taller), Rosa (stock) y Beto (caja) avisan y preguntan',
+  'test-oficina.js':        'La oficina: Tito (taller), Rosa (stock), Beto (caja), Lu (ventas) y Marta (personal) avisan y preguntan',
   'test-taller.js':         'Tablero del taller (Dashboard): columnas, quién trabaja, sin montos',
   'test-comision-tarjeta.js': 'Comisión de Getnet: cada cobro con tarjeta guarda lo que te depositan y la ganancia real',
   'test-estado-dia.js':     'El estado de cada dia (hoy lunes, ya abrimos) y a que hora sale',

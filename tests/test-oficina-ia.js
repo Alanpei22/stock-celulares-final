@@ -86,6 +86,20 @@ ok(d.ingresosHoy === 60000 && d.egresosHoy === 3000 && d.ventasSinCosto === 1 &&
 d = run(`oficinaDatosIA('beto', _v)`, { caja: { arqueo: true, cierre: false, movs: MOVS }, verPlata: false, tarjetas: {} });
 ok(!JSON.stringify(d).match(/10000|50000|60000|total|ingresosHoy/) && d.movimientosHoy === 3 && d.seVenLosMontos === false, 'Beto sin permiso: cuántos y cómo, ningún monto', d);
 
+d = run(`oficinaDatosIA('lu', Object.assign({ ahora: ${AHORA} }, _v))`, { verPlata: false, dolar: 1200, equipos: [
+  { id: 'e1', marca: 'Samsung', modelo: 'A15', estado: 'Usado', fecha: h(24 * 60), precio: 300000, costo: 200000, publicar: true, fotos: ['u'] },
+  { id: 'e2', marca: 'Moto', modelo: 'G32', fecha: h(24), precio: 250000, vendido: true }] });
+ok(d.equipos.length === 1 && d.equipos[0].diasEnStock === 60 && d.equipos[0].precioPesos === 300000 && d.equipos[0].enLaPagina && d.dolarBlue === 1200, 'Lu: equipos en venta con días, precio y si están en la página', d);
+ok(!('costoPesos' in d.equipos[0]), 'Lu sin permiso de totales: sin costo');
+vm.runInContext(leer('horas.js'), ctx, { filename: 'horas.js' });
+d = run(`oficinaDatosIA('marta', Object.assign({ ahora: ${AHORA} }, _v))`, { esDueno: true,
+  fichadas: [{ uid: 'u1', nombre: 'Nacho', tipo: 'entrada', ts: { toMillis: () => Date.parse('2026-10-24T10:00:00-03:00') } }, { uid: 'u1', nombre: 'Nacho', tipo: 'salida', ts: { toMillis: () => Date.parse('2026-10-24T18:00:00-03:00') } }],
+  repairs: [{ id: 'x', estado: 'entregado', nombre: 'Ana Gómez', tlf: '1144443333', marca: 'Moto', modelo: 'E13', fechaEntrega: h(48) }] });
+ok(d.horasUltimos7Dias.Nacho.horas === 8 && d.horasUltimos7Dias.Nacho.dias[0].entrada === '10:00', 'Marta: horas de cada uno', d.horasUltimos7Dias);
+ok(d.clientesQueRetiraron[0].cliente === 'Ana' && !JSON.stringify(d).includes('4444'), 'Marta: clientes que retiraron, sin teléfono');
+d = run(`oficinaDatosIA('marta', Object.assign({ ahora: ${AHORA} }, _v))`, { esDueno: false, fichadas: [], repairs: [] });
+ok(!('horasUltimos7Dias' in d), 'Marta con un empleado: sin las horas de los demás');
+
 console.log('\n4) El botón');
 run(`_ofVisible = true; REPAIRS = _v; _repairsLoaded = true;`, REPS);
 els['d-oficina'] = { clientWidth: 1200, innerHTML: '' };

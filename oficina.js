@@ -9,6 +9,8 @@
 //   🔧 Tito  · Taller  → demoradas, listas sin retirar, seguimientos…
 //   📦 Rosa  · Stock   → repuestos y accesorios bajo el mínimo, al pedido
 //   💵 Beto  · Caja    → apertura, chequeo, cierre, tarjetas, costos
+//   📱 Lu    · Ventas  → equipos quietos, página sin fotos, sin costo
+//   🗂️ Marta · Personal → fichadas sin salida, reseñas de clientes
 //
 // ── Cómo está armado ──────────────────────────────────────────
 // OFICINA_PJ es la lista de personajes. Cada uno tiene `revisar(ctx)`, una
@@ -230,6 +232,97 @@ function revisarBeto(ctx) {
   return out;
 }
 
+// 📱 Lu — ventas y página
+const OF_DIAS_QUIETO = 45;     // un equipo más tiempo que esto sin venderse
+function _ofEquipoNom(e) { return [e.marca, e.modelo, e.almacenamiento].filter(Boolean).join(' ') || 'Equipo'; }
+function revisarLu(ctx) {
+  const ahora = ctx.ahora || Date.now();
+  const eqs = (Array.isArray(ctx.equipos) ? ctx.equipos : []).filter(e => e && !e.vendido && !e.eliminado);
+  const out = [];
+  const ver = e => ({ txt: 'Ver equipo', fn: 'equipo', id: e.id });
+  const irStock = { txt: 'Ver equipos', fn: 'seccion', id: 'stock' };
+  const fotos = e => Array.isArray(e.fotos) && e.fotos.length > 0;
+
+  // Los que no se venden: lo que más plata tiene parada
+  const quietos = eqs.filter(e => !e.reservado).map(e => ({ e, d: _ofDias(e.fecha, ahora) }))
+    .filter(x => x.d !== null && x.d >= OF_DIAS_QUIETO).sort((a, b) => b.d - a.d);
+  out.push(..._ofTope(quietos.map(({ e, d }) => ({
+    clave: 'lu:quieto:' + e.id, nivel: d >= 90 ? 'aviso' : 'info',
+    texto: `El ${_ofEquipoNom(e)} lleva ${d} días sin venderse${e.publicar === true ? '' : ' y no está en la página'}. ¿Le bajamos el precio o lo movemos?`,
+    acciones: [
+      { txt: '✨ ¿A cuánto lo dejo?', fn: 'ia', pj: 'lu', pregunta: `¿A cuánto dejo el ${_ofEquipoNom(e)} (id ${e.id}) que lleva ${d} días sin venderse? Escribime también un texto corto para promocionarlo.` },
+      ver(e),
+    ],
+  })), n => ({ clave: 'lu:quieto:resto', nivel: 'info', texto: `Y ${n} equipos más que hace rato no se venden.`, acciones: [irStock] })));
+
+  // En la página sin fotos: casi nadie consulta así
+  out.push(..._ofTope(eqs.filter(e => e.publicar === true && !fotos(e)).map(e => ({
+    clave: 'lu:sinfoto:' + e.id, nivel: 'aviso',
+    texto: `El ${_ofEquipoNom(e)} está en la página sin fotos. Así casi nadie consulta: ¿le sacamos unas?`,
+    acciones: [ver(e)],
+  })), n => ({ clave: 'lu:sinfoto:resto', nivel: 'aviso', texto: `Y ${n} equipos más en la página sin fotos.`, acciones: [irStock] })));
+
+  // Con fotos pero sin publicar: trabajo hecho que no se aprovecha
+  const paraPublicar = eqs.filter(e => e.publicar !== true && fotos(e) && !e.reservado);
+  if (paraPublicar.length) out.push({
+    clave: 'lu:publicar:' + paraPublicar.length, nivel: 'info',
+    texto: `${paraPublicar.length} ${_ofPlural(paraPublicar.length, 'equipo tiene', 'equipos tienen')} fotos pero no ${_ofPlural(paraPublicar.length, 'está', 'están')} en la página. ¿${_ofPlural(paraPublicar.length, 'Lo publicamos', 'Los publicamos')}?`,
+    acciones: paraPublicar.length === 1 ? [ver(paraPublicar[0])] : [irStock],
+  });
+
+  // Sin costo: cuando se venda no se sabe cuánto se ganó (solo a quien ve la plata)
+  const sinCosto = eqs.filter(e => !(Number(e.costo) > 0));
+  if (sinCosto.length && ctx.verPlata) out.push({
+    clave: 'lu:sincosto:' + sinCosto.length, nivel: 'info',
+    texto: `${sinCosto.length} ${_ofPlural(sinCosto.length, 'equipo en venta no tiene', 'equipos en venta no tienen')} el costo cargado: cuando se vendan no vas a saber cuánto ganaste.`,
+    acciones: sinCosto.length === 1 ? [ver(sinCosto[0])] : [irStock],
+  });
+  return out;
+}
+
+// 🗂️ Marta — personal y clientes
+function revisarMarta(ctx) {
+  const ahora = ctx.ahora || Date.now();
+  const out = [];
+  const verHoras = { txt: '🕐 Ver horas', fn: 'horas' };
+  const diaTxt = d => (typeof _horasDiaTxt === 'function') ? _horasDiaTxt(d) : d;
+
+  // Horas del personal (las fichadas solo las ve el dueño)
+  if (ctx.esDueno && Array.isArray(ctx.fichadas) && typeof horasTurnos === 'function') {
+    const turnos = horasTurnos(ctx.fichadas, ahora);
+    turnos.filter(t => t.sinSalida).slice(-OF_MAX_POR_TIPO).forEach(t => out.push({
+      clave: `marta:sinsal:${t.uid}:${t.dia}`, nivel: 'aviso',
+      texto: `${t.nombre || 'Alguien'} no marcó la salida el ${diaTxt(t.dia)}. Se le cuenta hasta las ${OF_CIERRE}; si se fue antes, corregilo.`,
+      acciones: [verHoras],
+    }));
+    turnos.filter(t => t.sinEntrada).slice(-OF_MAX_POR_TIPO).forEach(t => out.push({
+      clave: `marta:sinent:${t.uid}:${t.dia}`, nivel: 'aviso',
+      texto: `${t.nombre || 'Alguien'} marcó la salida el ${diaTxt(t.dia)} pero no la entrada: ese día no le suma horas hasta que lo corrijas.`,
+      acciones: [verHoras],
+    }));
+    // Un día de semana a media mañana sin ninguna entrada (si ya se usa el fichaje)
+    const hoy = _ofHoyAR(ahora), hora = _ofHoraAR(ahora);
+    const domingo = new Date(ahora - 3 * 3600e3).getUTCDay() === 0;
+    const ficharonHoy = ctx.fichadas.some(f => typeof horasMs === 'function' && _ofHoyAR(horasMs(f)) === hoy);
+    if (ctx.fichadas.length && !domingo && hora >= '10:30' && hora < OF_CIERRE && !ficharonHoy) out.push({
+      clave: 'marta:nadie:' + hoy, nivel: 'info',
+      texto: `Son las ${hora} y hoy nadie fichó la entrada. ¿Se olvidaron de escanear el QR?`,
+      acciones: [verHoras],
+    });
+  }
+
+  // Clientes que retiraron esta semana: el mejor momento para pedir una reseña
+  const retiraron = (ctx.repairs || []).filter(r => r.estado === 'entregado' && r.tlf && !r.devuelto)
+    .filter(r => { const d = _ofDias(r.fechaEntrega, ahora); return d !== null && d <= 7; });
+  if (retiraron.length) out.push({
+    clave: 'marta:resenas', nivel: 'info',
+    texto: `${retiraron.length} ${_ofPlural(retiraron.length, 'cliente retiró su equipo', 'clientes retiraron su equipo')} esta semana. Una reseña en Google de un cliente contento trae otros: ¿les escribimos?`,
+    acciones: [{ txt: '✨ Escribime los mensajes', fn: 'ia', pj: 'marta', posponer: 24 * 6,
+      pregunta: 'Escribime un mensaje para cada cliente que retiró esta semana, agradeciendo y pidiendo una reseña en Google (el link lo agrego yo al final).' }],
+  });
+  return out;
+}
+
 // El elenco. Para sumar a alguien: un objeto más acá (y su dibujo).
 const OFICINA_PJ = [
   { id: 'tito', nombre: 'Tito', rol: 'Taller', color: '#2563eb', piel: '#f1c27d', pelo: '#3b2a1a', alfombra: '#a7f3d0',
@@ -241,6 +334,12 @@ const OFICINA_PJ = [
   { id: 'beto', nombre: 'Beto', rol: 'Caja', color: '#d97706', piel: '#c68642', pelo: '#111827', alfombra: '#fed7aa',
     listo: ctx => ctx.cajaLista, revisar: revisarBeto, tranquilo: 'La caja está en orden 👌',
     mira: 'Apertura, chequeo y cierre de caja, tarjetas y ventas sin costo' },
+  { id: 'lu', nombre: 'Lu', rol: 'Ventas', color: '#db2777', piel: '#f5d0a9', pelo: '#a16207', alfombra: '#fbcfe8',
+    listo: ctx => ctx.equiposListos, revisar: revisarLu, tranquilo: 'Los equipos se mueven 👌',
+    mira: 'Equipos que no se venden, la página (fotos, publicados) y precios' },
+  { id: 'marta', nombre: 'Marta', rol: 'Personal', color: '#7c3aed', piel: '#d8a47f', pelo: '#9ca3af', alfombra: '#c7d2fe',
+    listo: ctx => ctx.repairsListas && (!ctx.esDueno || ctx.fichadasListas), revisar: revisarMarta, tranquilo: 'El equipo y los clientes, bien 👌',
+    mira: 'Horas del personal (fichadas sin salida) y reseñas de clientes' },
 ];
 
 // ══════════════════════════════════════════════════════════════
@@ -276,6 +375,7 @@ function oficinaHallazgos(ctx) {
 //  Datos (lo que la app ya tiene + la caja de hoy)
 // ══════════════════════════════════════════════════════════════
 let _ofCaja = { leida: 0, arqueo: null, cierre: null, movs: [] };
+let _ofFich = { leida: 0, lista: null };
 let _ofVisible = false;
 let _ofTimer = null;
 let _ofFiltro = '';
@@ -299,6 +399,12 @@ function _ofCtx() {
     tarjetas: (typeof tarjetaCfg === 'function') ? tarjetaCfg() : {},
     chequeoPendiente: (typeof _chqPendiente === 'function') ? (() => { try { return _chqPendiente(); } catch { return null; } })() : null,
     verPlata: (typeof tpPuede === 'function') ? tpPuede('totales') : true,
+    equipos: (typeof _stockEnLocal !== 'undefined' && Array.isArray(_stockEnLocal)) ? _stockEnLocal : [],
+    equiposListos: (typeof _stockLoaded !== 'undefined') ? !!_stockLoaded : false,
+    dolar: (typeof dolarBlue !== 'undefined' && Number(dolarBlue) > 0) ? Number(dolarBlue) : null,
+    esDueno: (typeof tpEsDueno === 'function') ? tpEsDueno() : false,
+    fichadas: _ofFich.lista,
+    fichadasListas: _ofFich.leida > 0,
   };
 }
 
@@ -318,6 +424,20 @@ async function _ofLeerCaja() {
       : db.collection('caja_movimientos').where('fecha', '==', hoy).get().then(s => s.docs.map(d => d.data())).catch(() => []),
   ]);
   _ofCaja = { leida: Date.now(), arqueo, cierre, movs: movs || [] };
+}
+
+// Las fichadas de la última semana, para Marta. Solo el dueño las puede leer
+// (reglas) y solo mientras mira la oficina, cada 15 minutos: unas pocas
+// lecturas (2 por persona por día).
+async function _ofLeerFichadas() {
+  if (typeof db === 'undefined' || !db) return;
+  if (!(typeof tpEsDueno === 'function' && tpEsDueno())) return;
+  if (Date.now() - _ofFich.leida < 15 * 60e3) return;
+  const desde = _ofHoyAR(Date.now() - 7 * 86400e3);
+  const lista = await db.collection('fichadas').where('dia', '>=', desde).get()
+    .then(s => s.docs.map(d => Object.assign({ id: d.id }, d.data()))).catch(() => null);
+  // Si las reglas no dejan (no se publicaron), Marta no inventa: sin fichadas
+  _ofFich = { leida: Date.now(), lista };
 }
 
 // Abre los listeners que Rosa necesita (los mismos que al entrar a esas
@@ -343,6 +463,9 @@ async function oficinaAccion(clave, i) {
     else if (a.fn === 'accesorios') location.href = 'caja.html?tab=inventario';
     else if (a.fn === 'caja') location.href = 'caja.html' + (a.id ? '?action=' + a.id : '');
     else if (a.fn === 'verPedido' && typeof openPedidosModal === 'function') openPedidosModal();
+    else if (a.fn === 'equipo') { if (typeof switchSection === 'function') switchSection('stock'); setTimeout(() => (typeof openDetail === 'function') && openDetail(a.id), 300); }
+    else if (a.fn === 'horas' && typeof abrirHoras === 'function') abrirHoras();
+    else if (a.fn === 'ia') oficinaIA(a.pj, a.pregunta);
     else if (a.fn === 'pedido') {
       await db.collection('pedidos').add({
         nombre: a.nombre, cantidad: a.cantidad, categoria: a.categoria || 'Otro', prioridad: 'normal',
@@ -441,6 +564,50 @@ function oficinaDatosIA(pjId, ctx) {
         .map(p => ({ nombre: p.nombre, cantidad: p.cantidad || 1, categoria: p.categoria || '' })),
     };
   }
+  if (pjId === 'lu') {
+    const eqs = (ctx.equipos || []).filter(e => e && !e.vendido && !e.eliminado)
+      .map(e => ({ e, d: _ofDias(e.fecha, ahora) })).sort((a, b) => (b.d || 0) - (a.d || 0));
+    return {
+      dolarBlue: ctx.dolar || null,
+      equiposEnVenta: eqs.length,
+      equipos: eqs.slice(0, 60).map(({ e, d }) => {
+        const o = { id: e.id, equipo: _ofEquipoNom(e), condicion: e.estado || '', diasEnStock: d,
+          enLaPagina: e.publicar === true, fotos: Array.isArray(e.fotos) ? e.fotos.length : 0 };
+        if (e.ram) o.ram = e.ram;
+        if (Number(e.bateria) > 0) o.bateria = Number(e.bateria);
+        if (e.color) o.color = e.color;
+        if (e.reservado) o.reservado = true;
+        if (Number(e.precio) > 0) o.precioPesos = Number(e.precio);
+        if (e.moneda === 'usd' && Number(e.precioUSD) > 0) o.precioDolares = Number(e.precioUSD);
+        if (verPlata && Number(e.costo) > 0) o.costoPesos = Number(e.costo);
+        if (Number(e.garantiaMeses) > 0) o.garantiaMeses = Number(e.garantiaMeses);
+        return o;
+      }),
+    };
+  }
+  if (pjId === 'marta') {
+    const o = {};
+    if (ctx.esDueno && Array.isArray(ctx.fichadas) && typeof horasTurnos === 'function') {
+      const porPersona = {};
+      horasTurnos(ctx.fichadas, ahora).forEach(t => {
+        const p = porPersona[t.nombre || t.uid] = porPersona[t.nombre || t.uid] || { horas: 0, dias: [], sinSalida: 0, sinEntrada: 0 };
+        p.horas += (t.min || 0) / 60;
+        if (t.sinSalida) p.sinSalida++;
+        if (t.sinEntrada) p.sinEntrada++;
+        p.dias.push({ dia: t.dia, entrada: t.entrada ? _ofHoraAR(t.desde) : null, salida: t.salida ? _ofHoraAR(t.hasta) : null, trabajando: !!t.enCurso });
+      });
+      Object.values(porPersona).forEach(p => { p.horas = Math.round(p.horas * 10) / 10; });
+      o.horasUltimos7Dias = porPersona;
+      o.cierreDelLocal = OF_CIERRE;
+    }
+    o.clientesQueRetiraron = (ctx.repairs || [])
+      .filter(r => r.estado === 'entregado' && !r.devuelto)
+      .map(r => ({ r, d: _ofDias(r.fechaEntrega, ahora) }))
+      .filter(x => x.d !== null && x.d <= 7)
+      .slice(0, 30)
+      .map(({ r, d }) => ({ id: r.id, cliente: pila(r.nombre), equipo: _ofEquipo(r), arreglo: String(r.arreglo || '').slice(0, 120), diasDesdeQueRetiro: d, tieneWhatsApp: !!r.tlf }));
+    return o;
+  }
   if (pjId === 'beto') {
     const caja = ctx.caja || {};
     const movs = Array.isArray(caja.movs) ? caja.movs : [];
@@ -478,7 +645,7 @@ function oficinaDatosIA(pjId, ctx) {
   return (pj && typeof pj.datosIA === 'function') ? pj.datosIA(ctx) : {};
 }
 
-async function oficinaIA(id) {
+async function oficinaIA(id, preguntaBoton) {
   const est = _ofIACargar();
   if (!id) {
     // Enter en la pregunta: al que estás mirando, o al que tiene más para decir
@@ -488,7 +655,7 @@ async function oficinaIA(id) {
   const pj = OFICINA_PJ.find(p => p.id === id);
   if (!pj || (est[id] && est[id].pensando)) return;
   const inp = typeof document !== 'undefined' ? document.getElementById('of-ia-preg') : null;
-  const pregunta = String((inp && inp.value) || _ofIAPreg || '').trim().slice(0, 600);
+  const pregunta = String(preguntaBoton || (inp && inp.value) || _ofIAPreg || '').trim().slice(0, 600);
   const ctx = _ofCtx();
   const hallazgos = ((oficinaHallazgos(ctx).find(g => g.pj.id === id) || {}).items || []).map(h => h.texto);
   _ofIAVer = id;
@@ -582,6 +749,13 @@ function _ofPersonajeSvg(pj, x, estado, cuenta, globo, compacto) {
            <path d="M${x - 98} ${y + 104} h34 M${x - 92} ${y + 78} h26" stroke="#b07d45" stroke-width="2"/>`,
     beto: `<g fill="none" stroke="#111827" stroke-width="2.5"><circle cx="${x - 8}" cy="${y + 34}" r="6"/><circle cx="${x + 8}" cy="${y + 34}" r="6"/><path d="M${x - 2} ${y + 34} h4"/></g>
            <rect x="${x + 40}" y="${y + 98}" width="34" height="22" rx="4" fill="#475569"/><rect x="${x + 44}" y="${y + 90}" width="26" height="10" rx="2" fill="#22c55e"/>`,
+    lu: `<path d="M${x - 26} ${y + 26} q-6 30 4 44 h6 v-40 z M${x + 26} ${y + 26} q6 30 -4 44 h-6 v-40 z" fill="${pj.pelo}"/>
+         <rect x="${x + 46}" y="${y + 78}" width="20" height="32" rx="4" fill="#0f172a"/><rect x="${x + 49}" y="${y + 82}" width="14" height="22" rx="2" fill="#38bdf8"/>
+         <path d="M${x - 92} ${y + 92} h30 l10 10 l-10 10 h-30 z" fill="#fde047"/><text x="${x - 79}" y="${y + 107}" text-anchor="middle" font-size="13" font-weight="800" fill="#854d0e">$</text>`,
+    marta: `<circle cx="${x}" cy="${y + 4}" r="11" fill="${pj.pelo}"/>
+            <rect x="${x - 92}" y="${y + 74}" width="30" height="38" rx="3" fill="#a16207"/><rect x="${x - 88}" y="${y + 80}" width="22" height="28" fill="#fff"/>
+            <rect x="${x - 82}" y="${y + 71}" width="10" height="6" rx="2" fill="#64748b"/><path d="M${x - 85} ${y + 88} h16 M${x - 85} ${y + 95} h16 M${x - 85} ${y + 102} h10" stroke="#94a3b8" stroke-width="2"/>
+            <circle cx="${x + 58}" cy="${y + 96}" r="12" fill="#fff" stroke="#475569" stroke-width="3"/><path d="M${x + 58} ${y + 96} v-7 M${x + 58} ${y + 96} h5" stroke="#475569" stroke-width="2.5" stroke-linecap="round"/>`,
   }[pj.id] || '';
   const tono = estado === 'urgente' ? '#ef4444' : estado === 'aviso' ? '#f59e0b' : estado === 'revisando' ? '#94a3b8' : '#22c55e';
   const texto = _ofEsc(String(globo || '').length > 34 ? String(globo).slice(0, 33) + '…' : globo || '');
@@ -610,26 +784,33 @@ function _ofPersonajeSvg(pj, x, estado, cuenta, globo, compacto) {
       <path d="M${x - 8} ${y - 15} l8 12 l8 -12 z" fill="#fff" stroke="${tono}" stroke-width="3" stroke-linejoin="round"/>
       <rect x="${x - 10}" y="${y - 18}" width="20" height="6" fill="#fff"/>
     </g>
-    <rect x="${x - (compacto ? 80 : 66)}" y="${y + 160}" width="${compacto ? 160 : 132}" height="${compacto ? 40 : 30}" rx="${compacto ? 20 : 15}" fill="#0f172a" opacity=".85"/>
-    <circle cx="${x - (compacto ? 58 : 48)}" cy="${y + (compacto ? 180 : 175)}" r="${compacto ? 8 : 6}" fill="${tono}"/>
+    <rect x="${x - (compacto ? 80 : 78)}" y="${y + 160}" width="${compacto ? 160 : 156}" height="${compacto ? 40 : 30}" rx="${compacto ? 20 : 15}" fill="#0f172a" opacity=".85"/>
+    <circle cx="${x - (compacto ? 58 : 64)}" cy="${y + (compacto ? 180 : 175)}" r="${compacto ? 8 : 6}" fill="${tono}"/>
     <text x="${x + 8}" y="${y + (compacto ? 189 : 181)}" text-anchor="middle" class="of-nombre${compacto ? ' of-nombre--grande' : ''}">${_ofEsc(pj.nombre)}${compacto ? '' : ' · ' + _ofEsc(pj.rol)}</text>
   </g>`;
 }
 
+// De a 3 por fila: con 5 en una sola fila los globitos no se leían.
+const OF_POR_FILA = 3;
 function _ofEscenaSvg(grupos, compacto) {
-  const ancho = 300 * grupos.length;
+  const cols = Math.min(OF_POR_FILA, grupos.length);
+  const filas = Math.ceil(grupos.length / cols);
+  const ancho = 300 * cols, alto = 280 * filas;
   const pjs = grupos.map((g, i) => {
+    const fila = Math.floor(i / cols), enFila = Math.min(cols, grupos.length - fila * cols);
+    // la última fila, si está incompleta, va centrada
+    const x0 = (ancho - 300 * enFila) / 2;
     const nivel = g.revisando ? 'revisando'
       : g.items.some(h => h.nivel === 'urgente') ? 'urgente'
       : g.items.some(h => h.nivel === 'aviso') ? 'aviso'
       : g.items.length ? 'info' : 'ok';
     const globo = g.revisando ? 'Revisando…'
       : g.items.length ? (g.items.length === 1 ? 'Tengo algo para vos' : `Tengo ${g.items.length} cosas`) : g.pj.tranquilo;
-    return _ofPersonajeSvg(g.pj, 150 + i * 300, nivel, g.items.length, globo, compacto);
+    return `<g transform="translate(0 ${fila * 280})">${_ofPersonajeSvg(g.pj, x0 + 150 + (i - fila * cols) * 300, nivel, g.items.length, globo, compacto)}</g>`;
   }).join('');
-  return `<svg class="of-escena" viewBox="0 0 ${ancho} 280" preserveAspectRatio="xMidYMid meet" role="img" aria-label="La oficina">
+  return `<svg class="of-escena" viewBox="0 0 ${ancho} ${alto}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="La oficina">
     <defs><pattern id="of-piso" width="60" height="280" patternUnits="userSpaceOnUse"><rect width="60" height="280" fill="#c2763a"/><rect width="2" height="280" fill="#a8622e"/></pattern></defs>
-    <rect width="${ancho}" height="280" fill="url(#of-piso)" rx="16"/>
+    <rect width="${ancho}" height="${alto}" fill="url(#of-piso)" rx="16"/>
     <rect width="${ancho}" height="18" fill="#e2e8f0" rx="8"/>
     ${pjs}
   </svg>`;
@@ -695,8 +876,9 @@ function oficinaMostrar() {
   _ofEstilos();
   _ofAbrirFuentes();
   oficinaRender();
-  _ofLeerCaja().then(oficinaRender).catch(() => {});
-  if (!_ofTimer) _ofTimer = setInterval(() => { _ofLeerCaja().then(oficinaRender).catch(() => {}); }, 60000);
+  const leer = () => Promise.all([_ofLeerCaja(), _ofLeerFichadas()]).then(() => oficinaRender()).catch(() => {});
+  leer();
+  if (!_ofTimer) _ofTimer = setInterval(leer, 60000);
 }
 function oficinaDejar() {
   _ofVisible = false;
