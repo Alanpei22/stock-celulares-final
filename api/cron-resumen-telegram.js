@@ -1,6 +1,6 @@
 // Vercel Function — POST /api/cron-resumen-telegram
 // La dispara GitHub Actions a las 19:15 AR (22:15 UTC).
-// Con { oficina: true }, a las 10:30 AR: el parte de la oficina (ver abajo).
+// Con { oficina: true }, a las 10:30 AR: lo urgente del día (ver abajo).
 //
 // Manda al Telegram del dueño el resumen del día: qué entró a reparar, qué se
 // entregó, qué equipos se vendieron y cuánta plata entró, separando efectivo
@@ -137,121 +137,67 @@ function lista(l, items) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  🏢 El parte de la oficina (body { oficina: true }, 10:30 AR)
+//  ✅ El parte de la mañana (body { oficina: true }, 10:30 AR)
 // ══════════════════════════════════════════════════════════════
-// Los personajes de la oficina (oficina.js) avisan solo con la app abierta.
-// Esto es lo mismo pero de mañana y por Telegram, aunque nadie la abra:
-// cada uno firma lo suyo, y arriba la IA dice por dónde arrancar el día.
-// Las reglas son una copia corta de las de oficina.js (acá no hay app):
-// si cambian allá, conviene mirar acá.
+// Lo mismo que la tarjeta "Para hacer hoy" del Dashboard (hoy.js), pero por
+// Telegram y aunque nadie abra la app. SOLO lo urgente; si no hay nada, no
+// manda nada (antes era un parte largo firmado por personajes y Alan dijo
+// que no le servía). Además anota solo en el pedido lo que se terminó: acá
+// se leen el stock y el pedido enteros, así que se sabe bien qué falta.
+// Las reglas son una copia corta de hoy.js: si cambian allá, mirar acá.
 const DIA = 864e5;
-const PJ = { tito: '🔧 Tito', rosa: '📦 Rosa', beto: '💵 Beto', lu: '📱 Lu', marta: '🗂️ Marta' };
 const dias = (iso, ahora) => { const t = iso ? Date.parse(iso) : NaN; return Number.isFinite(t) ? Math.floor((ahora - t) / DIA) : null; };
 const equipoRep = r => [r.marca, r.modelo].filter(Boolean).join(' ') || 'Equipo';
 
-// Hechos por personaje: { tito: ['...'], ... }. Pura (tests/test-parte-oficina.js).
-export function armarParteOficina({ ahora, repairs, repuestos, productos, pedidos, equipos, cierreAyer }) {
-  const p = { tito: [], rosa: [], beto: [], lu: [], marta: [] };
-  const reps = (repairs || []).filter(r => { const d = dias(r.fechaIngreso, ahora); return d !== null && d <= 60; });
+// Categoría del pedido según el tipo (la misma tabla que hoy.js)
+function categoriaPedido(x) {
+  const t = String((x && (x.tipo || x.categoria)) || '').toLowerCase();
+  const tabla = [['módulo', 'Módulo'], ['modulo', 'Módulo'], ['pantalla', 'Pantalla'], ['bater', 'Batería'], ['cargador', 'Cargador'],
+    ['cable', 'Cable'], ['auricular', 'Auricular'], ['funda', 'Funda'], ['vidrio', 'Vidrio templado / Hidrogel'], ['hidrogel', 'Vidrio templado / Hidrogel'],
+    ['conector', 'Conector'], ['pin', 'Conector'], ['flex', 'Flex'], ['cámara', 'Cámara'], ['camara', 'Cámara'], ['parlante', 'Parlante'],
+    ['micr', 'Micrófono'], ['marco', 'Marco']];
+  const hit = tabla.find(([k]) => t.includes(k));
+  return hit ? hit[1] : 'Otro';
+}
 
-  const dem = reps.filter(r => r.estado === 'reparando' && dias(r.fechaIngreso, ahora) > 3)
-    .sort((a, b) => String(a.fechaIngreso).localeCompare(String(b.fechaIngreso)));
-  dem.forEach(r => p.tito.push(`#${r.nOrden || '?'} ${equipoRep(r)} lleva ${dias(r.fechaIngreso, ahora)} días en el taller${r.tecnico ? ' (' + r.tecnico + ')' : ''}`));
-  const listas = reps.filter(r => r.estado === 'listo')
-    .map(r => ({ r, d: dias(r.fechaListo || r.fechaIngreso, ahora) })).filter(x => x.d !== null && x.d >= 7)
-    .sort((a, b) => b.d - a.d);
-  listas.forEach(({ r, d }) => p.tito.push(`#${r.nOrden || '?'} ${equipoRep(r)} lista hace ${d} días y ${r.nombre ? String(r.nombre).split(' ')[0] : 'el cliente'} no la retiró`));
-  const hoy = new Date(ahora - 3 * 3600e3).toISOString().slice(0, 10);
-  (repairs || []).filter(r => r.seguimientoFecha && r.seguimientoFecha <= hoy && !r.seguimientoAck)
-    .forEach(r => p.tito.push(`seguimiento pendiente: #${r.nOrden || '?'} ${equipoRep(r)}`));
+// Lo que se terminó (con mínimo cargado) y no está en el pedido. Pura.
+export function terminadosSinPedir({ repuestos, productos, pedidos }) {
+  const abiertos = new Set((pedidos || []).filter(p => !p.comprado && p.itemId).map(p => p.itemId));
+  const de = (lista, campo, origen, nombre) => (lista || [])
+    .filter(x => x && x.id && x.activo !== false && Number(x.stockMin) > 0 && (Number(x[campo]) || 0) <= 0 && !abiertos.has(x.id))
+    .map(x => ({ id: x.id, origen, nombre: nombre(x), cantidad: Math.max(1, Number(x.stockMin) * 2), categoria: categoriaPedido(x) }));
+  return [
+    ...de(repuestos, 'cantidad', 'repuesto', x => [x.tipo, x.nombre && x.nombre !== x.tipo ? x.nombre : '', x.marca, x.modelo].filter(Boolean).join(' ')),
+    ...de(productos, 'stock', 'producto', x => x.nombre || 'Artículo'),
+  ];
+}
 
-  const pedidosAbiertos = new Set((pedidos || []).filter(x => !x.comprado && x.itemId).map(x => x.itemId));
-  const bajo = (lista, campo, nombre) => (lista || []).filter(x => x && x.activo !== false && !pedidosAbiertos.has(x.id))
-    .map(x => ({ x, c: Number(x[campo]) || 0, m: Number(x.stockMin) || 0 }))
-    .filter(o => o.m > 0 && o.c <= o.m)
-    .sort((a, b) => (a.c - a.m) - (b.c - b.m))
-    .map(({ x, c, m }) => `${nombre(x)}: ${c <= 0 ? 'se terminó' : 'quedan ' + c} (mínimo ${m})`);
-  p.rosa.push(...bajo(repuestos, 'cantidad', x => [x.tipo, x.nombre && x.nombre !== x.tipo ? x.nombre : '', x.marca, x.modelo].filter(Boolean).join(' ')));
-  p.rosa.push(...bajo(productos, 'stock', x => x.nombre || 'Artículo'));
-  const pend = (pedidos || []).filter(x => !x.comprado).length;
-  if (pend >= 10) p.rosa.push(`el pedido al proveedor ya tiene ${pend} cosas anotadas`);
-
-  if (cierreAyer === false) p.beto.push('ayer la caja no se cerró');
-
-  const eqs = (equipos || []).filter(e => e && !e.vendido && !e.eliminado);
-  eqs.filter(e => !e.reservado).map(e => ({ e, d: dias(e.fecha, ahora) })).filter(x => x.d !== null && x.d >= 45)
+// Lo urgente, por tema. Pura (tests/test-parte-oficina.js).
+export function armarParteOficina({ ahora, repairs, equipos, cierreAyer, anotados }) {
+  const p = { caja: [], taller: [], stock: [], ventas: [] };
+  if (cierreAyer === false) p.caja.push('ayer la caja no se cerró');
+  (repairs || []).filter(r => r.estado === 'listo')
+    .map(r => ({ r, d: dias(r.fechaListo || r.fechaIngreso, ahora), ing: dias(r.fechaIngreso, ahora) }))
+    .filter(x => x.d !== null && x.d >= 7 && x.ing !== null && x.ing <= 60)
     .sort((a, b) => b.d - a.d)
-    .forEach(({ e, d }) => p.lu.push(`${[e.marca, e.modelo, e.almacenamiento].filter(Boolean).join(' ')} lleva ${d} días sin venderse`));
-  const sinFotos = eqs.filter(e => e.publicar === true && !(Array.isArray(e.fotos) && e.fotos.length)).length;
-  if (sinFotos) p.lu.push(`${sinFotos} ${sinFotos === 1 ? 'equipo está' : 'equipos están'} en la página sin fotos`);
-
-  // Los que retiraron ayer (día argentino)
-  const diaAR = iso => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t - 3 * 3600e3).toISOString().slice(0, 10) : ''; };
-  const diaAyer = new Date(ahora - 3 * 3600e3 - DIA).toISOString().slice(0, 10);
-  const ayer = (repairs || []).filter(r => r.estado === 'entregado' && r.tlf && !r.devuelto && diaAR(r.fechaEntrega) === diaAyer).length;
-  if (ayer) p.marta.push(`${ayer} ${ayer === 1 ? 'cliente retiró' : 'clientes retiraron'} ayer: buen momento para pedirles una reseña`);
+    .forEach(({ r, d }) => p.taller.push(`${r.nombre ? String(r.nombre).split(' ')[0] : 'Un cliente'} no retiró su ${equipoRep(r)} (#${r.nOrden || '?'}): listo hace ${d} días`));
+  if ((anotados || []).length) p.stock.push(`se terminó y lo anoté en el pedido: ${anotados.join(', ')}`);
+  (equipos || []).filter(e => e && !e.vendido && !e.eliminado && !e.reservado)
+    .map(e => ({ e, d: dias(e.fecha, ahora) })).filter(x => x.d !== null && x.d >= 90)
+    .sort((a, b) => b.d - a.d)
+    .forEach(({ e, d }) => p.ventas.push(`${[e.marca, e.modelo, e.almacenamiento].filter(Boolean).join(' ')}: ${d} días sin venderse`));
   return p;
 }
 
-// Hechos → mensaje de Telegram (HTML). La idea de la IA va arriba si vino.
-export function textoParteOficina(p, idea, dia) {
-  const l = [`🏢 <b>Buen día — el parte de la oficina ${dia.split('-').reverse().join('/')}</b>`];
-  if (idea && idea.length) {
-    l.push('', '🧠 <b>Para arrancar:</b>');
-    idea.slice(0, 3).forEach((t, i) => l.push(`${i + 1}. ${esc(t)}`));
-  }
-  let algo = false;
-  for (const id of Object.keys(PJ)) {
-    const xs = p[id] || [];
-    if (!xs.length) continue;
-    algo = true;
-    l.push('', `<b>${PJ[id]}:</b>`);
-    lista(l, xs);
-  }
-  if (!algo) l.push('', 'Nadie tiene nada para decirte hoy. ☕');
-  l.push('', '<i>El detalle y los botones, en la app: Dashboard → 🏢 Oficina.</i>');
+const TEMAS = { caja: '💵 Caja', taller: '📱 Para retirar', stock: '📦 Stock', ventas: '🏷️ Equipos parados' };
+
+// Lo urgente → mensaje de Telegram (HTML), o null si no hay nada que decir
+export function textoParteOficina(p, dia) {
+  const temas = Object.keys(TEMAS).filter(t => (p[t] || []).length);
+  if (!temas.length) return null;
+  const l = [`✅ <b>Para hacer hoy — ${dia.split('-').reverse().join('/')}</b>`];
+  temas.forEach(t => { l.push('', `<b>${TEMAS[t]}</b>`); lista(l, p[t]); });
   return l.join('\n');
-}
-
-// La IA lee los hechos y dice las 3 cosas por las que conviene empezar. Si
-// tarda o falla, el parte sale igual sin esta parte (no se pierde el aviso).
-export function pedidoIdeaIA(p, dia) {
-  const hechos = Object.keys(PJ).map(id => `${PJ[id]}:\n` + ((p[id] || []).slice(0, 15).map(x => '- ' + x).join('\n') || '- nada')).join('\n\n');
-  return {
-    model: 'claude-opus-5-5',
-    max_tokens: 4000,
-    thinking: { type: 'adaptive' },
-    // low: es un mensaje corto de todas las mañanas, tiene que salir rápido
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: {
-      type: 'object', additionalProperties: false, required: ['prioridades'],
-      properties: { prioridades: { type: 'array', items: { type: 'string' } } },
-    } } },
-    fallbacks: 'default',
-    system: 'Sos el encargado de TechPoint, un local de reparación y venta de celulares en Caseros (Buenos Aires). Cada mañana leés lo que avisan los personajes de la oficina y le decís al dueño, Alan, por dónde arrancar el día. Español rioplatense, directo, sin jerga. Usá solo los datos que te pasan; no inventes. Devolvé hasta 3 prioridades, cada una una frase corta (máx 120 caracteres) con la acción concreta. Si no hay nada importante, una sola diciendo que el día arranca tranquilo.',
-    messages: [{ role: 'user', content: `Hoy es ${dia}. Esto avisan:\n\n${hechos}` }],
-  };
-}
-
-async function ideaIA(p, dia) {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return null;
-  const ctrl = new AbortController();
-  const corte = setTimeout(() => ctrl.abort(), 40000);
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST', signal: ctrl.signal,
-      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json',
-        'anthropic-beta': 'server-side-fallback-2026-07-01' },
-      body: JSON.stringify(pedidoIdeaIA(p, dia)),
-    });
-    const j = await r.json();
-    if (!r.ok || j.stop_reason === 'refusal' || j.stop_reason === 'max_tokens') return null;
-    const o = JSON.parse((j.content || []).filter(b => b.type === 'text').map(b => b.text).join(''));
-    return (Array.isArray(o.prioridades) ? o.prioridades : []).map(s => String(s).slice(0, 200)).filter(Boolean);
-  } catch (e) {
-    console.warn('parte oficina, IA:', e.message);
-    return null;
-  } finally { clearTimeout(corte); }
 }
 
 async function parteOficina(db) {
@@ -259,10 +205,8 @@ async function parteOficina(db) {
   const dia = hoyAR();
   const ayer = new Date(Date.parse(dia + 'T12:00:00Z') - DIA).toISOString().slice(0, 10);
   // Una vez por día: unas cientos de lecturas, lejos del cupo de 50.000
-  const [rep, lis, entr, rpt, prod, ped, eq, cierre] = await Promise.all([
-    db.collection('repairs').where('estado', '==', 'reparando').get(),
+  const [lis, rpt, prod, ped, eq, cierre] = await Promise.all([
     db.collection('repairs').where('estado', '==', 'listo').get(),
-    db.collection('repairs').where('fechaEntrega', '>=', new Date(ahora - 2 * DIA).toISOString()).get(),
     db.collection('repuestos').get(),
     db.collection('productos').get(),
     db.collection('pedidos').where('comprado', '==', false).get(),
@@ -270,15 +214,30 @@ async function parteOficina(db) {
     db.collection('caja_cierres').doc(ayer).get(),
   ]);
   const docs = s => s.docs.map(d => Object.assign({ id: d.id }, d.data()));
-  // seguimientos: los trae la consulta de reparando/listo (no se pide aparte)
+
+  // Lo que se terminó va solo al pedido. Mismo id que usa la app (auto_<id>):
+  // si la app ya lo anotó, no se duplica.
+  const anotados = [];
+  for (const t of terminadosSinPedir({ repuestos: docs(rpt), productos: docs(prod), pedidos: docs(ped) }).slice(0, 30)) {
+    try {
+      const ref = db.collection('pedidos').doc('auto_' + t.id);
+      const d = await ref.get();
+      if (d.exists && (!d.data().comprado || ahora - Date.parse(d.data().fechaCompra || 0) < 3 * DIA)) continue;
+      await ref.set({
+        nombre: t.nombre, cantidad: t.cantidad, categoria: t.categoria, prioridad: 'normal', proveedor: null,
+        notas: 'Se anotó solo: se terminó', itemId: t.id, itemSource: t.origen,
+        createdAt: new Date().toISOString(), comprado: false, fechaCompra: null, auto: true,
+      });
+      anotados.push(t.nombre);
+    } catch (e) { console.error('parte, auto-pedido:', e); }
+  }
+
   const p = armarParteOficina({
-    ahora, repairs: [...docs(rep), ...docs(lis), ...docs(entr)],
-    repuestos: docs(rpt), productos: docs(prod), pedidos: docs(ped), equipos: docs(eq),
+    ahora, repairs: docs(lis), equipos: docs(eq), anotados,
     // domingo cerrado: ayer sin cierre un lunes no es un problema
     cierreAyer: new Date(Date.parse(ayer + 'T12:00:00Z')).getUTCDay() === 0 ? null : cierre.exists,
   });
-  const idea = await ideaIA(p, dia);
-  return { texto: textoParteOficina(p, idea, dia), conIA: !!idea };
+  return { texto: textoParteOficina(p, dia), anotados: anotados.length };
 }
 
 export default async function handler(req, res) {
@@ -303,7 +262,9 @@ export default async function handler(req, res) {
     // El parte de la mañana va por la misma función (no sumamos otra: el
     // plan de Vercel tiene un tope de funciones)
     if (req.body && req.body.oficina) {
-      const { texto, conIA } = await parteOficina(db);
+      const { texto, anotados } = await parteOficina(db);
+      // Nada urgente: no se manda nada (un "todo bien" diario se deja de leer)
+      if (!texto) return res.status(200).json({ ok: true, oficina: true, nada: true, anotados });
       const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -311,7 +272,7 @@ export default async function handler(req, res) {
       });
       const data = await r.json();
       if (!data.ok) console.error('parte oficina:', data);
-      return res.status(200).json({ ok: !!data.ok, oficina: true, conIA, error: data.ok ? undefined : data.description });
+      return res.status(200).json({ ok: !!data.ok, oficina: true, anotados, error: data.ok ? undefined : data.description });
     }
 
     const [movsSnap, inSnap, outSnap] = await Promise.all([

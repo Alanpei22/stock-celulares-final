@@ -343,7 +343,6 @@
         <div class="d-seg d-modo" id="d-modo">
           <button type="button" data-modo="numeros" class="sel" onclick="tallerModo('numeros')">📊 Números</button>
           <button type="button" data-modo="taller" onclick="tallerModo('taller')">🔧 Taller</button>
-          <button type="button" data-modo="oficina" onclick="tallerModo('oficina')">🏢 Oficina</button>
         </div>
         <div class="d-topbar-actions">
           <button class="d-icon-btn d-sb-toggle" onclick="toggleSidebar()" title="Colapsar panel">&#9776;</button>
@@ -353,8 +352,6 @@
 
       <!-- Tablero del taller (vista 🔧 Taller): lo arma taller.js -->
       <div id="d-taller" class="d-taller"></div>
-      <!-- La oficina (vista 🏢 Oficina): personajes que avisan, oficina.js -->
-      <div id="d-oficina" class="d-oficina"></div>
 
       <!-- Saludo -->
       <div class="d-hello">
@@ -367,6 +364,9 @@
 
       <!-- Notificaciones in-app (banners) -->
       <div id="notif-banners" class="notif-banners hidden"></div>
+
+      <!-- ✅ Para hacer hoy: lo que hace perder plata o clientes (hoy.js) -->
+      <div id="d-hoy" class="d-hoy" style="display:none"></div>
 
       <!-- Acciones rápidas -->
       <div class="d-quick">
@@ -2386,7 +2386,7 @@
 <script defer src="horas.js"></script>
 <script defer src="movstock.js"></script>
 <script defer src="taller.js"></script>
-<script defer src="oficina.js"></script>
+<script defer src="hoy.js"></script>
 <script defer src="roturas.js"></script>
 <script defer src="instalar.js"></script>
 <script defer src="barcode.js"></script>

@@ -788,7 +788,6 @@ function switchSection(section) {
     else { if (typeof tallerModo === 'function' && tallerActivo()) tallerModo('numeros'); else renderDashboard(); }
   } else {
     if (typeof _tlDejar === 'function') _tlDejar();   // no escuchar fichadas sin mirar el tablero
-    if (typeof oficinaDejar === 'function') oficinaDejar();
   }
   // CUPO: los repuestos son una colección entera; se leen recién cuando se
   // entra a la sección, no en cada apertura de la app.
@@ -843,6 +842,7 @@ function _dashRango(k) {
 
 async function renderDashboard() {
   _renderDashSaludo();
+  if (typeof hoyMostrar === 'function') hoyMostrar();   // ✅ Para hacer hoy
   _renderPeriodoChips();
   _renderDashReps();
   await _loadDashPeriodo();
@@ -854,8 +854,7 @@ function _refreshDashIfVisible() {
   if (!s || s.classList.contains('section-hidden')) return;
   // En la vista 🔧 Taller se redibuja el tablero (cambió una reparación)
   if (typeof tallerActivo === 'function' && tallerActivo()) { tallerRender(); return; }
-  // En 🏢 Oficina los personajes vuelven a mirar (cambió algo)
-  if (typeof oficinaActiva === 'function' && oficinaActiva()) { oficinaRender(); return; }
+  if (typeof hoyRender === 'function') hoyRender();   // ✅ Para hacer hoy (de memoria)
   _renderDashReps();
   _renderKPIs();
   _renderDashCats();

@@ -29,10 +29,9 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-hoy.js':            'Para hacer hoy (Dashboard): solo lo que hace perder plata o clientes, 5 a la vista, lo que se termina va solo al pedido',
   'test-avisos-secret.js':  'Clave propia del script de Gmail (MercadoPago): sirve solo para push y Telegram, no rompe los crons',
-  'test-parte-oficina.js':  'Parte de la oficina por Telegram a las 10:30: cada personaje firma lo suyo y la IA dice por dónde arrancar',
-  'test-oficina-ia.js':     'Oficina con IA: cada personaje lo piensa y devuelve plan y mensajes listos (sin teléfonos, sin montos si no hay permiso)',
-  'test-oficina.js':        'La oficina: Tito (taller), Rosa (stock), Beto (caja), Lu (ventas) y Marta (personal) avisan y preguntan',
+  'test-parte-oficina.js':  'Telegram de las 10:30: solo lo urgente (si no hay nada no manda) y anota solo en el pedido lo que se terminó',
   'test-taller.js':         'Tablero del taller (Dashboard): columnas, quién trabaja, sin montos',
   'test-comision-tarjeta.js': 'Comisión de Getnet: cada cobro con tarjeta guarda lo que te depositan y la ganancia real',
   'test-estado-dia.js':     'El estado de cada dia (hoy lunes, ya abrimos) y a que hora sale',
