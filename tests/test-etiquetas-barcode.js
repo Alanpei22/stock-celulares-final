@@ -518,8 +518,13 @@ console.log('\n9) Códigos largos y la etiquetadora de 203 dpi');
   vm.runInContext('printEtiquetasRepuestos(__D, 1)', pCtx);
   await new Promise(r => setTimeout(r, 20));
   ok(GUARDADO.length === 1 && GUARDADO[0][0] === 'repuestos' && rep.codigoCorto, 'en repuestos también (en su colección)', GUARDADO);
-  ok(/const esSuyo = x => String\(x\.codigo \|\| ''\)\.trim\(\) === txt \|\| String\(x\.codigoCorto \|\| ''\)\.trim\(\) === txt/.test(caja),
-     'la caja encuentra el artículo por cualquiera de los dos códigos');
+  // La caja compara los dos códigos (el de fábrica y el corto nuestro) con la
+  // comparación normalizada de utils.js, que es la que aguanta un cero de
+  // adelante o un espacio de más.
+  ok(/tpEsSuCodigo\(x, txt\)/.test(caja), 'la caja compara con tpEsSuCodigo');
+  const utils = fs.readFileSync(DIR + 'utils.js', 'utf8');
+  ok(/codigoCorto/.test(utils.slice(utils.indexOf('function tpEsSuCodigo'))),
+     'y esa mira también el código corto que imprimimos nosotros');
 }
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');

@@ -141,7 +141,7 @@ run('_cart = []; TOASTS = [];');
 TOASTS.length = 0;
 ESCANEO.cb('111111111111111');
 ok(cart().length === 0, 'no entra', cart());
-ok(TOASTS.some(t => /no está en el inventario|no está/i.test(t[1])), 'y avisa', TOASTS);
+ok(TOASTS.some(t => /no encontré el código/i.test(t[1])), 'y avisa, diciendo qué código leyó', TOASTS);
 
 console.log('\n7) La boleta de una reparación');
 // El QR de la boleta lleva el token de seguimiento.
@@ -161,7 +161,7 @@ console.log('\n8) Un código que no es de nadie');
 run('_cart = [];'); TOASTS.length = 0;
 ESCANEO.cb('9999999999999');
 ok(cart().length === 0, 'no inventa un producto', cart());
-ok(TOASTS.some(t => /no está en el inventario/.test(t[1])), 'y lo dice', TOASTS);
+ok(TOASTS.some(t => /No encontré el código/.test(t[1])), 'y lo dice, con el código leído', TOASTS);
 
 console.log('\n9) Con categoría, la descripción deja de ser obligatoria');
 // Antes había que escribir "Venta producto" a mano en cada venta suelta.

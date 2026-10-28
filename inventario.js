@@ -411,8 +411,10 @@ async function saveProducto(opts) {
   if (!nom) { toast('Ingresá el nombre del producto', 'error'); return; }
 
   // Verificar código duplicado (al crear Y al editar si cambió el código)
-  if (cod && PRODUCTOS_MAP.has(cod)) {
-    const existente = PRODUCTOS_MAP.get(cod);
+  // También con la comparación normalizada: cargar el mismo código con un
+  // cero de adelante creaba un segundo producto igual.
+  if (cod && invPorCodigo(cod)) {
+    const existente = invPorCodigo(cod);
     // Si estamos editando y el producto con ese código ES el mismo que editamos, está ok
     if (!_invEditingId || existente.id !== _invEditingId) {
       toast('Ya existe un producto con ese código', 'error');
@@ -592,8 +594,17 @@ function focusInvScan() {
   if (inp) inp.focus();
 }
 
+// Buscar por código como lo hace la caja: exacto primero y, si no, con la
+// comparación normalizada (cero de adelante, espacios, mayúsculas).
+function invPorCodigo(codigo) {
+  const exacto = PRODUCTOS_MAP.get(String(codigo || '').trim());
+  if (exacto) return exacto;
+  if (typeof tpEsSuCodigo !== 'function') return null;
+  return PRODUCTOS.find(p => tpEsSuCodigo(p, codigo)) || null;
+}
+
 function _handleInvScan(codigo) {
-  const p = PRODUCTOS_MAP.get(codigo);
+  const p = invPorCodigo(codigo);
   if (p) {
     // Producto existe → abrir form para editar / ajustar stock
     openProductoForm(p.id);

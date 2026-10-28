@@ -3284,7 +3284,12 @@ function _movDesdeCodigo(cod, opts = {}) {
 
   // El código de fábrica o el corto que lleva la etiqueta cuando el de
   // fábrica es muy largo para imprimirlo legible (print.js)
-  const esSuyo = x => String(x.codigo || '').trim() === txt || String(x.codigoCorto || '').trim() === txt;
+  // La comparación normalizada (utils.js) es la que hace que un código con un
+  // cero de adelante, un espacio de más o en minúscula igual encuentre a su
+  // producto. Con `===` pelado había códigos que no leían nunca.
+  const esSuyo = x => (typeof tpEsSuCodigo === 'function')
+    ? tpEsSuCodigo(x, txt)
+    : (String(x.codigo || '').trim() === txt || String(x.codigoCorto || '').trim() === txt);
 
   // 1) Accesorio del inventario, por su código de barras
   const prod = (typeof PRODUCTOS !== 'undefined' ? PRODUCTOS : [])
@@ -3346,7 +3351,16 @@ function _movDesdeCodigo(cod, opts = {}) {
     return true;
   }
 
-  if (!opts.silencioso) toast('Ese código no está en el inventario ni en el stock', 'error');
+  // Un artículo desactivado no se vende, pero decir "no está en el
+  // inventario" manda a cargarlo de nuevo y termina duplicado.
+  const apagado = (typeof PRODUCTOS !== 'undefined' ? PRODUCTOS : []).find(p => p.activo === false && esSuyo(p));
+  if (apagado) {
+    toast(`⏸️ ${apagado.nombre || 'Ese artículo'} está desactivado: activalo en Accesorios`, 'error');
+    return false;
+  }
+  // El código leído va en el cartel: así se ve si lo que salió del lector es
+  // lo mismo que está cargado (un cero de adelante, una cifra de menos).
+  if (!opts.silencioso) toast(`No encontré el código ${txt}`, 'error');
   return false;
 }
 

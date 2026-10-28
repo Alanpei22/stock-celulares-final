@@ -835,3 +835,41 @@ function waAbrir(url) {
   }
   return window.open(u, '_blank');
 }
+
+// ══════════════════════════════════════════════════════════════
+//  CÓDIGOS DE BARRAS — comparar lo que lee el lector con lo guardado
+// ══════════════════════════════════════════════════════════════
+//  La comparación era `===` pelado y por eso había códigos que no leían
+//  nunca, siempre los mismos:
+//
+//   · El CERO DE ADELANTE. La misma etiqueta sale como UPC de 12 cifras o
+//     como EAN de 13 con un cero adelante, según el lector y según de dónde
+//     se copió el número. "7790895000997" y "07790895000997" son el mismo
+//     producto y no se encontraban entre ellos.
+//   · Un ESPACIO o un GUIÓN de más al cargarlo a mano o al importar de Excel.
+//   · MAYÚSCULAS en los nuestros: "TP00041" contra "tp00041".
+//
+//  No se toca lo guardado: se comparan normalizados.
+
+function tpCodNorm(v) {
+  return String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, '');
+}
+
+function tpCodigosIguales(a, b) {
+  const x = tpCodNorm(a), y = tpCodNorm(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  // Solo entre números: sacarle los ceros de adelante a "TP007" sería otro
+  // código distinto.
+  if (/^\d+$/.test(x) && /^\d+$/.test(y)) {
+    return x.replace(/^0+/, '') === y.replace(/^0+/, '');
+  }
+  return false;
+}
+
+// ¿Este producto/repuesto es el del código leído? Mira el de fábrica y el
+// corto que imprimimos nosotros (print.js usa el corto cuando el de fábrica
+// no entra en la etiqueta).
+function tpEsSuCodigo(item, cod) {
+  return !!item && (tpCodigosIguales(item.codigo, cod) || tpCodigosIguales(item.codigoCorto, cod));
+}

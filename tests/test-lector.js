@@ -54,6 +54,8 @@ const ctx = {
 ctx.globalThis = ctx; ctx.self = ctx;
 vm.createContext(ctx);
 vm.runInContext('var fmtNum = n => String(n); var fmtMoney = n => "$" + n; var safeListener = (p, c) => c();', ctx);
+// utils.js primero: de ahí sale la comparación de códigos que usan las dos.
+vm.runInContext(fs.readFileSync(DIR + 'utils.js', 'utf8'), ctx, { filename: 'utils.js' });
 vm.runInContext(fs.readFileSync(DIR + 'inventario.js', 'utf8'), ctx, { filename: 'inventario.js' });
 vm.runInContext(fs.readFileSync(DIR + 'caja.js', 'utf8'), ctx, { filename: 'caja.js' });
 const run = c => vm.runInContext(c, ctx);
@@ -157,6 +159,51 @@ ok(els['mov-fi-desc'].value === '', 'y el buscador queda limpio', els['mov-fi-de
 els['mov-fi-desc'].value = 'TP00099';
 ok(get("_movDesdeCodigo('TP00099')") === true, 'y el código de la etiqueta también');
 ok(els['mov-fi-desc'].value === '', 'con el buscador igual de limpio', els['mov-fi-desc'].value);
+
+console.log('\n6b) Los códigos que no leían nunca');
+// Alan: "tengo dos códigos que no me leen el producto". Siempre los mismos,
+// no "a veces": eso ya no es la carrera, es la comparación. Era `===` pelado.
+ok(get("tpCodigosIguales('7790895000997', '07790895000997')") === true,
+   'el cero de adelante: UPC de 12 y EAN de 13 son la misma etiqueta');
+ok(get("tpCodigosIguales('0000123', '123')") === true, 'y varios ceros también');
+ok(get("tpCodigosIguales(' 7790895000997 ', '7790895000997')") === true, 'un espacio de más al cargarlo');
+ok(get("tpCodigosIguales('7790-895-000997', '7790895000997')") === true, 'guiones del Excel');
+ok(get("tpCodigosIguales('tp00041', 'TP00041')") === true, 'y la minúscula en los nuestros');
+// Lo que NO puede pasar: que un código encuentre al de otro producto.
+ok(get("tpCodigosIguales('7790895000997', '7790895000998')") === false, 'una cifra distinta es otro producto');
+ok(get("tpCodigosIguales('TP007', 'TP7')") === false, 'y a los nuestros no se les sacan ceros: TP007 no es TP7');
+// Los ceros se sacan SOLO entre números: en algo con letras, el cero es
+// parte del código y sacárselo lo convertiría en otro.
+ok(get("tpCodigosIguales('007TP', '7TP')") === false, 'a un código con letras no se le tocan los ceros');
+ok(get("tpCodigosIguales('', '123')") === false, 'vacío no encuentra nada');
+
+// El caso completo, como en el mostrador: el producto cargado SIN el cero y
+// el lector que lo manda CON el cero.
+run("_cart = []; PRODUCTOS = __PRODS; PRODUCTOS_MAP = new Map(); PRODUCTOS.forEach(p => PRODUCTOS_MAP.set(String(p.codigo), p));");
+TOASTS.length = 0;
+ok(get("_movDesdeCodigo('07790895000997')") === true, 'escaneado con el cero adelante, lo encuentra igual');
+ok(cart().length === 1 && cart()[0].id === 'p1', 'y entra el producto correcto', cart());
+
+// El código corto (TP…): print.js lo imprime cuando el de fábrica es muy
+// largo para que entre legible en la etiqueta, así que es el que se escanea.
+run("_cart = []; PRODUCTOS = [{ id: 'p5', codigo: '7790895000997', codigoCorto: 'TP00041', nombre: 'Funda', precioVenta: 5000, stock: 3, activo: true }];");
+ok(get("_movDesdeCodigo('TP00041')") === true, 'también lo encuentra por el código corto de la etiqueta');
+ok(cart().length === 1 && cart()[0].id === 'p5', 'y es el producto correcto', cart());
+
+// Un artículo desactivado no se vende, pero decir "no existe" lleva a
+// cargarlo de nuevo y termina duplicado en el inventario.
+run("_cart = []; PRODUCTOS = [{ id: 'p9', codigo: '7799999999999', nombre: 'Funda vieja', activo: false }];");
+TOASTS.length = 0;
+ok(get("_movDesdeCodigo('7799999999999')") === false, 'un artículo desactivado no entra a la venta');
+ok(TOASTS.some(t => /desactivado/.test(t[1])), 'pero avisa que está desactivado, no que no existe', TOASTS);
+ok(TOASTS.some(t => /Funda vieja/.test(t[1])), 'y dice cuál es', TOASTS);
+
+// Y cuando de verdad no está, el cartel dice el código leído: así se ve de un
+// vistazo si lo que salió del lector es lo mismo que está cargado.
+run("_cart = []; PRODUCTOS = [];");
+TOASTS.length = 0;
+get("_movDesdeCodigo('1234567890123')");
+ok(TOASTS.some(t => /1234567890123/.test(t[1])), 'el cartel muestra el código que leyó', TOASTS);
 
 console.log('\n7) La espera no se cuelga para siempre');
 // Si Firestore no contesta, el mostrador no puede quedar esperando: a los 6
