@@ -2737,7 +2737,27 @@ function _markError(el, on) {
 // Arranca los listeners que alimentan el autocomplete de la venta.
 // Se llama al tocar el buscador o al abrir el modal de cobro: si el día se pasa
 // mirando los números sin vender, esas colecciones no se leen nunca.
+// Los datos de la venta se piden recién cuando hacen falta (cupo de Firebase),
+// y tardan: Firestore contesta cuando contesta. El problema es el lector de
+// mano — abrís la venta, escaneás en el acto y el código se busca contra
+// listas TODAVÍA VACÍAS. No encuentra nada, y a la segunda pasada ya están
+// cargadas y anda. Eso es el "a veces tengo que escanear dos veces".
+//
+// Esta promesa se cumple cuando llegaron los accesorios y los repuestos, que
+// es el 99% de lo que se escanea. Si Firestore tarda, se corta a los 6
+// segundos para no dejar el mostrador esperando.
+let _datosVentaListos = null;
+function datosVentaListos() {
+  return _datosVentaListos || Promise.resolve();
+}
+
 function _asegurarDatosVenta() {
+  if (!_datosVentaListos) {
+    _datosVentaListos = Promise.race([
+      Promise.all([_primerSnap('productos'), _primerSnap('repuestos')]),
+      new Promise(ok => setTimeout(ok, 6000)),
+    ]);
+  }
   listenCajaRepuestos();
   listenCajaStock();
   listenCajaRepairs();
@@ -2748,11 +2768,29 @@ function _asegurarDatosVenta() {
   if (typeof _listenProductos === 'function') _listenProductos();
 }
 
+// Se cumple cuando esa lista trajo su primer snapshot (o ya tenía datos).
+const _snapEspera = {};
+function _primerSnap(cual) {
+  const ya = cual === 'productos'
+    ? (typeof PRODUCTOS !== 'undefined' && PRODUCTOS.length)
+    : (typeof CAJA_REPUESTOS !== 'undefined' && CAJA_REPUESTOS.length);
+  if (ya) return Promise.resolve();
+  if (!_snapEspera[cual]) {
+    _snapEspera[cual] = {};
+    _snapEspera[cual].p = new Promise(ok => { _snapEspera[cual].ok = ok; });
+  }
+  return _snapEspera[cual].p;
+}
+function _snapLlego(cual) {
+  if (_snapEspera[cual] && _snapEspera[cual].ok) { _snapEspera[cual].ok(); _snapEspera[cual].ok = null; }
+}
+
 function listenCajaRepuestos() {
   if (_cajaRepuestosListener) return;
   _cajaRepuestosListener = db.collection('repuestos').onSnapshot(snap => {
     CAJA_REPUESTOS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  }, err => console.error('Repuestos (caja):', err));
+    _snapLlego('repuestos');
+  }, err => { console.error('Repuestos (caja):', err); _snapLlego('repuestos'); });
 }
 
 function listenCajaStock() {
@@ -2808,23 +2846,8 @@ function _initMovDescAutocomplete() {
       // código exacto (accesorio, repuesto, equipo, boleta). Antes iba directo
       // a la búsqueda aproximada: agregaba lo parecido, o un "producto libre"
       // con el código como nombre.
-      const cod = input.value.trim();
-      if (cod && _movDesdeCodigo(cod, { silencioso: true })) {
-        e.preventDefault();
-        input.value = '';
-        _hideMovSuggestions();
-        return;
-      }
-      // Enter confirma el artículo: agrega la primera sugerencia, o lo carga como producto libre
-      const drop = document.getElementById('mov-desc-suggest');
-      const visible = drop && !drop.classList.contains('hidden');
-      if (visible && drop._results && drop._results.length) {
-        e.preventDefault();
-        _selectMovSuggestion(0);
-      } else if (input.value.trim()) {
-        e.preventDefault();
-        _addFreeFromSearch();
-      }
+      e.preventDefault();
+      _movEnterBuscador(input.value.trim());
     }
   });
 }
@@ -2855,6 +2878,52 @@ function _initTecladoCaja() {
   vv.addEventListener('resize', mirar);
   vv.addEventListener('scroll', mirar);
   mirar();
+}
+
+// Lo que pasa al tocar Enter (o al escanear, que es lo mismo con el lector de
+// mano). Es `async` por una sola razón: si todavía no llegaron los accesorios
+// y los repuestos, hay que ESPERARLOS antes de decir que el código no existe.
+async function _movEnterBuscador(cod) {
+  const input = document.getElementById('mov-fi-desc');
+  if (cod && _movDesdeCodigo(cod, { silencioso: true })) { _movLimpiarBuscador(); return; }
+
+  // Un código de barras no es el nombre de un producto. Si no se encontró,
+  // puede ser que las listas todavía no hayan llegado: se esperan y se busca
+  // de nuevo. Recién ahí se dice que no está.
+  if (cod && _pareceCodigo(cod)) {
+    _movAviso('Buscando…');
+    await datosVentaListos();
+    if (_movDesdeCodigo(cod, { silencioso: true })) { _movLimpiarBuscador(); _movAviso(''); return; }
+    _movAviso('');
+    toast('Ese código no está en el inventario ni en el stock', 'error');
+    // No se agrega como "producto libre": un artículo llamado
+    // "7798123456789" en la venta y en el comprobante no le sirve a nadie.
+    return;
+  }
+
+  // Texto escrito a mano: lo de siempre.
+  const drop = document.getElementById('mov-desc-suggest');
+  const visible = drop && !drop.classList.contains('hidden');
+  if (visible && drop._results && drop._results.length) _selectMovSuggestion(0);
+  else if (input && input.value.trim()) _addFreeFromSearch();
+}
+
+// ¿Esto lo tipeó alguien o lo escupió el lector? Los códigos son largos y sin
+// espacios: de fábrica (EAN/UPC, 8 a 14 cifras) o los nuestros (TP00041).
+function _pareceCodigo(txt) {
+  const t = String(txt || '').trim();
+  if (/\s/.test(t)) return false;
+  return /^\d{8,14}$/.test(t) || /^TP\d{3,}$/i.test(t);
+}
+
+// Un cartelito abajo del buscador mientras se esperan las listas.
+function _movAviso(txt) {
+  const el = document.getElementById('mov-desc-suggest');
+  if (!el) return;
+  if (!txt) { if (el._aviso) { el._aviso = false; el.classList.add('hidden'); el.innerHTML = ''; } return; }
+  el._aviso = true;
+  el.innerHTML = `<div class="mov-sug-item mov-sug-espera">⏳ ${txt}</div>`;
+  el.classList.remove('hidden');
 }
 
 function _onMovDescInput() {
@@ -3197,6 +3266,17 @@ function _addEquipoAlCarrito(eq) {
 // Lo que se escaneó, convertido en algo que la caja entiende.
 // Devuelve true si lo encontró. `silencioso`: sin el cartel de "no está"
 // (la pistola lectora, que si no lo encuentra sigue con la búsqueda común).
+// Devuelve true si el código era de algo y ya se hizo lo que correspondía.
+// OJO: esto lo mira quien llama para no seguir de largo. Antes las ramas que
+// encontraban algo hacían `return` pelado (undefined), así que el que
+// llamaba creía que NO se había encontrado nada y seguía con la búsqueda
+// aproximada — justo lo que este código vino a evitar.
+function _movLimpiarBuscador() {
+  const input = document.getElementById('mov-fi-desc');
+  if (input) input.value = '';
+  if (typeof _hideMovSuggestions === 'function') _hideMovSuggestions();
+}
+
 function _movDesdeCodigo(cod, opts = {}) {
   const txt = String(cod || '').trim();
   if (!txt) return false;
@@ -3217,7 +3297,7 @@ function _movDesdeCodigo(cod, opts = {}) {
       costoUSD: Number(prod.precioCostoUSD) || 0,
       costoARS: (typeof invCostoARS === 'function') ? invCostoARS(prod) : (Number(prod.precioCosto) || 0), icon: '📦',
     });
-    return;
+    return true;
   }
 
   // 2) Repuesto
@@ -3234,19 +3314,19 @@ function _movDesdeCodigo(cod, opts = {}) {
       costoUSD, costoARS: costoUSD > 0 && dolar > 0 ? Math.round(costoUSD * dolar) : (Number(repu.precioCompra) || 0),
       icon: '🔧',
     });
-    return;
+    return true;
   }
 
   // 3) Equipo del stock, por el código corto de SU etiqueta
   const eqCod = (typeof CAJA_STOCK !== 'undefined' ? CAJA_STOCK : [])
     .find(p => !p.vendido && String(p.codigo || '').trim() && String(p.codigo).trim() === txt);
-  if (eqCod) { _addEquipoAlCarrito(eqCod); return; }
+  if (eqCod) { _addEquipoAlCarrito(eqCod); _movLimpiarBuscador(); return true; }
 
   // 4) …o por el IMEI, que es lo que trae impreso la caja de fábrica
   if (digitos.length >= 14) {
     const eq = (typeof CAJA_STOCK !== 'undefined' ? CAJA_STOCK : [])
       .find(p => !p.vendido && String(p.imei || '').replace(/\D/g, '') === digitos);
-    if (eq) { _addEquipoAlCarrito(eq); return; }
+    if (eq) { _addEquipoAlCarrito(eq); _movLimpiarBuscador(); return true; }
   }
 
   // 4) Boleta de una reparación: el QR lleva el token de seguimiento, y el
@@ -3258,11 +3338,12 @@ function _movDesdeCodigo(cod, opts = {}) {
   if (rep) {
     if (rep.cobrado && rep.estado === 'entregado') {
       toast(`N°${rep.nOrden} ya está cobrada y entregada`, 'error');
-      return;
+      return true;
     }
     if (typeof cerrarEscaner === 'function') cerrarEscaner();   // abre un cartel: la cámara estorba
+    _movLimpiarBuscador();
     _openRepairLinkModal(rep);
-    return;
+    return true;
   }
 
   if (!opts.silencioso) toast('Ese código no está en el inventario ni en el stock', 'error');
@@ -3285,7 +3366,7 @@ function _selectMovSuggestion(idx) {
   // ── Equipo del stock → la venta de equipo, con su comprobante ──
   if (r.source === 'equipo') {
     const eq = (CAJA_STOCK || []).find(p => p.id === r.id);
-    if (eq) { _addEquipoAlCarrito(eq); return; }
+    if (eq) { _addEquipoAlCarrito(eq); _movLimpiarBuscador(); return true; }
   }
 
   _addToCart(r);

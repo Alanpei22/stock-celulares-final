@@ -987,6 +987,10 @@ body.dark .cajachica-contado-val { color: #F2F2F7; }
 /* Fondo suave para filas de reparación en el autocomplete */
 .mov-sug-item--repair { background: rgba(200,150,90,.04); border-left: 3px solid #C8965A; }
 
+/* "Buscando…" mientras llegan las listas al escanear: sin esto el lector
+   parecía no haber leído nada y se escaneaba de nuevo. */
+.mov-sug-espera { color: var(--text2); font-size: .82rem; padding: 10px 12px; }
+
 /* Badge de modo en el card inline */
 .repair-mode-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 

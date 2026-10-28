@@ -125,10 +125,14 @@ run('_selectedRepairItem = null;');
 
 console.log('\n5b) La pistola lectora (Enter en el buscador) busca el código exacto');
 const cj = fs.readFileSync(DIR + 'caja.js', 'utf8');
-const enter = cj.slice(cj.indexOf("else if (e.key === 'Enter') {"), cj.indexOf("else if (e.key === 'Enter') {") + 1200);
-ok(enter.indexOf('_movDesdeCodigo(cod, { silencioso: true })') >= 0 &&
-   enter.indexOf('_movDesdeCodigo(cod, { silencioso: true })') < enter.indexOf('_addFreeFromSearch()'),
-   'primero el código exacto; solo si no existe, la búsqueda común (antes: "producto libre" con el código como nombre)');
+const enter = cj.slice(cj.indexOf("else if (e.key === 'Enter') {"), cj.indexOf("else if (e.key === 'Enter') {") + 400);
+ok(/_movEnterBuscador\(/.test(enter), 'el Enter del lector va al buscador de códigos', enter.slice(0, 260));
+// Lo que rompía todo: la rama que SÍ encontraba algo devolvía undefined, así
+// que quien llamaba creía que no se había encontrado nada y seguía de largo
+// con la búsqueda aproximada (ver test-lector.js).
+ok(run("_movDesdeCodigo('7790895000997')") === true, 'encontrar un accesorio DEVUELVE true');
+ok(run("_movDesdeCodigo('RP-001')") === true, 'y un repuesto también');
+ok(run("_movDesdeCodigo('356938035643809')") === true, 'y el IMEI de un equipo del stock');
 ok(/searchMatch\(\[p\.marca, p\.modelo, p\.almacenamiento, p\.imei, p\.codigo\], q\)/.test(cj), 'el buscador encuentra el equipo por el código de su etiqueta');
 ok(run("_movDesdeCodigo('NO-EXISTE', { silencioso: true })") === false, 'un código que no existe devuelve false sin cartel');
 
