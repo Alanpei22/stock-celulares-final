@@ -1,7 +1,8 @@
 // ══════════════════════════════════════════
 //  _arca.js — hablar con ARCA (ex AFIP)
 // ══════════════════════════════════════════
-// FASE 1: solo autenticarse y LEER. Todavía no emite ningún comprobante.
+// FASE 1: autenticarse y leer. FASE 2 (al final): emitir Factura C, con la
+// numeración a prueba de cortes. Producción sigue bloqueada (fase 4).
 //
 // Son dos servicios SOAP encadenados:
 //   WSAA   → se le manda un XML firmado con el certificado y devuelve un
@@ -22,6 +23,7 @@
 
 import forge from 'node-forge';
 import admin from 'firebase-admin';
+import { CBTE_FACTURA_C, armarFECAE, leerFECAE, esNumeroOcupado, leerConsulta, datosQR } from './_arca-fe.js';
 
 // Endpoints verificados el 19/08/2026 pidiendo el WSDL de cada uno.
 // OJO: `wsfev1homo.afip.gov.ar` NO existe, aunque circule en tutoriales.
@@ -139,6 +141,9 @@ function _db() {
   }
   return admin.firestore();
 }
+
+// Para el endpoint (leer la venta): inicializa Firebase Admin si hace falta
+export function arcaDb() { return _db(); }
 
 const _docTA = (entorno) => _db().collection('config').doc('arca_ta_' + entorno);
 
@@ -280,4 +285,107 @@ export async function ultimoAutorizado({ ptoVenta, cbteTipo = 11 }) {
     proximo: (Number.isFinite(ultimo) ? ultimo : 0) + 1,
     tokenDeCache: ta.deCache,
   };
+}
+
+// ══════════════════════════════════════════
+//  FASE 2 — EMITIR (Factura C)
+// ══════════════════════════════════════════
+// Lo que se cuida, en orden:
+//  1. La numeración no puede tener huecos ni repetidos (es un problema
+//     fiscal, no de pantalla). Cada venta tiene su documento en `facturas`
+//     (id = la venta). ANTES de pedir el CAE se anota qué número se va a
+//     usar; si se corta en el medio, el próximo intento le pregunta a ARCA
+//     (FECompConsultar) si ese número ya salió, en vez de pedir otro.
+//  2. Dos intentos a la vez de la misma venta: una transacción deja pasar
+//     uno solo. Dos ventas distintas a la vez: si ARCA dice que el número ya
+//     no es el que sigue (10016), se pregunta de nuevo y se reintenta.
+//  3. Producción bloqueada hasta la fase 4: con ARCA_ENTORNO=produccion no
+//     se emite salvo ARCA_EMITIR_PRODUCCION=si. Emitir de verdad creyendo que
+//     se prueba es lo peor que puede pasar.
+
+// ── FECompConsultar: ¿ese número ya se emitió? ──────────────
+export async function consultarCbte({ ptoVenta, cbteTipo = CBTE_FACTURA_C, nro }) {
+  const cfg = arcaConfig();
+  const ta = await obtenerTA();
+  const xml = await _llamarWsfe('FECompConsultar',
+    `${_authXml({ ...ta, cuit: cfg.cuit })}<ar:FeCompConsReq><ar:CbteTipo>${cbteTipo}</ar:CbteTipo><ar:CbteNro>${Number(nro)}</ar:CbteNro><ar:PtoVta>${Number(ptoVenta)}</ar:PtoVta></ar:FeCompConsReq>`);
+  const c = leerConsulta(xml);
+  if (c) return c;
+  // 602 = "no existen datos": ese número no se emitió. Cualquier otro error
+  // no se puede tomar como "no existe" (sería arriesgarse a repetir).
+  if (/<(?:\w+:)?Code>602</.test(xml)) return null;
+  const err = _errorNegocio(xml);
+  throw new Error('No se pudo consultar a ARCA: ' + (err || 'respuesta inesperada'));
+}
+
+export async function emitirFactura({ id, detalle, extra = {} }) {
+  const cfg = arcaConfig();
+  if (cfg.entorno === 'produccion' && process.env.ARCA_EMITIR_PRODUCCION !== 'si') {
+    throw new Error('Facturar en producción todavía no está habilitado (fase 4).');
+  }
+  const pv = cfg.ptoVenta;
+  if (!pv) throw new Error('Falta el punto de venta (ARCA_PTO_VENTA)');
+  const db = _db();
+  const ref = db.collection('facturas').doc(String(id));
+  const ahora = () => new Date().toISOString();
+
+  // 1) El turno de esta venta
+  const previo = await db.runTransaction(async tx => {
+    const s = await tx.get(ref);
+    const d = s.exists ? s.data() : null;
+    if (d && d.estado === 'emitida') return { listo: d };
+    if (d && d.estado === 'emitiendo' && Date.now() - Date.parse(d.desde || 0) < 60e3) return { ocupado: true };
+    tx.set(ref, {
+      estado: 'emitiendo', desde: ahora(), entorno: cfg.entorno, ptoVenta: pv, cbteTipo: CBTE_FACTURA_C,
+      importe: detalle.importe, detalle, ...extra, nro: (d && d.estado === 'emitiendo' && d.nro) || null,
+    }, { merge: true });
+    return { pendiente: d && d.estado === 'emitiendo' ? d : null };
+  });
+  if (previo.listo) return Object.assign({}, previo.listo, { yaEstaba: true });
+  if (previo.ocupado) throw new Error('Esta venta se está facturando en este momento. Esperá un minuto.');
+
+  const guardar = async (r, nro) => {
+    const f = {
+      estado: 'emitida', nro, cae: r.cae, caeVto: r.caeVto, emitidaEn: ahora(), rechazo: null,
+      qr: datosQR({ cuit: cfg.cuit, ptoVenta: pv, nro, cae: r.cae, detalle }),
+    };
+    await ref.set(f, { merge: true });
+    return Object.assign({ entorno: cfg.entorno, ptoVenta: pv, cbteTipo: CBTE_FACTURA_C, importe: detalle.importe }, f);
+  };
+
+  // 2) Quedó a medias: ¿ARCA la había emitido?
+  if (previo.pendiente && previo.pendiente.nro) {
+    const nro = previo.pendiente.nro;
+    const c = await consultarCbte({ ptoVenta: pv, nro });
+    if (c && Math.abs(c.importe - detalle.importe) < 0.01 && c.docNro === detalle.docNro) {
+      // Ojo: dos ventas del mismo importe a la vez podrían tener el mismo
+      // número anotado. Si otra venta ya lo tiene como suyo, no es nuestro.
+      const otra = await db.collection('facturas').where('ptoVenta', '==', pv).where('nro', '==', nro).where('estado', '==', 'emitida').get();
+      if (!otra.docs.some(x => x.id !== String(id))) return guardar(c, nro);
+    }
+  }
+
+  // 3) Número nuevo y CAE. Hasta 3 vueltas si otra venta ganó el número.
+  const ta = await obtenerTA();
+  for (let vuelta = 0; vuelta < 3; vuelta++) {
+    const { proximo } = await ultimoAutorizado({ ptoVenta: pv });
+    // Se anota ANTES de pedir: si se corta, el reintento sabe qué consultar
+    await ref.set({ nro: proximo, desde: ahora() }, { merge: true });
+    let xml;
+    try {
+      xml = await _llamarWsfe('FECAESolicitar', _authXml({ ...ta, cuit: cfg.cuit }) + armarFECAE({ ptoVenta: pv, nro: proximo, detalle }));
+    } catch (e) {
+      // No se sabe si ARCA la emitió: queda 'emitiendo' con el número y el
+      // próximo intento pregunta antes de repetir
+      throw new Error('No se supo si ARCA la emitió (' + e.message + '). Volvé a intentar: antes de repetir se fija.');
+    }
+    const r = leerFECAE(xml);
+    if (r.aprobado) return guardar(r, proximo);
+    if (esNumeroOcupado(r)) continue;
+    // Rechazada: no consume número, se puede reintentar corrigiendo el dato
+    await ref.set({ estado: 'rechazada', rechazo: r.rechazo, nro: null }, { merge: true });
+    throw new Error('ARCA la rechazó: ' + (r.rechazo.map(e => `[${e.code}] ${e.msg}`).join(' · ') || 'sin detalle'));
+  }
+  await ref.set({ estado: 'rechazada', rechazo: [{ code: 10016, msg: 'Número ocupado tres veces seguidas' }], nro: null }, { merge: true });
+  throw new Error('Había muchas facturas saliendo a la vez. Volvé a intentar.');
 }

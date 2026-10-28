@@ -160,9 +160,9 @@ distintos**. No se mezclan.
 
 | Fase | Qué | Quién |
 |---|---|---|
-| **0** | Certificado de homologación + PV tipo Web Services + confirmar con el contador | Dueño |
+| **0** | Certificado de homologación + PV tipo Web Services (HECHO 28/10: PV 6) + confirmar con el contador | Dueño |
 | **1** | `/api/factura` + WSAA + consultar último número. **Solo leer** | HECHO 19/08 |
-| **2** | Emitir en homologación, con numeración idempotente | Claude |
+| **2** | Emitir en homologación, con numeración idempotente | HECHO 28/10 (falta la primera prueba real) |
 | **3** | La factura impresa con CAE, vencimiento y QR | Claude |
 | **3b** | Estado por venta, reintento y lista de sin facturar (ver riesgo 1b) | Claude |
 | **4** | Producción con el certificado real | Los dos |
@@ -286,3 +286,47 @@ no un detalle técnico, y la tiene que tomar el dueño sabiendo eso.
 - [Ayuda — Factura electrónica](https://www.afip.gob.ar/fe/ayuda/webservice.asp)
 - [Habilitación de puntos de venta](https://www.afip.gob.ar/derechos-de-exportacion-de-servicios/comprobantes-y-facturacion/puntos-de-venta.asp)
 - [Monotributo — Factura electrónica](https://www.afip.gob.ar/facturacion/monotributo/factura-electronica.asp)
+
+---
+
+## Punto de venta (28/10/2026)
+
+El que se usa es el **6**: "Factura Electronica - Monotributo - Web Services",
+Av. Urquiza 4741, Caseros. Va en Vercel como `ARCA_PTO_VENTA=6`.
+
+Ese día se dieron de alta otros dos por error, que quedan sin usar:
+- **4**: "CAEA - Fact. Elect. (RECE) - Monotributo - Contingencias". Es para
+  contingencia (números pedidos por adelantado), no para facturar en el momento.
+- **5**: "Comprobantes de Exportacion - Web Services". Es Factura E (exterior).
+
+## Fase 2 (28/10/2026) — emitir
+
+Archivos: `api/_arca-fe.js` (armar y leer, puro, sin red) y el final de
+`api/_arca.js` (`emitirFactura`, `consultarCbte`). Prueba:
+`tests/test-arca-emitir.js`, que simula ARCA y Firestore.
+
+Acciones nuevas de `/api/factura`:
+- `emitir` + `movId` — factura una venta de la caja. El importe sale del
+  movimiento guardado, no del navegador. Rechaza las cobradas en efectivo o
+  dólares (con pago dividido, si una parte es digital, va la venta entera).
+  Opcionales: `concepto` (productos | servicios | ambos), `docTipo`
+  (cf | dni | cuit), `docNro`, `condIva`.
+- `prueba` + `importe` — una factura de prueba. SOLO en homologación.
+- `consultar` + `nro` — qué dice ARCA de ese número (FECompConsultar).
+
+**Cómo no se rompe la numeración.** Cada venta tiene su doc en `facturas`
+(id = la venta). Antes de pedir el CAE se anota el número que se va a usar.
+Si se corta, el próximo intento (pasado un minuto) le pregunta a ARCA si ese
+número ya salió: si salió con el mismo importe, se queda con ese CAE; si no,
+pide número nuevo. Si dos ventas pelean el mismo número, ARCA contesta 10016
+y se vuelve a preguntar. Un rechazo no consume número.
+
+**Producción bloqueada:** con `ARCA_ENTORNO=produccion` no emite salvo
+`ARCA_EMITIR_PRODUCCION=si`. Se habilita en la fase 4, a propósito.
+
+Defaults (a confirmar con el contador): Factura C, consumidor final
+(DocTipo 99, CondicionIVAReceptorId 5), concepto "productos". Para una
+reparación conviene `concepto: 'ambos'` (lleva fechas de servicio).
+
+Reglas: `facturas` la escribe solo el servidor; la app la lee. Hay que
+publicar firestore.rules.

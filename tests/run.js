@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-arca-emitir.js':    'Factura C en ARCA: numeración sin huecos ni repetidos aunque se corte, rechazos, solo digitales, producción bloqueada',
   'test-lector.js':         'El lector de mano: por que habia que escanear dos veces',
   'test-hoy.js':            'Para hacer hoy (Dashboard): solo lo que hace perder plata o clientes, 5 a la vista, lo que se termina va solo al pedido',
   'test-avisos-secret.js':  'Clave propia del script de Gmail (MercadoPago): sirve solo para push y Telegram, no rompe los crons',

@@ -27,7 +27,8 @@ const ok = (c, l, x) => {
 // código real (no solo mirarlo con regex) se copia a un .mjs temporal dentro
 // del proyecto, así node_modules resuelve igual, y se importa.
 const TMP = path.join(__dirname, '_tmp-arca.mjs');
-fs.writeFileSync(TMP, leer('api/_arca.js'));
+// _arca.js importa './_arca-fe.js' (fase 2): desde tests/ esa ruta es otra
+fs.writeFileSync(TMP, leer('api/_arca.js').replace("from './_arca-fe.js'", "from '../api/_arca-fe.js'"));
 
 (async () => {
 try {
@@ -173,9 +174,15 @@ try {
   ok(/config'\)\.doc\('arca_ta_/.test(src), 'el token se cachea en UN documento, no en una colección');
   ok(/MARGEN_MS/.test(src), 'y se renueva antes de que venza, no justo al filo');
 
-  console.log('\n8) La fase 1 NO emite nada');
-  ok(!/FECAESolicitar/.test(src), '_arca.js no tiene FECAESolicitar');
-  ok(!/FECAESolicitar/.test(fac), 'el endpoint tampoco');
+  console.log('\n8) Emitir: solo en PRUEBA hasta la fase 4');
+  // Fase 2: ya emite, pero en producción está bloqueado salvo que se
+  // habilite a propósito (ARCA_EMITIR_PRODUCCION=si).
+  ok(/FECAESolicitar/.test(src), '_arca.js ya pide CAE (fase 2)');
+  process.env.ARCA_ENTORNO = 'produccion';
+  let bloqueo = null;
+  try { await arca.emitirFactura({ id: 'x', detalle: { importe: 1 } }); } catch (e) { bloqueo = e.message; }
+  ok(/producción todavía no está habilitado/.test(bloqueo || ''), 'con ARCA_ENTORNO=produccion NO emite (sin tocar ARCA ni Firebase)', bloqueo);
+  process.env.ARCA_ENTORNO = 'homologacion';
   ok(/FECompUltimoAutorizado/.test(src), 'sí puede consultar el último número');
   ok(/FEDummy/.test(src), 'y preguntar si ARCA está viva');
 
