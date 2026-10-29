@@ -188,7 +188,7 @@ try {
 
   console.log('\n9) El endpoint está protegido');
   // Es el más sensible del repo: del otro lado está la identidad fiscal.
-  ok(/import \{ exigirSesion \} from '\.\/_auth\.js'/.test(fac), 'importa el guardia');
+  ok(/import \{ exigirSesion[^}]*\} from '\.\/_auth\.js'/.test(fac), 'importa el guardia');
   ok(fac.indexOf('exigirSesion(req, res)') < fac.indexOf('arcaConfig()'),
      'y corta antes de tocar nada de ARCA');
   ok(!/return res\.status\(200\)\.json\(\{[^}]*token:/.test(fac),

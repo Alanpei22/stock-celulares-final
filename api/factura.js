@@ -15,8 +15,8 @@
 //
 // El detalle técnico y el plan completo: tools/factura-arca.md
 
-import { exigirSesion } from './_auth.js';
-import { arcaConfig, arcaFaltantes, dummy, obtenerTA, ultimoAutorizado, consultarCbte, emitirFactura, arcaDb } from './_arca.js';
+import { exigirSesion, verificarSesion, esDuenoUid } from './_auth.js';
+import { arcaConfig, arcaFaltantes, dummy, obtenerTA, ultimoAutorizado, consultarCbte, emitirFactura, arcaDb, armarCSR, certVence } from './_arca.js';
 import { normalizarDetalle } from './_arca-fe.js';
 
 // Los métodos de pago que NO se facturan (decidido el 19/08/2026: solo los
@@ -50,6 +50,9 @@ export default async function handler(req, res) {
         ptoVenta: cfg.ptoVenta || null,
         urls: cfg.urls,
         faltaConfigurar: arcaFaltantes(),
+        // Cuándo vence el certificado cargado (y de qué entorno es)
+        certVence: certVence(cfg.cert),
+        emiteEnProduccion: cfg.entorno === 'produccion' && process.env.ARCA_EMITIR_PRODUCCION === 'si',
         listo: arcaFaltantes().length === 0,
       });
     }
@@ -126,6 +129,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, factura: f, ms: ms() });
     }
 
+    // ── El pedido de certificado de PRODUCCIÓN (solo el dueño) ──
+    // Se arma con la clave que ya está en Vercel: la clave no sale de ahí y
+    // lo que se devuelve (el CSR) es público. Se pega en ARCA → Administración
+    // de Certificados Digitales.
+    if (action === 'csr') {
+      const s = await verificarSesion(req);
+      if (!s.ok || !esDuenoUid(s.uid)) return res.status(403).json({ error: 'Solo el dueño' });
+      if (!/BEGIN (RSA )?PRIVATE KEY/.test(cfg.key) || !cfg.cuit) return res.status(400).json({ error: 'Falta ARCA_KEY o ARCA_CUIT en Vercel' });
+      const csr = armarCSR({ keyPem: cfg.key, cuit: cfg.cuit, razonSocial: 'RICARDI ALAN AGUSTIN', alias: 'techpoint' });
+      return res.status(200).json({ ok: true, csr });
+    }
+
     // ── ¿Qué dice ARCA de un número? ──
     if (action === 'consultar') {
       const nro = Number((req.body || {}).nro);
@@ -136,7 +151,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({
       error: 'action desconocida',
-      disponibles: ['config', 'dummy', 'token', 'ultimo', 'emitir', 'prueba', 'consultar'],
+      disponibles: ['config', 'dummy', 'token', 'ultimo', 'emitir', 'prueba', 'consultar', 'csr'],
     });
   } catch (e) {
     console.error('factura:', e);

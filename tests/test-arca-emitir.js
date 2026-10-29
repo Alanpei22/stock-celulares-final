@@ -164,7 +164,33 @@ try {
   ok(!c.seFactura({ metodoPago: 'Efectivo' }) && !c.seFactura({ metodoPago: 'Dólares' }), 'efectivo y dólares: no');
   ok(c.seFactura({ metodoPago: 'Efectivo', metodoPago2: 'MercadoPago', monto2: 5000 }), 'mitad efectivo, mitad MercadoPago: se factura entera');
 
-  console.log('\n9) Producción, bloqueada');
+  console.log('\n9) Pasar a producción');
+  const crypto = require('crypto');
+  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs1', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
+  const csrPem = arca.armarCSR({ keyPem: privateKey, cuit: '20385199628', razonSocial: 'RICARDI ALAN AGUSTIN' });
+  const forge = require(path.join(DIR, 'node_modules/node-forge'));
+  const csr = forge.pki.certificationRequestFromPem(csrPem);
+  ok(/BEGIN CERTIFICATE REQUEST/.test(csrPem) && csr.verify(), 'el pedido de certificado (CSR) sale firmado y válido');
+  ok(csr.subject.getField({ type: '2.5.4.5' }).value === 'CUIT 20385199628' && csr.subject.getField('O').value === 'RICARDI ALAN AGUSTIN' && csr.subject.getField('C').value === 'AR', 'con el CUIT y la razón social, como pide ARCA');
+  const pub = forge.pki.privateKeyFromPem(privateKey);
+  ok(csr.publicKey.n.equals(pub.n), 'con la misma clave que ya está en Vercel (la clave no sale de ahí)');
+  const fac2 = leer('api/factura.js');
+  ok(/action === 'csr'/.test(fac2) && /esDuenoUid\(s\.uid\)/.test(fac2), 'el CSR lo pide solo el dueño');
+  const cert = forge.pki.createCertificate();
+  cert.publicKey = csr.publicKey; cert.serialNumber = '01';
+  cert.validity.notBefore = new Date('2026-10-29'); cert.validity.notAfter = new Date('2028-10-29T00:00:00Z');
+  cert.setSubject(csr.subject.attributes); cert.setIssuer(csr.subject.attributes); cert.sign(pub, forge.md.sha256.create());
+  ok(arca.certVence(forge.pki.certificateToPem(cert)) === '2028-10-29T00:00:00.000Z' && arca.certVence('basura') === null, 'sabe cuándo vence el certificado');
+
+  // Una factura de PRUEBA hecha sobre una venta real no traba la de verdad
+  process.env.ARCA_ENTORNO = 'produccion'; process.env.ARCA_EMITIR_PRODUCCION = 'si';
+  DB['config/arca_ta_produccion'] = { token: 'T', sign: 'S', expira: new Date(Date.now() + 6 * 3600e3).toISOString() };
+  ARCA.llamadas = [];
+  f = await arca.emitirFactura({ id: 'v1', detalle: det });
+  ok(!f.yaEstaba && f.estado === 'emitida' && DB['facturas/v1'].entorno === 'produccion' && ARCA.llamadas.includes('FECAESolicitar'), 'una venta con factura de prueba se factura de verdad en producción', f);
+  delete process.env.ARCA_EMITIR_PRODUCCION;
+
+  console.log('\n10) Producción, bloqueada');
   process.env.ARCA_ENTORNO = 'produccion';
   err = null;
   try { await arca.emitirFactura({ id: 'p', detalle: det }); } catch (e) { err = e.message; }

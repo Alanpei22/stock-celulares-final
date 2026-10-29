@@ -365,3 +365,33 @@ a la versión 10. Se extendió a la 15 y aparecieron dos errores que ya estaban
 desde la versión 7 (patrones de alineación sobre la línea de tiempo, y la info
 de versión con el polinomio truncado): esos QR no se leían. Verificado leyendo
 los QR generados con un lector (jsQR) en todas las versiones.
+
+## Fase 4 — pasar a producción (preparado el 29/10/2026)
+
+Lo que quedó listo en el código:
+- `/api/factura` action `csr` (solo el dueño): arma el pedido de certificado
+  de PRODUCCIÓN con la misma clave que ya está en Vercel (ARCA_KEY). La clave
+  no sale de Vercel; el CSR es público. Sujeto: C=AR, O=RICARDI ALAN AGUSTIN,
+  CN=techpoint, serialNumber="CUIT 20385199628".
+- `config` devuelve `certVence` (cuándo vence el certificado cargado) y
+  `emiteEnProduccion`.
+- El parte de las 10:30 avisa por Telegram desde 30 días antes de que venza
+  el certificado (y si ya venció).
+- Una factura de PRUEBA hecha sobre una venta real no traba la de verdad: en
+  producción esa venta se factura de nuevo (el doc de `facturas` guarda el
+  entorno).
+
+Los pasos, en orden:
+1. Visto bueno del contador (Factura C a consumidor final; reparaciones como
+   "productos y servicios").
+2. En la app, F12 → Console:
+   `apiFetch('/api/factura',{method:'POST',body:JSON.stringify({action:'csr'})}).then(r=>r.json()).then(j=>console.log(j.csr))`
+   y copiar el texto (de -----BEGIN a -----END).
+3. ARCA con clave fiscal → "Administración de Certificados Digitales" →
+   Agregar alias (techpoint) → subir el CSR → descargar el .crt.
+4. ARCA → "Administrador de Relaciones de Clave Fiscal" → Nueva relación →
+   ARCA → WebServices → "Facturación Electrónica" → Representante: el
+   computador fiscal (alias techpoint).
+5. Vercel: ARCA_CERT = el .crt nuevo (entero), ARCA_ENTORNO = produccion,
+   ARCA_EMITIR_PRODUCCION = si → Redeploy.
+6. Primera factura real chica y verificarla con el QR.

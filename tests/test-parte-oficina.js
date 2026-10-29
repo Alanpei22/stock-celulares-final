@@ -29,11 +29,19 @@ ok(p.taller.length === 1 && /Juan no retiró su iPhone 11 \(#8398\): listo hace 
 ok(/anoté en el pedido: Batería iPhone 11/.test(p.stock[0]), 'te cuenta lo que anotó solo en el pedido');
 ok(p.ventas.length === 1 && /A15 128GB: 100 días/.test(p.ventas[0]), 'equipos parados 90+ días (no los reservados)', p.ventas);
 
+let pc = ctx.armar({ ahora: AHORA, certVto: new Date(AHORA + 20 * 864e5).toISOString() });
+ok(/certificado vence en 20 días/.test(pc.arca[0]), 'certificado de ARCA a 20 días de vencer: avisa');
+pc = ctx.armar({ ahora: AHORA, certVto: new Date(AHORA + 200 * 864e5).toISOString() });
+ok(!pc.arca.length, 'a 200 días: nada');
+pc = ctx.armar({ ahora: AHORA, certVto: new Date(AHORA - 864e5).toISOString() });
+ok(/VENCIÓ/.test(pc.arca[0]), 'vencido: lo dice bien claro');
+ok(/<b>🧾 Facturación \(ARCA\)<\/b>/.test(ctx.texto(pc, '2026-10-27')), 'y sale primero en el Telegram');
+
 console.log('\n2) El mensaje');
 let t = ctx.texto(p, '2026-10-27');
 ok(/✅ <b>Para hacer hoy — 27\/10\/2026<\/b>/.test(t) && /<b>💵 Caja<\/b>/.test(t) && /<b>📱 Para retirar<\/b>/.test(t), 'título y temas');
 ok(!/Tito|Rosa|Beto|Para arrancar/.test(t), 'sin personajes ni IA');
-ok(ctx.texto({ caja: [], taller: [], stock: [], ventas: [] }, '2026-10-27') === null, 'si no hay nada urgente, no se manda nada');
+ok(ctx.texto({ arca: [], caja: [], taller: [], stock: [], ventas: [] }, '2026-10-27') === null, 'si no hay nada urgente, no se manda nada');
 t = ctx.texto({ taller: ['<b>raro</b> & cosa'] }, '2026-10-27');
 ok(/&lt;b&gt;raro/.test(t), 'lo escrito por clientes no rompe el HTML de Telegram');
 

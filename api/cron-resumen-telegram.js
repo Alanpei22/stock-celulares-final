@@ -16,6 +16,7 @@
 // Auth: Authorization: Bearer <CRON_SECRET>.
 
 import admin from 'firebase-admin';
+import { arcaConfig, certVence } from './_arca.js';
 
 function getAdmin() {
   if (admin.apps.length) return admin;
@@ -173,8 +174,14 @@ export function terminadosSinPedir({ repuestos, productos, pedidos }) {
 }
 
 // Lo urgente, por tema. Pura (tests/test-parte-oficina.js).
-export function armarParteOficina({ ahora, repairs, equipos, cierreAyer, anotados }) {
-  const p = { caja: [], taller: [], stock: [], ventas: [] };
+export function armarParteOficina({ ahora, repairs, equipos, cierreAyer, anotados, certVto }) {
+  const p = { arca: [], caja: [], taller: [], stock: [], ventas: [] };
+  // El certificado de ARCA dura 2 años. Si vence, se corta la facturación de
+  // un día para el otro (y la app es el único camino para facturar): se
+  // avisa desde 30 días antes, todos los días.
+  const dv = certVto ? Math.ceil((Date.parse(certVto) - ahora) / DIA) : null;
+  if (dv !== null && dv <= 30) p.arca.push(dv <= 0 ? 'el certificado VENCIÓ: no se puede facturar hasta renovarlo'
+    : `el certificado vence en ${dv} ${dv === 1 ? 'día' : 'días'}: hay que renovarlo en ARCA antes`);
   if (cierreAyer === false) p.caja.push('ayer la caja no se cerró');
   (repairs || []).filter(r => r.estado === 'listo')
     .map(r => ({ r, d: dias(r.fechaListo || r.fechaIngreso, ahora), ing: dias(r.fechaIngreso, ahora) }))
@@ -189,7 +196,7 @@ export function armarParteOficina({ ahora, repairs, equipos, cierreAyer, anotado
   return p;
 }
 
-const TEMAS = { caja: '💵 Caja', taller: '📱 Para retirar', stock: '📦 Stock', ventas: '🏷️ Equipos parados' };
+const TEMAS = { arca: '🧾 Facturación (ARCA)', caja: '💵 Caja', taller: '📱 Para retirar', stock: '📦 Stock', ventas: '🏷️ Equipos parados' };
 
 // Lo urgente → mensaje de Telegram (HTML), o null si no hay nada que decir
 export function textoParteOficina(p, dia) {
@@ -232,8 +239,10 @@ async function parteOficina(db) {
     } catch (e) { console.error('parte, auto-pedido:', e); }
   }
 
+  let certVto = null;
+  try { certVto = certVence(arcaConfig().cert); } catch {}
   const p = armarParteOficina({
-    ahora, repairs: docs(lis), equipos: docs(eq), anotados,
+    ahora, repairs: docs(lis), equipos: docs(eq), anotados, certVto,
     // domingo cerrado: ayer sin cierre un lunes no es un problema
     cierreAyer: new Date(Date.parse(ayer + 'T12:00:00Z')).getUTCDay() === 0 ? null : cierre.exists,
   });

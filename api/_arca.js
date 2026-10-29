@@ -333,13 +333,16 @@ export async function emitirFactura({ id, detalle, extra = {} }) {
   const previo = await db.runTransaction(async tx => {
     const s = await tx.get(ref);
     const d = s.exists ? s.data() : null;
-    if (d && d.estado === 'emitida') return { listo: d };
-    if (d && d.estado === 'emitiendo' && Date.now() - Date.parse(d.desde || 0) < 60e3) return { ocupado: true };
+    // Una factura de PRUEBA (homologación) hecha sobre una venta real no
+    // cuenta en producción: ahí se emite la de verdad.
+    if (d && d.estado === 'emitida' && (d.entorno || 'homologacion') === cfg.entorno) return { listo: d };
+    if (d && d.estado === 'emitiendo' && d.entorno === cfg.entorno && Date.now() - Date.parse(d.desde || 0) < 60e3) return { ocupado: true };
     tx.set(ref, {
       estado: 'emitiendo', desde: ahora(), entorno: cfg.entorno, ptoVenta: pv, cbteTipo: CBTE_FACTURA_C,
-      importe: detalle.importe, detalle, ...extra, nro: (d && d.estado === 'emitiendo' && d.nro) || null,
+      importe: detalle.importe, detalle, ...extra, nro: (d && d.estado === 'emitiendo' && d.entorno === cfg.entorno && d.nro) || null,
+      cae: null, caeVto: null,
     }, { merge: true });
-    return { pendiente: d && d.estado === 'emitiendo' ? d : null };
+    return { pendiente: d && d.estado === 'emitiendo' && d.entorno === cfg.entorno ? d : null };
   });
   if (previo.listo) return Object.assign({}, previo.listo, { yaEstaba: true });
   if (previo.ocupado) throw new Error('Esta venta se está facturando en este momento. Esperá un minuto.');
@@ -388,4 +391,33 @@ export async function emitirFactura({ id, detalle, extra = {} }) {
   }
   await ref.set({ estado: 'rechazada', rechazo: [{ code: 10016, msg: 'Número ocupado tres veces seguidas' }], nro: null }, { merge: true });
   throw new Error('Había muchas facturas saliendo a la vez. Volvé a intentar.');
+}
+
+// ══════════════════════════════════════════
+//  FASE 4 — pasar a producción
+// ══════════════════════════════════════════
+// El pedido de certificado (CSR) para PRODUCCIÓN se arma con la MISMA clave
+// privada que ya está en Vercel (ARCA_KEY). Así la clave no sale nunca de
+// ahí: lo que se le da a ARCA es el CSR, que es público. ARCA devuelve el
+// .crt, que va en ARCA_CERT.
+export function armarCSR({ keyPem, cuit, razonSocial, alias = 'techpoint' }) {
+  const key = forge.pki.privateKeyFromPem(keyPem);
+  const csr = forge.pki.createCertificationRequest();
+  csr.publicKey = forge.pki.setRsaPublicKey(key.n, key.e);
+  csr.setSubject([
+    { name: 'countryName', value: 'AR' },
+    { name: 'organizationName', value: razonSocial },
+    { name: 'commonName', value: alias },
+    // ARCA identifica al contribuyente por este campo: "CUIT 20385199628"
+    { type: '2.5.4.5', value: 'CUIT ' + cuit },
+  ]);
+  csr.sign(key, forge.md.sha256.create());
+  return forge.pki.certificationRequestToPem(csr);
+}
+
+// ¿Cuándo vence el certificado? (dura 2 años; si vence sin que nadie mire, se
+// corta la facturación de un día para el otro: lo avisa el parte de las 10:30)
+export function certVence(certPem) {
+  try { return forge.pki.certificateFromPem(certPem).validity.notAfter.toISOString(); }
+  catch { return null; }
 }
