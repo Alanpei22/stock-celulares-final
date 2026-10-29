@@ -16,7 +16,7 @@
 // El detalle técnico y el plan completo: tools/factura-arca.md
 
 import { exigirSesion, verificarSesion, esDuenoUid } from './_auth.js';
-import { arcaConfig, arcaFaltantes, dummy, obtenerTA, ultimoAutorizado, consultarCbte, emitirFactura, arcaDb, armarCSR, certVence } from './_arca.js';
+import { arcaConfig, arcaFaltantes, dummy, obtenerTA, ultimoAutorizado, consultarCbte, emitirFactura, arcaDb, armarCSR, certVence, emiteEnProduccion } from './_arca.js';
 import { normalizarDetalle } from './_arca-fe.js';
 
 // Los métodos de pago que NO se facturan (decidido el 19/08/2026: solo los
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
         faltaConfigurar: arcaFaltantes(),
         // Cuándo vence el certificado cargado (y de qué entorno es)
         certVence: certVence(cfg.cert),
-        emiteEnProduccion: cfg.entorno === 'produccion' && process.env.ARCA_EMITIR_PRODUCCION === 'si',
+        emiteEnProduccion: cfg.entorno === 'produccion' && emiteEnProduccion(),
         listo: arcaFaltantes().length === 0,
       });
     }

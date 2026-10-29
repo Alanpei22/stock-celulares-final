@@ -372,10 +372,19 @@ export async function consultarCbte({ ptoVenta, cbteTipo = CBTE_FACTURA_C, nro }
   throw new Error('No se pudo consultar a ARCA: ' + (err || 'respuesta inesperada'));
 }
 
+// ¿Está habilitado facturar de verdad? Se acepta "si" escrito como sea (Si,
+// SI, sí, con espacios): el 29/10/2026 Alan la cargó en Vercel y la app
+// decía "todavía no está habilitado" por cómo quedó escrita.
+export function emiteEnProduccion() {
+  const v = String(process.env.ARCA_EMITIR_PRODUCCION || '').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return v === 'si';
+}
+
 export async function emitirFactura({ id, detalle, extra = {} }) {
   const cfg = arcaConfig();
-  if (cfg.entorno === 'produccion' && process.env.ARCA_EMITIR_PRODUCCION !== 'si') {
-    throw new Error('Facturar en producción todavía no está habilitado (fase 4).');
+  if (cfg.entorno === 'produccion' && !emiteEnProduccion()) {
+    throw new Error('Facturar en producción todavía no está habilitado: en Vercel falta ARCA_EMITIR_PRODUCCION = si (y después Redeploy).');
   }
   const pv = cfg.ptoVenta;
   if (!pv) throw new Error('Falta el punto de venta (ARCA_PTO_VENTA)');

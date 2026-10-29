@@ -214,6 +214,9 @@ try {
   err = null;
   try { await arca.emitirFactura({ id: 'p', detalle: det }); } catch (e) { err = e.message; }
   ok(/producción todavía no está habilitado/.test(err || ''), 'sin ARCA_EMITIR_PRODUCCION=si no factura de verdad', err);
+  for (const v of ['Si', ' SI ', 'sí']) { process.env.ARCA_EMITIR_PRODUCCION = v; ok(arca.emiteEnProduccion(), `"${v}" también vale`); }
+  for (const v of ['no', '', 'sii']) { process.env.ARCA_EMITIR_PRODUCCION = v; ok(!arca.emiteEnProduccion(), `"${v}" no habilita`); }
+  delete process.env.ARCA_EMITIR_PRODUCCION;
 } catch (e) {
   console.error(e); fails++;
 } finally {
