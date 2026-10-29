@@ -403,3 +403,15 @@ CN=TECHPOINT, serialNumber="CUIT 20385199628", emisor CN=Computadores, O=AFIP
 (la CA de producción). **Vale hasta el 28/10/2028.** Se verificó que su clave
 pública es la misma del CSR, o sea la de ARCA_KEY: no hay que cambiar la clave.
 El parte de las 10:30 avisa desde el 28/09/2028.
+
+### Producción conectada (29/10/2026)
+
+`servicios1.afip.gov.ar` cortaba con "dh key too small" (DH de 1024 bits,
+Node 18+ exige 2048). Con el OK de Alan, las llamadas a ARCA usan un agente
+HTTPS con SECLEVEL=1, solo para *.afip.gov.ar / *.arca.gob.ar (ver
+`_postArca` en api/_arca.js). Después de eso:
+
+    {ok: true, entorno: 'produccion', ptoVenta: 6, cbteTipo: 11,
+     ultimo: 0, proximo: 1, tokenDeCache: true, ms: 1749}
+
+El punto de venta 6 arranca en cero en producción.
