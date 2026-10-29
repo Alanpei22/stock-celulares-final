@@ -170,8 +170,10 @@ async function facturarVenta(movId, mov, receptor) {
       return null;
     }
     const f = out.factura;
-    if (typeof toast === 'function') toast(`✅ Factura C ${_fvNro(f.ptoVenta, f.nro)}${f.entorno !== 'produccion' ? ' (PRUEBA)' : ''}`, 'success');
-    await imprimirFactura(mov, f);
+    // No se imprime sola: muchas veces el cliente no quiere el papel (Alan:
+    // "a veces solo necesito facturar"). Se pregunta, y si nadie toca nada,
+    // queda facturada igual y se puede reimprimir desde la lista.
+    ofrecerTicketFactura(mov, f);
     return f;
   } catch (e) {
     console.error('facturar:', e);
@@ -180,6 +182,56 @@ async function facturarVenta(movId, mov, receptor) {
   } finally {
     _fvEnCurso = false;
   }
+}
+
+// ── Ya facturada: ¿ticket? (imprimir / WhatsApp / no) ──
+function ofrecerTicketFactura(mov, f) {
+  _fvOcultarBarra();
+  const b = document.createElement('div');
+  b.id = 'fv-barra';
+  b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:950;' +
+    'display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-radius:14px;' +
+    'background:var(--card,#fff);border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,.18);max-width:560px;margin:0 auto';
+  b.innerHTML = `<b style="flex:1 1 100%;font-size:15px">✅ Factura C ${_fvNro(f.ptoVenta, f.nro)}${f.entorno !== 'produccion' ? ' (PRUEBA)' : ''} hecha. ¿Se la das?</b>
+    <button class="btn-primary" style="flex:1" id="fv-imp">🖨️ Imprimir</button>
+    <button class="btn-secondary" style="flex:1" id="fv-wa">🟢 WhatsApp</button>
+    <button class="btn-secondary" id="fv-listo">No, listo</button>`;
+  document.body.appendChild(b);
+  b.querySelector('#fv-imp').onclick = () => { _fvOcultarBarra(); imprimirFactura(mov, f); };
+  b.querySelector('#fv-wa').onclick = () => { _fvOcultarBarra(); whatsappFactura(mov, f); };
+  b.querySelector('#fv-listo').onclick = _fvOcultarBarra;
+  b._timer = setTimeout(_fvOcultarBarra, 20000);
+}
+
+// El texto para mandar por WhatsApp, con el link de ARCA para verificarla
+// (el mismo que tiene el QR del ticket)
+function textoFacturaWa(mov, f) {
+  const biz = (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint';
+  const qrUrl = 'https://www.afip.gob.ar/fe/qr/?p=' + btoa(JSON.stringify(f.qr || {}));
+  const fecha = (f.qr && f.qr.fecha) ? f.qr.fecha.split('-').reverse().join('/') : '';
+  return [
+    `*${biz}* — Factura C N° ${_fvNro(f.ptoVenta, f.nro)}`,
+    fecha ? 'Fecha: ' + fecha : '',
+    `Total: *${_fvPlata(f.importe != null ? f.importe : mov.monto)}*`,
+    `CAE: ${f.cae} (vence ${String(f.caeVto || '').split('-').reverse().join('/')})`,
+    f.entorno && f.entorno !== 'produccion' ? '_PRUEBA — sin validez fiscal_' : '',
+    '',
+    'Verificala en ARCA: ' + qrUrl,
+    '',
+    '¡Gracias por tu compra!',
+  ].filter((x, i, a) => x !== '' || (a[i - 1] !== '' && i > 0)).join('\n');
+}
+function whatsappFactura(mov, f) {
+  let tel = String(mov.clienteTel || '').replace(/\D/g, '');
+  if (!tel) {
+    const r = prompt('WhatsApp del cliente (con código de área, sin 0 ni 15):', '');
+    if (r === null) return;
+    tel = String(r).replace(/\D/g, '');
+    if (tel.length < 8) { if (typeof toast === 'function') toast('Ese número no parece un celular', 'error'); return; }
+  }
+  if (!tel.startsWith('54')) tel = '549' + tel;
+  const url = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(textoFacturaWa(mov, f));
+  if (typeof waAbrir === 'function') waAbrir(url); else window.open(url, '_blank');
 }
 
 // ── A un CUIT: monotributista, empresa, exento ──

@@ -71,14 +71,26 @@ RESP = { ok: true, factura: { entorno: 'homologacion', ptoVenta: 6, cbteTipo: 11
   receptor: { docTipo: 99, docNro: 0, condIva: 5 }, qr: qrJson } };
 await run('facturarVenta("d1", _v, null)', { id: 'd1', tipo: 'ingreso', monto: 15000, metodoPago: 'Transferencia', descripcion: 'Funda A15' });
 ok(ENVIADO.action === 'emitir' && ENVIADO.movId === 'd1' && ENVIADO.docTipo === 'cf' && ENVIADO.concepto === 'productos', 'pide la factura con la venta (el importe lo pone el servidor)', ENVIADO);
+ok(PRINTS.length === 0, 'NO imprime sola: muchas veces el cliente no quiere el papel');
+ok(/Factura C 00006-00000001 \(PRUEBA\) hecha/.test(BARRAS['fv-barra'].innerHTML) && /Imprimir/.test(BARRAS['fv-barra'].innerHTML) && /WhatsApp/.test(BARRAS['fv-barra'].innerHTML) && /No, listo/.test(BARRAS['fv-barra'].innerHTML),
+   'pregunta: imprimir / WhatsApp / no');
+BARRAS['fv-barra'].querySelector('#fv-imp').onclick();
+await new Promise(r => setTimeout(r, 20));
 const html = PRINTS[0] && PRINTS[0][1];
-ok(PRINTS[0][0] === 'ticket', 'imprime por la de tickets');
+ok(PRINTS.length === 1 && PRINTS[0][0] === 'ticket', 'con "Imprimir" sale por la de tickets');
 ok(/FACTURA C/.test(html) && /Cód\. 011/.test(html) && /N° 00006-00000001/.test(html), 'tipo y número (punto de venta 6, factura 1)');
 ok(/CAE: <b>86441029094101<\/b>/.test(html) && /Vto\. CAE: 08\/11\/2026/.test(html), 'CAE y vencimiento');
 ok(/<svg/.test(html), 'con el QR');
 ok(/Consumidor Final/.test(html) && /CUIT: 20-38519962-8/.test(html) && /Responsable Monotributo/.test(html), 'emisor y receptor');
 ok(/Ingresos Brutos: 901-123456-7/.test(html) && /Inicio de actividades: 01\/03\/2020/.test(html), 'Ingresos Brutos e inicio de actividades (de config/facturaEmisor)');
 ok(/PRUEBA — SIN VALIDEZ FISCAL/.test(html), 'en prueba lo dice bien grande');
+
+ctx._f = RESP.factura;
+let WA = null;
+ctx.waAbrir = u => { WA = u; };
+run('whatsappFactura(_v, _f)', { clienteTel: '1155554444', monto: 15000 });
+const txt = WA && decodeURIComponent(WA.split('text=')[1]);
+ok(/^https:\/\/wa\.me\/5491155554444/.test(WA || '') && /Factura C N° 00006-00000001/.test(txt) && /CAE: 86441029094101/.test(txt) && /afip\.gob\.ar\/fe\/qr\/\?p=/.test(txt), 'por WhatsApp: número, CAE y el link de ARCA para verificarla', txt);
 
 console.log('\n5) A un CUIT');
 PRINTS.length = 0;
