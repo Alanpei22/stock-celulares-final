@@ -84,7 +84,7 @@ export default async function handler(req, res) {
     // El importe sale del movimiento guardado, no de lo que mande el
     // navegador: así la factura no puede decir otra cosa que la venta.
     if (action === 'emitir') {
-      const { movId, concepto, docTipo, docNro, condIva } = req.body || {};
+      const { movId, concepto, docTipo, docNro, condIva, receptorNombre } = req.body || {};
       if (!movId || typeof movId !== 'string') return res.status(400).json({ error: 'Falta la venta (movId)' });
       const snap = await arcaDb().collection('caja_movimientos').doc(movId).get();
       if (!snap.exists) return res.status(404).json({ error: 'No encuentro esa venta en la caja' });
@@ -93,8 +93,27 @@ export default async function handler(req, res) {
       if (!seFactura(mov)) return res.status(400).json({ error: 'Se cobró en efectivo: no se factura' });
       const detalle = normalizarDetalle({ importe: mov.monto, fecha: mov.fecha, concepto, docTipo, docNro, condIva });
       if (detalle.error) return res.status(400).json({ error: detalle.error });
-      const f = await emitirFactura({ id: movId, detalle, extra: { movId, descripcion: String(mov.descripcion || '').slice(0, 200) } });
-      return res.status(200).json({ ok: true, factura: f, ms: ms() });
+      const receptor = { nombre: String(receptorNombre || '').trim().slice(0, 120), docTipo: detalle.docTipo, docNro: detalle.docNro, condIva: detalle.condIva };
+      const movRef = arcaDb().collection('caja_movimientos').doc(movId);
+      let f;
+      try {
+        f = await emitirFactura({ id: movId, detalle, extra: { movId, receptor, descripcion: String(mov.descripcion || '').slice(0, 200) } });
+      } catch (e) {
+        // La venta queda marcada "falló": así aparece en "sin facturar" con
+        // el motivo, y no se pierde. (Si se está facturando en otro lado, no
+        // se pisa nada.)
+        if (!/se está facturando/.test(e.message)) {
+          await movRef.set({ factura: { estado: 'fallo', error: e.message.slice(0, 300), en: new Date().toISOString() } }, { merge: true }).catch(() => {});
+        }
+        throw e;
+      }
+      // Lo justo en la venta, para la lista de la caja y para reimprimir
+      // (el detalle completo queda en facturas/<movId>)
+      await movRef.set({ factura: {
+        estado: 'emitida', entorno: f.entorno || cfg.entorno, ptoVenta: f.ptoVenta, cbteTipo: f.cbteTipo, nro: f.nro,
+        cae: f.cae, caeVto: f.caeVto, qr: f.qr, receptor: f.receptor || receptor,
+      } }, { merge: true });
+      return res.status(200).json({ ok: true, factura: Object.assign({ receptor }, f), ms: ms() });
     }
 
     // ── Factura de prueba: SOLO en homologación ──

@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-factura-venta.js':  'Factura C en la caja: solo cobros digitales, consumidor final o CUIT, ticket con CAE y QR de ARCA, sin facturar',
   'test-arca-emitir.js':    'Factura C en ARCA: numeración sin huecos ni repetidos aunque se corte, rechazos, solo digitales, producción bloqueada',
   'test-lector.js':         'El lector de mano: por que habia que escanear dos veces',
   'test-hoy.js':            'Para hacer hoy (Dashboard): solo lo que hace perder plata o clientes, 5 a la vista, lo que se termina va solo al pedido',

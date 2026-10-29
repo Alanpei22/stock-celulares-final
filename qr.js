@@ -12,8 +12,8 @@
 //    · corrección de errores nivel M (recupera ~15% del código)
 //    · salida en SVG, que imprime nítido a cualquier tamaño
 //
-//  Modo byte (UTF-8), versiones 1 a 10 (hasta ~200 caracteres con nivel M),
-//  de sobra para una URL de seguimiento.
+//  Modo byte (UTF-8), versiones 1 a 15 (hasta ~410 caracteres con nivel M):
+//  una URL de seguimiento, o el QR obligatorio de la factura de ARCA.
 // ══════════════════════════════════════════════════════════════
 'use strict';
 
@@ -63,7 +63,7 @@ function _qrECC(datos, cantEC) {
   return res.slice(datos.length);
 }
 
-// ── Tablas del nivel M (el que usamos), versiones 1..10 ──
+// ── Tablas del nivel M (el que usamos), versiones 1..15 ──
 // [ total de codewords de datos, codewords EC por bloque, bloques grupo1, bloques grupo2 ]
 const _QR_M = {
   1:  [16,  10, 1, 0],
@@ -76,11 +76,19 @@ const _QR_M = {
   8:  [154, 22, 2, 2],
   9:  [182, 22, 3, 2],
   10: [216, 26, 4, 1],
+  // 11 a 15: el QR de la factura de ARCA (una URL con ~300 caracteres) no
+  // entraba en la 10. Tablas de la norma ISO 18004, nivel M.
+  11: [254, 30, 1, 4],
+  12: [290, 22, 6, 2],
+  13: [334, 22, 8, 1],
+  14: [365, 24, 4, 5],
+  15: [415, 24, 5, 5],
 };
 // Posiciones de los patrones de alineación por versión
 const _QR_ALIGN = {
   1: [], 2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30],
   6: [6, 34], 7: [6, 22, 38], 8: [6, 24, 42], 9: [6, 26, 46], 10: [6, 28, 50],
+  11: [6, 30, 54], 12: [6, 32, 58], 13: [6, 34, 62], 14: [6, 26, 46, 66], 15: [6, 26, 48, 70],
 };
 
 function _qrSize(v) { return v * 4 + 17; }
@@ -172,9 +180,14 @@ function _qrMatrizVacia(version) {
 
   // Patrones de alineación
   const ali = _QR_ALIGN[version];
+  const ult = ali[ali.length - 1];
   for (const r of ali) {
     for (const c of ali) {
-      if (reservado[r][c]) continue;   // no pisar los finders
+      // Solo se saltean las tres esquinas (ahí están los finders). Antes se
+      // salteaba todo lo reservado, y desde la versión 7 eso incluía los que
+      // caen sobre la línea de tiempo (fila/columna 6): faltaban patrones y
+      // el QR no se leía. Con textos cortos (versión 6 o menos) no pasaba.
+      if ((r === ali[0] && c === ali[0]) || (r === ali[0] && c === ult) || (r === ult && c === ali[0])) continue;
       for (let dr = -2; dr <= 2; dr++) {
         for (let dc = -2; dc <= 2; dc++) {
           const borde = Math.abs(dr) === 2 || Math.abs(dc) === 2;
@@ -250,12 +263,14 @@ function _qrFormato(mascara) {
 }
 
 // Info de versión (v7+): BCH(18,6)
+// El polinomio generador es 0x1F25 (13 bits). Antes estaba truncado a 10
+// bits y la info de versión salía mal: los lectores no reconocían el QR.
 function _qrInfoVersion(version) {
   let v = version << 12;
   for (let i = 5; i >= 0; i--) {
-    if ((v >> (i + 12)) & 1) v ^= 0b1111100100 << i;
+    if ((v >> (i + 12)) & 1) v ^= 0x1F25 << i;
   }
-  return (version << 12) | v;
+  return (version << 12) | (v & 0xFFF);
 }
 
 function _qrPonerFormato(m, n, mascara) {
@@ -337,7 +352,7 @@ function _qrPenalizacion(m, n) {
 // Devuelve la matriz de módulos (true = negro) para un texto.
 function qrMatriz(texto) {
   let version = 0, cw = null;
-  for (let v = 1; v <= 10; v++) {
+  for (let v = 1; v <= 15; v++) {
     const c = _qrCodewords(texto, v);
     if (c) { version = v; cw = c; break; }
   }

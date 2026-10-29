@@ -131,7 +131,14 @@ service cloud.firestore {
     // horario del chequeo). Por eso se excluyen a mano.
     match /config/{doc} {
       allow read: if isAllowed();
-      allow write: if isAllowed() && !(doc in ['owner', 'chequeoCaja', 'fichar']);
+      allow write: if isAllowed() && !(doc in ['owner', 'chequeoCaja', 'fichar', 'facturaEmisor']);
+    }
+
+    // ── config/facturaEmisor: los datos del local que salen en la factura ──
+    // (razón social, CUIT, Ingresos Brutos, inicio de actividades). Los lee
+    // la caja al imprimir; cambiarlos es solo del dueño.
+    match /config/facturaEmisor {
+      allow write: if esDueno();
     }
 
     // ── config/fichar: dónde está el local (para las fichadas) ──

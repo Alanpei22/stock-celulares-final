@@ -97,7 +97,11 @@ ctx.waAppActiva = () => false;
 
 console.log('\n4) Enganchado');
 const caja = fs.readFileSync(DIR + 'caja.js', 'utf8');
-ok(/if \(data\.tipo === 'ingreso' && typeof ofrecerComprobanteVenta === 'function'\)/.test(caja), 'después de cobrar una venta se pregunta (los gastos no)');
+// Desde la factura (factura-venta.js): con cobro digital pregunta "¿Factura?"
+// y con efectivo el "¿Comprobante?" de siempre. Los gastos, nada.
+ok(/if \(data\.tipo === 'ingreso'\) \{/.test(caja) && /ofrecerDespuesDeCobrar\(movRef\.id, movIns\)/.test(caja)
+   && /else if \(typeof ofrecerComprobanteVenta === 'function'\) ofrecerComprobanteVenta\(movRef\.id, movIns\)/.test(caja),
+   'después de cobrar una venta se pregunta (los gastos no)');
 const html = fs.readFileSync(DIR + 'caja.html', 'utf8');
 ok(html.indexOf('src="comprobante-venta.js"') > html.indexOf('src="qz-print.js"'), 'caja.html lo carga después de la impresión directa');
 ok(/id="mov-comprobante-btn"/.test(html), 'y se puede pedir de nuevo desde la venta guardada');

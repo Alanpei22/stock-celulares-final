@@ -871,7 +871,8 @@ function _metodoInfo(metodo) {
 // Badge(s) de método para una tarjeta (contempla pago dividido) + lo que
 // te deposita Getnet si se pagó con tarjeta (💳, ver tarjetaAplicar en utils.js)
 function _metodoBadges(m) {
-  const base = _metodoBadgesBase(m);
+  // 🧾 factura ARCA: "FC 00006-…" o "sin facturar" (solo cobros digitales)
+  const base = _metodoBadgesBase(m) + ((typeof facturaBadge === 'function') ? facturaBadge(m) : '');
   const com = Number(m.comisionTarjeta) || 0;
   if (!(com > 0) || m.tipo === 'egreso') return base;
   return base + `<span class="mov-metodo-badge metodo-otro" title="Getnet se queda $${com.toLocaleString('es-AR')}">🏦 te depositan $${(Number(m.netoTarjeta) || 0).toLocaleString('es-AR')}</span>`;
@@ -1057,14 +1058,20 @@ function toggleCajaMenu() {
       { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
       { icon: '📄', label: 'Reporte financiero', sub: 'Exportar a PDF por período', hide: !isOwner, onClick: () => (typeof openFinanzasReport === 'function') && openFinanzasReport() },
     ]),
+    // Facturación y la comisión de Getnet juntas: las dos son "lo que pasa
+    // con un cobro digital" (y el menú tiene un tope de opciones, test-menus)
+    sheetGrupo(toggleCajaMenu, 'Facturación y tarjetas', '🧾', 'Facturación y tarjetas', 'Facturas de ARCA y comisión de Getnet', [
+      { icon: '🧾', label: 'Sin facturar', sub: 'Cobros digitales que todavía no tienen factura', onClick: () => (typeof abrirSinFacturar === 'function') && abrirSinFacturar() },
+      { icon: '🏪', label: 'Datos del local en la factura', sub: 'Ingresos Brutos, inicio de actividades, domicilio', hide: !isOwner, onClick: () => (typeof editarDatosFactura === 'function') && editarDatosFactura() },
+      { icon: '💳', label: 'Comisión de tarjetas (Getnet)', sub: (() => { const c = (typeof tarjetaCfg === 'function') ? tarjetaCfg() : {}; return (c.debito || c.credito) ? `Débito ${c.debito}% · Crédito ${c.credito}%` : 'Cuánto te descuenta Getnet de cada cobro'; })(),
+        hide: !isOwner, onClick: configurarComisionTarjetas },
+    ]),
     { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
     { icon: '💬', label: 'WhatsApp: abrir la app de escritorio',
       sub: (typeof waAppActiva === 'function' && waAppActiva()) ? '✅ Activado en esta PC · tocá para volver a wa.me' : 'Sin la página intermedia (necesita WhatsApp instalado)',
       onClick: () => (typeof toggleWaApp === 'function') && toggleWaApp() },
     { divider: true, hide: !isOwner },
     { icon: '📦', label: 'Caja Dueño', hide: !isOwner, onClick: openCajaDueno },
-    { icon: '💳', label: 'Comisión de tarjetas (Getnet)', sub: (() => { const c = (typeof tarjetaCfg === 'function') ? tarjetaCfg() : {}; return (c.debito || c.credito) ? `Débito ${c.debito}% · Crédito ${c.credito}%` : 'Cuánto te descuenta Getnet de cada cobro'; })(),
-      hide: !isOwner, onClick: configurarComisionTarjetas },
     { divider: true },
     { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
   ]);
@@ -4224,9 +4231,12 @@ async function saveMov() {
       }
 
       toast(toastMsg + (toastMsg === 'Movimiento registrado' ? '' : ''), 'success');
-      // Venta → "¿Comprobante?" (imprimir / WhatsApp / no). Ver comprobante-venta.js.
-      if (data.tipo === 'ingreso' && typeof ofrecerComprobanteVenta === 'function') {
-        ofrecerComprobanteVenta(movRef.id, { ...data, id: movRef.id, createdAt: new Date().toISOString() });
+      // Venta → cobro digital: "¿Factura?" (factura-venta.js); efectivo:
+      // "¿Comprobante?" (imprimir / WhatsApp / no, comprobante-venta.js).
+      if (data.tipo === 'ingreso') {
+        const movIns = { ...data, id: movRef.id, createdAt: new Date().toISOString() };
+        if (typeof ofrecerDespuesDeCobrar === 'function') ofrecerDespuesDeCobrar(movRef.id, movIns);
+        else if (typeof ofrecerComprobanteVenta === 'function') ofrecerComprobanteVenta(movRef.id, movIns);
       }
     }
     _clearSaleItem(false);

@@ -163,8 +163,8 @@ distintos**. No se mezclan.
 | **0** | Certificado de homologación + PV tipo Web Services (HECHO 28/10: PV 6) + confirmar con el contador | Dueño |
 | **1** | `/api/factura` + WSAA + consultar último número. **Solo leer** | HECHO 19/08 |
 | **2** | Emitir en homologación, con numeración idempotente | HECHO y VERIFICADO 29/10 |
-| **3** | La factura impresa con CAE, vencimiento y QR | Claude |
-| **3b** | Estado por venta, reintento y lista de sin facturar (ver riesgo 1b) | Claude |
+| **3** | La factura impresa con CAE, vencimiento y QR | HECHO 29/10 (factura-venta.js) |
+| **3b** | Estado por venta, reintento y lista de sin facturar (ver riesgo 1b) | HECHO 29/10 (falta: aviso de vencimiento del certificado) |
 | **4** | Producción con el certificado real | Los dos |
 
 **La fase 1 es la que despeja las dudas grandes**: si el timeout de Vercel
@@ -340,3 +340,28 @@ ARCA aceptó el XML tal cual lo arma `_arca-fe.js` (Factura C, consumidor
 final, CondicionIVAReceptorId 5). **Tardó 7,3 s** (incluía pedir token nuevo
 a WSAA: el cacheado era de agosto). Como el corte por defecto es a los 10 s,
 `vercel.json` le da 60 s a `api/factura.js`.
+
+## Fase 3 (29/10/2026) — en la caja
+
+`factura-venta.js` (caja.html):
+- Después de cobrar algo digital sale **"🧾 Cobro digital: ¿factura?"** con
+  *Consumidor final* · *A un CUIT* · *Solo ticket* · *No*. Con efectivo sigue
+  el "¿Comprobante?" de siempre.
+- *A un CUIT*: CUIT (se valida el dígito verificador), nombre y condición
+  (Monotributista 6, Responsable Inscripto 1, Exento 4). Siempre Factura C.
+- Reparación → concepto "productos y servicios"; lo demás → "productos".
+- El ticket (58mm) lleva emisor (razón social, CUIT, IIBB, inicio de
+  actividades, monotributo), FACTURA C cód. 011, N° PPPPP-NNNNNNNN, receptor,
+  renglones, total, CAE, vto. y el QR. En homologación: "PRUEBA — SIN VALIDEZ
+  FISCAL".
+- IIBB, inicio de actividades y domicilio: `config/facturaEmisor`, los carga el
+  dueño desde Caja → menú → Facturación y tarjetas → Datos del local.
+- En la lista: `🧾 FC 00006-…` (tocás y reimprime) o `🧾 sin facturar` /
+  `⚠️ falló la factura` (tocás y factura). Menú → *Sin facturar*.
+- El servidor deja en la venta `factura: {estado, nro, cae, caeVto, qr, receptor}`.
+
+**qr.js**: el QR de ARCA es una URL de ~300 caracteres y el generador llegaba
+a la versión 10. Se extendió a la 15 y aparecieron dos errores que ya estaban
+desde la versión 7 (patrones de alineación sobre la línea de tiempo, y la info
+de versión con el polinomio truncado): esos QR no se leían. Verificado leyendo
+los QR generados con un lector (jsQR) en todas las versiones.
