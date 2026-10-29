@@ -395,3 +395,11 @@ Los pasos, en orden:
 5. Vercel: ARCA_CERT = el .crt nuevo (entero), ARCA_ENTORNO = produccion,
    ARCA_EMITIR_PRODUCCION = si → Redeploy.
 6. Primera factura real chica y verificarla con el QR.
+
+### Certificado de producción (29/10/2026)
+
+ARCA lo emitió con el CSR que armó la app (action `csr`): sujeto
+CN=TECHPOINT, serialNumber="CUIT 20385199628", emisor CN=Computadores, O=AFIP
+(la CA de producción). **Vale hasta el 28/10/2028.** Se verificó que su clave
+pública es la misma del CSR, o sea la de ARCA_KEY: no hay que cambiar la clave.
+El parte de las 10:30 avisa desde el 28/09/2028.
