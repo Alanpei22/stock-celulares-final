@@ -80,6 +80,7 @@ fs.writeFileSync(TMP, leer('api/_arca.js')
 try {
   const fe = await import('file://' + TMP_FE.replace(/\\/g, '/'));
   const arca = await import('file://' + TMP.replace(/\\/g, '/'));
+  arca._usarTransporte((url, o) => globalThis.fetch(url, o));   // el ARCA de mentira
 
   console.log('\n1) Armar el pedido');
   let d = fe.normalizarDetalle({ importe: '15000.499', fecha: '2026-10-28' });
@@ -190,7 +191,25 @@ try {
   ok(!f.yaEstaba && f.estado === 'emitida' && DB['facturas/v1'].entorno === 'produccion' && ARCA.llamadas.includes('FECAESolicitar'), 'una venta con factura de prueba se factura de verdad en producción', f);
   delete process.env.ARCA_EMITIR_PRODUCCION;
 
-  console.log('\n10) Producción, bloqueada');
+  console.log('\n10) El cifrado viejo de ARCA, solo para ARCA');
+  // servicios1.afip.gov.ar (producción) usa DH de 1024 bits: Node lo corta con
+  // "dh key too small". Se acepta SOLO hacia los servidores de ARCA.
+  const srcA = leer('api/_arca.js');
+  ok(/ciphers: 'DEFAULT@SECLEVEL=1'/.test(srcA) && (srcA.match(/SECLEVEL=1'/g) || []).length === 1, 'acepta el cifrado viejo en un único lugar (el agente de ARCA)');
+  ok(!/rejectUnauthorized:\s*false/.test(srcA), 'sigue verificando el certificado del servidor');
+  ok(!/await fetch\(/.test(srcA), 'todas las llamadas a ARCA pasan por ese agente');
+  const otros = [];
+  for (const u of ['https://evil.com/x', 'http://servicios1.afip.gov.ar/x', 'https://afip.gov.ar.evil.com/x']) {
+    try { await arca._probarHost(u); otros.push(u + ' PASÓ'); } catch (e) { otros.push(/Solo se habla con servidores de ARCA/.test(e.message) ? 'ok' : e.message); }
+  }
+  ok(otros.every(x => x === 'ok'), 'con otro servidor (o sin https, o un dominio disfrazado) ni intenta conectarse', otros);
+  let errMsg = null;
+  arca._usarTransporte(async () => { const e = new Error('fetch failed'); e.cause = { code: 'ERR_SSL_DH_KEY_TOO_SMALL', message: 'dh key too small' }; throw e; });
+  try { await arca.dummy(); } catch (e) { errMsg = e.message; }
+  ok(/No se pudo conectar con ARCA \(servicios1\.afip\.gov\.ar\): ERR_SSL_DH_KEY_TOO_SMALL · dh key too small/.test(errMsg || ''), 'si no conecta, dice el servidor y el motivo', errMsg);
+  arca._usarTransporte((url, o) => globalThis.fetch(url, o));
+
+  console.log('\n11) Producción, bloqueada');
   process.env.ARCA_ENTORNO = 'produccion';
   err = null;
   try { await arca.emitirFactura({ id: 'p', detalle: det }); } catch (e) { err = e.message; }

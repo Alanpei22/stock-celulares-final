@@ -22,6 +22,7 @@
 'use strict';
 
 import forge from 'node-forge';
+import https from 'node:https';
 import admin from 'firebase-admin';
 import { CBTE_FACTURA_C, armarFECAE, leerFECAE, esNumeroOcupado, leerConsulta, datosQR } from './_arca-fe.js';
 
@@ -221,12 +222,50 @@ export async function obtenerTA({ forzar = false } = {}) {
 // motivo queda escondido en e.cause (ENOTFOUND, ECONNRESET, un error de TLS…).
 // El 29/10/2026, al pasar a producción, eso fue todo lo que se vio y no
 // alcanzaba para saber qué pasaba: ahora el error dice el host y el motivo.
+//
+// ── El cifrado viejo de ARCA (autorizado por Alan el 29/10/2026) ──
+// El servidor de facturas de PRODUCCIÓN (servicios1.afip.gov.ar) negocia la
+// conexión con una clave Diffie-Hellman de 1024 bits. Node 18+ (OpenSSL 3)
+// exige 2048 y corta con "dh key too small" (ERR_SSL_DH_KEY_TOO_SMALL): así
+// quedó al pasar a producción. Homologación usa una clave nueva y andaba.
+// La salida es bajar el nivel de seguridad de OpenSSL a 1 (acepta 1024),
+// SOLO para los servidores de ARCA (*.afip.gov.ar / *.arca.gob.ar). La
+// conexión sigue cifrada y se sigue verificando el certificado del servidor
+// (rejectUnauthorized queda como está). Todo lo demás de la app no se toca.
+// Si ARCA actualiza sus servidores, esto se puede sacar.
+const _HOSTS_ARCA = /(^|\.)(afip\.gov\.ar|arca\.gob\.ar)$/i;
+const _esServidorArca = u => u.protocol === 'https:' && _HOSTS_ARCA.test(u.hostname);
+const _agenteArca = new https.Agent({ keepAlive: true, ciphers: 'DEFAULT@SECLEVEL=1' });
+
+function _postArca(url, { method = 'POST', headers = {}, body = '' }) {
+  const u = new URL(url);
+  if (!_esServidorArca(u)) return Promise.reject(new Error('Solo se habla con servidores de ARCA: ' + u.hostname));
+  return new Promise((ok, mal) => {
+    const req = https.request(u, {
+      method, agent: _agenteArca, timeout: 25000,
+      headers: Object.assign({ 'Content-Length': Buffer.byteLength(body) }, headers),
+    }, res => {
+      let txt = '';
+      res.setEncoding('utf8');
+      res.on('data', c => { txt += c; });
+      res.on('end', () => ok({ status: res.statusCode, ok: res.statusCode < 400, text: async () => txt }));
+    });
+    req.on('timeout', () => req.destroy(Object.assign(new Error('ARCA no contestó en 25 segundos'), { code: 'ETIMEDOUT' })));
+    req.on('error', mal);
+    req.end(body);
+  });
+}
+
+// Las pruebas cambian esto por un ARCA de mentira (tests/test-arca-emitir.js)
+let _transporte = _postArca;
+export function _usarTransporte(fn) { _transporte = fn || _postArca; }
+
 async function _fetchArca(url, opts) {
   try {
-    return await fetch(url, opts);
+    return await _transporte(url, opts);
   } catch (e) {
-    const c = e && e.cause;
-    const motivo = c ? [c.code, c.message].filter(Boolean).join(' · ') : (e && e.message);
+    const c = (e && e.cause) || e;
+    const motivo = [c && c.code, c && c.message].filter(Boolean).join(' · ');
     throw new Error(`No se pudo conectar con ARCA (${new URL(url).host}): ${motivo || 'sin detalle'}`);
   }
 }
@@ -435,4 +474,12 @@ export function armarCSR({ keyPem, cuit, razonSocial, alias = 'techpoint' }) {
 export function certVence(certPem) {
   try { return forge.pki.certificateFromPem(certPem).validity.notAfter.toISOString(); }
   catch { return null; }
+}
+
+// Para las pruebas: ¿con esta URL se intentaría conectar? (no conecta: solo
+// valida el host con la misma regla que _postArca)
+export async function _probarHost(url) {
+  const u = new URL(url);
+  if (!_esServidorArca(u)) throw new Error('Solo se habla con servidores de ARCA: ' + u.hostname);
+  return true;
 }
