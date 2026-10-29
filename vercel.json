@@ -4,5 +4,10 @@
       "source": "/equipos",
       "destination": "/equipos.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/factura.js": {
+      "maxDuration": 60
+    }
+  }
 }

@@ -162,7 +162,7 @@ distintos**. No se mezclan.
 |---|---|---|
 | **0** | Certificado de homologación + PV tipo Web Services (HECHO 28/10: PV 6) + confirmar con el contador | Dueño |
 | **1** | `/api/factura` + WSAA + consultar último número. **Solo leer** | HECHO 19/08 |
-| **2** | Emitir en homologación, con numeración idempotente | HECHO 28/10 (falta la primera prueba real) |
+| **2** | Emitir en homologación, con numeración idempotente | HECHO y VERIFICADO 29/10 |
 | **3** | La factura impresa con CAE, vencimiento y QR | Claude |
 | **3b** | Estado por venta, reintento y lista de sin facturar (ver riesgo 1b) | Claude |
 | **4** | Producción con el certificado real | Los dos |
@@ -330,3 +330,13 @@ reparación conviene `concepto: 'ambos'` (lleva fechas de servicio).
 
 Reglas: `facturas` la escribe solo el servidor; la app la lee. Hay que
 publicar firestore.rules.
+
+### Primera factura real en homologación (29/10/2026)
+
+    {ok: true, factura: {ptoVenta: 6, cbteTipo: 11, nro: 1, importe: 1000,
+     cae: '86441029094101', caeVto: '2026-11-08', estado: 'emitida'}, ms: 7356}
+
+ARCA aceptó el XML tal cual lo arma `_arca-fe.js` (Factura C, consumidor
+final, CondicionIVAReceptorId 5). **Tardó 7,3 s** (incluía pedir token nuevo
+a WSAA: el cacheado era de agosto). Como el corte por defecto es a los 10 s,
+`vercel.json` le da 60 s a `api/factura.js`.
