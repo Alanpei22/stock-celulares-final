@@ -182,7 +182,7 @@ export async function obtenerTA({ forzar = false } = {}) {
   <soapenv:Body><wsaa:loginCms><wsaa:in0>${cms}</wsaa:in0></wsaa:loginCms></soapenv:Body>
 </soapenv:Envelope>`;
 
-  const r = await fetch(cfg.urls.wsaa, {
+  const r = await _fetchArca(cfg.urls.wsaa, {
     method: 'POST',
     headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '' },
     body: sobre,
@@ -216,6 +216,21 @@ export async function obtenerTA({ forzar = false } = {}) {
   return { token, sign, expira, deCache: false };
 }
 
+// ── fetch a ARCA, con el motivo real si no conecta ──────────
+// fetch() de Node, cuando no puede conectar, solo dice "fetch failed" y el
+// motivo queda escondido en e.cause (ENOTFOUND, ECONNRESET, un error de TLS…).
+// El 29/10/2026, al pasar a producción, eso fue todo lo que se vio y no
+// alcanzaba para saber qué pasaba: ahora el error dice el host y el motivo.
+async function _fetchArca(url, opts) {
+  try {
+    return await fetch(url, opts);
+  } catch (e) {
+    const c = e && e.cause;
+    const motivo = c ? [c.code, c.message].filter(Boolean).join(' · ') : (e && e.message);
+    throw new Error(`No se pudo conectar con ARCA (${new URL(url).host}): ${motivo || 'sin detalle'}`);
+  }
+}
+
 // ── WSFEv1: una llamada SOAP cualquiera ─────────────────────
 async function _llamarWsfe(metodo, cuerpoXml) {
   const cfg = arcaConfig();
@@ -224,7 +239,7 @@ async function _llamarWsfe(metodo, cuerpoXml) {
   <soap:Body><ar:${metodo}>${cuerpoXml}</ar:${metodo}></soap:Body>
 </soap:Envelope>`;
 
-  const r = await fetch(cfg.urls.wsfe, {
+  const r = await _fetchArca(cfg.urls.wsfe, {
     method: 'POST',
     headers: {
       'Content-Type': 'text/xml; charset=utf-8',
