@@ -94,7 +94,9 @@ function ticketFacturaHtml(mov, f, emisor) {
 @page{size:58mm 260mm;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;color:#000;background:#fff;width:58mm;padding:0 5mm}
-.tkt{width:48mm;padding:3mm 0 8mm;font-size:12px;line-height:1.35;font-weight:600}
+/* Abajo 22mm de papel en blanco: la cuchilla de la XPrinter corta más
+   arriba que el cabezal, y con 8mm cortaba pegado al QR (Alan, 30/10). */
+.tkt{width:48mm;padding:3mm 0 22mm;font-size:12px;line-height:1.35;font-weight:600}
 .c{text-align:center}
 .biz{font-size:19px;font-weight:900;line-height:1.15}
 .sm{font-size:10.5px}
@@ -134,6 +136,7 @@ body{font-family:Arial,sans-serif;color:#000;background:#fff;width:58mm;padding:
   <div class="sm">Vto. CAE: ${_fvEsc(vto)}</div>
   ${qr ? `<div class="qr">${qr}</div>` : ''}
   <div class="c sm" style="margin-top:1.5mm">Comprobante autorizado por ARCA</div>
+  <div class="c sm" style="margin-top:1mm">¡Gracias por tu compra!</div>
 </div>
 <script>
 (function(){var mm=96/25.4,h=Math.ceil(document.querySelector('.tkt').getBoundingClientRect().height/mm)+2;
