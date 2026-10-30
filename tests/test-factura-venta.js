@@ -81,7 +81,7 @@ ok(PRINTS.length === 1 && PRINTS[0][0] === 'ticket', 'con "Imprimir" sale por la
 ok(/FACTURA C/.test(html) && /Cód\. 011/.test(html) && /N° 00006-00000001/.test(html), 'tipo y número (punto de venta 6, factura 1)');
 ok(/CAE: <b>86441029094101<\/b>/.test(html) && /Vto\. CAE: 08\/11\/2026/.test(html), 'CAE y vencimiento');
 ok(/<svg/.test(html), 'con el QR');
-ok(/\.tkt\{[^}]*padding:3mm 0 22mm/.test(html), 'con papel en blanco abajo: la cuchilla no corta pegado al QR');
+ok(/\.fin\{margin-top:18mm/.test(html) && /<div class="fin">· · ·<\/div>\s*<\/div>/.test(html), 'termina en una marca 18mm más abajo: la impresora avanza el papel y no corta pegado al QR');
 ok(/Consumidor Final/.test(html) && /CUIT: 20-38519962-8/.test(html) && /Responsable Monotributo/.test(html), 'emisor y receptor');
 ok(/Ingresos Brutos: 901-123456-7/.test(html) && /Inicio de actividades: 01\/03\/2020/.test(html), 'Ingresos Brutos e inicio de actividades (de config/facturaEmisor)');
 ok(/PRUEBA — SIN VALIDEZ FISCAL/.test(html), 'en prueba lo dice bien grande');
