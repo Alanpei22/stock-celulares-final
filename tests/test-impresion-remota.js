@@ -108,6 +108,22 @@ ok(vm.runInContext(`etqFormato()`, celu) === '40x30r', 'el celu (que tenía otro
 celu.localStorage._d.qzRemota = 'null';
 ok(vm.runInContext(`etqFormato()`, celu) === '30x40', 'sin caja que imprima por él, vuelve a usar el suyo');
 
+console.log('\n4c) Una etiqueta armada en otro sentido no se gasta');
+LS.qzServidor = '1'; LS.etqFmt = '40x30r';
+LS.qzImpresoras = JSON.stringify({ etiqueta: 'XPrinter', ticket: 'XPrinter 58' });
+const antes = PRINTS.length;
+vm.runInContext(leer('print.js').slice(0, leer('print.js').indexOf('function elegirFormatoEtiqueta')), ctx, { filename: 'print' });
+DB['cola_impresion/etq'] = { tipo: 'etiqueta', fmt: '30x40', pag: { papelAncho: 30, papelAlto: 40, alto: 40, margen: 0 }, pngs: ['E'], altos: [40], estado: 'pendiente', creado: Date.now() };
+ctx._r = db.collection('cola_impresion').doc('etq');
+await run(`qzServidorImprimir(_r)`);
+ok(PRINTS.length === antes && DB['cola_impresion/etq'].estado === 'error' && /otro sentido \(30x40, la caja usa 40x30r\)/.test(DB['cola_impresion/etq'].error), 'no la imprime y avisa por qué', DB['cola_impresion/etq']);
+ok(DB['config/impresoraRemota'].etqFmt === '40x30r', 'y vuelve a avisar el sentido correcto');
+DB['cola_impresion/etq2'] = Object.assign({}, DB['cola_impresion/etq'], { fmt: '40x30r', estado: 'pendiente' });
+ctx._r = db.collection('cola_impresion').doc('etq2');
+await run(`qzServidorImprimir(_r)`);
+ok(PRINTS.length === antes + 1 && !DB['cola_impresion/etq2'], 'armada en el sentido de la caja: sale');
+ok(/_qzServidorPublicar\(true\)\.catch\(\(\) => \{\}\);\n  _qzServUnsub = db\.collection\('cola_impresion'\)/.test(leer('qz-print.js')), 'la caja avisa su sentido cada vez que abre la app');
+
 console.log('\n5) Reglas');
 const rules = leer('firestore.rules');
 ok(/match \/cola_impresion\/\{doc\} \{\s*allow read, create, update, delete: if isAllowed\(\);/.test(rules), 'la cola la usan solo las cuentas del local');

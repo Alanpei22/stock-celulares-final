@@ -435,6 +435,7 @@ async function qzMandarRemoto(tipo, html) {
     for (const parte of partes) {
       refs.push(await db.collection('cola_impresion').add({
         tipo, pag: Object.assign({}, pag), pngs: parte.pngs, altos: parte.altos,
+        fmt: (tipo === 'etiqueta' && typeof etqFormato === 'function') ? etqFormato() : null,
         de, estado: 'pendiente', creado: Date.now(),
       }));
     }
@@ -461,6 +462,7 @@ function _qzSeguirPedido(ref) {
     const j = d.data();
     if (j.estado === 'error' || j.estado === 'vencido') {
       clearTimeout(corte); fin();
+      qzRemotaLeer();   // por si cambió algo en la caja (el sentido de la etiqueta)
       if (typeof toast === 'function') toast('🖨️ La caja no pudo imprimirlo: ' + (j.error || j.estado), 'error');
     }
   }, () => clearTimeout(corte));
@@ -471,6 +473,11 @@ let _qzServUnsub = null;
 let _qzServCola = Promise.resolve();
 function qzServidorIniciar() {
   if (_qzServUnsub || !qzEsServidor() || typeof db === 'undefined' || !db) return;
+  // Cada vez que la caja abre la app vuelve a avisar qué imprime y en qué
+  // sentido van las etiquetas. Antes solo se avisaba al pasar por la
+  // configuración, y si el sentido cambió después, los otros equipos seguían
+  // armando la etiqueta con el viejo (Alan: "el sentido sigue mal").
+  _qzServidorPublicar(true).catch(() => {});
   _qzServUnsub = db.collection('cola_impresion').where('estado', '==', 'pendiente').onSnapshot(snap => {
     snap.docChanges().forEach(ch => {
       if (ch.type !== 'added') return;
@@ -494,6 +501,13 @@ async function qzServidorImprimir(ref) {
   const impresora = qzImpresoras()[job.tipo];
   try {
     if (!impresora) throw new Error('esta compu no tiene impresora para ' + job.tipo);
+    // Una etiqueta armada en otro sentido sale torcida o pasada a la de al
+    // lado: mejor no gastarla y avisar (el otro equipo se actualiza solo)
+    const miFmt = (typeof etqFormato === 'function') ? etqFormato() : null;
+    if (job.tipo === 'etiqueta' && job.fmt && miFmt && job.fmt !== miFmt) {
+      _qzServidorPublicar(true).catch(() => {});
+      throw new Error('la etiqueta vino armada en otro sentido (' + job.fmt + ', la caja usa ' + miFmt + '). Ya se corrigió: imprimila de nuevo');
+    }
     await _qzMandarPngs(impresora, job.tipo, job.pag, job.pngs, job.altos);
     await ref.delete();
   } catch (e) {
@@ -542,4 +556,12 @@ function _qzRemotaArrancar(intentos) {
 }
 if (typeof window !== 'undefined' && window.addEventListener) {
   window.addEventListener('load', () => setTimeout(() => _qzRemotaArrancar(0), 2500));
+  // El celu deja la app abierta días: al volver a ella se vuelve a preguntar
+  // (como mucho cada 5 minutos, 1 lectura) por si la caja cambió algo.
+  let _qzUltLect = Date.now();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || qzEsServidor() || Date.now() - _qzUltLect < 5 * 60e3) return;
+    _qzUltLect = Date.now();
+    qzRemotaLeer();
+  });
 }
