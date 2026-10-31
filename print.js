@@ -168,6 +168,14 @@ const ETQ_FORMATO_NOMBRE = {
 const _ETQ_KEY = 'etqFmt';
 
 function etqFormato() {
+  // Si las etiquetas de este equipo salen en la compu de la caja (impresión
+  // desde otro equipo, qz-print.js), manda el sentido elegido ALLÁ: es el que
+  // anda con esa XPrinter. Antes cada equipo usaba el suyo y desde el celu la
+  // etiqueta salía en otro sentido que desde la caja.
+  if (typeof qzRemotaActiva === 'function' && qzRemotaActiva('etiqueta') && typeof _qzRemota === 'function') {
+    const r = _qzRemota();
+    if (r && ETQ_FORMATOS.indexOf(r.etqFmt) >= 0) return r.etqFmt;
+  }
   try {
     const f = localStorage.getItem(_ETQ_KEY);
     return ETQ_FORMATOS.indexOf(f) >= 0 ? f : ETQ_FORMATO_DEF;
@@ -175,6 +183,8 @@ function etqFormato() {
 }
 function setEtqFormato(f) {
   try { localStorage.setItem(_ETQ_KEY, ETQ_FORMATOS.indexOf(f) >= 0 ? f : ETQ_FORMATO_DEF); } catch {}
+  // En la compu de la caja: los otros equipos se enteran del sentido nuevo
+  if (typeof qzEsServidor === 'function' && qzEsServidor() && typeof _qzServidorPublicar === 'function') _qzServidorPublicar(true).catch(() => {});
 }
 
 // ── Elegir el sentido ──
@@ -183,6 +193,10 @@ function setEtqFormato(f) {
 // solo carga la caja: desde Repuestos el botón no hacía nada.)
 function elegirFormatoEtiqueta() {
   if (typeof closeSheet === 'function') closeSheet();
+  if (typeof qzRemotaActiva === 'function' && qzRemotaActiva('etiqueta')) {
+    alert('🏷️ Las etiquetas de este equipo salen en la impresora de la caja, con el sentido elegido allá.\n\nSi salen mal, cambialo desde la compu de la caja.');
+    return;
+  }
   const elegido = prompt(
     'Sentido de la etiqueta en ESTE dispositivo.\n\n' +
     ETQ_FORMATOS.map((f, n) => `${n + 1}. ${ETQ_FORMATO_NOMBRE[f]}${f === etqFormato() ? '  ← ahora' : ''}`).join('\n') +

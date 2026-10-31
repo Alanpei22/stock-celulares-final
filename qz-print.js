@@ -403,7 +403,7 @@ async function qzRemotaLeer() {
   try {
     const d = await db.collection('config').doc('impresoraRemota').get();
     const v = d.exists ? d.data() : null;
-    localStorage.setItem(_QZ_REMOTA_KEY, JSON.stringify(v && v.activa ? { tipos: v.tipos || {}, nombre: v.nombre || 'la caja' } : null));
+    localStorage.setItem(_QZ_REMOTA_KEY, JSON.stringify(v && v.activa ? { tipos: v.tipos || {}, nombre: v.nombre || 'la caja', etqFmt: v.etqFmt || null } : null));
   } catch (e) { /* sin permiso o sin conexión: se queda con lo último que supo */ }
 }
 
@@ -502,14 +502,24 @@ async function qzServidorImprimir(ref) {
   }
 }
 
-// Prender / apagar "esta compu imprime lo de los demás"
-async function qzServidorConfigurar(activar) {
+// Lo que los otros equipos tienen que saber de la caja: qué imprime y en
+// qué sentido van las etiquetas (el que anda con su XPrinter)
+async function _qzServidorPublicar(activar) {
   const c = qzImpresoras();
   const tipos = { hoja: !!c.hoja, etiqueta: !!c.etiqueta, ticket: !!c.ticket };
-  try { localStorage.setItem(_QZ_SERV_KEY, activar ? '1' : '0'); } catch {}
   const nombre = (typeof getDeviceName === 'function' && getDeviceName()) || 'la caja';
+  // etqFormato() del dueño de la impresora (en la caja qzRemotaActiva es false)
+  const etqFmt = (typeof etqFormato === 'function') ? etqFormato() : null;
+  await db.collection('config').doc('impresoraRemota').set({ activa: !!activar, tipos, nombre, etqFmt, desde: new Date().toISOString() });
+  return nombre;
+}
+
+// Prender / apagar "esta compu imprime lo de los demás"
+async function qzServidorConfigurar(activar) {
+  try { localStorage.setItem(_QZ_SERV_KEY, activar ? '1' : '0'); } catch {}
+  let nombre;
   try {
-    await db.collection('config').doc('impresoraRemota').set({ activa: !!activar, tipos, nombre, desde: new Date().toISOString() });
+    nombre = await _qzServidorPublicar(activar);
   } catch (e) {
     if (typeof toast === 'function') toast('No se pudo guardar (¿publicaste las reglas nuevas?)', 'error');
     return;

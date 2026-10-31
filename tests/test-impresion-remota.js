@@ -88,6 +88,26 @@ const cfg = DB['config/impresoraRemota'];
 ok(LS.qzServidor === '1' && cfg.activa === true && cfg.tipos.ticket === true && cfg.tipos.etiqueta === true && cfg.tipos.hoja === false, 'queda anotado qué imprime la caja', cfg);
 ok(/Celu de Nacho|la caja/.test(cfg.nombre), 'con el nombre del equipo');
 
+console.log('\n4b) El sentido de la etiqueta es el de la caja');
+// Antes cada equipo usaba su sentido (se guarda por equipo) y desde el celu la
+// etiqueta salía distinta que desde la caja.
+const p2 = { console, Math, Date, JSON, Number, String, Array, Object, Promise, Error, setTimeout, clearTimeout,
+  localStorage: { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); } }, db, getDeviceName: () => 'Compu caja' };
+vm.createContext(p2);
+vm.runInContext(leer('qz-print.js') + '\n' + leer('print.js').slice(0, leer('print.js').indexOf('function elegirFormatoEtiqueta')), p2, { filename: 'print+qz' });
+p2.localStorage.setItem('etqFmt', '40x30r');                     // así la eligió el dueño en la caja
+p2.localStorage.setItem('qzImpresoras', JSON.stringify({ etiqueta: 'XPrinter' }));
+p2.localStorage.setItem('qzServidor', '1');
+await vm.runInContext(`_qzServidorPublicar(true)`, p2);
+ok(DB['config/impresoraRemota'].etqFmt === '40x30r', 'la caja publica su sentido de etiqueta');
+const celu = { console, Math, Date, JSON, Number, String, Array, Object, Promise, Error, setTimeout, clearTimeout,
+  localStorage: { _d: { etqFmt: '30x40', qzRemota: JSON.stringify({ tipos: { etiqueta: true }, nombre: 'Compu caja', etqFmt: '40x30r' }) }, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); } } };
+vm.createContext(celu);
+vm.runInContext(leer('qz-print.js') + '\n' + leer('print.js').slice(0, leer('print.js').indexOf('function elegirFormatoEtiqueta')), celu, { filename: 'print+qz' });
+ok(vm.runInContext(`etqFormato()`, celu) === '40x30r', 'el celu (que tenía otro guardado) arma la etiqueta con el sentido de la caja');
+celu.localStorage._d.qzRemota = 'null';
+ok(vm.runInContext(`etqFormato()`, celu) === '30x40', 'sin caja que imprima por él, vuelve a usar el suyo');
+
 console.log('\n5) Reglas');
 const rules = leer('firestore.rules');
 ok(/match \/cola_impresion\/\{doc\} \{\s*allow read, create, update, delete: if isAllowed\(\);/.test(rules), 'la cola la usan solo las cuentas del local');
