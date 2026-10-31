@@ -149,7 +149,9 @@ ok(/¿Imprimo las etiquetas/.test(lote), 'preguntando primero');
 const app = fs.readFileSync(DIR + 'app.js', 'utf8');
 ok(/function etiquetaDe/.test(app) && /printEtiquetas\(\[p\]\)/.test(app), 'y se puede reimprimir una sola desde la ficha');
 ok(/etiquetaDe\('\$\{p\.id\}'\)/.test(app), 'con su botón en el detalle del equipo');
-ok(!/etiquetaDe[\s\S]{0,400}p\.vendido \? /.test(app), 'el botón no aparece en equipos vendidos');
+// La botonera de la ficha cambió (31/10: mosaicos): el de Etiqueta va
+// atado a !p.vendido
+ok(/\$\{!p\.vendido \? tile\('🏷️', 'Etiqueta', `etiquetaDe\('\$\{p\.id\}'\)`\)/.test(app), 'el botón no aparece en equipos vendidos');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

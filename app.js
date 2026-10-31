@@ -1699,23 +1699,61 @@ function openDetail(id) {
     ${p.vendido ? '<div class="det-sold-badge">VENDIDO</div>' : ''}
   `;
 
+  // Antes eran 8 botones en una sola fila: en el celu los nombres quedaban
+  // cortados ("Cop", "His", "Eti", "Edi") y no se sabía cuál era cuál (Alan,
+  // 31/10). Ahora: lo principal (vender / reservar) grande arriba, y el resto
+  // en mosaicos con el ícono arriba y el nombre entero abajo.
+  _detEstilos();
+  const histNom = esc(JSON.stringify((p.marca || '') + ' ' + (p.modelo || ''))).replace(/"/g, '&quot;');
+  const tile = (ico, txt, onclick, extra) => `<button type="button" class="det-tile${extra ? ' ' + extra : ''}" onclick="${onclick}"><span>${ico}</span>${txt}</button>`;
   document.getElementById('det-actions').innerHTML = `
-    ${!p.vendido ? `<button class="btn-whatsapp" onclick="shareWhatsApp('${p.id}')">🟢 WhatsApp</button>` : ''}
-    <button class="btn-copy" onclick="copyInfo('${p.id}')">📋 Copiar</button>
-    <button class="btn-copy" onclick="historialStock('equipo','${p.id}', ${esc(JSON.stringify((p.marca || '') + ' ' + (p.modelo || ''))).replace(/"/g, '&quot;')})" title="Altas, ventas, reservas de este equipo">📜 Historial</button>
-    ${p.vendido ? `<button class="btn-edit" onclick="printVentaTicket('${p.id}','','A5')">📄 Comprobante A5</button>
-                <button class="btn-edit" onclick="printVentaTicket('${p.id}','','80mm')">🖨 Ticket 80mm</button>` : ''}
-    ${!p.vendido ? `<button class="btn-edit" onclick="etiquetaDe('${p.id}')">🏷️ Etiqueta</button>` : ''}
-    ${!p.vendido && !p.reservado ? `<button class="btn-edit" onclick="closeDetail();openForm('${p.id}')">✏️ Editar</button>` : ''}
-    ${!p.vendido && !p.reservado ? `<button class="btn-edit" onclick="openReservarModal('${p.id}')" style="background:#f59e0b;color:#fff">⏳ Reservar</button>` : ''}
-    ${p.reservado ? `<button class="btn-edit" onclick="printReservaDe('${p.id}')">📄 Comprobante de reserva</button>
-                <button class="btn-edit" onclick="cancelarReserva('${p.id}')" style="background:#fef3c7;color:#92400e">✕ Cancelar reserva</button>` : ''}
-    ${!p.vendido ? `<button class="btn-sell" onclick="markSold('${p.id}')">💰 Vendido</button>` : `<button class="btn-unsell" onclick="markUnsold('${p.id}')">↩️ Reactivar</button>`}
-    <button class="btn-delete" onclick="deletePhone('${p.id}')">🗑️</button>
+    <div class="det-acc-main">
+      ${!p.vendido ? `<button type="button" class="det-big det-big--vender" onclick="markSold('${p.id}')">💰 Vender</button>`
+        : `<button type="button" class="det-big" onclick="markUnsold('${p.id}')">↩️ Reactivar</button>`}
+      ${!p.vendido && !p.reservado ? `<button type="button" class="det-big det-big--reservar" onclick="openReservarModal('${p.id}')">⏳ Reservar</button>` : ''}
+      ${p.reservado ? `<button type="button" class="det-big det-big--cancelar" onclick="cancelarReserva('${p.id}')">✕ Cancelar reserva</button>` : ''}
+    </div>
+    <div class="det-acc-grid">
+      ${!p.vendido ? tile('🟢', 'WhatsApp', `shareWhatsApp('${p.id}')`) : ''}
+      ${!p.vendido ? tile('🏷️', 'Etiqueta', `etiquetaDe('${p.id}')`) : ''}
+      ${!p.vendido && !p.reservado ? tile('✏️', 'Editar', `closeDetail();openForm('${p.id}')`) : ''}
+      ${p.reservado ? tile('📄', 'Comprobante reserva', `printReservaDe('${p.id}')`) : ''}
+      ${p.vendido ? tile('📄', 'Comprobante A5', `printVentaTicket('${p.id}','','A5')`) : ''}
+      ${p.vendido ? tile('🖨', 'Ticket 80mm', `printVentaTicket('${p.id}','','80mm')`) : ''}
+      ${tile('📋', 'Copiar datos', `copyInfo('${p.id}')`)}
+      ${tile('📜', 'Historial', `historialStock('equipo','${p.id}', ${histNom})`)}
+      ${tile('🗑️', 'Eliminar', `deletePhone('${p.id}')`, 'det-tile--borrar')}
+    </div>
   `;
 
   document.getElementById('detail-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+}
+
+// Estilos de la botonera de la ficha. Viajan con el JS: el CSS se sirve del
+// caché y se actualiza atrás, y con el CSS viejo los botones nuevos saldrían
+// sin forma la primera vez.
+function _detEstilos() {
+  if (document.getElementById('det-estilos')) return;
+  const st = document.createElement('style');
+  st.id = 'det-estilos';
+  st.textContent = `
+#det-actions.det-actions { display: block; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); }
+.det-acc-main { display: flex; gap: 8px; margin-bottom: 8px; }
+.det-big { flex: 1; border: 0; border-radius: 14px; padding: 14px 10px; font-size: 1rem; font-weight: 800; cursor: pointer; background: var(--bg1); color: var(--text); }
+.det-big--vender { background: var(--accent); color: #fff; }
+.det-big--reservar { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.det-big--cancelar { background: #fef3c7; color: #92400e; }
+.det-big:active, .det-tile:active { transform: scale(.97); }
+.det-acc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 6px; }
+@media (max-width: 560px) { .det-acc-grid { grid-template-columns: repeat(3, 1fr); } }
+.det-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 60px;
+  border: 1px solid var(--border); border-radius: 12px; padding: 8px 4px; background: var(--card); color: var(--text);
+  font-size: .74rem; font-weight: 700; line-height: 1.15; text-align: center; white-space: normal; cursor: pointer; }
+.det-tile span { font-size: 1.25rem; line-height: 1; }
+.det-tile--borrar { color: #dc2626; }
+`;
+  document.head.appendChild(st);
 }
 
 function closeDetail() {
