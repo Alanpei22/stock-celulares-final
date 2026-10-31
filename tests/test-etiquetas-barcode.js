@@ -86,6 +86,10 @@ vm.createContext(pCtx);
 vm.runInContext(fs.readFileSync(DIR + 'qr.js', 'utf8'), pCtx, { filename: 'qr.js' });
 vm.runInContext(fs.readFileSync(DIR + 'barcode.js', 'utf8'), pCtx, { filename: 'barcode.js' });
 vm.runInContext(fs.readFileSync(DIR + 'print.js', 'utf8'), pCtx, { filename: 'print.js' });
+// Desde el 31/10 arranca DADA VUELTA (la que anda con la XPrinter del local).
+// Estas pruebas miran la parada: se elige a propósito.
+const _fmtDef = vm.runInContext('etqFormato()', pCtx);
+vm.runInContext("setEtqFormato('30x40')", pCtx);
 vm.runInContext('_openPrint = (html, t) => { __CAP(html, t); };', pCtx);
 pCtx.__CAP = (html, t) => { IMPRESO = { html, titulo: t }; };
 const imprimir = (fn, datos, copias) => {
@@ -257,7 +261,8 @@ ok(imprimir('printEtiquetasProductos', []) === '' && TOASTS.some(t => /No hay/.t
 ok(imprimir('printEtiquetasReparaciones', []) === '' && TOASTS.some(t => /No hay/.test(t[1])), 'reparaciones');
 
 console.log('\n8b) Los tres formatos');
-ok(vm.runInContext('etqFormato()', pCtx) === '30x40', 'arranca parada: es como alimenta el rollo esta etiquetadora');
+ok(_fmtDef === '40x30r', 'arranca apaisada dada vuelta: es como anda la XPrinter del local', _fmtDef);
+ok(vm.runInContext('etqFormato()', pCtx) === '30x40', 'la parada se puede elegir');
 const eq40 = imprimir('printEtiquetas', [{ marca: 'Samsung', modelo: 'A54', precio: 1, imei: '356938035643809' }]);
 ok(/@page\{size:30mm 40mm;margin:0\}/.test(eq40) && /rotate\(90deg\)/.test(eq40),
    'página de 30×40 con la etiqueta girada');

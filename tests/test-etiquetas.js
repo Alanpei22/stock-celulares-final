@@ -36,6 +36,8 @@ vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(DIR + 'qr.js', 'utf8'), ctx, { filename: 'qr.js' });
 vm.runInContext(fs.readFileSync(DIR + 'barcode.js', 'utf8'), ctx, { filename: 'barcode.js' });
 vm.runInContext(fs.readFileSync(DIR + 'print.js', 'utf8'), ctx, { filename: 'print.js' });
+// La parada, elegida a propósito: desde el 31/10 el de fábrica es la dada vuelta
+vm.runInContext("setEtqFormato('30x40')", ctx);
 const run = c => vm.runInContext(c, ctx);
 const get = e => vm.runInContext(e, ctx);
 // _openPrint abre una ventana: acá se captura el HTML

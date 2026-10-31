@@ -152,7 +152,10 @@ function _etqAncho()    { return etqEsA4() ? 55 : 38.4; }
 //  Se guarda por dispositivo: la PC del local puede tener la etiquetadora y la
 //  tablet no.
 // ══════════════════════════════════════════════════════════════
-const ETQ_FORMATO_DEF = '30x40';
+// Por defecto, la dada vuelta: es la que anda con la XPrinter del local
+// (Alan, 31/10). Antes era la parada, y cualquier equipo que nunca había
+// elegido (el celu, una compu nueva) armaba la etiqueta en otro sentido.
+const ETQ_FORMATO_DEF = '40x30r';
 const ETQ_FORMATOS = ['30x40', '40x30', '40x30r', 'a4'];
 const ETQ_FORMATO_NOMBRE = {
   '30x40': 'Etiquetadora · 40×30 parada',
