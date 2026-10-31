@@ -6499,6 +6499,20 @@ body.dark .rep-pend-barra { background: #1a1d21; border-top-color: #2a2e34; }
 }
 .acc-med--on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .acc-barra-med { font-size: .74rem; }
+/* ── Etiqueta en blanco ── */
+.etql-modal { max-width: 420px; }
+.etql-fila { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: .8rem; }
+.etql-fila span { color: var(--text2); }
+.etql-fila .fi { width: 80px; text-align: center; }
+/* La etiqueta es chica: se muestra al doble para poder leerla en pantalla.
+   El alto y el giro los pone etiqueta-libre.js, porque dependen del tamaño
+   de rollo que tengas elegido. */
+.etql-prev-wrap {
+ display: flex; justify-content: center; align-items: center; overflow: hidden;
+ border: 1px solid var(--border); border-radius: 10px; background: var(--bg1);
+ padding: 10px; margin-top: 4px; min-height: 160px;
+}
+.etql-prev { border: 0; background: #fff; }
 /* ── Estado del día ── */
 .est-dias { display: flex; gap: 5px; margin: 8px 0; }
 .est-dia {

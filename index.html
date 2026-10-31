@@ -1597,6 +1597,42 @@
   <button class="tpent-volver" onclick="estCerrar()">Cerrar</button>
 </div>
 
+<!-- MODAL: ETIQUETA EN BLANCO - la que dice lo que uno quiera.
+     Misma etiquetadora y mismo tamano que el resto (etiqueta-libre.js). -->
+<div id="etql-overlay" class="tpent-overlay hidden" onclick="etiquetaLibreCerrar()"></div>
+<div id="etql-modal" class="tpent-modal etql-modal hidden">
+  <div class="tpent-hd">
+    <span>&#127991;&#65039; Etiqueta en blanco</span>
+    <button class="tpent-x" onclick="etiquetaLibreCerrar()">&#10005;</button>
+  </div>
+  <p class="fi-helper">Escrib&iacute; lo que quieras y sale en la etiquetadora, con el tama&ntilde;o que ya ten&eacute;s puesto.</p>
+
+  <label class="fl">Rengl&oacute;n grande</label>
+  <input id="etql-titulo" class="fi" type="text" maxlength="40" placeholder="CAJ&Oacute;N 3" oninput="etqlCampo()">
+  <label class="fl" style="margin-top:8px">Abajo</label>
+  <input id="etql-l1" class="fi" type="text" maxlength="48" placeholder="Fundas iPhone" oninput="etqlCampo()">
+  <input id="etql-l2" class="fi" type="text" maxlength="48" placeholder="(opcional)" oninput="etqlCampo()" style="margin-top:5px">
+  <input id="etql-l3" class="fi" type="text" maxlength="48" placeholder="(opcional)" oninput="etqlCampo()" style="margin-top:5px">
+
+  <label class="fl" style="margin-top:8px">C&oacute;digo de barras <small>(opcional)</small></label>
+  <input id="etql-codigo" class="fi" type="text" maxlength="30" placeholder="Si pon&eacute;s uno, sale en barras" oninput="etqlCampo()">
+
+  <div class="etql-fila">
+    <span>Cu&aacute;ntas</span>
+    <input id="etql-copias" class="fi" type="number" min="1" max="20" inputmode="numeric" oninput="etqlCampo()">
+  </div>
+
+  <label class="fl" style="margin-top:10px;display:block">C&oacute;mo sale</label>
+  <div class="etql-prev-wrap" id="etql-prev-wrap">
+    <iframe id="etql-prev" class="etql-prev" title="Vista previa de la etiqueta"></iframe>
+  </div>
+  <p class="fi-helper" id="etql-nota"></p>
+
+  <button class="tpent-btn tpent-btn--si" id="etql-imprimir" onclick="etiquetaLibreImprimir()">&#128424;&#65039; Imprimir</button>
+  <button class="tpent-btn" onclick="etqlLimpiar()">&#129529; Empezar de cero</button>
+  <button class="tpent-volver" onclick="etiquetaLibreCerrar()">Cerrar</button>
+</div>
+
 <!-- MODAL: ¿LE AVISO AL CLIENTE? — sale al marcar una reparación como Listo.
      Reemplaza al confirm() del navegador: acá se ve el mensaje que se manda. -->
 <div id="avisowa-overlay" class="tpent-overlay hidden" onclick="closeAvisoWaModal()"></div>
@@ -2393,6 +2429,7 @@
 <script defer src="instalar.js"></script>
 <script defer src="barcode.js"></script>
 <script defer src="print.js"></script>
+<script defer src="etiqueta-libre.js"></script>
 <script defer src="carteles.js"></script>
 <script defer src="estados.js"></script>
 <script defer src="venta-articulos.js"></script>

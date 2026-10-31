@@ -657,6 +657,8 @@ function toggleHdrMenu() {
     sheetGrupo(toggleHdrMenu, 'Etiquetas, carteles e impresión', '🏷️', 'Etiquetas, carteles e impresión', 'Carteles de vidriera, etiquetas e impresora', [
       { icon: '🪧', label: 'Carteles de exhibición', sub: 'Los de la vidriera: 8 por hoja A4',
         onClick: () => (typeof cartAbrir === 'function') && cartAbrir() },
+      { icon: '🏷️', label: 'Etiqueta en blanco', sub: 'Escribís lo que quieras y sale: un cajón, una caja, lo que sea',
+        onClick: () => (typeof etiquetaLibreAbrir === 'function') && etiquetaLibreAbrir() },
       { icon: '📐', label: 'Sentido de la etiqueta',
         sub: (typeof etqFormato === 'function' && typeof ETQ_FORMATO_NOMBRE === 'object') ? ETQ_FORMATO_NOMBRE[etqFormato()] : '',
         onClick: elegirFormatoEtiqueta },
