@@ -33,7 +33,9 @@ function qzImpresoras() {
 function _qzGuardar(c) {
   try { localStorage.setItem(_QZ_KEY, JSON.stringify({ hoja: c.hoja || '', etiqueta: c.etiqueta || '', ticket: c.ticket || '' })); } catch {}
 }
-function qzActivo(tipo) { return !!qzImpresoras()[tipo]; }
+// Activo = sale sin diálogo: por una impresora de ESTA compu, o mandándolo a
+// la compu de la caja (imprimir desde otro equipo, más abajo).
+function qzActivo(tipo) { return !!qzImpresoras()[tipo] || qzRemotaActiva(tipo); }
 
 // ── Conexión ────────────────────────────────────────────────
 // qz-tray.js se carga recién cuando hace falta: en los dispositivos sin QZ
@@ -163,9 +165,8 @@ async function _qzPaginasPng(html, selector, anchoMm, altoMm, dpi, byn) {
 // elegido en 📐 — el mismo tamaño de página que ya le funciona al driver.
 // Devuelve true si salió por QZ Tray; false si hay que usar el diálogo.
 let _qzUltimoError = '';
-async function qzImprimir(tipo, html) {
-  const impresora = qzImpresoras()[tipo];
-  if (!impresora) return false;
+// Cómo es la página de cada tipo (null: ese tipo va por el diálogo)
+function _qzPagina(tipo) {
   let pag;
   if (tipo === 'hoja') {
     pag = { selector: '.tk', ancho: 134, alto: 196, papelAncho: 148, papelAlto: 210, margen: 7, dpi: 200, byn: false };
@@ -173,27 +174,41 @@ async function qzImprimir(tipo, html) {
     // Rollo de 58mm: 48mm útiles y el largo que haga falta.
     pag = { selector: '.tkt', ancho: 48, alto: 'auto', papelAncho: 58, margen: 0, dpi: 203, byn: true };
   } else {
-    if (typeof etqEsA4 === 'function' && etqEsA4()) return false;   // la hoja A4 va por el diálogo
+    if (typeof etqEsA4 === 'function' && etqEsA4()) return null;   // la hoja A4 va por el diálogo
     const parada = typeof etqFormato === 'function' && etqFormato() === '30x40';
     const a = parada ? 30 : 40, h = parada ? 40 : 30;
     pag = { selector: '.pag', ancho: a, alto: h, papelAncho: a, papelAlto: h, margen: 0, dpi: 203, byn: true };
   }
+  return pag;
+}
+
+// Las imágenes ya armadas → a la impresora, por QZ Tray
+async function _qzMandarPngs(impresora, tipo, pag, pngs, altos) {
+  await qzConectar();
+  const alto = pag.alto === 'auto' ? Math.max(...altos) : pag.papelAlto;
+  const cfg = qz.configs.create(impresora, {
+    units: 'mm',
+    size: { width: pag.papelAncho, height: alto },
+    // El ticket va centrado en el rollo: 5mm a cada lado de los 48 útiles.
+    margins: tipo === 'ticket' ? { top: 0, right: 5, bottom: 0, left: 5 } : pag.margen,
+    scaleContent: true,
+    colorType: pag.byn ? 'blackwhite' : 'default',
+    interpolation: 'nearest-neighbor',
+    jobName: 'TechPoint · ' + tipo,
+  });
+  await qz.print(cfg, pngs.map(b64 => ({ type: 'pixel', format: 'image', flavor: 'base64', data: b64 })));
+}
+
+async function qzImprimir(tipo, html) {
+  const impresora = qzImpresoras()[tipo];
+  // Sin impresora acá: si la compu de la caja imprime lo de los demás, va allá
+  if (!impresora) return qzRemotaActiva(tipo) ? qzMandarRemoto(tipo, html) : false;
+  const pag = _qzPagina(tipo);
+  if (!pag) return false;
   try {
-    await qzConectar();
     const pngs = await _qzPaginasPng(html, pag.selector, pag.ancho, pag.alto, pag.dpi, pag.byn);
     if (!pngs.length) throw new Error('no se armó ninguna página');
-    const alto = pag.alto === 'auto' ? Math.max(...pngs.altos) : pag.papelAlto;
-    const cfg = qz.configs.create(impresora, {
-      units: 'mm',
-      size: { width: pag.papelAncho, height: alto },
-      // El ticket va centrado en el rollo: 5mm a cada lado de los 48 útiles.
-      margins: tipo === 'ticket' ? { top: 0, right: 5, bottom: 0, left: 5 } : pag.margen,
-      scaleContent: true,
-      colorType: pag.byn ? 'blackwhite' : 'default',
-      interpolation: 'nearest-neighbor',
-      jobName: 'TechPoint · ' + tipo,
-    });
-    await qz.print(cfg, pngs.map(b64 => ({ type: 'pixel', format: 'image', flavor: 'base64', data: b64 })));
+    await _qzMandarPngs(impresora, tipo, pag, pngs, pngs.altos);
     return true;
   } catch (e) {
     console.error('QZ Tray:', e);
@@ -214,6 +229,15 @@ async function configurarImpresoras() {
     lista = await qz.printers.find();
   } catch (e) {
     console.error('QZ Tray:', e);
+    // En un equipo sin QZ (celu, tablet): ¿hay una compu que imprima por él?
+    await qzRemotaLeer();
+    const r = _qzRemota();
+    if (r && r.tipos && (r.tipos.hoja || r.tipos.etiqueta || r.tipos.ticket)) {
+      alert('🖨️ Este equipo no tiene impresoras: lo que imprimas sale en ' + (r.nombre || 'la caja') + '.\n\n' +
+        'Hojas: ' + (r.tipos.hoja ? 'sí' : 'no') + ' · Etiquetas: ' + (r.tipos.etiqueta ? 'sí' : 'no') + ' · Tickets: ' + (r.tipos.ticket ? 'sí' : 'no') + '\n\n' +
+        'Tiene que estar prendida con la app abierta.');
+      return;
+    }
     alert('No encontré QZ Tray en esta PC.\n\n' +
       '1. Bajalo gratis de qz.io/download e instalalo.\n' +
       '2. Abrilo (queda como ícono al lado del reloj).\n' +
@@ -247,6 +271,12 @@ async function configurarImpresoras() {
     toast('🖨️ Hojas: ' + (hoja || 'diálogo') + ' · Etiquetas: ' + (etiqueta || 'diálogo') +
           ' · Tickets: ' + (ticket || 'diálogo'), 'success');
   }
+  if (hoja || etiqueta || ticket) {
+    // ¿Esta es la compu de la caja, la que imprime lo de los celus y las otras compus?
+    const serv = confirm('¿Esta compu imprime también lo que manden los OTROS equipos (celus, tablet, otras compus)?\n\n' +
+      'Aceptar = sí (tiene que quedar prendida con la app abierta) · Cancelar = no');
+    if (serv !== qzEsServidor() || serv) await qzServidorConfigurar(serv);
+  }
   if ((hoja || etiqueta || ticket) && confirm('¿Imprimo una prueba en cada impresora elegida?')) qzPrueba();
 }
 
@@ -276,7 +306,10 @@ async function qzPrueba() {
 
 function qzMenuSub() {
   const c = qzImpresoras();
-  return (c.hoja || c.etiqueta || c.ticket) ? 'Con QZ Tray, sin diálogo' : 'Imprimir sin el diálogo (QZ Tray)';
+  if (c.hoja || c.etiqueta || c.ticket) return qzEsServidor() ? 'Con QZ Tray · imprime también lo de los otros equipos' : 'Con QZ Tray, sin diálogo';
+  const r = _qzRemota();
+  if (r && r.tipos && (r.tipos.hoja || r.tipos.etiqueta || r.tipos.ticket)) return 'Sale en la impresora de ' + (r.nombre || 'la caja');
+  return 'Imprimir sin el diálogo (QZ Tray)';
 }
 
 // ¿Por qué QZ Tray pregunta "¿Permitir?"? Confía sin preguntar solo si la
@@ -324,3 +357,179 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined' && window.a
   window.addEventListener('load', () => setTimeout(qzPrecalentar, 1500));
 }
 
+
+// ══════════════════════════════════════════════════════════════
+//  Imprimir desde otro equipo (celu, tablet, otra compu)
+// ══════════════════════════════════════════════════════════════
+// Alan: "que desde otro equipo se imprima en el equipo que tiene programadas
+// las impresoras". Las impresoras (y QZ Tray) están en UNA compu, la de la
+// caja. Ahora esa compu puede quedar como "la que imprime lo de los demás":
+//
+//  · El otro equipo arma las IMÁGENES de lo que hay que imprimir (igual que
+//    para QZ, con su Chrome) y las deja en Firestore, en `cola_impresion`.
+//  · La compu de la caja, con la app abierta, escucha esa cola, las manda a
+//    su impresora por QZ Tray y borra el pedido.
+//
+// Se mandan imágenes y no el HTML a propósito: así la compu de la caja (que
+// suele tener la sesión del dueño) no ejecuta nada que venga de otro equipo,
+// solo imprime fotos.
+//
+// Si la compu de la caja está apagada, el pedido espera. Uno de más de 30
+// minutos no se imprime (sería un papel viejo saliendo de golpe a la mañana)
+// y se avisa.
+//
+// Cupo: un documento por impresión, que se borra al imprimir. La compu de la
+// caja escucha solo los pendientes; los demás leen la configuración una vez.
+const _QZ_SERV_KEY = 'qzServidor';
+const _QZ_REMOTA_KEY = 'qzRemota';
+const QZ_REMOTA_VENCE_MIN = 30;
+const QZ_REMOTA_MAX_BYTES = 700000;   // Firestore admite 1 MB por documento
+
+function qzEsServidor() { try { return localStorage.getItem(_QZ_SERV_KEY) === '1'; } catch { return false; } }
+
+// Lo que dijo la compu de la caja: { tipos: {hoja, etiqueta, ticket}, nombre }
+function _qzRemota() {
+  try { return JSON.parse(localStorage.getItem(_QZ_REMOTA_KEY) || 'null'); } catch { return null; }
+}
+function qzRemotaActiva(tipo) {
+  if (qzEsServidor()) return false;
+  const r = _qzRemota();
+  return !!(r && r.tipos && r.tipos[tipo]);
+}
+// Se lee una vez por apertura de la app (1 lectura) y queda guardada para
+// poder decidir en el momento del toque, sin esperar a Firestore.
+async function qzRemotaLeer() {
+  if (typeof db === 'undefined' || !db) return;
+  try {
+    const d = await db.collection('config').doc('impresoraRemota').get();
+    const v = d.exists ? d.data() : null;
+    localStorage.setItem(_QZ_REMOTA_KEY, JSON.stringify(v && v.activa ? { tipos: v.tipos || {}, nombre: v.nombre || 'la caja' } : null));
+  } catch (e) { /* sin permiso o sin conexión: se queda con lo último que supo */ }
+}
+
+// Parte las páginas en pedidos que entren en un documento
+function qzPartirPaginas(pngs, altos, max) {
+  const lim = max || QZ_REMOTA_MAX_BYTES;
+  const out = [];
+  let cur = { pngs: [], altos: [], bytes: 0 };
+  pngs.forEach((p, i) => {
+    if (p.length > lim) throw new Error('una página es demasiado grande para mandarla');
+    if (cur.pngs.length && cur.bytes + p.length > lim) { out.push(cur); cur = { pngs: [], altos: [], bytes: 0 }; }
+    cur.pngs.push(p); cur.altos.push(altos ? altos[i] : null); cur.bytes += p.length;
+  });
+  if (cur.pngs.length) out.push(cur);
+  return out;
+}
+
+// ── El equipo SIN impresora: manda el pedido ──
+async function qzMandarRemoto(tipo, html) {
+  const pag = _qzPagina(tipo);
+  if (!pag || typeof db === 'undefined' || !db) return false;
+  const r = _qzRemota() || {};
+  try {
+    const pngs = await _qzPaginasPng(html, pag.selector, pag.ancho, pag.alto, pag.dpi, pag.byn);
+    if (!pngs.length) throw new Error('no se armó ninguna página');
+    const partes = qzPartirPaginas(pngs, pngs.altos);
+    const de = (typeof getDeviceName === 'function' && getDeviceName()) || 'otro equipo';
+    const refs = [];
+    for (const parte of partes) {
+      refs.push(await db.collection('cola_impresion').add({
+        tipo, pag: Object.assign({}, pag), pngs: parte.pngs, altos: parte.altos,
+        de, estado: 'pendiente', creado: Date.now(),
+      }));
+    }
+    if (typeof toast === 'function') toast(`🖨️ Mandado a la impresora de ${r.nombre || 'la caja'}`, 'success');
+    _qzSeguirPedido(refs[0]);
+    return true;
+  } catch (e) {
+    console.error('impresión remota:', e);
+    if (typeof toast === 'function') toast('🖨️ No se pudo mandar a la caja (' + ((e && e.message) || e) + ') · sale el diálogo', 'error');
+    return false;
+  }
+}
+
+// Se mira el pedido un rato para avisar si salió o si falló
+function _qzSeguirPedido(ref) {
+  if (!ref || typeof ref.onSnapshot !== 'function') return;
+  let fin = null;
+  const corte = setTimeout(() => {
+    if (fin) fin();
+    if (typeof toast === 'function') toast('🖨️ La compu de la caja todavía no lo imprimió: ¿está prendida con la app abierta?', 'info');
+  }, 60000);
+  fin = ref.onSnapshot(d => {
+    if (!d.exists) { clearTimeout(corte); fin(); if (typeof toast === 'function') toast('✅ Impreso en la caja', 'success'); return; }
+    const j = d.data();
+    if (j.estado === 'error' || j.estado === 'vencido') {
+      clearTimeout(corte); fin();
+      if (typeof toast === 'function') toast('🖨️ La caja no pudo imprimirlo: ' + (j.error || j.estado), 'error');
+    }
+  }, () => clearTimeout(corte));
+}
+
+// ── La compu de la CAJA: imprime lo que llega ──
+let _qzServUnsub = null;
+let _qzServCola = Promise.resolve();
+function qzServidorIniciar() {
+  if (_qzServUnsub || !qzEsServidor() || typeof db === 'undefined' || !db) return;
+  _qzServUnsub = db.collection('cola_impresion').where('estado', '==', 'pendiente').onSnapshot(snap => {
+    snap.docChanges().forEach(ch => {
+      if (ch.type !== 'added') return;
+      const ref = ch.doc.ref;
+      _qzServCola = _qzServCola.then(() => qzServidorImprimir(ref)).catch(e => console.error('cola de impresión:', e));
+    });
+  }, e => { console.error('cola de impresión:', e); _qzServUnsub = null; });
+}
+async function qzServidorImprimir(ref) {
+  // Se lo "toma" en una transacción: si hubiera dos compus de caja, no sale dos veces
+  let job = null;
+  await db.runTransaction(async t => {
+    const d = await t.get(ref);
+    if (!d.exists || d.data().estado !== 'pendiente') return;
+    job = d.data();
+    const viejo = Date.now() - (Number(job.creado) || 0) > QZ_REMOTA_VENCE_MIN * 60e3;
+    t.update(ref, viejo ? { estado: 'vencido' } : { estado: 'imprimiendo' });
+    if (viejo) job = null;
+  });
+  if (!job) return;
+  const impresora = qzImpresoras()[job.tipo];
+  try {
+    if (!impresora) throw new Error('esta compu no tiene impresora para ' + job.tipo);
+    await _qzMandarPngs(impresora, job.tipo, job.pag, job.pngs, job.altos);
+    await ref.delete();
+  } catch (e) {
+    console.error('cola de impresión:', e);
+    await ref.update({ estado: 'error', error: String((e && e.message) || e).slice(0, 200) }).catch(() => {});
+  }
+}
+
+// Prender / apagar "esta compu imprime lo de los demás"
+async function qzServidorConfigurar(activar) {
+  const c = qzImpresoras();
+  const tipos = { hoja: !!c.hoja, etiqueta: !!c.etiqueta, ticket: !!c.ticket };
+  try { localStorage.setItem(_QZ_SERV_KEY, activar ? '1' : '0'); } catch {}
+  const nombre = (typeof getDeviceName === 'function' && getDeviceName()) || 'la caja';
+  try {
+    await db.collection('config').doc('impresoraRemota').set({ activa: !!activar, tipos, nombre, desde: new Date().toISOString() });
+  } catch (e) {
+    if (typeof toast === 'function') toast('No se pudo guardar (¿publicaste las reglas nuevas?)', 'error');
+    return;
+  }
+  if (activar) qzServidorIniciar();
+  else if (_qzServUnsub) { _qzServUnsub(); _qzServUnsub = null; }
+  if (typeof toast === 'function') toast(activar ? `🖨️ Listo: ${nombre} imprime lo que manden los otros equipos` : '🖨️ Esta compu ya no imprime lo de los demás', 'success');
+}
+
+// Al abrir la app: la caja empieza a escuchar; los demás averiguan si hay
+// una compu que imprima por ellos. Se espera a que haya sesión.
+function _qzRemotaArrancar(intentos) {
+  const u = (typeof _fbAuth === 'function') ? (() => { try { return _fbAuth().currentUser; } catch { return null; } })() : null;
+  if (!u || typeof db === 'undefined' || !db) {
+    if ((intentos || 0) < 30) setTimeout(() => _qzRemotaArrancar((intentos || 0) + 1), 2000);
+    return;
+  }
+  if (qzEsServidor()) qzServidorIniciar();
+  else qzRemotaLeer();
+}
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('load', () => setTimeout(() => _qzRemotaArrancar(0), 2500));
+}

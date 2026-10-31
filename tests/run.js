@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-impresion-remota.js': 'Imprimir desde otro equipo en la compu de la caja: manda imágenes, una sola vez, sin pedidos viejos',
   'test-pistola.js':        'Pistola lectora desde cualquier pantalla: reconoce el escaneo y abre la caja con el producto cargado',
   'test-factura-venta.js':  'Factura C en la caja: solo cobros digitales, consumidor final o CUIT, ticket con CAE y QR de ARCA, sin facturar',
   'test-arca-emitir.js':    'Factura C en ARCA: numeración sin huecos ni repetidos aunque se corte, rechazos, solo digitales, producción bloqueada',

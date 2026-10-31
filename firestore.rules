@@ -224,6 +224,13 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Cola de impresión (qz-print.js) ──
+    // Un equipo sin impresora deja acá las IMÁGENES de lo que hay que imprimir;
+    // la compu de la caja las imprime y borra el pedido. Solo cuentas del local.
+    match /cola_impresion/{doc} {
+      allow read, create, update, delete: if isAllowed();
+    }
+
     // ── Facturas de ARCA (api/factura.js) ──
     // Las escribe SOLO el servidor (con la cuenta de servicio, que no pasa por
     // estas reglas): una factura con CAE no se toca desde el navegador. La app
