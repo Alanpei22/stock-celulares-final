@@ -19,7 +19,15 @@ const DB = {};
 const docRef = (col, id) => ({
   id,
   get: async () => ({ exists: !!DB[col + '/' + id], data: () => DB[col + '/' + id] && JSON.parse(JSON.stringify(DB[col + '/' + id])) }),
-  set: async (v, o) => { DB[col + '/' + id] = (o && o.merge) ? Object.assign({}, DB[col + '/' + id] || {}, v) : Object.assign({}, v); },
+  set: async (v, o) => {
+    const prev = DB[col + '/' + id] || {};
+    if (v && v.meses) {   // config/facturacionTotales: increment por mes
+      const meses = Object.assign({}, prev.meses || {});
+      Object.keys(v.meses).forEach(k => { const x = v.meses[k]; meses[k] = (x && x.__inc != null) ? (meses[k] || 0) + x.__inc : x; });
+      DB[col + '/' + id] = Object.assign({}, prev, v, { meses }); return;
+    }
+    DB[col + '/' + id] = (o && o.merge) ? Object.assign({}, prev, v) : Object.assign({}, v);
+  },
 });
 const fakeDb = {
   collection: col => ({
@@ -33,20 +41,32 @@ const fakeDb = {
   }),
   runTransaction: async fn => fn({ get: r => r.get(), set: (r, v, o) => { r.set(v, o); } }),
 };
-globalThis.__fakeAdmin = { apps: [1], firestore: () => fakeDb };
+const _fs = () => fakeDb;
+_fs.FieldValue = { increment: n => ({ __inc: n }) };
+globalThis.__fakeAdmin = { apps: [1], firestore: _fs };
 
 // ── ARCA de mentira ──
-const ARCA = { ultimo: 0, comps: {}, cortar: null, robarNumero: false, rechazar: false, llamadas: [] };
+const ARCA = { ultimo: 0, comps: {}, cortar: null, robarNumero: false, rechazar: false, llamadas: [], nc: { ultimo: 0, comps: {}, ultimoBody: '' } };
 const tag = (x, t) => { const m = x.match(new RegExp(`<ar:${t}>([^<]*)</ar:${t}>`)); return m ? m[1] : null; };
 globalThis.fetch = async (url, o) => {
   const accion = String(o.headers.SOAPAction || '').split('/').pop();
   ARCA.llamadas.push(accion);
   const resp = body => ({ text: async () => `<soap:Envelope><soap:Body>${body}</soap:Body></soap:Envelope>` });
-  if (accion === 'FECompUltimoAutorizado') return resp(`<CbteNro>${ARCA.ultimo}</CbteNro>`);
+  if (accion === 'FECompUltimoAutorizado') return resp(`<CbteNro>${tag(o.body, 'CbteTipo') === '13' ? ARCA.nc.ultimo : ARCA.ultimo}</CbteNro>`);
   if (accion === 'FECompConsultar') {
     const n = Number(tag(o.body, 'CbteNro')), c = ARCA.comps[n];
     return resp(c ? `<ResultGet><CbteDesde>${n}</CbteDesde><CbteFch>20261028</CbteFch><ImpTotal>${c.importe}</ImpTotal><DocTipo>99</DocTipo><DocNro>0</DocNro><CodAutorizacion>${c.cae}</CodAutorizacion><FchVto>20261107</FchVto></ResultGet>`
       : `<Errors><Err><Code>602</Code><Msg>No existen datos en nuestros registros para los parametros ingresados.</Msg></Err></Errors>`);
+  }
+  if (accion === 'FECAESolicitar' && tag(o.body, 'CbteTipo') === '13') {
+    // Nota de Crédito C: su propia numeración
+    ARCA.nc.ultimoBody = o.body;
+    const n = Number(tag(o.body, 'CbteDesde'));
+    if (n !== ARCA.nc.ultimo + 1) return resp(`<Errors><Err><Code>10016</Code><Msg>numero</Msg></Err></Errors>`);
+    ARCA.nc.ultimo = n;
+    const cae = String(80000000000000 + n);
+    ARCA.nc.comps[n] = { importe: Number(tag(o.body, 'ImpTotal')), cae };
+    return resp(`<FeCabResp><Resultado>A</Resultado></FeCabResp><FeDetResp><FECAEDetResponse><CbteDesde>${n}</CbteDesde><Resultado>A</Resultado><CAE>${cae}</CAE><CAEFchVto>20261110</CAEFchVto></FECAEDetResponse></FeDetResp>`);
   }
   if (accion === 'FECAESolicitar') {
     if (ARCA.cortar === 'antes') { ARCA.cortar = null; throw new Error('timeout'); }
@@ -209,7 +229,45 @@ try {
   ok(/No se pudo conectar con ARCA \(servicios1\.afip\.gov\.ar\): ERR_SSL_DH_KEY_TOO_SMALL · dh key too small/.test(errMsg || ''), 'si no conecta, dice el servidor y el motivo', errMsg);
   arca._usarTransporte((url, o) => globalThis.fetch(url, o));
 
-  console.log('\n11) Producción, bloqueada');
+  console.log('\n11) Anular: Nota de Crédito C');
+  process.env.ARCA_ENTORNO = 'homologacion'; delete process.env.ARCA_EMITIR_PRODUCCION;
+  let x2 = fe.armarFECAE({ ptoVenta: 6, cbteTipo: 13, nro: 1, detalle: fe.normalizarDetalle({ importe: 10, concepto: 'ambos', fecha: '2026-10-31' }),
+    asociado: { tipo: 11, ptoVenta: 6, nro: 7, cuit: '20385199628', fecha: '20261029' } });
+  ok(/<ar:CbteTipo>13<\/ar:CbteTipo>/.test(x2) && /<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>11<\/ar:Tipo><ar:PtoVta>6<\/ar:PtoVta><ar:Nro>7<\/ar:Nro><ar:Cuit>20385199628<\/ar:Cuit><ar:CbteFch>20261029<\/ar:CbteFch><\/ar:CbteAsoc><\/ar:CbtesAsoc>/.test(x2),
+     'la NC dice qué factura anula (tipo, punto de venta, número, CUIT y fecha)');
+  ok(/<ar:CondicionIVAReceptorId>5<\/ar:CondicionIVAReceptorId><ar:CbtesAsoc>/.test(x2), 'en el orden del esquema (después de la condición de IVA)');
+  const fAnt = DB['facturas/v1'];   // la de la sección 2, en homologación... se rehace una limpia
+  DB['facturas/a1'] = { estado: 'emitida', entorno: 'homologacion', cbteTipo: 11, ptoVenta: 6, nro: 7, importe: 15000, movId: 'a1',
+    detalle: fe.normalizarDetalle({ importe: 15000, concepto: 'ambos', fecha: '2026-10-29' }), receptor: { docTipo: 99 } };
+  const nc = await arca.anularFactura({ id: 'a1' });
+  ok(nc.cbteTipo === 13 && nc.nro === 1 && /^8\d{13}$/.test(nc.cae), 'sale la NC con su propio número (la 1) y CAE', nc);
+  ok(ARCA.nc.comps[1].importe === 15000, 'por el mismo importe de la factura');
+  ok(/<ar:FchServDesde>20261029<\/ar:FchServDesde>/.test(ARCA.nc.ultimoBody), 'el servicio es el de la factura (no el de hoy)');
+  ok(DB['facturas/a1'].anulada && DB['facturas/a1'].anulada.nro === 1 && DB['facturas/nc_a1'].anulaA === 'a1', 'la factura queda marcada como anulada, y la NC sabe a cuál anula');
+  ARCA.llamadas = [];
+  const nc2 = await arca.anularFactura({ id: 'a1' });
+  ok(nc2.yaEstaba && !ARCA.llamadas.includes('FECAESolicitar'), 'anularla dos veces no hace dos notas de crédito');
+  let e2 = null;
+  try { await arca.anularFactura({ id: 'noexiste' }); } catch (e) { e2 = e.message; }
+  ok(/no tiene factura/.test(e2 || ''), 'una venta sin factura no se "anula"');
+  const facA = leer('api/factura.js');
+  ok(/action === 'anular'/.test(facA) && /Anular una factura es solo del dueño/.test(facA), 'anular es solo del dueño');
+
+  console.log('\n12) El total del mes (para el tope del monotributo)');
+  process.env.ARCA_ENTORNO = 'produccion'; process.env.ARCA_EMITIR_PRODUCCION = 'si';
+  delete DB['config/facturacionTotales'];
+  await arca.emitirFactura({ id: 't1', detalle: fe.normalizarDetalle({ importe: 10000, fecha: '2026-10-31' }) });
+  await arca.emitirFactura({ id: 't2', detalle: fe.normalizarDetalle({ importe: 5000, fecha: '2026-10-31' }) });
+  ok(DB['config/facturacionTotales'].meses['2026-10'] === 15000, 'cada factura real suma al mes', DB['config/facturacionTotales']);
+  await arca.anularFactura({ id: 't2' });
+  ok(DB['config/facturacionTotales'].meses['2026-10'] === 10000, 'la nota de crédito resta');
+  process.env.ARCA_ENTORNO = 'homologacion';
+  await arca.emitirFactura({ id: 't3', detalle: fe.normalizarDetalle({ importe: 999, fecha: '2026-10-31' }) });
+  ok(DB['config/facturacionTotales'].meses['2026-10'] === 10000, 'las de prueba no cuentan');
+  ok(/'facturacionTotales'\]\);/.test(leer('firestore.rules')), 'el total no se puede tocar desde la app (solo el servidor)');
+  delete process.env.ARCA_EMITIR_PRODUCCION;
+
+  console.log('\n13) Producción, bloqueada');
   process.env.ARCA_ENTORNO = 'produccion';
   err = null;
   try { await arca.emitirFactura({ id: 'p', detalle: det }); } catch (e) { err = e.message; }

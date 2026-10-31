@@ -129,9 +129,12 @@ service cloud.firestore {
     // Antes decía `write: if isAllowed()` a secas, y eso le devolvía al
     // empleado la escritura que sus bloques le niegan (el PIN de dueño, el
     // horario del chequeo). Por eso se excluyen a mano.
+    // facturacionTotales: el total facturado por mes, lo escribe SOLO el
+    // servidor al emitir (si se pudiera tocar desde la app, el control del
+    // tope del monotributo no serviría)
     match /config/{doc} {
       allow read: if isAllowed();
-      allow write: if isAllowed() && !(doc in ['owner', 'chequeoCaja', 'fichar', 'facturaEmisor']);
+      allow write: if isAllowed() && !(doc in ['owner', 'chequeoCaja', 'fichar', 'facturaEmisor', 'facturacionTotales']);
     }
 
     // ── config/facturaEmisor: los datos del local que salen en la factura ──

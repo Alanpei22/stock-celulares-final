@@ -112,7 +112,8 @@ ok(r === null && TOASTS.some(([k, t]) => k === 'error' && /10015/.test(t) && /si
 
 console.log('\n7) En la lista de la caja');
 let b = run('facturaBadge(_v)', { id: 'a', tipo: 'ingreso', monto: 1, metodoPago: 'Transferencia', factura: { estado: 'emitida', ptoVenta: 6, nro: 12, entorno: 'produccion' } });
-ok(/🧾 FC 00006-00000012/.test(b) && /reimprimirFactura/.test(b), 'facturada: el número, y tocás para reimprimir');
+// Desde el 31/10 el toque abre un menú (reimprimir / WhatsApp / anular)
+ok(/🧾 FC 00006-00000012/.test(b) && /menuFactura/.test(b), 'facturada: el número, y tocás para reimprimirla (o mandarla, o anularla)');
 b = run('facturaBadge(_v)', { id: 'a', tipo: 'ingreso', monto: 1, metodoPago: 'Transferencia' });
 ok(/sin facturar/.test(b) && /facturarDesdeLista/.test(b), 'sin facturar: tocás y factura');
 b = run('facturaBadge(_v)', { id: 'a', tipo: 'ingreso', monto: 1, metodoPago: 'Transferencia', factura: { estado: 'fallo', error: 'x' } });
@@ -120,6 +121,47 @@ ok(/falló la factura/.test(b), 'si falló, se ve');
 ok(run('facturaBadge(_v)', { id: 'a', tipo: 'ingreso', monto: 1, metodoPago: 'Efectivo' }) === '', 'efectivo: nada');
 const sf = run('ventasSinFacturar(_v)', [{ id: 1, tipo: 'ingreso', monto: 1, metodoPago: 'Transferencia' }, { id: 2, tipo: 'ingreso', monto: 1, metodoPago: 'Transferencia', factura: { estado: 'emitida' } }, { id: 3, tipo: 'ingreso', monto: 1, metodoPago: 'Efectivo' }]);
 ok(sf.length === 1 && sf[0].id === 1, '"Sin facturar": solo los digitales sin factura');
+
+console.log('\n7b) Anular: nota de crédito');
+STATUS = 200; ENVIADO = null; TOASTS.length = 0;
+ctx.confirm = () => true;
+ctx.tpEsDueno = () => true;
+const vendida = { id: 'v9', tipo: 'ingreso', monto: 15000, metodoPago: 'Transferencia', descripcion: 'Funda',
+  factura: { estado: 'emitida', entorno: 'produccion', ptoVenta: 6, nro: 1, cae: '86441029094101', caeVto: '2026-11-08', receptor: { docTipo: 99 }, qr: qrJson } };
+ctx.MOVIMIENTOS = [vendida]; vm.runInContext('MOVIMIENTOS = this.MOVIMIENTOS', ctx);
+run('menuFactura("v9")');
+const menu = BARRAS['fv-modal'].innerHTML;
+ok(/Reimprimir la factura/.test(menu) && /Mandarla por WhatsApp/.test(menu) && /Anular \(nota de crédito\)/.test(menu), 'tocando la factura: reimprimir, WhatsApp o anular');
+ctx.tpEsDueno = () => false;
+run('menuFactura("v9")');
+ok(!/Anular/.test(BARRAS['fv-modal'].innerHTML), 'un empleado no ve "Anular"');
+ctx.tpEsDueno = () => true;
+ok(run('ventaConFacturaViva(_v)', vendida) === true, 'una venta con factura real sin anular: "viva" (no se puede borrar)');
+RESP = { ok: true, notaCredito: { cbteTipo: 13, ptoVenta: 6, nro: 1, cae: '80000000000001', caeVto: '2026-11-10', entorno: 'produccion', qr: Object.assign({}, qrJson, { tipoCmp: 13 }) } };
+const nc = await run('anularFacturaVenta("v9")');
+ok(ENVIADO.action === 'anular' && ENVIADO.movId === 'v9' && nc && nc.nro === 1, 'pide la nota de crédito al servidor');
+ok(/Nota de Crédito C 00006-00000001/.test(BARRAS['fv-barra'].innerHTML) && /Imprimir/.test(BARRAS['fv-barra'].innerHTML), 'y pregunta si se la das (no se imprime sola)');
+ctx._f = Object.assign({ importe: 15000, receptor: { docTipo: 99 }, asociado: { ptoVenta: 6, nro: 1 } }, RESP.notaCredito);
+const hNC = run('ticketFacturaHtml(_v, _f, {})', vendida);
+ok(/NOTA DE CRÉDITO C/.test(hNC) && /Cód\. 013/.test(hNC) && /Anula la Factura C N° 00006-00000001/.test(hNC) && !/FACTURA C<\/div>/.test(hNC), 'el ticket dice NOTA DE CRÉDITO C (cód. 013) y qué factura anula');
+ctx.confirm = () => false; ENVIADO = null;
+await run('anularFacturaVenta("v9")');
+ok(ENVIADO === null, 'si no confirmás, no se anula nada');
+vendida.factura.anulada = { cbteTipo: 13, ptoVenta: 6, nro: 1, cae: '80000000000001' };
+ok(run('ventaConFacturaViva(_v)', vendida) === false, 'anulada: ya se puede borrar la venta');
+const bA = run('facturaBadge(_v)', vendida);
+ok(/anulada/.test(bA) && /line-through/.test(bA), 'en la lista se ve tachada: "anulada"');
+run('menuFactura("v9")');
+ok(/Reimprimir la nota de crédito/.test(BARRAS['fv-modal'].innerHTML) && !/❌ Anular/.test(BARRAS['fv-modal'].innerHTML), 'anulada: se puede reimprimir la NC, y no se anula dos veces');
+ok(run('ventaConFacturaViva(_v)', { factura: { estado: 'emitida', entorno: 'homologacion' } }) === false, 'una de prueba no traba nada');
+const cjB = leer('caja.js');
+ok(/ventaConFacturaViva\(movFact\)/.test(cjB) && /Primero anulala/.test(cjB), 'la caja no deja borrar una venta con factura real sin anular');
+
+console.log('\n7c) Facturado y tope');
+const rs = run('fvResumenFacturado(_v, "2026-10", 10000000)', { meses: { '2026-10': 1500000, '2026-09': 1000000, '2025-11': 500000, '2025-10': 999999 } });
+ok(rs.mes === 1500000 && rs.anterior === 1000000 && rs.anio === 3000000 && rs.pct === 30, 'este mes, el anterior, los últimos 12 (no el de hace 13) y el %', rs);
+ok(run('fvResumenFacturado(_v, "2026-10", 0)', { meses: {} }).pct === null, 'sin tope cargado: no inventa un porcentaje');
+ok(/abrirFacturado\(\)/.test(cjB) && /'Facturado y tope'/.test(cjB), 'en el menú de la caja (Facturación y tarjetas)');
 
 console.log('\n8) Enganchado');
 const cj = leer('caja.js');
@@ -129,7 +171,7 @@ ok(/<script src="factura-venta\.js"><\/script>/.test(leer('caja.html')), 'caja.h
 const fac = leer('api/factura.js');
 ok(/factura: \{\s*estado: 'emitida'/.test(fac) && /estado: 'fallo'/.test(fac), 'el servidor deja marcada la venta (facturada o falló)');
 const rules = leer('firestore.rules');
-ok(/match \/config\/facturaEmisor \{\s*allow write: if esDueno\(\);/.test(rules) && /'fichar', 'facturaEmisor'\]/.test(rules), 'los datos del local en la factura los cambia solo el dueño');
+ok(/match \/config\/facturaEmisor \{\s*allow write: if esDueno\(\);/.test(rules) && /'fichar', 'facturaEmisor'/.test(rules), 'los datos del local en la factura los cambia solo el dueño');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

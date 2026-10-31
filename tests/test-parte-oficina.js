@@ -37,6 +37,14 @@ pc = ctx.armar({ ahora: AHORA, certVto: new Date(AHORA - 864e5).toISOString() })
 ok(/VENCIÓ/.test(pc.arca[0]), 'vencido: lo dice bien claro');
 ok(/<b>🧾 Facturación \(ARCA\)<\/b>/.test(ctx.texto(pc, '2026-10-27')), 'y sale primero en el Telegram');
 
+pc = ctx.armar({ ahora: AHORA, facturado: { anio: 8500000, tope: 10000000 } });
+ok(/facturaste \$8\.500\.000: el 85% del tope de tu categoría \(\$10\.000\.000\)/.test(pc.arca[0] || ''), 'facturado al 85% del tope de la categoría: avisa', pc.arca);
+ok(!ctx.armar({ ahora: AHORA, facturado: { anio: 5000000, tope: 10000000 } }).arca.length, 'al 50%: nada');
+ok(!ctx.armar({ ahora: AHORA, facturado: { anio: 5000000, tope: 0 } }).arca.length, 'sin tope cargado: nada');
+vm.runInContext('this.u12 = ultimos12;', ctx);
+const u = ctx.u12('2026-02');
+ok(u.length === 12 && u[0] === '2026-02' && u[1] === '2026-01' && u[2] === '2025-12' && u[11] === '2025-03', 'los últimos 12 meses cruzan bien el año', u);
+
 console.log('\n2) El mensaje');
 let t = ctx.texto(p, '2026-10-27');
 ok(/✅ <b>Para hacer hoy — 27\/10\/2026<\/b>/.test(t) && /<b>💵 Caja<\/b>/.test(t) && /<b>📱 Para retirar<\/b>/.test(t), 'título y temas');

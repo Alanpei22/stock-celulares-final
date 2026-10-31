@@ -11,6 +11,9 @@
 'use strict';
 
 export const CBTE_FACTURA_C = 11;
+// Nota de Crédito C: anula (total o parcialmente) una Factura C. Lleva su
+// propia numeración y tiene que decir a qué factura anula (CbtesAsoc).
+export const CBTE_NC_C = 13;
 
 // Concepto: 1 productos · 2 servicios · 3 productos y servicios.
 // Una reparación es servicio (y casi siempre lleva repuesto): 3. Con 2 o 3
@@ -57,9 +60,11 @@ export function normalizarDetalle(d) {
 
 // El pedido de CAE para UN comprobante (FECAESolicitar). El orden de los
 // campos importa: es el del esquema de ARCA.
-export function armarFECAE({ ptoVenta, cbteTipo = CBTE_FACTURA_C, nro, detalle }) {
+export function armarFECAE({ ptoVenta, cbteTipo = CBTE_FACTURA_C, nro, detalle, asociado = null }) {
   const d = detalle;
   const servicio = d.concepto === CONCEPTOS.servicios || d.concepto === CONCEPTOS.ambos;
+  // En una nota de crédito, el servicio es el de la factura que anula
+  const fServ = d.servFecha || d.fecha;
   return `<ar:FeCAEReq>`
     + `<ar:FeCabReq><ar:CantReg>1</ar:CantReg><ar:PtoVta>${Number(ptoVenta)}</ar:PtoVta><ar:CbteTipo>${Number(cbteTipo)}</ar:CbteTipo></ar:FeCabReq>`
     + `<ar:FeDetReq><ar:FECAEDetRequest>`
@@ -71,9 +76,11 @@ export function armarFECAE({ ptoVenta, cbteTipo = CBTE_FACTURA_C, nro, detalle }
     + `<ar:ImpTotal>${_num(d.importe)}</ar:ImpTotal><ar:ImpTotConc>0.00</ar:ImpTotConc>`
     + `<ar:ImpNeto>${_num(d.importe)}</ar:ImpNeto><ar:ImpOpEx>0.00</ar:ImpOpEx>`
     + `<ar:ImpTrib>0.00</ar:ImpTrib><ar:ImpIVA>0.00</ar:ImpIVA>`
-    + (servicio ? `<ar:FchServDesde>${d.fecha}</ar:FchServDesde><ar:FchServHasta>${d.fecha}</ar:FchServHasta><ar:FchVtoPago>${d.fecha}</ar:FchVtoPago>` : '')
+    + (servicio ? `<ar:FchServDesde>${fServ}</ar:FchServDesde><ar:FchServHasta>${fServ}</ar:FchServHasta><ar:FchVtoPago>${d.fecha}</ar:FchVtoPago>` : '')
     + `<ar:MonId>PES</ar:MonId><ar:MonCotiz>1</ar:MonCotiz>`
     + `<ar:CondicionIVAReceptorId>${d.condIva}</ar:CondicionIVAReceptorId>`
+    + (asociado ? `<ar:CbtesAsoc><ar:CbteAsoc><ar:Tipo>${Number(asociado.tipo)}</ar:Tipo><ar:PtoVta>${Number(asociado.ptoVenta)}</ar:PtoVta>`
+      + `<ar:Nro>${Number(asociado.nro)}</ar:Nro><ar:Cuit>${String(asociado.cuit).replace(/\D/g, '')}</ar:Cuit><ar:CbteFch>${asociado.fecha}</ar:CbteFch></ar:CbteAsoc></ar:CbtesAsoc>` : '')
     + `</ar:FECAEDetRequest></ar:FeDetReq></ar:FeCAEReq>`;
 }
 

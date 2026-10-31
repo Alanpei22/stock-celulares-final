@@ -16,7 +16,7 @@
 // El detalle técnico y el plan completo: tools/factura-arca.md
 
 import { exigirSesion, verificarSesion, esDuenoUid } from './_auth.js';
-import { arcaConfig, arcaFaltantes, dummy, obtenerTA, ultimoAutorizado, consultarCbte, emitirFactura, arcaDb, armarCSR, certVence, emiteEnProduccion } from './_arca.js';
+import { arcaConfig, arcaFaltantes, dummy, obtenerTA, ultimoAutorizado, consultarCbte, emitirFactura, arcaDb, armarCSR, certVence, emiteEnProduccion, anularFactura, recalcularMes } from './_arca.js';
 import { normalizarDetalle } from './_arca-fe.js';
 
 // Los métodos de pago que NO se facturan (decidido el 19/08/2026: solo los
@@ -129,6 +129,30 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, factura: f, ms: ms() });
     }
 
+    // ── Anular la factura de una venta: Nota de Crédito C (solo el dueño) ──
+    // Es definitivo ante ARCA: por eso no lo puede hacer un empleado.
+    if (action === 'anular') {
+      const s = await verificarSesion(req);
+      if (!s.ok || !esDuenoUid(s.uid)) return res.status(403).json({ error: 'Anular una factura es solo del dueño' });
+      const { movId } = req.body || {};
+      if (!movId || typeof movId !== 'string') return res.status(400).json({ error: 'Falta la venta (movId)' });
+      const nc = await anularFactura({ id: movId });
+      // En la venta, para que la caja muestre "anulada" y deje reimprimir la NC
+      await arcaDb().collection('caja_movimientos').doc(movId).set({ factura: { anulada: {
+        cbteTipo: nc.cbteTipo, ptoVenta: nc.ptoVenta, nro: nc.nro, cae: nc.cae, caeVto: nc.caeVto, qr: nc.qr, entorno: nc.entorno || cfg.entorno,
+      } } }, { merge: true }).catch(() => {});
+      return res.status(200).json({ ok: true, notaCredito: nc, ms: ms() });
+    }
+
+    // ── Recalcular el total facturado de un mes (solo el dueño) ──
+    if (action === 'recalcular') {
+      const s = await verificarSesion(req);
+      if (!s.ok || !esDuenoUid(s.uid)) return res.status(403).json({ error: 'Solo el dueño' });
+      const ym = String((req.body || {}).mes || new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 7));
+      if (!/^\d{4}-\d{2}$/.test(ym)) return res.status(400).json({ error: 'Mes inválido (AAAA-MM)' });
+      return res.status(200).json(Object.assign({ ok: true }, await recalcularMes(ym), { ms: ms() }));
+    }
+
     // ── El pedido de certificado de PRODUCCIÓN (solo el dueño) ──
     // Se arma con la clave que ya está en Vercel: la clave no sale de ahí y
     // lo que se devuelve (el CSR) es público. Se pega en ARCA → Administración
@@ -151,7 +175,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({
       error: 'action desconocida',
-      disponibles: ['config', 'dummy', 'token', 'ultimo', 'emitir', 'prueba', 'consultar', 'csr'],
+      disponibles: ['config', 'dummy', 'token', 'ultimo', 'emitir', 'prueba', 'consultar', 'csr', 'anular', 'recalcular'],
     });
   } catch (e) {
     console.error('factura:', e);

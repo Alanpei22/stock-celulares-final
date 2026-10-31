@@ -1069,6 +1069,7 @@ function toggleCajaMenu() {
     // con un cobro digital" (y el menú tiene un tope de opciones, test-menus)
     sheetGrupo(toggleCajaMenu, 'Facturación y tarjetas', '🧾', 'Facturación y tarjetas', 'Facturas de ARCA y comisión de Getnet', [
       { icon: '🧾', label: 'Sin facturar', sub: 'Cobros digitales que todavía no tienen factura', onClick: () => (typeof abrirSinFacturar === 'function') && abrirSinFacturar() },
+      { icon: '📊', label: 'Facturado y tope', sub: 'Cuánto facturaste y cuánto te falta para el tope del monotributo', hide: !isOwner, onClick: () => (typeof abrirFacturado === 'function') && abrirFacturado() },
       { icon: '🏪', label: 'Datos del local en la factura', sub: 'Ingresos Brutos, inicio de actividades, domicilio', hide: !isOwner, onClick: () => (typeof editarDatosFactura === 'function') && editarDatosFactura() },
       { icon: '💳', label: 'Comisión de tarjetas (Getnet)', sub: (() => { const c = (typeof tarjetaCfg === 'function') ? tarjetaCfg() : {}; return (c.debito || c.credito) ? `Débito ${c.debito}% · Crédito ${c.credito}%` : 'Cuánto te descuenta Getnet de cada cobro'; })(),
         hide: !isOwner, onClick: configurarComisionTarjetas },
@@ -4263,6 +4264,14 @@ function deleteMov() {
   // Empleado con permiso de borrar (👥 Empleados → 🔐): confirma y listo, sin
   // PIN de dueño. Sin permiso, se le dice por qué. El dueño, con su PIN.
   if (typeof tpEsEmpleado === 'function' && tpEsEmpleado() && typeof tpFrenar === 'function' && tpFrenar('borrar', 'borrar movimientos')) return;
+  // Una venta con factura real (con CAE) no se borra así nomás: la venta
+  // desaparecería de la app pero la factura seguiría existiendo en ARCA y
+  // contando para el monotributo. Primero se anula con nota de crédito.
+  const movFact = (typeof MOVIMIENTOS !== 'undefined' ? MOVIMIENTOS : []).find(m => m.id === id);
+  if (typeof ventaConFacturaViva === 'function' && ventaConFacturaViva(movFact)) {
+    alert('Esta venta tiene la Factura C hecha en ARCA.\n\nPrimero anulala: tocá "🧾 FC …" en la lista → "❌ Anular (nota de crédito)". Después la podés borrar.');
+    return;
+  }
   const pedir = (typeof tpEmpleadoPuede === 'function' && tpEmpleadoPuede('borrar'))
     ? (cb => { if (confirm('¿Borrar este movimiento de la caja?')) cb(); })
     : requireCajaOwnerPin;

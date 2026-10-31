@@ -24,7 +24,7 @@
 import forge from 'node-forge';
 import https from 'node:https';
 import admin from 'firebase-admin';
-import { CBTE_FACTURA_C, armarFECAE, leerFECAE, esNumeroOcupado, leerConsulta, datosQR } from './_arca-fe.js';
+import { CBTE_FACTURA_C, CBTE_NC_C, armarFECAE, leerFECAE, esNumeroOcupado, leerConsulta, datosQR, fechaArca } from './_arca-fe.js';
 
 // Endpoints verificados el 19/08/2026 pidiendo el WSDL de cada uno.
 // OJO: `wsfev1homo.afip.gov.ar` NO existe, aunque circule en tutoriales.
@@ -381,7 +381,7 @@ export function emiteEnProduccion() {
   return v === 'si';
 }
 
-export async function emitirFactura({ id, detalle, extra = {} }) {
+export async function emitirFactura({ id, detalle, extra = {}, cbteTipo = CBTE_FACTURA_C, asociado = null }) {
   const cfg = arcaConfig();
   if (cfg.entorno === 'produccion' && !emiteEnProduccion()) {
     throw new Error('Facturar en producción todavía no está habilitado: en Vercel falta ARCA_EMITIR_PRODUCCION = si (y después Redeploy).');
@@ -401,7 +401,7 @@ export async function emitirFactura({ id, detalle, extra = {} }) {
     if (d && d.estado === 'emitida' && (d.entorno || 'homologacion') === cfg.entorno) return { listo: d };
     if (d && d.estado === 'emitiendo' && d.entorno === cfg.entorno && Date.now() - Date.parse(d.desde || 0) < 60e3) return { ocupado: true };
     tx.set(ref, {
-      estado: 'emitiendo', desde: ahora(), entorno: cfg.entorno, ptoVenta: pv, cbteTipo: CBTE_FACTURA_C,
+      estado: 'emitiendo', desde: ahora(), entorno: cfg.entorno, ptoVenta: pv, cbteTipo,
       importe: detalle.importe, detalle, ...extra, nro: (d && d.estado === 'emitiendo' && d.entorno === cfg.entorno && d.nro) || null,
       cae: null, caeVto: null,
     }, { merge: true });
@@ -413,33 +413,35 @@ export async function emitirFactura({ id, detalle, extra = {} }) {
   const guardar = async (r, nro) => {
     const f = {
       estado: 'emitida', nro, cae: r.cae, caeVto: r.caeVto, emitidaEn: ahora(), rechazo: null,
-      qr: datosQR({ cuit: cfg.cuit, ptoVenta: pv, nro, cae: r.cae, detalle }),
+      qr: datosQR({ cuit: cfg.cuit, ptoVenta: pv, cbteTipo, nro, cae: r.cae, detalle }),
+      asociado: asociado || null,
     };
     await ref.set(f, { merge: true });
-    return Object.assign({ entorno: cfg.entorno, ptoVenta: pv, cbteTipo: CBTE_FACTURA_C, importe: detalle.importe }, f);
+    await _sumarAlMes(cfg.entorno, detalle, cbteTipo === CBTE_NC_C ? -1 : 1);
+    return Object.assign({ entorno: cfg.entorno, ptoVenta: pv, cbteTipo, importe: detalle.importe }, f);
   };
 
   // 2) Quedó a medias: ¿ARCA la había emitido?
   if (previo.pendiente && previo.pendiente.nro) {
     const nro = previo.pendiente.nro;
-    const c = await consultarCbte({ ptoVenta: pv, nro });
+    const c = await consultarCbte({ ptoVenta: pv, cbteTipo, nro });
     if (c && Math.abs(c.importe - detalle.importe) < 0.01 && c.docNro === detalle.docNro) {
       // Ojo: dos ventas del mismo importe a la vez podrían tener el mismo
       // número anotado. Si otra venta ya lo tiene como suyo, no es nuestro.
       const otra = await db.collection('facturas').where('ptoVenta', '==', pv).where('nro', '==', nro).where('estado', '==', 'emitida').get();
-      if (!otra.docs.some(x => x.id !== String(id))) return guardar(c, nro);
+      if (!otra.docs.some(x => x.id !== String(id) && (x.data().cbteTipo || CBTE_FACTURA_C) === cbteTipo)) return guardar(c, nro);
     }
   }
 
   // 3) Número nuevo y CAE. Hasta 3 vueltas si otra venta ganó el número.
   const ta = await obtenerTA();
   for (let vuelta = 0; vuelta < 3; vuelta++) {
-    const { proximo } = await ultimoAutorizado({ ptoVenta: pv });
+    const { proximo } = await ultimoAutorizado({ ptoVenta: pv, cbteTipo });
     // Se anota ANTES de pedir: si se corta, el reintento sabe qué consultar
     await ref.set({ nro: proximo, desde: ahora() }, { merge: true });
     let xml;
     try {
-      xml = await _llamarWsfe('FECAESolicitar', _authXml({ ...ta, cuit: cfg.cuit }) + armarFECAE({ ptoVenta: pv, nro: proximo, detalle }));
+      xml = await _llamarWsfe('FECAESolicitar', _authXml({ ...ta, cuit: cfg.cuit }) + armarFECAE({ ptoVenta: pv, cbteTipo, nro: proximo, detalle, asociado }));
     } catch (e) {
       // No se sabe si ARCA la emitió: queda 'emitiendo' con el número y el
       // próximo intento pregunta antes de repetir
@@ -491,4 +493,69 @@ export async function _probarHost(url) {
   const u = new URL(url);
   if (!_esServidorArca(u)) throw new Error('Solo se habla con servidores de ARCA: ' + u.hostname);
   return true;
+}
+
+// ══════════════════════════════════════════
+//  Anular una factura: Nota de Crédito C
+// ══════════════════════════════════════════
+// Una Factura C con CAE no se borra: ante ARCA se anula con una Nota de
+// Crédito C por el mismo importe que dice a qué factura anula. Usa el mismo
+// motor que las facturas (numeración a prueba de cortes), con su propio doc
+// en `facturas`: nc_<venta>. La factura queda marcada con `anulada`.
+export async function anularFactura({ id }) {
+  const cfg = arcaConfig();
+  const db = _db();
+  const fRef = db.collection('facturas').doc(String(id));
+  const snap = await fRef.get();
+  if (!snap.exists) throw new Error('Esa venta no tiene factura');
+  const f = snap.data();
+  if (f.estado !== 'emitida' || (f.entorno || 'homologacion') !== cfg.entorno) throw new Error('Esa venta no tiene una factura emitida para anular');
+  if ((f.cbteTipo || CBTE_FACTURA_C) !== CBTE_FACTURA_C) throw new Error('Solo se anulan facturas');
+  if (f.anulada && f.anulada.cae) return Object.assign({ yaEstaba: true }, f.anulada);
+  const detalle = Object.assign({}, f.detalle, { fecha: fechaArca(new Date()), servFecha: f.detalle.fecha });
+  const asociado = { tipo: CBTE_FACTURA_C, ptoVenta: f.ptoVenta, nro: f.nro, cuit: cfg.cuit, fecha: f.detalle.fecha };
+  const nc = await emitirFactura({
+    id: 'nc_' + id, detalle, cbteTipo: CBTE_NC_C, asociado,
+    extra: { anulaA: String(id), movId: f.movId || null, receptor: f.receptor || null, descripcion: f.descripcion || '' },
+  });
+  const anulada = { cbteTipo: CBTE_NC_C, ptoVenta: nc.ptoVenta, nro: nc.nro, cae: nc.cae, caeVto: nc.caeVto, qr: nc.qr, emitidaEn: nc.emitidaEn || new Date().toISOString(), entorno: nc.entorno };
+  await fRef.set({ anulada }, { merge: true });
+  return Object.assign({}, nc, { asociado });
+}
+
+// ══════════════════════════════════════════
+//  Cuánto se facturó por mes (para el tope del monotributo)
+// ══════════════════════════════════════════
+// Un solo documento con el total de cada mes (config/facturacionTotales):
+// leerlo cuesta 1 lectura, en vez de sumar cientos de facturas. Cada factura
+// suma, cada nota de crédito resta. Solo producción: las de prueba no cuentan.
+export function mesDe(detalle) {
+  const f = String((detalle && detalle.fecha) || '');
+  return /^\d{8}$/.test(f) ? f.slice(0, 4) + '-' + f.slice(4, 6) : new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 7);
+}
+async function _sumarAlMes(entorno, detalle, signo) {
+  if (entorno !== 'produccion') return;
+  try {
+    const FV = admin.firestore && admin.firestore.FieldValue;
+    const monto = signo * (Number(detalle.importe) || 0);
+    if (!FV || !monto) return;
+    await _db().collection('config').doc('facturacionTotales').set({ meses: { [mesDe(detalle)]: FV.increment(monto) } }, { merge: true });
+  } catch (e) { console.warn('[arca] no se pudo sumar al total del mes:', e.message); }
+}
+
+// Recalcula un mes desde las facturas (para las que se hicieron antes de que
+// existiera el total, o si alguna vez queda desfasado)
+export async function recalcularMes(ym) {
+  const db = _db();
+  const desde = ym + '-01T03:00:00.000Z';
+  const snap = await db.collection('facturas').where('emitidaEn', '>=', desde).get();
+  let total = 0, cant = 0;
+  snap.docs.forEach(d => {
+    const f = d.data();
+    if (f.estado !== 'emitida' || f.entorno !== 'produccion' || mesDe(f.detalle) !== ym) return;
+    total += ((f.cbteTipo || CBTE_FACTURA_C) === CBTE_NC_C ? -1 : 1) * (Number(f.importe) || 0);
+    cant++;
+  });
+  await db.collection('config').doc('facturacionTotales').set({ meses: { [ym]: Math.round(total * 100) / 100 } }, { merge: true });
+  return { mes: ym, total, comprobantes: cant };
 }

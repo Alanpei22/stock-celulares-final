@@ -75,6 +75,7 @@ async function _fvCargarEmisor() {
 // ── El ticket de la factura (58mm) ──
 function ticketFacturaHtml(mov, f, emisor) {
   const e = Object.assign({}, FV_EMISOR_DEF, emisor || {});
+  const esNC = Number(f.cbteTipo) === 13;   // Nota de Crédito C (anula una factura)
   const rec = f.receptor || {};
   const renglones = (typeof _cvRenglones === 'function') ? _cvRenglones(mov) : [{ nombre: mov.descripcion || 'Venta', qty: 1, unit: Number(mov.monto) || 0, total: Number(mov.monto) || 0 }];
   const total = Number(f.importe != null ? f.importe : mov.monto) || 0;
@@ -89,7 +90,7 @@ function ticketFacturaHtml(mov, f, emisor) {
     : `<div>A: <b>${_fvEsc(rec.nombre || '')}</b></div>
        <div>${Number(rec.docTipo) === 80 ? 'CUIT' : Number(rec.docTipo) === 96 ? 'DNI' : 'Doc.'}: ${_fvEsc(rec.docNro)}</div>
        <div>${_fvEsc(FV_COND[rec.condIva] || '')}</div>`;
-  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Factura C ${_fvNro(f.ptoVenta, f.nro)}</title>
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>${esNC ? 'Nota de Crédito C' : 'Factura C'} ${_fvNro(f.ptoVenta, f.nro)}</title>
 <style>
 @page{size:58mm 260mm;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -124,9 +125,10 @@ body{font-family:Arial,sans-serif;color:#000;background:#fff;width:58mm;padding:
   ${e.inicio ? `<div class="c sm">Inicio de actividades: ${_fvEsc(e.inicio)}</div>` : ''}
   <div class="c sm">Responsable Monotributo</div>
   <div class="sep"></div>
-  <div class="c tipo">FACTURA C</div>
-  <div class="c sm">Cód. 011</div>
+  <div class="c tipo">${esNC ? 'NOTA DE CRÉDITO C' : 'FACTURA C'}</div>
+  <div class="c sm">Cód. ${esNC ? '013' : '011'}</div>
   <div class="c">N° ${_fvNro(f.ptoVenta, f.nro)}</div>
+  ${esNC && f.asociado ? `<div class="c sm">Anula la Factura C N° ${_fvNro(f.asociado.ptoVenta, f.asociado.nro)}</div>` : ''}
   <div class="c sm">Fecha: ${_fvEsc(fecha)}</div>
   <div class="sep"></div>
   <div class="sm">${cliente}</div>
@@ -200,7 +202,7 @@ function ofrecerTicketFactura(mov, f) {
   b.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:950;' +
     'display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;border-radius:14px;' +
     'background:var(--card,#fff);border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,.18);max-width:560px;margin:0 auto';
-  b.innerHTML = `<b style="flex:1 1 100%;font-size:15px">✅ Factura C ${_fvNro(f.ptoVenta, f.nro)}${f.entorno !== 'produccion' ? ' (PRUEBA)' : ''} hecha. ¿Se la das?</b>
+  b.innerHTML = `<b style="flex:1 1 100%;font-size:15px">✅ ${Number(f.cbteTipo) === 13 ? 'Nota de Crédito C' : 'Factura C'} ${_fvNro(f.ptoVenta, f.nro)}${f.entorno !== 'produccion' ? ' (PRUEBA)' : ''} hecha. ¿Se la das?</b>
     <button class="btn-primary" style="flex:1" id="fv-imp">🖨️ Imprimir</button>
     <button class="btn-secondary" style="flex:1" id="fv-wa">🟢 WhatsApp</button>
     <button class="btn-secondary" id="fv-listo">No, listo</button>`;
@@ -218,7 +220,8 @@ function textoFacturaWa(mov, f) {
   const qrUrl = 'https://www.afip.gob.ar/fe/qr/?p=' + btoa(JSON.stringify(f.qr || {}));
   const fecha = (f.qr && f.qr.fecha) ? f.qr.fecha.split('-').reverse().join('/') : '';
   return [
-    `*${biz}* — Factura C N° ${_fvNro(f.ptoVenta, f.nro)}`,
+    `*${biz}* — ${Number(f.cbteTipo) === 13 ? 'Nota de Crédito C' : 'Factura C'} N° ${_fvNro(f.ptoVenta, f.nro)}`,
+    Number(f.cbteTipo) === 13 && f.asociado ? `Anula la Factura C N° ${_fvNro(f.asociado.ptoVenta, f.asociado.nro)}` : '',
     fecha ? 'Fecha: ' + fecha : '',
     `Total: *${_fvPlata(f.importe != null ? f.importe : mov.monto)}*`,
     `CAE: ${f.cae} (vence ${String(f.caeVto || '').split('-').reverse().join('/')})`,
@@ -314,7 +317,8 @@ function facturaBadge(m) {
   if (!ventaFacturable(m)) return '';
   const f = m.factura;
   if (f && f.estado === 'emitida') {
-    return `<span class="mov-metodo-badge metodo-otro" style="cursor:pointer" title="Reimprimir la factura" onclick="event.stopPropagation();reimprimirFactura('${_fvEsc(m.id)}')">🧾 FC ${_fvNro(f.ptoVenta, f.nro)}${f.entorno && f.entorno !== 'produccion' ? ' · prueba' : ''}</span>`;
+    const anul = f.anulada && f.anulada.cae;
+    return `<span class="mov-metodo-badge metodo-otro" style="cursor:pointer;${anul ? 'text-decoration:line-through;opacity:.75' : ''}" title="${anul ? 'Anulada con nota de crédito' : 'Reimprimir, mandar o anular'}" onclick="event.stopPropagation();menuFactura('${_fvEsc(m.id)}')">🧾 FC ${_fvNro(f.ptoVenta, f.nro)}${f.entorno && f.entorno !== 'produccion' ? ' · prueba' : ''}${anul ? ' · anulada' : ''}</span>`;
   }
   const fallo = f && f.estado === 'fallo';
   return `<span class="mov-metodo-badge metodo-otro" style="cursor:pointer;${fallo ? 'color:#dc2626' : ''}" title="${_fvEsc(fallo ? 'Falló: ' + (f.error || '') : 'Tocá para facturar')}" onclick="event.stopPropagation();facturarDesdeLista('${_fvEsc(m.id)}')">${fallo ? '⚠️ falló la factura' : '🧾 sin facturar'}</span>`;
@@ -332,6 +336,83 @@ async function reimprimirFactura(movId) {
   const mov = _fvMov(movId);
   if (!mov || !mov.factura) return;
   await imprimirFactura(mov, Object.assign({ importe: mov.monto }, mov.factura));
+}
+async function reimprimirNotaCredito(movId) {
+  const mov = _fvMov(movId);
+  const f = mov && mov.factura;
+  if (!f || !f.anulada) return;
+  await imprimirFactura(mov, Object.assign({ importe: mov.monto, receptor: f.receptor, asociado: { ptoVenta: f.ptoVenta, nro: f.nro } }, f.anulada));
+}
+function whatsappFacturaDe(movId) {
+  const mov = _fvMov(movId);
+  if (mov && mov.factura) whatsappFactura(mov, Object.assign({ importe: mov.monto }, mov.factura));
+}
+
+// ── Tocar la factura en la lista: qué hacer con ella ──
+function _fvCerrarModal() { const x = document.getElementById('fv-modal'); if (x) x.remove(); }
+function menuFactura(movId) {
+  const mov = _fvMov(movId);
+  const f = mov && mov.factura;
+  if (!f || f.estado !== 'emitida') return;
+  const anul = f.anulada && f.anulada.cae;
+  const dueno = typeof tpEsDueno !== 'function' || tpEsDueno();
+  _fvCerrarModal();
+  const m = document.createElement('div');
+  m.id = 'fv-modal';
+  m.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  const id = _fvEsc(movId);
+  const btn = (txt, fn, rojo) => `<button class="btn-secondary" style="width:100%;margin-top:8px${rojo ? ';color:#dc2626' : ''}" onclick="_fvCerrarModal();${fn}('${id}')">${txt}</button>`;
+  m.innerHTML = `<div style="background:var(--card,#fff);color:var(--text,#111);border-radius:14px;padding:16px;width:100%;max-width:360px">
+    <b style="font-size:16px">🧾 Factura C ${_fvNro(f.ptoVenta, f.nro)}</b>
+    <div style="font-size:13px;opacity:.8;margin-top:4px">${_fvPlata(mov.monto)} · CAE ${_fvEsc(f.cae || '')}${anul ? `<br><b style="color:#dc2626">Anulada con la Nota de Crédito C ${_fvNro(f.anulada.ptoVenta, f.anulada.nro)}</b>` : ''}</div>
+    ${btn('🖨️ Reimprimir la factura', 'reimprimirFactura')}
+    ${btn('🟢 Mandarla por WhatsApp', 'whatsappFacturaDe')}
+    ${anul ? btn('🖨️ Reimprimir la nota de crédito', 'reimprimirNotaCredito') : ''}
+    ${!anul && dueno ? btn('❌ Anular (nota de crédito)', 'anularFacturaVenta', true) : ''}
+    <button class="btn-secondary" style="width:100%;margin-top:12px" onclick="_fvCerrarModal()">Cerrar</button>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+// ── Anular: Nota de Crédito C por el mismo importe ──
+// Una factura con CAE no se borra: se anula ante ARCA con una nota de
+// crédito. Es definitivo, por eso se confirma y es solo del dueño (el
+// servidor también lo exige).
+let _fvAnulando = false;
+async function anularFacturaVenta(movId) {
+  const mov = _fvMov(movId);
+  const f = mov && mov.factura;
+  if (!f || f.estado !== 'emitida' || _fvAnulando) return null;
+  if (!confirm(`¿Anular la Factura C ${_fvNro(f.ptoVenta, f.nro)} por ${_fvPlata(mov.monto)}?\n\nSe hace una NOTA DE CRÉDITO C por el mismo importe ante ARCA. Es definitivo.\n\nUsalo si el cliente devolvió lo que compró o si la factura salió mal (después podés facturar de nuevo la venta corregida).`)) return null;
+  _fvAnulando = true;
+  if (typeof toast === 'function') toast('🧾 Pidiendo la nota de crédito a ARCA…', 'info');
+  try {
+    const res = await apiFetch('/api/factura', { method: 'POST', body: JSON.stringify({ action: 'anular', movId }) });
+    let out = {};
+    try { out = await res.json(); } catch {}
+    if (!res.ok || !out.notaCredito) {
+      if (typeof toast === 'function') toast('⚠️ No se pudo anular: ' + (out.error || 'error ' + res.status), 'error');
+      return null;
+    }
+    const nc = out.notaCredito;
+    if (typeof toast === 'function') toast(`✅ Factura anulada: Nota de Crédito C ${_fvNro(nc.ptoVenta, nc.nro)}`, 'success');
+    // ¿Se la das? (igual que la factura: no se imprime sola)
+    ofrecerTicketFactura(mov, Object.assign({ importe: mov.monto, receptor: f.receptor, asociado: { ptoVenta: f.ptoVenta, nro: f.nro } }, nc));
+    return nc;
+  } catch (e) {
+    console.error('anular:', e);
+    if (typeof toast === 'function') toast('⚠️ Sin conexión: no se anuló. Probá de nuevo.', 'error');
+    return null;
+  } finally {
+    _fvAnulando = false;
+  }
+}
+
+// ¿Esta venta tiene una factura viva (sin anular)? La caja no deja borrarla:
+// la venta desaparecería de la app pero la factura seguiría en ARCA.
+function ventaConFacturaViva(mov) {
+  const f = mov && mov.factura;
+  return !!(f && f.estado === 'emitida' && f.entorno === 'produccion' && !(f.anulada && f.anulada.cae));
 }
 
 // ── Ventas sin facturar (de lo que está cargado en la caja) ──
@@ -375,4 +456,91 @@ async function editarDatosFactura() {
     console.error(err);
     if (typeof toast === 'function') toast('No se pudo guardar (¿publicaste las reglas nuevas?)', 'error');
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  📊 Cuánto se facturó (y el tope de la categoría del monotributo)
+// ══════════════════════════════════════════════════════════════
+// El servidor lleva el total de cada mes en config/facturacionTotales (cada
+// factura suma, cada nota de crédito resta; solo las reales). Leerlo es UNA
+// lectura. El tope de la categoría lo carga el dueño (cambia dos veces por
+// año y depende de la categoría): queda en config/facturaEmisor.topeAnual.
+// Ojo: cuenta lo facturado DESDE LA APP; lo de antes (web de ARCA, otro
+// sistema) no está.
+
+// "2026-10" → los 12 meses que terminan en ese (para el tope anual)
+function fvUltimos12(ym) {
+  let [a, m] = String(ym).split('-').map(Number);
+  const out = [];
+  for (let i = 0; i < 12; i++) {
+    out.push(`${a}-${String(m).padStart(2, '0')}`);
+    m--; if (m === 0) { m = 12; a--; }
+  }
+  return out;
+}
+// { meses: { 'AAAA-MM': total } } + mes → los números del panel (pura)
+function fvResumenFacturado(totales, ym, topeAnual) {
+  const meses = (totales && totales.meses) || {};
+  const v = k => Math.round((Number(meses[k]) || 0) * 100) / 100;
+  const doce = fvUltimos12(ym);
+  const anio = doce.reduce((t, k) => t + v(k), 0);
+  const tope = Number(topeAnual) || 0;
+  return { mes: v(ym), anterior: v(doce[1]), anio, tope, pct: tope ? Math.round(anio / tope * 1000) / 10 : null };
+}
+
+async function abrirFacturado() {
+  if (typeof tpEsDueno === 'function' && !tpEsDueno()) { if (typeof toast === 'function') toast('Solo el dueño', 'error'); return; }
+  const ym = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 7);
+  let tot = {}, emisor = {};
+  try {
+    const [a, b] = await Promise.all([db.collection('config').doc('facturacionTotales').get(), db.collection('config').doc('facturaEmisor').get()]);
+    tot = a.exists ? a.data() : {};
+    emisor = b.exists ? b.data() : {};
+  } catch (e) { console.error(e); }
+  const r = fvResumenFacturado(tot, ym, emisor.topeAnual);
+  const color = r.pct == null ? '#64748b' : r.pct >= 90 ? '#dc2626' : r.pct >= 80 ? '#d97706' : '#16a34a';
+  _fvCerrarModal();
+  const m = document.createElement('div');
+  m.id = 'fv-modal';
+  m.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  const fila = (t, v, fuerte) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border,#ddd)"><span>${t}</span><b style="${fuerte ? 'font-size:17px' : ''}">${v}</b></div>`;
+  m.innerHTML = `<div style="background:var(--card,#fff);color:var(--text,#111);border-radius:14px;padding:16px;width:100%;max-width:400px">
+    <b style="font-size:16px">📊 Facturado (Factura C)</b>
+    <div style="font-size:12px;opacity:.75;margin:4px 0 8px">Solo lo facturado desde la app. Las notas de crédito ya están restadas.</div>
+    ${fila('Este mes', _fvPlata(r.mes), true)}
+    ${fila('Mes anterior', _fvPlata(r.anterior))}
+    ${fila('Últimos 12 meses', _fvPlata(r.anio), true)}
+    ${fila('Tope de tu categoría (anual)', r.tope ? _fvPlata(r.tope) : '<span style="opacity:.7">sin cargar</span>')}
+    ${r.pct != null ? `<div style="margin-top:8px;background:var(--bg2,#eee);border-radius:999px;height:12px;overflow:hidden"><div style="height:100%;width:${Math.min(100, r.pct)}%;background:${color}"></div></div>
+      <div style="text-align:right;font-weight:700;color:${color};margin-top:4px">${r.pct}% del tope${r.pct >= 80 ? ' · hablalo con el contador' : ''}</div>` : ''}
+    <button class="btn-secondary" style="width:100%;margin-top:12px" onclick="_fvCerrarModal();cambiarTopeFacturacion()">${r.tope ? 'Cambiar' : 'Cargar'} el tope de la categoría</button>
+    <button class="btn-secondary" style="width:100%;margin-top:8px" onclick="_fvCerrarModal();recalcularFacturado()">Recalcular este mes</button>
+    <button class="btn-secondary" style="width:100%;margin-top:8px" onclick="_fvCerrarModal()">Cerrar</button>
+  </div>`;
+  document.body.appendChild(m);
+}
+
+async function cambiarTopeFacturacion() {
+  const e = await _fvCargarEmisor();
+  const r = prompt('Tope de ingresos ANUAL de tu categoría de monotributo, en pesos (sin puntos).\n\nEstá en la página de ARCA de monotributo, o te lo dice el contador. Cambia dos veces por año: acordate de actualizarlo.', e.topeAnual || '');
+  if (r === null) return;
+  const n = Number(String(r).replace(/[^\d]/g, ''));
+  if (!(n > 0)) { if (typeof toast === 'function') toast('Escribí un número', 'error'); return; }
+  try {
+    await db.collection('config').doc('facturaEmisor').set({ topeAnual: n }, { merge: true });
+    _fvEmisor = null;
+    if (typeof toast === 'function') toast('📊 Tope guardado: ' + _fvPlata(n), 'success');
+    abrirFacturado();
+  } catch (err) { console.error(err); if (typeof toast === 'function') toast('No se pudo guardar (¿publicaste las reglas?)', 'error'); }
+}
+
+// Para las facturas hechas antes de que existiera el total del mes
+async function recalcularFacturado() {
+  try {
+    const res = await apiFetch('/api/factura', { method: 'POST', body: JSON.stringify({ action: 'recalcular' }) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || 'error ' + res.status);
+    if (typeof toast === 'function') toast(`📊 ${out.mes}: ${_fvPlata(out.total)} (${out.comprobantes} comprobantes)`, 'success');
+    abrirFacturado();
+  } catch (e) { if (typeof toast === 'function') toast('No se pudo recalcular: ' + e.message, 'error'); }
 }
