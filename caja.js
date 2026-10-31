@@ -223,6 +223,10 @@ function _handleUrlAction() {
       }
       return;
     }
+    // ?action=venta&scan=CODIGO: se escaneó un producto en otra pantalla
+    // (pistola.js). Se abre la venta con ese producto ya cargado.
+    const scan = params.get('scan');
+    params.delete('scan');
     // Limpiar el param de la URL (sin recargar)
     params.delete('action');
     const newSearch = params.toString();
@@ -240,7 +244,10 @@ function _handleUrlAction() {
         else if (retry < 10) setTimeout(() => tryAct(retry + 1), 300);
       } else if (action === 'venta' || action === 'egreso') {
         // Accesos rápidos del dashboard
-        if (typeof openMovFormType === 'function') openMovFormType(action === 'venta' ? 'ingreso' : 'egreso');
+        if (typeof openMovFormType === 'function') {
+          openMovFormType(action === 'venta' ? 'ingreso' : 'egreso');
+          if (scan && action === 'venta' && typeof _movEnterBuscador === 'function') setTimeout(() => _movEnterBuscador(scan), 350);
+        }
         else if (retry < 10) setTimeout(() => tryAct(retry + 1), 300);
       }
     };
