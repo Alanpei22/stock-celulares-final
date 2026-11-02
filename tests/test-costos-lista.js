@@ -57,6 +57,24 @@ ok(/requireOwnerPin\(\(\) => \{[\s\S]{0,120}unlockOwnerMode\(\);[\s\S]{0,40}guar
 ok(/function _costosFila\(el\) \{\s*_costosSeguirDueno\(\);/.test(src) && /_ownerLockTimer = setTimeout\(lockOwnerMode, 15 \* 60 \* 1000\)/.test(src),
    'mientras escribís costos, el modo dueño no se vence');
 
+console.log('\n4b) Pegar lista');
+const leerL = t => { ctx._t = t; return JSON.parse(JSON.stringify(vm.runInContext('_costosLeerLista(_t)', ctx))); };
+const L = leerL('Modulo a04 premium 16900\nMódulo a05 oled\t15.000\nModulo a16 4g c/m $25000\nrenglón sin número\nModulo a10 17000,00');
+ok(L.length === 4, 'lee los renglones con costo y salta los que no tienen', L);
+ok(L[1].costo === 15000 && L[1].nombre === 'Módulo a05 oled', '"15.000" con tab → 15000', L[1]);
+ok(L[2].nombre === 'Modulo a16 4g c/m' && L[2].costo === 25000, 'el 4g del nombre no se confunde con el costo', L[2]);
+ok(L[3].nombre === 'Modulo a10' && L[3].costo === 17000, 'nombre que termina en número + "17000,00"', L[3]);
+const empar = (r, n) => { ctx._r = r; ctx._n = n; return JSON.parse(JSON.stringify(vm.runInContext('_costosEmparejar(_r, _n)', ctx))); };
+const NOMBRES = ['Modulo a04 premium', 'Modulo a05 oled', 'Modulo a04 oled', 'Modulo a03/a04e premium', 'Modulo a06 premium'];
+let E = empar([{ nombre: 'modulo A04 PREMIUM', costo: 1 }, { nombre: 'Módulo a03 / a04e premium', costo: 2 }], NOMBRES);
+ok(E[0].idx === 0 && E[1].idx === 3, 'sin importar mayúsculas, acentos ni espacios', E);
+E = empar([{ nombre: 'Modulo a04 premiun', costo: 1 }], NOMBRES);
+ok(E[0].idx === 0, 'perdona una letra mal tipeada ("premiun")', E);
+E = empar([{ nombre: 'Modulo a07 oled', costo: 1 }, { nombre: 'Modulo a06 oled', costo: 1 }], NOMBRES);
+ok(E[0].idx === -1 && E[1].idx === -1, 'pero NUNCA cambia un número de modelo (a06 oled no cae en a05 oled)', E);
+ok(/function _costosPegarAplicar[\s\S]*?_costosFila\(inp\)/.test(src) && !/function _costosPegarAplicar[\s\S]*?batch/.test(src.slice(src.indexOf('function _costosPegarAplicar'), src.indexOf('// "Solo sin costo"'))),
+   'pegar solo completa los casilleros: guardar sigue siendo con el botón');
+
 console.log('\n5) Está en los menús y en la página');
 const app = leer('app.js');
 const stock = app.slice(app.indexOf("openSheet('Stock'"), app.indexOf('function closeHdrMenu'));

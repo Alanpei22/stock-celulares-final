@@ -88,6 +88,16 @@ function abrirCostosLista(tipo) {
       <label style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;cursor:pointer">
         <input type="checkbox" id="costos-solo-faltan" onchange="_costosSoloFaltan(this.checked)"> solo sin costo
       </label>
+      <button type="button" class="btn-secondary" style="min-height:0;padding:4px 10px;font-size:12px;margin-left:6px"
+              onclick="_costosPegarToggle()">📋 Pegar lista</button>
+      <div id="costos-pegar" class="hidden" style="margin-top:8px">
+        <textarea id="costos-pegar-txt" class="fi" rows="5" style="font-size:13px"
+                  placeholder="Un producto por renglón, con el costo al final. Ej:&#10;Modulo a04 premium 16900&#10;Modulo a05 oled 15000"></textarea>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+          <button type="button" class="btn-primary" style="min-height:0;padding:8px 14px" onclick="_costosPegarAplicar()">Completar casilleros</button>
+          <span id="costos-pegar-res" style="font-size:12px"></span>
+        </div>
+      </div>
     </div>
     <div class="modal-body" style="max-height:62vh;overflow:auto;gap:0">
       ${lista.map(x => {
@@ -99,7 +109,7 @@ function abrirCostosLista(tipo) {
             ${venta ? `<div style="font-size:12px;color:var(--t3)">venta ${_costosPesos(venta)} <span class="costos-gan">${_costosGanancia(venta, val)}</span></div>` : ''}
           </div>
           <span style="font-size:13px;color:var(--t3)">$</span>
-          <input class="fi costos-inp" data-id="${esc(x.id)}" data-antes="${val || ''}" data-venta="${venta}"
+          <input class="fi costos-inp" data-id="${esc(x.id)}" data-nombre="${esc(cfg.nombre(x))}" data-antes="${val || ''}" data-venta="${venta}"
                  type="number" min="0" step="1" inputmode="numeric" enterkeyhint="next"
                  value="${val || ''}" placeholder="0" style="width:110px;text-align:right"
                  oninput="_costosFila(this)">
@@ -153,6 +163,96 @@ function _costosSeguirDueno() {
 function _costosContarCambios() {
   const m = document.getElementById('costos-lista-modal');
   return m ? _costosCambios(_costosTipo, [...m.querySelectorAll('.costos-inp')], _costosDolar()).length : 0;
+}
+
+// ── Pegar lista ─────────────────────────────────────────────
+// Para no tipear de a uno lo que ya está escrito en otro lado (la lista del
+// proveedor, una nota, WhatsApp): se pega "nombre costo" por renglón y se
+// completan los casilleros que coinciden por nombre. NO guarda solo: llena
+// los casilleros (quedan marcados como cambiados) y se revisa antes de
+// tocar Guardar.
+function _costosPegarToggle() {
+  const box = document.getElementById('costos-pegar');
+  if (!box) return;
+  box.classList.toggle('hidden');
+  if (!box.classList.contains('hidden')) document.getElementById('costos-pegar-txt')?.focus();
+}
+
+// Nombre comparable: sin mayúsculas, acentos ni espacios ("Módulo a04e / a03"
+// = "modulo a04e/a03").
+function _costosNorm(t) {
+  return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '');
+}
+
+// Distancia entre dos textos, cortada en `max` (para perdonar un error de
+// tipeo: "premiun" por "premium").
+function _costosDist(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let minFila = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < minFila) minFila = cur[j];
+    }
+    if (minFila > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// Renglones → [{ nombre, costo }]. El costo es el último número del renglón;
+// acepta "16.900", "$16900", "16900,00", y separado por tab, ; o espacios.
+function _costosLeerLista(texto) {
+  const out = [];
+  String(texto || '').split(/\r?\n/).forEach(l => {
+    const m = /^(.*?)[\s;:\t|=-]*\$?\s*(\d[\d.]*)(?:,\d{1,2})?\s*$/.exec(l.trim());
+    if (!m) return;
+    const nombre = m[1].replace(/[\s;:\t|=$-]+$/, '').trim();
+    const costo = parseInt(m[2].replace(/\./g, ''), 10);
+    if (nombre && costo > 0) out.push({ nombre, costo });
+  });
+  return out;
+}
+
+// Para cada renglón, el casillero con el mismo nombre. Si no hay uno igual,
+// se acepta UNO que difiera en una letra; si hay dos parecidos, no se adivina.
+function _costosEmparejar(renglones, nombres) {
+  const norm = nombres.map(_costosNorm);
+  return renglones.map(r => {
+    const n = _costosNorm(r.nombre);
+    let idx = norm.map((x, i) => x === n ? i : -1).filter(i => i >= 0);
+    // Los números tienen que ser los mismos: "a04" y "a05" difieren en una
+    // sola letra pero son otro módulo, y eso no se perdona nunca.
+    const nums = t => t.replace(/\D+/g, ' ').trim();
+    if (!idx.length) idx = norm.map((x, i) => nums(x) === nums(n) && _costosDist(x, n, 1) <= 1 ? i : -1).filter(i => i >= 0);
+    return { ...r, idx: idx.length === 1 ? idx[0] : -1, dudoso: idx.length > 1 };
+  });
+}
+
+function _costosPegarAplicar() {
+  const m = document.getElementById('costos-lista-modal');
+  if (!m) return;
+  const inputs = [...m.querySelectorAll('.costos-inp')];
+  const renglones = _costosLeerLista(document.getElementById('costos-pegar-txt').value);
+  const res = document.getElementById('costos-pegar-res');
+  if (!renglones.length) { res.textContent = 'No encontré renglones con nombre y costo'; res.style.color = '#dc2626'; return; }
+  const pares = _costosEmparejar(renglones, inputs.map(i => i.dataset.nombre || ''));
+  let ok = 0;
+  pares.forEach(p => {
+    if (p.idx < 0) return;
+    const inp = inputs[p.idx];
+    inp.value = p.costo;
+    _costosFila(inp);
+    const fila = inp.closest('.costos-fila');
+    if (fila) fila.style.display = '';
+    ok++;
+  });
+  const faltan = pares.filter(p => p.idx < 0).map(p => p.nombre + (p.dudoso ? ' (hay varios parecidos)' : ''));
+  res.style.color = faltan.length ? '#b45309' : '#10b981';
+  res.textContent = `✅ ${ok} completado${ok === 1 ? '' : 's'}` +
+    (faltan.length ? ` · ⚠️ no encontré: ${faltan.join(', ')}` : '') + ' — revisá y tocá Guardar';
 }
 
 // "Solo sin costo" mira cómo estaba al abrir: así la fila no se esconde
