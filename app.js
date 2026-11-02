@@ -675,7 +675,10 @@ function toggleHdrMenu() {
     ]),
     { icon: '📊', label: 'Estadísticas', hide: !_puede('reporte'), onClick: () => document.getElementById('stats-btn')?.click() },
     { icon: '⚙️', label: 'Configuración', hide: _soloDueno(), onClick: () => document.getElementById('settings-btn')?.click() },
-    sheetGrupo(toggleHdrMenu, 'Datos', '💾', 'Exportar y backup', 'Movimientos de stock, exportar, backup', [
+    sheetGrupo(toggleHdrMenu, 'Datos', '💾', 'Costos, exportar y backup', 'Cargar costos, movimientos, exportar, backup', [
+      // El menú ya está en diez renglones (tests/test-menus.js): va adentro.
+      { icon: '💵', label: 'Cargar costos', sub: 'Todos los equipos en una lista (modo dueño)', hide: _soloDueno(),
+        onClick: () => (typeof abrirCostosLista === 'function') && abrirCostosLista('equipo') },
       { icon: '📜', label: 'Movimientos de stock', sub: 'Qué entró y salió: equipos, repuestos y accesorios',
         onClick: () => (typeof abrirMovStock === 'function') && abrirMovStock('equipo') },
       { icon: '💾', label: 'Exportar stock', hide: _soloDueno(), onClick: () => document.getElementById('export-btn')?.click() },
@@ -735,12 +738,18 @@ function toggleRep2Menu() {
         sub: (typeof qzMenuSub === 'function') ? qzMenuSub() : '',
         onClick: () => (typeof configurarImpresoras === 'function') && configurarImpresoras() },
     ]),
-    { icon: '📊', label: 'Exportar / Importar Excel', onClick: () => location.href = 'bulk-edit-repuestos.html' },
     { icon: '📉', label: 'Roturas del mes', sub: 'Lo que se rompió o vino roto',
       onClick: () => (typeof tpAbrirRoturas === 'function') && tpAbrirRoturas() },
     { icon: '📋', label: 'Pedido de mercadería', onClick: () => (typeof openPedidosModal === 'function') && openPedidosModal() },
-    { icon: '📜', label: 'Movimientos de stock', sub: 'Qué entró y salió, quién y por qué',
-      onClick: () => (typeof abrirMovStock === 'function') && abrirMovStock('repuesto') },
+    // Costos, Excel y movimientos juntos, como en Stock: así entra "Cargar
+    // costos" sin pasar de diez renglones (tests/test-menus.js).
+    sheetGrupo(toggleRep2Menu, 'Datos', '💾', 'Costos y Excel', 'Cargar costos, Excel, movimientos', [
+      { icon: '💵', label: 'Cargar costos', sub: 'Todos los repuestos en una lista (modo dueño)', hide: _soloDueno(),
+        onClick: () => (typeof abrirCostosLista === 'function') && abrirCostosLista('repuesto') },
+      { icon: '📊', label: 'Exportar / Importar Excel', onClick: () => location.href = 'bulk-edit-repuestos.html' },
+      { icon: '📜', label: 'Movimientos de stock', sub: 'Qué entró y salió, quién y por qué',
+        onClick: () => (typeof abrirMovStock === 'function') && abrirMovStock('repuesto') },
+    ]),
     { divider: true },
     { icon: '🚪', label: 'Cerrar sesión', danger: true, onClick: async () => { await signOut(); location.replace('login.html'); } },
   ]);
