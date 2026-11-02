@@ -38,6 +38,23 @@ function _cajaOwnerRenovar() {
   _cajaOwnerTimer = setTimeout(lockCajaOwner, 15 * 60 * 1000);
 }
 
+// Y "algo de dueño" es cualquier toque o tecla: antes solo renovaban algunas
+// acciones del inventario, y el resto de la caja se cortaba a los 15 minutos
+// aunque la estuvieras usando (igual que pasó en la lista de costos de la
+// app, donde se perdieron 21 costos). Se re-arma como mucho cada 30 segundos.
+let _cajaOwnerUltimoUso = 0;
+function _cajaOwnerRenovarPorUso() {
+  if (!_cajaIsOwner) return;
+  const ahora = Date.now();
+  if (ahora - _cajaOwnerUltimoUso < 30 * 1000) return;
+  _cajaOwnerUltimoUso = ahora;
+  _cajaOwnerRenovar();
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  ['pointerdown', 'keydown', 'input'].forEach(ev =>
+    document.addEventListener(ev, _cajaOwnerRenovarPorUso, { capture: true, passive: true }));
+}
+
 function openCajaOwnerPin() {
   if (_cajaIsOwner) {
     lockCajaOwner(); return;

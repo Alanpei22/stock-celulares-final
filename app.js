@@ -367,6 +367,26 @@ function unlockOwnerMode() {
   toast('🔓 Modo dueño activo', 'success');
 }
 
+// El modo dueño se bloquea a los 15 minutos SIN USO, no a los 15 minutos de
+// poner el PIN. Antes se cortaba aunque lo estuvieras usando: cargando costos
+// en lista se venció a la mitad y no dejaba guardar (se perdieron 21 costos).
+// Cualquier toque o tecla vuelve a contar los 15 minutos; una pantalla que
+// queda sola en el mostrador se sigue bloqueando igual.
+// (Se re-arma como mucho cada 30 segundos: no hace falta en cada tecla.)
+let _ownerUltimoUso = 0;
+function _ownerRenovarPorUso() {
+  if (!OWNER_MODE) return;
+  const ahora = Date.now();
+  if (ahora - _ownerUltimoUso < 30 * 1000) return;
+  _ownerUltimoUso = ahora;
+  clearTimeout(_ownerLockTimer);
+  _ownerLockTimer = setTimeout(lockOwnerMode, 15 * 60 * 1000);
+}
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  ['pointerdown', 'keydown', 'input'].forEach(ev =>
+    document.addEventListener(ev, _ownerRenovarPorUso, { capture: true, passive: true }));
+}
+
 function lockOwnerMode() {
   OWNER_MODE = false;
   document.body.classList.remove('owner-mode');
