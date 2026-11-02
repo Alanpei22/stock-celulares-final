@@ -52,6 +52,11 @@ ok(/batch\.update\(/.test(guardar) && /i \+= 450/.test(guardar), 'se guarda en t
 
 ok(/focusin[\s\S]{0,120}\.select\(\)/.test(abrir), 'al entrar a un casillero se marca el número: escribir lo reemplaza, no se pega al viejo');
 
+ok(/requireOwnerPin\(\(\) => \{[\s\S]{0,120}unlockOwnerMode\(\);[\s\S]{0,40}guardarCostosLista\(\)/.test(guardar),
+   'si el modo dueño se venció con la lista abierta, Guardar pide el PIN ahí mismo y guarda (no se pierde lo cargado)');
+ok(/function _costosFila\(el\) \{\s*_costosSeguirDueno\(\);/.test(src) && /_ownerLockTimer = setTimeout\(lockOwnerMode, 15 \* 60 \* 1000\)/.test(src),
+   'mientras escribís costos, el modo dueño no se vence');
+
 console.log('\n5) Está en los menús y en la página');
 const app = leer('app.js');
 const stock = app.slice(app.indexOf("openSheet('Stock'"), app.indexOf('function closeHdrMenu'));

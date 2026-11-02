@@ -129,6 +129,7 @@ function abrirCostosLista(tipo) {
 
 // Al escribir: se recalcula la ganancia y se marca lo que cambió
 function _costosFila(el) {
+  _costosSeguirDueno();
   const fila = el.closest('.costos-fila');
   const gan = fila && fila.querySelector('.costos-gan');
   if (gan) gan.innerHTML = _costosGanancia(el.dataset.venta, parseFloat(el.value));
@@ -137,6 +138,16 @@ function _costosFila(el) {
   const n = _costosContarCambios();
   const btn = document.getElementById('costos-lista-save');
   if (btn) btn.textContent = n ? `Guardar ${n} costo${n === 1 ? '' : 's'}` : 'Guardar costos';
+}
+
+// Mientras cargás, el modo dueño no se vence: cada número escrito vuelve a
+// contar los 15 minutos (los mismos que usa unlockOwnerMode en app.js).
+function _costosSeguirDueno() {
+  if (!_costosEsDueno() || typeof lockOwnerMode !== 'function') return;
+  try {
+    clearTimeout(_ownerLockTimer);
+    _ownerLockTimer = setTimeout(lockOwnerMode, 15 * 60 * 1000);
+  } catch (e) {}
 }
 
 function _costosContarCambios() {
@@ -184,7 +195,21 @@ async function guardarCostosLista() {
   const m = document.getElementById('costos-lista-modal');
   const cfg = _COSTOS_CFG[_costosTipo];
   if (!m || !cfg) return;
-  if (!_costosEsDueno()) { toast('🔒 Activá el modo dueño para cargar costos', 'error'); return; }
+  // El modo dueño se bloquea solo a los 15 minutos. Antes, si se vencía con la
+  // lista abierta, Guardar decía "activá el modo dueño" y la lista tapaba el
+  // 🔒: no había forma de guardar lo cargado (se perdieron 21 costos así).
+  // Ahora pide el PIN ahí mismo y guarda: la lista queda abierta con todo.
+  if (!_costosEsDueno()) {
+    if (typeof requireOwnerPin === 'function') {
+      requireOwnerPin(() => {
+        if (typeof unlockOwnerMode === 'function') unlockOwnerMode();
+        guardarCostosLista();
+      }, 'Se bloqueó el modo dueño. Poné el PIN para guardar los costos');
+    } else {
+      toast('🔒 Activá el modo dueño para guardar', 'error');
+    }
+    return;
+  }
   const cambios = _costosCambios(_costosTipo, [...m.querySelectorAll('.costos-inp')], _costosDolar(),
                                  firebase.firestore.FieldValue.delete());
   if (!cambios.length) { m.remove(); toast('No cambiaste ningún costo', 'info'); return; }
