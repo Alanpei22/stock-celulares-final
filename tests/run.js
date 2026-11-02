@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-ingreso-no-se-pierde.js': 'El ingreso de una reparación no se pierde por tocar el fondo: la ✕, Cancelar y Escape preguntan si ya cargaste algo',
   'test-costos-lista.js':   'Cargar costos de equipos y repuestos en una lista: guarda igual que el formulario, solo lo que cambió y solo el dueño',
   'test-etiqueta-libre.js': 'La etiqueta en blanco: escribis lo que quieras y sale',
   'test-impresion-remota.js': 'Imprimir desde otro equipo en la compu de la caja: manda imágenes, una sola vez, sin pedidos viejos',
