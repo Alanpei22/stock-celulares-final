@@ -44,6 +44,7 @@
           <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
           <button class="hdr-btn owner-lock-btn" onclick="toggleOwnerLock()" title="Modo dueño">🔒</button>
           <button class="hdr-btn" id="settings-btn" title="Configuración">⚙️</button>
+          <button class="hdr-btn owner-only" onclick="openCostos()" title="Cargar costos">💲</button>
           <button class="hdr-btn" id="stats-btn" title="Estadísticas y historial">📊</button>
           <button class="hdr-btn" id="export-btn" title="Exportar stock">💾</button>
           <button class="hdr-btn" id="add-btn" title="Agregar equipo">＋</button>
@@ -167,6 +168,7 @@
         <div class="hdr-actions">
           <button class="hdr-btn dark-toggle-btn" onclick="toggleDarkMode()" title="Modo oscuro">🌙</button>
           <button class="hdr-btn owner-lock-btn" onclick="toggleOwnerLock()" title="Modo dueño">🔒</button>
+          <button class="hdr-btn owner-only" onclick="openCostos()" title="Cargar costos">💲</button>
           <button class="hdr-btn" id="rep2-add-btn" title="Agregar repuesto">＋</button>
           <button class="hdr-btn" onclick="(async()=>{ await signOut(); location.replace('login.html'); })()" title="Cerrar sesión">🚪</button>
         </div>
@@ -187,6 +189,7 @@
           <option value="Parlante">Parlante</option>
           <option value="Micrófono">Micrófono</option>
           <option value="Marco">Marco</option>
+          <option value="Accesorio">Accesorio</option>
           <option value="Otro">Otro</option>
         </select>
         <select class="pill" id="rep2-f-marca"><option value="">Todas las marcas</option></select>
@@ -974,6 +977,35 @@
   </div>
 </div>
 
+<!-- ═══════════ MODAL COSTOS (carga masiva) ═══════════ -->
+<div id="costos-modal" class="modal-overlay hidden">
+  <div class="modal-card costos-card">
+    <div class="modal-header">
+      <h3>💲 Precios de costo</h3>
+      <button class="modal-close" id="costos-close" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="costos-tools">
+      <input id="costos-search" class="fi" type="search" placeholder="Buscar producto..." autocomplete="off">
+      <div class="costos-filters">
+        <select id="costos-f-cat" class="fi">
+          <option value="">Todo</option>
+          <option value="celular">📱 Celulares</option>
+          <option value="repuesto">🔩 Repuestos</option>
+          <option value="accesorio">🎧 Accesorios</option>
+        </select>
+        <label class="costos-chk"><input type="checkbox" id="costos-f-sin"> Solo sin costo</label>
+      </div>
+      <div class="costos-summary" id="costos-summary"></div>
+      <div class="costos-hint">Escribí el costo y apretá Enter para pasar al siguiente. Al final, Guardar.</div>
+    </div>
+    <div id="costos-list" class="costos-list"></div>
+    <div class="costos-foot">
+      <button class="btn-secondary" id="costos-cancel" style="flex:1">Cerrar</button>
+      <button class="btn-primary" id="costos-save" style="flex:2" disabled>💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ MODAL REPUESTOS ═══════════ -->
 <div id="rep2-form-modal" class="modal-overlay hidden">
   <div class="modal-sheet">
@@ -1011,6 +1043,7 @@
           <option value="Parlante">Parlante</option>
           <option value="Micrófono">Micrófono</option>
           <option value="Marco">Marco</option>
+          <option value="Accesorio">Accesorio</option>
           <option value="Otro">Otro</option>
         </select>
       </div>
@@ -1055,6 +1088,7 @@
 <script src="app.js"></script>
 <script src="print.js"></script>
 <script src="precios.js"></script>
+<script src="costos.js"></script>
 
 <!-- ── AI CHAT FLOTANTE ── -->
 <button class="ai-fab" onclick="toggleAiChat()" title="Asistente IA">✨</button>
