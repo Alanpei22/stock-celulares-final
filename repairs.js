@@ -505,12 +505,17 @@ function initRepairs() {
   // Como los dejaste la última vez.
   _repReponerFiltros();
 
-  document.getElementById('rep-form-close').addEventListener('click', closeRepairForm);
-  document.getElementById('rep-form-cancel').addEventListener('click', closeRepairForm);
+  document.getElementById('rep-form-close').addEventListener('click', pedirCerrarRepairForm);
+  document.getElementById('rep-form-cancel').addEventListener('click', pedirCerrarRepairForm);
   document.getElementById('rep-form-save').addEventListener('click', saveRepair);
-  document.getElementById('rep-form-modal').addEventListener('click', e => {
-    if (e.target.id === 'rep-form-modal') closeRepairForm();
-  });
+  // Tocar el fondo ya NO cierra el ingreso. Pasaba en el mostrador: un toque
+  // sin querer al costado y se perdía todo lo cargado (cliente, falla, seña).
+  // Para salir están la ✕ y Cancelar, que preguntan si ya escribiste algo.
+  // Cualquier cosa que el usuario escriba o elija marca el formulario como
+  // "tocado" (isTrusted: lo que carga la app sola al abrir no cuenta).
+  const repFormModal = document.getElementById('rep-form-modal');
+  repFormModal.addEventListener('input',  _repFormMarcarTocado);
+  repFormModal.addEventListener('change', _repFormMarcarTocado);
   // El <select> ahora AGREGA a la lista (ver _onArregloSelect en index.html).
   // Si el usuario escribe el monto a mano, la suma de las reparaciones deja de
   // pisárselo: está haciendo precio.
@@ -575,7 +580,7 @@ function initRepairs() {
     if (e.key !== 'Escape') return;
     const order = [
       { id: 'cobro-overlay',    fn: closeCobroModal    },
-      { id: 'rep-form-modal',   fn: closeRepairForm    },
+      { id: 'rep-form-modal',   fn: pedirCerrarRepairForm },
       { id: 'garantia-modal',   fn: closeGarantiaModal },
       { id: 'history-modal',    fn: closeHistoryModal  },
       { id: 'rep-stats-modal',  fn: closeRepairStats   },
@@ -1709,6 +1714,7 @@ function _repwizBack() {
 }
 
 function openRepairForm(id) {
+  _repFormTocado = false;
   if (typeof tpFrenar === 'function' && tpFrenar('reparaciones', id ? 'editar reparaciones' : 'tomar reparaciones')) return;
   editingRepairId = id || null;
   const COMMON_ARREGLOS = [
@@ -1906,7 +1912,19 @@ function printPromptDismiss() {
   if (bar) bar.classList.add('hidden');
 }
 
+// ¿Ya cargaste algo en el ingreso? Si sí, cerrar pregunta antes de tirarlo.
+let _repFormTocado = false;
+function _repFormMarcarTocado(e) { if (e && e.isTrusted) _repFormTocado = true; }
+
+// La ✕, Cancelar y Escape pasan por acá. Guardar cierra directo con
+// closeRepairForm (ya está guardado, no hay nada que perder).
+function pedirCerrarRepairForm() {
+  if (_repFormTocado && !confirm('¿Salir sin guardar?\n\nSe pierde lo que cargaste en esta reparación.')) return;
+  closeRepairForm();
+}
+
 function closeRepairForm() {
+  _repFormTocado = false;
   document.getElementById('rep-form-modal').classList.add('hidden');
   document.body.style.overflow = '';
   editingRepairId = null;
