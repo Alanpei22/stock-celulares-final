@@ -672,8 +672,13 @@ function toggleHdrMenu() {
     { icon: '🔒', label: 'Modo dueño', hide: _soloDueno(), onClick: toggleOwnerLock },
     { divider: true },
     { icon: '☑️', label: 'Seleccionar varios', sub: 'Editar varios equipos a la vez', onClick: enterBatchMode },
-    { icon: '🌐', label: 'Página de equipos', sub: 'Ver la página y copiar el link para Instagram / WhatsApp',
-      onClick: () => (typeof catAbrirPagina === 'function') && catAbrirPagina() },
+    // Página y estados juntos: el menú no pasa de diez renglones (tests/test-menus.js)
+    sheetGrupo(toggleHdrMenu, 'Página de equipos', '🌐', 'Página de equipos', 'La página, el link y los estados de WhatsApp', [
+      { icon: '🌐', label: 'Ver la página', sub: 'Y copiar el link para Instagram / WhatsApp',
+        onClick: () => (typeof catAbrirPagina === 'function') && catAbrirPagina() },
+      { icon: '📲', label: 'Estados de WhatsApp', sub: 'Una imagen por equipo publicado, lista para "Mi estado"',
+        onClick: () => (typeof eeAbrir === 'function') && eeAbrir() },
+    ]),
     sheetGrupo(toggleHdrMenu, 'Etiquetas, carteles e impresión', '🏷️', 'Etiquetas, carteles e impresión', 'Carteles de vidriera, etiquetas e impresora', [
       { icon: '🪧', label: 'Carteles de exhibición', sub: 'Los de la vidriera: 8 por hoja A4',
         onClick: () => (typeof cartAbrir === 'function') && cartAbrir() },
@@ -1746,6 +1751,7 @@ function openDetail(id) {
     </div>
     <div class="det-acc-grid">
       ${!p.vendido ? tile('🟢', 'WhatsApp', `shareWhatsApp('${p.id}')`) : ''}
+      ${!p.vendido ? tile('📲', 'Estado', `eeEstadoDe('${p.id}')`) : ''}
       ${!p.vendido ? tile('🏷️', 'Etiqueta', `etiquetaDe('${p.id}')`) : ''}
       ${!p.vendido && !p.reservado ? tile('✏️', 'Editar', `closeDetail();openForm('${p.id}')`) : ''}
       ${p.reservado ? tile('📄', 'Comprobante reserva', `printReservaDe('${p.id}')`) : ''}

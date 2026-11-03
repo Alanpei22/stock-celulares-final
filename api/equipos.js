@@ -28,6 +28,7 @@ export const DIAS_SIN_STOCK = 30;
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.query && req.query.foto) return mandarFoto(String(req.query.foto), res);
   try {
     const db = getAdmin().firestore();
     const snap = await db.collection('stock').where('publicar', '==', true).get();
@@ -41,6 +42,29 @@ export default async function handler(req, res) {
     console.error('api/equipos:', e);
     res.setHeader('Cache-Control', 'no-store');
     return res.status(500).json({ error: 'No se pudo cargar la lista' });
+  }
+}
+
+// ── ?foto= : una foto de un equipo, pasada por acá ───────
+// Para los estados de WhatsApp (estado-equipos.js) la app dibuja la foto en
+// un canvas, y el navegador no deja leer un canvas con una imagen de otro
+// dominio si ese dominio no lo autoriza (CORS). Acá se trae del lado del
+// servidor, donde esa traba no existe. Solo fotos de NUESTRO Storage (esas
+// URLs ya son públicas, son las mismas que muestra la página): no sirve
+// para traer cualquier cosa de internet.
+export const FOTO_PERMITIDA = /^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/stockcelustech\.firebasestorage\.app\/o\/[^?#]+\?alt=media(&token=[\w-]+)?$/;
+async function mandarFoto(url, res) {
+  if (!FOTO_PERMITIDA.test(url)) return res.status(400).json({ error: 'Foto no válida' });
+  try {
+    const r = await fetch(url);
+    const tipo = r.headers.get('content-type') || '';
+    if (!r.ok || !/^image\//.test(tipo)) return res.status(404).json({ error: 'No está la foto' });
+    res.setHeader('Content-Type', tipo);
+    res.setHeader('Cache-Control', 'public, s-maxage=86400, max-age=86400');
+    return res.status(200).send(Buffer.from(await r.arrayBuffer()));
+  } catch (e) {
+    console.error('api/equipos foto:', e);
+    return res.status(502).json({ error: 'No se pudo traer la foto' });
   }
 }
 
