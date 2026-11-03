@@ -36,6 +36,21 @@ ok(/\.\.\.\(it\.regalo \? \{ regalo: true \} : \{\}\)/.test(cj), 'queda guardado
 ok(/stockUpdates\.push\(\{ collection, id: it\.id, stockField, qty, nombre: it\.nombre, regalo: !!it\.regalo \}\)/.test(cj), 'y el stock se descuenta como cualquier venta');
 ok(/' \(sin cargo\)'/.test(cj), 'la descripción del movimiento lo dice');
 
+// Alan (03/11): "cuando pongo algo sin cargo no se deja guardar". Si TODO va
+// sin cargo (el cargador que se regala con un equipo vendido por otro lado),
+// el total da $0 y la caja pedía "Completá: monto": no se guardaba y el stock
+// no bajaba. Se evalúa la misma condición que usa saveMov.
+const m = cj.match(/const soloRegalos = (Array\.isArray\(_cart\)[\s\S]*?_selectedRepairItem\));/);
+ok(!!m, 'saveMov sabe cuándo todo va sin cargo');
+const solo = (cart, rep) => vm.runInContext(`(function(_cart, _selectedRepairItem){ return ${m[1]}; })`, vm.createContext({ Array }))(cart, rep || null);
+ok(solo([{ regalo: true }, { regalo: true }]) === true, 'todo 🎁: es "solo regalos"');
+ok(solo([{ regalo: true }, { precio: 1000 }]) === false, 'con algo que se cobra: no');
+ok(solo([]) === false, 'carrito vacío: no (una venta en $0 sin nada sigue sin guardarse)');
+ok(solo([{ regalo: true }], { repair: {} }) === false, 'con una reparación de por medio: no');
+ok(/if \(soloRegalos && !\(monto > 0\)\) monto = 0;/.test(cj) && /const montoOk = monto > 0 \|\| \(soloRegalos && monto === 0\);/.test(cj),
+   'todo sin cargo: se guarda en $0 (y descuenta el stock)');
+ok(/if \(soloRegalos && monto === 0 && !metodoPago\) metodoPago = 'Efectivo';/.test(cj), 'sin pedir con qué pagó');
+
 console.log('\n3) Comprobantes');
 ok(/it\.regalo \? ' \(sin cargo\)' : ''/.test(leer('comprobante-venta.js')), 'el ticket dice "(sin cargo)"');
 ok((leer('print.js').match(/a\.regalo \? 'Sin cargo'/g) || []).length === 2, 'y el comprobante A5 "Sin cargo" en vez de $0');

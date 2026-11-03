@@ -3868,17 +3868,25 @@ async function saveMov() {
   const catWrap    = document.querySelector('#mov-categorias')?.closest('.fg');
   const metWrap    = document.querySelector('.metodos-group')?.closest('.fg');
 
-  const monto      = parseFloat(montoInput?.value);
+  // 🎁 Todo sin cargo (ej. el cargador que se regala con un equipo vendido por
+  // otro lado): el total da $0 y antes no se dejaba guardar ("Completá:
+  // monto"), así que el stock no se descontaba. Ahora se guarda en $0.
+  const soloRegalos = Array.isArray(_cart) && _cart.length > 0 && _cart.every(it => it.regalo)
+    && !(typeof _selectedRepairItem !== 'undefined' && _selectedRepairItem);
+  let monto        = parseFloat(montoInput?.value);
+  if (soloRegalos && !(monto > 0)) monto = 0;
   // Con carrito, la descripción se arma del resumen de productos (+ la reparación
   // si la venta lleva las dos cosas); sino, texto libre.
   const descripcion = _descripcionVenta();
   const categoria  = document.getElementById('mov-hidden-cat')?.value || '';
-  const metodoPago = document.getElementById('mov-hidden-metodo')?.value || '';
+  // Sin cargo no hay con qué pagar: si no se eligió, va como efectivo ($0)
+  let metodoPago   = document.getElementById('mov-hidden-metodo')?.value || '';
+  if (soloRegalos && monto === 0 && !metodoPago) metodoPago = 'Efectivo';
 
   const metodo2  = document.getElementById('mov-hidden-metodo2')?.value || '';
   const splitAmt = _splitActive ? (parseFloat(document.getElementById('mov-split-amt')?.value) || 0) : 0;
 
-  const montoOk = monto > 0;
+  const montoOk = monto > 0 || (soloRegalos && monto === 0);
   // La descripción se puede deducir: con categoría elegida, escribir "Venta
   // producto" a mano era un paso al pedo en cada venta.
   const descOk  = descripcion.length > 0 || categoria.length > 0;

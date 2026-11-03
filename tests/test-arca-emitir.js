@@ -256,14 +256,18 @@ try {
   console.log('\n12) El total del mes (para el tope del monotributo)');
   process.env.ARCA_ENTORNO = 'produccion'; process.env.ARCA_EMITIR_PRODUCCION = 'si';
   delete DB['config/facturacionTotales'];
-  await arca.emitirFactura({ id: 't1', detalle: fe.normalizarDetalle({ importe: 10000, fecha: '2026-10-31' }) });
-  await arca.emitirFactura({ id: 't2', detalle: fe.normalizarDetalle({ importe: 5000, fecha: '2026-10-31' }) });
-  ok(DB['config/facturacionTotales'].meses['2026-10'] === 15000, 'cada factura real suma al mes', DB['config/facturacionTotales']);
+  // La nota de crédito cuenta en el mes en que se hace (hoy), así que las
+  // facturas de prueba también van con fecha de hoy. Antes estaba fija en
+  // octubre y la prueba empezó a fallar sola al pasar a noviembre.
+  const YM = arca.mesDe({}), HOY = YM + '-15';
+  await arca.emitirFactura({ id: 't1', detalle: fe.normalizarDetalle({ importe: 10000, fecha: HOY }) });
+  await arca.emitirFactura({ id: 't2', detalle: fe.normalizarDetalle({ importe: 5000, fecha: HOY }) });
+  ok(DB['config/facturacionTotales'].meses[YM] === 15000, 'cada factura real suma al mes', DB['config/facturacionTotales']);
   await arca.anularFactura({ id: 't2' });
-  ok(DB['config/facturacionTotales'].meses['2026-10'] === 10000, 'la nota de crédito resta');
+  ok(DB['config/facturacionTotales'].meses[YM] === 10000, 'la nota de crédito resta');
   process.env.ARCA_ENTORNO = 'homologacion';
-  await arca.emitirFactura({ id: 't3', detalle: fe.normalizarDetalle({ importe: 999, fecha: '2026-10-31' }) });
-  ok(DB['config/facturacionTotales'].meses['2026-10'] === 10000, 'las de prueba no cuentan');
+  await arca.emitirFactura({ id: 't3', detalle: fe.normalizarDetalle({ importe: 999, fecha: HOY }) });
+  ok(DB['config/facturacionTotales'].meses[YM] === 10000, 'las de prueba no cuentan');
   ok(/'facturacionTotales'\]\);/.test(leer('firestore.rules')), 'el total no se puede tocar desde la app (solo el servidor)');
   delete process.env.ARCA_EMITIR_PRODUCCION;
 
