@@ -14,7 +14,7 @@ const NODOS = {};
 const fakeEl = id => ({ id, onclick: null, set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; },
   className: '', remove() { delete NODOS[this.id]; }, click() { DESCARGAS.push(this.download); } });
 const ctx = {
-  console, Math, Number, String, Array, Object, JSON, Map, Promise, setTimeout: f => f(), Error,
+  console, Math, Number, Symbol, String, Array, Object, JSON, Map, Promise, setTimeout: f => f(), Error,
   toast: (m, t) => TOASTS.push(m),
   confirm: () => true,
   URL: { createObjectURL: () => 'blob:x', revokeObjectURL() {} },
@@ -83,10 +83,33 @@ ctx.navigator.share = async d => { COMPARTIDO = d; };
   ok(COMPARTIDO && COMPARTIDO.files.length === 3, 'y ese toque abre compartir con las 3 imágenes juntas', COMPARTIDO);
   ok(/estado-01-Samsung-Galaxy-A16-128-GB\.jpg/.test(COMPARTIDO.files[0].name), 'con nombres prolijos', COMPARTIDO.files[0].name);
 
+  // Compu: WhatsApp de escritorio sube estados eligiendo fotos de una carpeta
   ctx._waEsCompu = () => true;
+  ctx.window = {};
   DESCARGAS.length = 0;
   await run('eeCompartir(_l)');
-  ok(DESCARGAS.length === 3 && /descargad/.test(TOASTS[TOASTS.length - 1]), 'compu: se descargan', DESCARGAS);
+  ok(DESCARGAS.length === 0 && /Novedades/.test(NODOS['ee-mod'].innerHTML) && /Ctrl\+A/.test(NODOS['ee-mod'].innerHTML),
+     'compu: ya armadas, explica cómo subirlas desde WhatsApp de escritorio');
+  ok(NODOS['ee-wa'] && typeof NODOS['ee-wa'].onclick === 'function', 'con un botón para abrir WhatsApp');
+  await NODOS['ee-guardar'].onclick();
+  ok(DESCARGAS.length === 3, 'un navegador sin carpetas: se descargan', DESCARGAS);
+
+  // Con carpeta: se guardan juntas y se borran los estados viejos
+  const CARPETA = { 'estado-01-Moto-G24.jpg': 1, 'estado-07-viejo.jpg': 1, 'factura.pdf': 1 };
+  ctx.window.showDirectoryPicker = async () => ({
+    name: 'Estados TechPoint',
+    async *entries() { for (const k of Object.keys(CARPETA)) yield [k, { kind: 'file' }]; },
+    async removeEntry(n) { delete CARPETA[n]; },
+    async getFileHandle(n) { return { async createWritable() { return { async write() { CARPETA[n] = 2; }, async close() {} }; } }; },
+  });
+  DESCARGAS.length = 0;
+  await run('eeCompartir(_l)');
+  ok(/Guardar en la carpeta/.test(NODOS['ee-mod'].innerHTML), 'Chrome/Edge: ofrece guardarlas en una carpeta');
+  await NODOS['ee-guardar'].onclick();
+  const k = Object.keys(CARPETA).sort();
+  ok(k.length === 4 && k.includes('factura.pdf') && !k.includes('estado-07-viejo.jpg') && !k.includes('estado-01-Moto-G24.jpg') && DESCARGAS.length === 0,
+     'quedan las de hoy, sin las viejas (y sin tocar otros archivos)', k);
+  ok(/Estados TechPoint/.test(TOASTS[TOASTS.length - 1]), 'y avisa dónde quedaron', TOASTS[TOASTS.length - 1]);
 
   TOASTS.length = 0;
   await run('eeCompartir([])');

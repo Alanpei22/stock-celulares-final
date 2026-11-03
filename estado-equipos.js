@@ -266,6 +266,13 @@ async function eeCompartir(equipos, btn) {
     _eeListo(archivos);
     return;
   }
+  // Compu: WhatsApp de escritorio ya deja subir estados (Novedades → ➕),
+  // pero hay que elegir las fotos de una carpeta. Antes se descargaban de a
+  // una y quedaban mezcladas en Descargas; ahora van juntas a una carpeta.
+  _eeListoPc(archivos);
+}
+
+function _eeDescargar(archivos) {
   archivos.forEach((f, i) => setTimeout(() => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(f);
@@ -273,7 +280,61 @@ async function eeCompartir(equipos, btn) {
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   }, i * 300));   // de a una: Chrome frena muchas descargas juntas
-  toast(`⬇️ ${archivos.length} imagen${archivos.length === 1 ? '' : 'es'} descargada${archivos.length === 1 ? '' : 's'}. Desde el celu sale directo a WhatsApp`, 'success');
+}
+
+// Las guarda en UNA carpeta (Chrome se acuerda de cuál fue la última vez).
+// Antes de guardar borra los estados viejos de esa carpeta: si no, al
+// elegirlas en WhatsApp se mezclan los de hoy con equipos ya vendidos.
+async function _eeGuardarEnCarpeta(archivos) {
+  const dir = await window.showDirectoryPicker({ id: 'tp-estados', mode: 'readwrite', startIn: 'pictures' });
+  const viejos = [];
+  for await (const [nombre, h] of dir.entries()) {
+    if (h.kind === 'file' && /^estado-\d+-.*\.jpg$/.test(nombre)) viejos.push(nombre);
+  }
+  for (const n of viejos) { try { await dir.removeEntry(n); } catch (e) { console.warn('[estado-equipos] borrar viejo:', n, e); } }
+  for (const f of archivos) {
+    const fh = await dir.getFileHandle(f.name, { create: true });
+    const w = await fh.createWritable();
+    await w.write(f); await w.close();
+  }
+  return dir.name;
+}
+
+function _eeListoPc(archivos) {
+  _eeEstilos();
+  eeCerrar();
+  const n = archivos.length;
+  const carpeta = typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
+  const ov = document.createElement('div');
+  ov.className = 'ee-ov'; ov.id = 'ee-ov'; ov.onclick = eeCerrar;
+  const m = document.createElement('div');
+  m.className = 'ee-mod'; m.id = 'ee-mod';
+  m.innerHTML = `<div class="ee-hd"><span>✅ ${n === 1 ? 'Listo' : n + ' listos'}</span><button type="button" class="ee-x" onclick="eeCerrar()">✕</button></div>
+    <ol class="ee-pasos">
+      <li>${carpeta ? 'Guardalas en una carpeta (la primera vez creá una, por ejemplo <b>Estados TechPoint</b>; después se acuerda sola).'
+                    : 'Se bajan a la carpeta <b>Descargas</b>.'}</li>
+      <li>En <b>WhatsApp</b> de la compu: <b>Novedades</b> (el circulito) → <b>➕</b> → <b>Fotos y videos</b>.</li>
+      <li>Entrá a esa carpeta, apretá <b>Ctrl+A</b> para elegir todas y <b>Enviar</b>.</li>
+    </ol>
+    <button type="button" class="ee-ir" id="ee-guardar">${carpeta ? '💾 Guardar en la carpeta' : '⬇️ Descargar'}</button>
+    <button type="button" class="ee-ir ee-ir--2" id="ee-wa">🟢 Abrir WhatsApp</button>
+    <p class="ee-ayuda" style="margin-top:10px">¿No ves el ➕ en Novedades? Actualizá WhatsApp desde Microsoft Store: la opción de subir estados desde la compu se está habilitando de a poco.</p>`;
+  document.body.appendChild(ov);
+  document.body.appendChild(m);
+  document.getElementById('ee-guardar').onclick = async () => {
+    if (!carpeta) { _eeDescargar(archivos); toast(`⬇️ ${n} imagen${n === 1 ? '' : 'es'} en Descargas`, 'success'); return; }
+    try {
+      const nom = await _eeGuardarEnCarpeta(archivos);
+      toast(`💾 ${n} imagen${n === 1 ? '' : 'es'} en la carpeta "${nom}"`, 'success');
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      console.error('[estado-equipos] carpeta:', e);
+      _eeDescargar(archivos);
+      toast('No se pudo usar la carpeta: van a Descargas', 'info');
+    }
+  };
+  // La app de escritorio se abre con su link propio (lo mismo que waAbrir)
+  document.getElementById('ee-wa').onclick = () => { location.href = 'whatsapp://'; };
 }
 
 function _eeListo(archivos) {
@@ -329,7 +390,10 @@ function _eeEstilos() {
 .ee-fila input{width:20px;height:20px;flex:none}
 .ee-todos{font-size:13px;background:none;border:0;color:#2563eb;cursor:pointer;padding:4px 0;margin-bottom:4px}
 .ee-ir{width:100%;margin-top:12px;padding:14px;border:0;border-radius:12px;background:#25D366;color:#fff;font-weight:700;font-size:16px;cursor:pointer}
-.ee-ir:disabled{opacity:.6}`;
+.ee-ir:disabled{opacity:.6}
+.ee-ir--2{background:#0f2b52}
+.ee-pasos{margin:4px 0 6px 18px;padding:0;font-size:14px;line-height:1.45}
+.ee-pasos li{margin-bottom:6px}`;
   document.head.appendChild(st);
 }
 
