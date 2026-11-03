@@ -12,7 +12,7 @@ const leer = f => fs.readFileSync(DIR + f, 'utf8');
 const TOASTS = [], DESCARGAS = [];
 const NODOS = {};
 const fakeEl = id => ({ id, onclick: null, set innerHTML(v) { this._h = v; }, get innerHTML() { return this._h || ''; },
-  className: '', remove() { delete NODOS[this.id]; }, click() { DESCARGAS.push(this.download); } });
+  className: '', classList: { _on: {}, toggle(c, v) { this._on[c] = !!v; } }, remove() { delete NODOS[this.id]; }, click() { DESCARGAS.push(this.download); } });
 const ctx = {
   console, Math, Number, Symbol, String, Array, Object, JSON, Map, Promise, setTimeout: f => f(), Error,
   toast: (m, t) => TOASTS.push(m),
@@ -68,9 +68,21 @@ ok(run('eeTextos(_e)').precio === 'Consultar precio' && run('eeTextos(_e)').cond
 ctx._e = run(`eeDesdeStock({ marca: 'Motorola', modelo: 'Motorola Edge 50' })`);
 ok(run('eeTextos(_e)').nombre === 'Motorola Edge 50', 'la marca no sale dos veces');
 
+console.log('\n2b) Todas las fotos del equipo');
+// Alan (03/11): "que se puedan subir todas las imágenes que estén subidas del equipo"
+ctx._m = [run(`eeDesdeStock({ id: 'm', marca: 'Apple', modelo: 'iPhone 13', fotos: ['https://a/1', 'https://a/2', 'https://a/3'] })`), L[1]];
+const P = run('eePiezas(_m)');
+ok(P.length === 4, 'un equipo con 3 fotos da 3 imágenes (y uno sin fotos, 1)', P.length);
+ok(P[0].n === 0 && P[0].total === 3 && P[0].foto === 'https://a/1' && P[2].foto === 'https://a/3', 'la primera es la portada, las otras la galería, en orden');
+ok(P[3].foto === null && P[3].total === 1, 'sin fotos: una sola, con el dibujito');
+ok(run('eeCuantasImagenes(_m)') === 4, 'se cuentan imágenes, no equipos (WhatsApp sube hasta 30)');
+ok(/-foto2\.jpg$/.test(run('_eeNombreArchivo(_p, 1)'.replace('_p', 'eePiezas(_m)[1]'))), 'el archivo dice qué foto es');
+
 console.log('\n3) Mandarlas');
 // El dibujo necesita un canvas de verdad: se reemplaza por uno de mentira.
-run(`eeDibujar = async () => ({ size: 1 })`);
+const OPC = [];
+ctx._OPC = OPC;
+run(`eeDibujar = async (pz, op) => { _OPC.push(op); return { size: 1 }; }`);
 ctx._waEsCompu = () => false;
 ctx.navigator.canShare = () => true;
 let COMPARTIDO = null;
@@ -110,6 +122,24 @@ ctx.navigator.share = async d => { COMPARTIDO = d; };
   ok(k.length === 4 && k.includes('factura.pdf') && !k.includes('estado-07-viejo.jpg') && !k.includes('estado-01-Moto-G24.jpg') && DESCARGAS.length === 0,
      'quedan las de hoy, sin las viejas (y sin tocar otros archivos)', k);
   ok(/Estados TechPoint/.test(TOASTS[TOASTS.length - 1]), 'y avisa dónde quedaron', TOASTS[TOASTS.length - 1]);
+
+  OPC.length = 0;
+  ctx._waEsCompu = () => false;
+  await run('eeCompartir(_m, null, { precio: false })');
+  ok(OPC.length === 4 && OPC.every(o => o && o.precio === false), '"sin precio" llega a cada imagen', OPC);
+
+  console.log('\n3b) Con o sin precio: se pregunta cada vez');
+  ctx.STOCK = [{ id: 'z', publicar: true, marca: 'Moto', modelo: 'G24', precio: 190000, fotos: ['https://a/1', 'https://a/2'] }];
+  run('eeEstadoDe("z")');
+  const h = NODOS['ee-mod'].innerHTML;
+  ok(/¿Va con el precio\?/.test(h) && /Con precio/.test(h) && /Sin precio/.test(h), 'el cuadro pregunta si va con precio');
+  ok(/Estado de este equipo/.test(h), 'el botón de la ficha abre el mismo cuadro, con ese equipo solo');
+  ok(NODOS['ee-ir'].disabled === true && /Elegí arriba si va con precio/.test(NODOS['ee-ir'].textContent), 'sin elegir, no arma nada');
+  run('eeConPrecio(false)');
+  ok(NODOS['ee-p-no'].classList._on.on === true && NODOS['ee-p-si'].classList._on.on === false, 'se marca la opción elegida');
+  ok(!/Elegí arriba/.test(NODOS['ee-ir'].textContent), 'elegida, ya se puede armar', NODOS['ee-ir'].textContent);
+  run('eeAbrir()');
+  ok(NODOS['ee-ir'].disabled === true, 'y la próxima vez vuelve a preguntar (no se queda con la anterior)');
 
   TOASTS.length = 0;
   await run('eeCompartir([])');
