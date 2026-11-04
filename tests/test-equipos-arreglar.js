@@ -75,6 +75,29 @@ ok(/15/.test(run(`arrValidar({ marca: 'Moto', falla: 'x', imei: '123' })`)), 'un
   await run('arrPaso(_id, "listo")');
   ok(DB[k].estado === 'listo' && DB[k].costoArreglo === 25000 && DB[k].fechaListo, '✅ Quedó listo: pregunta cuánto se gastó en el arreglo', DB[k]);
 
+  console.log('\n3b) Cambiar el estado a mano');
+  // Alan: "que tenga una forma de cambiar el estado de reparación"
+  run('arrElegirEstado(_id)');
+  const hEst = NODOS['eqa-mod'].innerHTML;
+  ok(/Por arreglar/.test(hEst) && /Arreglando/.test(hEst) && /Listo/.test(hEst) && !/A la venta/.test(hEst), 'tocando el estado se elige entre los tres (a la venta es pasarlo al stock)');
+  ok(/class="eqa-op on" disabled[\s\S]*?Listo[\s\S]*?está así/.test(hEst), 'marca en cuál está ahora');
+  await run('arrElegido(_id, "pendiente")');
+  ok(DB[k].estado === 'pendiente', 'se puede volver atrás (por ejemplo, a "Por arreglar")', DB[k].estado);
+  await run('arrElegido(_id, "arreglando")');
+  ok(DB[k].estado === 'arreglando', 'o a cualquier otro');
+  // Desde ✏️ Editar también
+  run('arrEditar(_id)');
+  ok(/<select id="eqa-estado">/.test(NODOS['eqa-mod'].innerHTML) && /value="arreglando" selected/.test(NODOS['eqa-mod'].innerHTML), 'al editar está el estado, con el actual elegido');
+  ['marca', 'modelo', 'falla', 'almacenamiento', 'color', 'imei', 'bateria', 'notas'].forEach(c => { el('eqa-' + c).value = String(DB[k][c] == null ? '' : DB[k][c]); });
+  el('eqa-costoCompra').value = '90000'; el('eqa-costoArreglo').value = '25000';
+  el('eqa-estado').value = 'listo';
+  await run('arrGuardarForm()');
+  ok(DB[k].estado === 'listo' && DB[k].costoArreglo === 25000, 'y se guarda desde ahí', DB[k].estado);
+  run('arrEditar()');
+  ok(!/eqa-estado/.test(NODOS['eqa-mod'].innerHTML), 'uno nuevo no lo pregunta: arranca "Por arreglar"');
+  const lst = leer('equipos-arreglar.js');
+  ok(/onclick="arrElegirEstado\('\$\{id\}'\)"/.test(lst), 'el cartelito del estado de cada equipo se toca');
+
   console.log('\n4) Poner a la venta');
   run('arrPonerALaVenta(_id)');
   ok(ctx.FORM_ABIERTO, 'abre el formulario de siempre del stock');

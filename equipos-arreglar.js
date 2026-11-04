@@ -30,6 +30,9 @@ const ARR_ESTADOS = {
   a_la_venta: { lbl: 'A la venta',   ico: '💰' },
 };
 
+// Los que se eligen a mano (cambiar estado). "A la venta" no: eso es pasarlo al stock.
+const ARR_PASOS = ['pendiente', 'arreglando', 'listo'];
+
 let ARREGLOS = [];
 let _arrUnsub = null;
 let _arrFiltro = 'todos';
@@ -126,6 +129,12 @@ function _arrEstilos() {
 .eqa-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
 .eqa-nom{font-weight:800;font-size:15px}
 .eqa-est{font-size:12px;font-weight:700;white-space:nowrap;padding:3px 9px;border-radius:999px;background:rgba(128,128,128,.14)}
+.eqa-est--btn{border:1.5px solid rgba(128,128,128,.3);color:inherit;cursor:pointer;padding:5px 10px;font-family:inherit}
+.eqa-ops{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.eqa-op{display:flex;align-items:center;gap:10px;padding:14px;border-radius:12px;border:2px solid rgba(128,128,128,.25);background:none;color:inherit;font-size:16px;font-weight:700;cursor:pointer;text-align:left;font-family:inherit}
+.eqa-op.on{border-color:#2563eb;background:rgba(37,99,235,.1);cursor:default}
+.eqa-op small{margin-left:auto;font-size:12px;font-weight:600;opacity:.7}
+.eqa-f select{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1.5px solid rgba(128,128,128,.3);background:transparent;color:inherit;font-size:15px;font-family:inherit}
 .eqa-falla{font-size:14px;margin:6px 0 4px}
 .eqa-dato{font-size:12px;opacity:.75}
 .eqa-acc{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
@@ -199,7 +208,7 @@ function arrPintarLista() {
     acc += `<button type="button" class="eqa-btn eqa-btn--chico" onclick="arrEditar('${id}')" title="Editar">✏️</button>`;
     acc += `<button type="button" class="eqa-btn eqa-btn--x" onclick="arrBorrar('${id}')" title="Sacar de la lista">🗑️</button>`;
     return `<div class="eqa-item${a.estado === 'listo' ? ' eqa-item--listo' : ''}">
-      <div class="eqa-top"><span class="eqa-nom">${_arrEsc(arrNombre(a))}</span><span class="eqa-est">${e.ico} ${e.lbl}</span></div>
+      <div class="eqa-top"><span class="eqa-nom">${_arrEsc(arrNombre(a))}</span><button type="button" class="eqa-est eqa-est--btn" onclick="arrElegirEstado('${id}')" title="Cambiar el estado">${e.ico} ${e.lbl} ▾</button></div>
       <div class="eqa-falla">🛠️ ${_arrEsc(a.falla || 'Sin anotar qué necesita')}</div>
       ${datos ? `<div class="eqa-dato">${_arrEsc(datos)}</div>` : ''}
       ${a.notas ? `<div class="eqa-dato">📝 ${_arrEsc(a.notas)}</div>` : ''}
@@ -229,6 +238,8 @@ function arrEditar(id) {
         <div><label>Marca</label><input id="eqa-marca" value="${v('marca')}" placeholder="Samsung" autocomplete="off"></div>
         <div><label>Modelo</label><input id="eqa-modelo" value="${v('modelo')}" placeholder="Galaxy A32" autocomplete="off"></div>
       </div>
+      ${a ? `<label>Estado</label>
+      <select id="eqa-estado">${ARR_PASOS.map(k => `<option value="${k}"${a.estado === k ? ' selected' : ''}>${ARR_ESTADOS[k].ico} ${ARR_ESTADOS[k].lbl}</option>`).join('')}</select>` : ''}
       <label>¿Qué necesita? *</label>
       <textarea id="eqa-falla" rows="2" placeholder="Cambio de módulo, batería, pin de carga…">${v('falla')}</textarea>
       <div class="eqa-2">
@@ -259,6 +270,9 @@ function arrLeerForm() {
     imei: val('imei').replace(/\D/g, ''), notas: val('notas'),
     bateria: Math.min(100, arrNum(val('bateria'))) || null,
   };
+  // El estado solo está al editar (uno nuevo arranca "por arreglar")
+  const est = val('estado');
+  if (ARR_PASOS.includes(est)) d.estado = est;
   // Si el empleado no ve los campos de plata, no se pisan
   if (document.getElementById('eqa-costoCompra')) {
     d.costoCompra = arrNum(val('costoCompra').replace(/\D/g, ''));
@@ -284,6 +298,8 @@ async function arrGuardarForm() {
   if (btn) btn.disabled = true;
   try {
     if (_arrEditId) {
+      const antes = ARREGLOS.find(x => x.id === _arrEditId);
+      if (d.estado === 'listo' && antes && antes.estado !== 'listo') d.fechaListo = new Date().toISOString();
       await _arrGuardar(_arrEditId, d);
       const a = ARREGLOS.find(x => x.id === _arrEditId);
       if (a) Object.assign(a, d);
@@ -301,6 +317,30 @@ async function arrGuardarForm() {
     console.error('[arreglos] guardar:', e);
     toast('No se pudo guardar — revisá la conexión', 'error');
   } finally { if (btn) btn.disabled = false; }
+}
+
+// Alan: "que tenga una forma de cambiar el estado de reparación". Los
+// botones de abajo solo avanzan un paso; tocando el cartelito del estado
+// se elige cualquiera (por ejemplo, volver a "Por arreglar" si se trabó
+// esperando un repuesto). "A la venta" no está acá: eso es pasarlo al stock.
+
+function arrElegirEstado(id) {
+  const a = ARREGLOS.find(x => x.id === id);
+  if (!a) return;
+  const ops = ARR_PASOS.map(k => {
+    const e = ARR_ESTADOS[k], ahora = a.estado === k;
+    return `<button type="button" class="eqa-op${ahora ? ' on' : ''}" ${ahora ? 'disabled' : `onclick="arrElegido('${_arrEsc(id)}','${k}')"`}>
+      <span>${e.ico}</span><span>${e.lbl}</span>${ahora ? '<small>(está así)</small>' : ''}</button>`;
+  }).join('');
+  _arrModal(`<div class="eqa-hd"><span>Cambiar estado</span><button type="button" class="eqa-x" onclick="arrAbrir()">✕</button></div>
+    <p class="eqa-sub">${_arrEsc(arrNombre(a))} · ${_arrEsc(a.falla || '')}</p>
+    <div class="eqa-ops">${ops}</div>
+    <button type="button" class="eqa-volver" onclick="arrAbrir()">← Volver a la lista</button>`);
+}
+
+async function arrElegido(id, estado) {
+  arrAbrir();
+  await arrPaso(id, estado);
 }
 
 // Pasar de un paso al otro
