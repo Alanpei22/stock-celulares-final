@@ -1566,6 +1566,7 @@ async function etiquetaDe(id) {
 }
 
 function closeForm() {
+  if (typeof arrFormCerrado === 'function') arrFormCerrado();
   document.getElementById('form-modal').classList.add('hidden');
   document.body.style.overflow = '';
   editingId = null;
@@ -1657,6 +1658,8 @@ async function savePhone() {
       await db.collection('stock').doc(id).set(newDoc);
       if (typeof catSubirPendientes === 'function') catSubirPendientes(id);
       if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc: newDoc, cant: 1, motivo: 'alta' });   // 📜 registro
+      // Si venía de 🔧 Equipos para arreglar, sale de esa lista
+      if (typeof arrALaVentaGuardado === 'function') arrALaVentaGuardado(id);
       toast('Equipo agregado al stock ✅', 'success');
       // 📨 Aviso Telegram: equipo cargado para la venta
       if (typeof tgNotify === 'function') {

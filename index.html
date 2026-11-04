@@ -112,6 +112,8 @@
       <div class="stat stat--vendidos" onclick="filterToSold()" style="cursor:pointer"><span class="stat-num" id="s-sold">0</span><span class="stat-lbl">Vendidos</span></div>
       <div class="stat" onclick="filterToUbicacion('Exhibición')" style="cursor:pointer"><span class="stat-num" id="s-exhibicion">0</span><span class="stat-lbl">Exhibición</span></div>
       <div class="stat" onclick="filterToUbicacion('Depósito')" style="cursor:pointer"><span class="stat-num" id="s-deposito">0</span><span class="stat-lbl">Depósito</span></div>
+      <!-- Los del local que necesitan un arreglo antes de venderse (equipos-arreglar.js) -->
+      <div class="stat" onclick="arrAbrir()" style="cursor:pointer" title="Equipos del local para arreglar"><span class="stat-num" id="s-arreglar">0</span><span class="stat-lbl">🔧 Para arreglar</span></div>
     </div>
     <div id="stock-lowqty-banner" class="lowstock-banner" style="display:none">
       <div class="lowstock-banner-hdr" onclick="toggleStockLowBanner()">
@@ -2434,6 +2436,7 @@
 <script defer src="carteles.js"></script>
 <script defer src="estados.js"></script>
 <script defer src="estado-equipos.js"></script>
+<script defer src="equipos-arreglar.js"></script>
 <script defer src="venta-articulos.js"></script>
 <script defer src="qz-print.js"></script>
 <script defer src="bluetooth-print.js"></script>
