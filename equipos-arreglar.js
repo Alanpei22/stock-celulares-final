@@ -131,7 +131,7 @@ function _arrEstilos() {
 .eqa-acc{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .eqa-btn{flex:1 1 auto;padding:9px 10px;border-radius:10px;border:1.5px solid rgba(128,128,128,.3);background:none;color:inherit;font-weight:700;font-size:13px;cursor:pointer}
 .eqa-btn--si{background:#22c55e;border-color:#22c55e;color:#fff}
-.eqa-btn--venta{background:#f59e0b;border-color:#f59e0b;color:#111}
+.eqa-btn--venta{background:#f59e0b;border-color:#f59e0b;color:#111;flex-basis:100%}
 .eqa-btn--x,.eqa-btn--chico{flex:0 0 auto}
 .eqa-btn--x{color:#dc2626}
 .eqa-vacio{text-align:center;padding:30px 10px;opacity:.7;font-size:14px}
@@ -195,6 +195,7 @@ function arrPintarLista() {
       acc += `<button type="button" class="eqa-btn eqa-btn--venta" onclick="arrPonerALaVenta('${id}')">💰 Poner a la venta</button>`;
       acc += `<button type="button" class="eqa-btn" onclick="arrPaso('${id}','arreglando')">↩️ Le falta algo</button>`;
     }
+    acc += `<button type="button" class="eqa-btn eqa-btn--chico" onclick="arrEtiqueta('${id}')" title="Imprimir etiqueta">🏷️</button>`;
     acc += `<button type="button" class="eqa-btn eqa-btn--chico" onclick="arrEditar('${id}')" title="Editar">✏️</button>`;
     acc += `<button type="button" class="eqa-btn eqa-btn--x" onclick="arrBorrar('${id}')" title="Sacar de la lista">🗑️</button>`;
     return `<div class="eqa-item${a.estado === 'listo' ? ' eqa-item--listo' : ''}">
@@ -210,6 +211,7 @@ function arrPintarLista() {
     <p class="eqa-sub">Los celus del local que necesitan un arreglo antes de venderse. No están en el stock: cuando quedan listos, los ponés a la venta desde acá.${verPlata && r.invertido ? ` Hay <b>${_arrPlata(r.invertido)}</b> invertidos esperando.` : ''}</p>
     <button type="button" class="eqa-nuevo" onclick="arrEditar()">＋ Anotar un equipo</button>
     <div class="eqa-chips">${chip('todos', 'Todos', r.total)}${chip('pendiente', '🔴 Por arreglar', r.pendiente)}${chip('arreglando', '🔧 Arreglando', r.arreglando)}${chip('listo', '✅ Listos', r.listo)}</div>
+    ${lista.length ? `<button type="button" class="eqa-chip" style="margin-bottom:10px" onclick="arrEtiquetasTodas()">🏷️ Imprimir ${lista.length === 1 ? 'la etiqueta' : `las ${lista.length} etiquetas`}${_arrFiltro === 'todos' ? '' : ' de este paso'}</button>` : ''}
     ${items || `<div class="eqa-vacio">${r.total ? 'No hay equipos en este paso.' : 'No hay equipos para arreglar.<br>Tocá <b>＋ Anotar un equipo</b> para sumar el primero.'}</div>`}`;
 }
 
@@ -291,7 +293,7 @@ async function arrGuardarForm() {
       const nuevo = { ...d, estado: 'pendiente', activo: true, fecha: new Date().toISOString() };
       await _arrGuardar(id, nuevo);
       if (!ARREGLOS.some(x => x.id === id)) ARREGLOS.push({ id, ...nuevo });
-      toast('🔧 Anotado para arreglar', 'success');
+      toast('🔧 Anotado. Tocá 🏷️ para imprimirle la etiqueta', 'success');
     }
     arrPintarContador();
     arrAbrir();
@@ -341,6 +343,56 @@ async function arrBorrar(id) {
     console.error('[arreglos] borrar:', e);
     toast('No se pudo sacar — revisá la conexión', 'error');
   }
+}
+
+// ── Etiqueta ──────────────────────────────────────────────
+// Alan: "agregar la impresión de una etiqueta para esos equipos que faltan
+// reparar". Para pegarle al equipo (o a la bolsita) y que en el cajón se
+// sepa cuál es y qué le falta, sin abrir la app. Sale por la misma
+// etiquetadora, el mismo tamaño y la misma impresión directa/remota que la
+// "Etiqueta en blanco" (etiqueta-libre.js): no hay que tocar nada más.
+function arrEtiquetaDatos(a) {
+  const f = a.fecha ? new Date(a.fecha) : null;
+  const fecha = f && !isNaN(f) ? `${String(f.getDate()).padStart(2, '0')}/${String(f.getMonth() + 1).padStart(2, '0')}` : '';
+  // El IMEI va solo en su renglón: con el color al lado no entraba y se partía
+  return {
+    titulo: arrNombre(a),
+    lineas: [
+      '🔧 ' + (String(a.falla || '').trim() || 'Revisar'),
+      a.imei ? 'IMEI ' + a.imei : '',
+      ['PARA ARREGLAR', a.color, fecha ? 'desde ' + fecha : ''].filter(Boolean).join(' · '),
+    ].filter(Boolean),
+    codigo: '',
+    copias: 1,
+  };
+}
+
+function arrEtiquetasDoc(lista) {
+  if (typeof _hojaEtiquetas !== 'function' || typeof etiquetaLibreHtml !== 'function') return '';
+  const html = _hojaEtiquetas((lista || []).map(arrEtiquetaDatos), etiquetaLibreHtml);
+  // El estilo de los renglones sueltos es el de la etiqueta en blanco
+  return typeof _ETQL_CSS === 'string' ? html.replace('</style>', _ETQL_CSS + '</style>') : html;
+}
+
+// OJO: sin await antes de imprimir. Sin QZ Tray la ventana de impresión
+// tiene que abrirse en el mismo toque, si no Chrome la bloquea.
+function _arrImprimir(lista) {
+  if (!lista.length) { toast('No hay equipos para imprimir', 'info'); return; }
+  const html = arrEtiquetasDoc(lista);
+  if (!html) { toast('No se puede imprimir desde acá', 'error'); return; }
+  const tit = lista.length === 1 ? 'Etiqueta' : `Etiquetas (${lista.length})`;
+  if (typeof _imprimirTocando === 'function') _imprimirTocando('etiqueta', html, tit);
+  else if (typeof _openPrint === 'function') _openPrint(html, tit);
+}
+
+function arrEtiqueta(id) {
+  const a = ARREGLOS.find(x => x.id === id);
+  if (a) _arrImprimir([a]);
+}
+
+// Las de la lista que se está mirando (todas, o solo "por arreglar", etc.)
+function arrEtiquetasTodas() {
+  _arrImprimir(arrOrdenar(ARREGLOS.filter(a => a.activo && (_arrFiltro === 'todos' || a.estado === _arrFiltro))));
 }
 
 // ── Poner a la venta ──────────────────────────────────────

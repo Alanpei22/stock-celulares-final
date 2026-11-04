@@ -107,6 +107,31 @@ ok(/15/.test(run(`arrValidar({ marca: 'Moto', falla: 'x', imei: '123' })`)), 'un
   ok(run('arrVePlata()') === false, 'igual que el costo del stock');
   EMPLEADO = false;
 
+  console.log('\n6b) La etiqueta');
+  // Alan: "agregar la impresión de una etiqueta para esos equipos que faltan reparar"
+  const et = run(`arrEtiquetaDatos({ marca: 'Samsung', modelo: 'Galaxy A32', almacenamiento: '128GB', falla: 'Cambio de módulo', color: 'Negro', imei: '356938035643809', fecha: '2026-10-28T12:00:00' })`);
+  ok(et.titulo === 'Samsung Galaxy A32 128GB' && et.lineas[0] === '🔧 Cambio de módulo', 'dice qué equipo es y qué le falta', et);
+  ok(et.lineas[1] === 'IMEI 356938035643809' && /PARA ARREGLAR · Negro · desde 28\/10/.test(et.lineas[2]), 'el IMEI en su renglón, y que es para arreglar desde cuándo', et.lineas);
+  ok(et.lineas.length <= 3, 'entra en el rollo (máximo 3 renglones abajo del nombre)');
+  ok(run(`arrEtiquetaDatos({ modelo: 'G52' })`).lineas.join('|') === '🔧 Revisar|PARA ARREGLAR', 'sin datos, igual sale algo útil');
+  const IMPRESO = [];
+  ctx._hojaEtiquetas = (items, fn) => '<style></style>' + items.map(i => i.titulo).join(',');
+  ctx.etiquetaLibreHtml = () => '';
+  ctx._imprimirTocando = (tipo, html, tit) => IMPRESO.push({ tipo, html, tit });
+  ctx.ARREGLOS = null;
+  run(`ARREGLOS = [{ id: 'e1', activo: true, estado: 'pendiente', marca: 'Moto', modelo: 'G52', fecha: '2026-11-01' },
+                   { id: 'e2', activo: true, estado: 'listo', marca: 'Apple', modelo: 'iPhone 11', fecha: '2026-11-02' }]; _arrFiltro = 'todos'`);
+  run('arrEtiqueta("e1")');
+  ok(IMPRESO[0] && IMPRESO[0].tipo === 'etiqueta' && /Moto G52/.test(IMPRESO[0].html), 'el 🏷️ de cada equipo la imprime por la etiquetadora (directa o remota, como las otras)', IMPRESO[0]);
+  run('arrEtiquetasTodas()');
+  ok(/Apple iPhone 11,Moto G52/.test(IMPRESO[1].html) && /Etiquetas \(2\)/.test(IMPRESO[1].tit), 'y "imprimir todas" saca las de la lista que estás mirando');
+  run(`_arrFiltro = 'pendiente'`); run('arrEtiquetasTodas()');
+  ok(IMPRESO[2].html.endsWith('Moto G52'), 'con un filtro puesto, solo las de ese paso');
+  const src = leer('equipos-arreglar.js');
+  const fnImp = (src.match(/function _arrImprimir[\s\S]*?\n\}/) || [''])[0];
+  ok(fnImp && !/await/.test(fnImp), 'imprime en el mismo toque (si espera algo, Chrome bloquea la ventana)');
+  ok(/onclick="arrEtiqueta\('\$\{id\}'\)"/.test(src) && /onclick="arrEtiquetasTodas\(\)"/.test(src), 'los botones están en la lista');
+
   console.log('\n7) Enganchado');
   const app = leer('app.js'), html = leer('index.html');
   ok(/arrALaVentaGuardado\(id\)/.test(app), 'savePhone avisa cuando el equipo entra al stock');
