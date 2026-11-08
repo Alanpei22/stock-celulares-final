@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-lista-precios.js': '📋 Lista de precios para los estados: todo el stock en una imagen, un renglón por equipo, nuevos aparte y en varias si no entra',
   'test-equipos-arreglar.js': '🔧 Equipos para arreglar: los del local que necesitan un arreglo; listos, pasan al stock con el formulario completo y el costo = compra + arreglo',
   'test-estado-equipos.js': 'Estados de WhatsApp: una imagen por equipo publicado (foto, precio, datos del local) lista para "Mi estado"',
   'test-ingreso-no-se-pierde.js': 'El ingreso de una reparación no se pierde por tocar el fondo: la ✕, Cancelar y Escape preguntan si ya cargaste algo',

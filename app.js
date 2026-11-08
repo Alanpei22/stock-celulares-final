@@ -678,6 +678,8 @@ function toggleHdrMenu() {
         onClick: () => (typeof catAbrirPagina === 'function') && catAbrirPagina() },
       { icon: '📲', label: 'Estados de WhatsApp', sub: 'Una imagen por equipo publicado, lista para "Mi estado"',
         onClick: () => (typeof eeAbrir === 'function') && eeAbrir() },
+      { icon: '📋', label: 'Lista de precios', sub: 'Una imagen con todo el stock, un renglón por equipo',
+        onClick: () => (typeof lpAbrir === 'function') && lpAbrir() },
     ]),
     sheetGrupo(toggleHdrMenu, 'Etiquetas, carteles e impresión', '🏷️', 'Etiquetas, carteles e impresión', 'Carteles de vidriera, etiquetas e impresora', [
       { icon: '🪧', label: 'Carteles de exhibición', sub: 'Los de la vidriera: 8 por hoja A4',

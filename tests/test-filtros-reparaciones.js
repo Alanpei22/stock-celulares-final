@@ -15,6 +15,16 @@ const ok = (c, l, x) => { console.log((c ? '  OK  ' : '  FAIL') + ' · ' + l + (
 const leer = f => fs.readFileSync(DIR + f, 'utf8');
 
 // ── Sandbox con repairs.js de verdad ────────────────────────
+// Reloj fijo en el 9/10 (el mismo "hoy" que _todayAR de abajo). La lista de
+// reparaciones muestra los últimos 30 días: con el reloj de verdad, las
+// reparaciones de prueba (del 8/10) quedaron afuera el 8/11 y la prueba
+// empezó a fallar sola.
+const _AHORA_FIJO = Date.parse('2026-10-09T15:00:00.000Z');
+class FechaFija extends Date {
+  constructor(...a) { super(...(a.length ? a : [_AHORA_FIJO])); }
+  static now() { return _AHORA_FIJO; }
+}
+
 function arrancar(LS = {}) {
   const els = {};
   const opcion = (value, textContent) => ({ value, textContent });
@@ -36,7 +46,7 @@ function arrancar(LS = {}) {
    'rep-empty', 'rep-add-btn', 'rep-stats-btn'].forEach(id => el(id));
 
   const ctx = {
-    console, setTimeout: f => f(), clearTimeout, Date, Math, JSON,
+    console, setTimeout: f => f(), clearTimeout, Date: FechaFija, Math, JSON,
     document: {
       // initRepairs engancha media pantalla: lo que no se declaró arriba se
       // inventa al vuelo, así el test no tiene que listar 40 ids.
