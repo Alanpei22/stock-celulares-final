@@ -468,6 +468,113 @@ function arrPonerALaVenta(id) {
   if (t) t.textContent = '💰 Poner a la venta';
   toast('Completá el precio (y las fotos si querés) y guardá', 'info');
   setTimeout(() => document.getElementById('fi-precio')?.focus(), 350);
+  _arrSugerir(a);
+}
+
+// ── Precio sugerido ───────────────────────────────────────
+// Alan (08/11) eligió "precio sugerido al poner a la venta": que la app
+// diga a cuánto conviene publicarlo. Se mira, en este orden:
+//   1) a cuánto vendiste los iguales (misma marca y modelo, usados, último
+//      año; si hay de la misma capacidad, solo esos),
+//   2) si nunca vendiste uno, a cuánto tenés publicados los iguales,
+//   3) si no hay ninguno, tu costo + el margen que le venís sacando a los
+//      equipos vendidos (35% si todavía no hay con qué calcularlo).
+// El número del medio (mediana), no el promedio: una venta regalada o una
+// carísima no lo corren.
+function _arrNormMod(marca, modelo) {
+  const n = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+  let m = n(modelo);
+  const ma = n(marca);
+  if (ma && m.startsWith(ma + ' ')) m = m.slice(ma.length + 1);
+  // "Galaxy A32" y "A32" son el mismo: cada uno lo carga como le sale
+  m = m.replace(/^galaxy\s+/, '');
+  return n(marca === 'Apple' || /iphone/i.test(modelo) ? 'apple' : ma) + '|' + m.replace(/\s+/g, '');
+}
+function _arrCapGB(c) {
+  const m = String(c || '').match(/(\d+)\s*(GB|TB)/i);
+  return m ? Number(m[1]) * (/tb/i.test(m[2]) ? 1024 : 1) : 0;
+}
+function _arrMediana(v) {
+  const a = v.slice().sort((x, y) => x - y), i = Math.floor(a.length / 2);
+  return a.length % 2 ? a[i] : (a[i - 1] + a[i]) / 2;
+}
+const _arrRedondear = (n, usd) => usd ? Math.round(n / 5) * 5 : Math.round(n / 5000) * 5000;
+
+function arrPrecioSugerido(a, stock, opciones) {
+  const o = opciones || {};
+  const ahora = o.ahora || Date.now();
+  const costo = arrInvertido(a);
+  const clave = _arrNormMod(a.marca, a.modelo);
+  const cap = _arrCapGB(a.almacenamiento);
+  const iguales = (stock || []).filter(p => p && !p.eliminado && p.estado !== 'Nuevo'
+    && Number(p.precio) > 0 && _arrNormMod(p.marca, p.modelo) === clave);
+  const unAnio = 365 * 864e5;
+  const vendidos = iguales.filter(p => p.vendido && (!p.fecha_venta || ahora - Date.parse(p.fecha_venta) <= unAnio));
+  const enStock = iguales.filter(p => !p.vendido);
+  const mismaCap = arr => { if (!cap) return { l: arr, cap: false }; const c = arr.filter(p => _arrCapGB(p.almacenamiento) === cap); return c.length ? { l: c, cap: true } : { l: arr, cap: false }; };
+  const fuente = vendidos.length ? 'vendidos' : enStock.length ? 'stock' : null;
+  if (fuente) {
+    const { l, cap: conCap } = mismaCap(fuente === 'vendidos' ? vendidos : enStock);
+    const usd = l.filter(p => p.moneda === 'usd' && Number(p.precioUSD) > 0);
+    const enUsd = usd.length > l.length / 2;
+    const precio = _arrRedondear(_arrMediana(enUsd ? usd.map(p => Number(p.precioUSD)) : l.map(p => Number(p.precio))), enUsd);
+    return { precio, moneda: enUsd ? 'usd' : 'ars', fuente, n: l.length, mismaCapacidad: conCap, costo };
+  }
+  if (costo > 0) {
+    const conCosto = (stock || []).filter(p => p && p.vendido && Number(p.costo) > 0 && Number(p.precio) > Number(p.costo));
+    let margen = conCosto.length >= 3 ? _arrMediana(conCosto.map(p => (p.precio - p.costo) / p.costo)) : 0.35;
+    margen = Math.min(1, Math.max(0.15, margen));
+    return { precio: _arrRedondear(costo * (1 + margen), false), moneda: 'ars', fuente: 'margen', margen, n: conCosto.length, costo };
+  }
+  return null;
+}
+
+// El texto que se muestra debajo del precio
+function arrSugeridoTexto(s, dolar) {
+  if (!s) return '';
+  const plata = (n, usd) => usd ? `U$S ${Math.round(n).toLocaleString('es-AR')}` : '$' + Math.round(n).toLocaleString('es-AR');
+  const usd = s.moneda === 'usd';
+  const capTxt = s.mismaCapacidad ? ' de la misma capacidad' : '';
+  const porque = s.fuente === 'vendidos'
+    ? `es lo que cobraste por ${s.n === 1 ? 'el igual' : `los ${s.n} iguales`}${capTxt} que vendiste`
+    : s.fuente === 'stock'
+      ? `es como tenés publicado${s.n === 1 ? ' el igual' : `s los ${s.n} iguales`}${capTxt} en stock`
+      : `tu costo + el ${Math.round(s.margen * 100)}% que le venís ganando a los equipos`;
+  let gan = '';
+  if (s.costo > 0) {
+    const enPesos = usd ? (dolar > 0 ? s.precio * dolar : 0) : s.precio;
+    if (enPesos) {
+      const g = enPesos - s.costo;
+      gan = g >= 0 ? ` · te costó ${plata(s.costo)} → ganás ${plata(g)}${usd ? ' (al dólar de hoy)' : ''}`
+                   : ` · ⚠️ te costó ${plata(s.costo)}: a ese precio perdés ${plata(-g)}`;
+    }
+  }
+  return `💡 Sugerido: <b>${plata(s.precio, usd)}</b> — ${porque}${gan}`;
+}
+
+async function _arrSugerir(a) {
+  try {
+    // Los vendidos se traen solo si hace falta (y quedan guardados unas horas)
+    if (typeof cargarVendidos === 'function') await cargarVendidos();
+  } catch (e) { /* sin vendidos, se sugiere con lo que haya */ }
+  if (!_arrDesde) return;                       // ya cerró el formulario
+  const s = arrPrecioSugerido(a, typeof STOCK !== 'undefined' ? STOCK : []);
+  const helper = document.getElementById('fi-precio-helper');
+  if (!s || !helper || !helper.parentNode) return;
+  document.getElementById('fi-sugerido')?.remove();
+  const box = document.createElement('div');
+  box.id = 'fi-sugerido';
+  box.style.cssText = 'margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.45);font-size:13px;line-height:1.35';
+  box.innerHTML = `${arrSugeridoTexto(s, typeof dolarBlue !== 'undefined' ? dolarBlue : 0)}
+    <button type="button" id="fi-sugerido-usar" style="display:block;margin-top:6px;padding:6px 12px;border-radius:8px;border:0;background:#f59e0b;color:#111;font-weight:700;cursor:pointer">Usar este precio</button>`;
+  helper.parentNode.insertBefore(box, helper.nextSibling);
+  document.getElementById('fi-sugerido-usar').onclick = () => {
+    // Si el sugerido está en dólares y el formulario en pesos (o al revés), se cambia
+    const quiere = s.moneda === 'usd' ? 'usd' : 'ars';
+    if (typeof monedaMode !== 'undefined' && monedaMode !== quiere && typeof toggleMoneda === 'function') toggleMoneda();
+    const inp = document.getElementById('fi-precio');
+    if (inp) { inp.value = s.precio; inp.focus(); }
+  };
 }
 
 // La llama savePhone cuando guarda un equipo nuevo en el stock
@@ -487,7 +594,7 @@ async function arrALaVentaGuardado(stockId) {
 }
 
 // Si se cierra el formulario sin guardar, el equipo sigue en la lista
-function arrFormCerrado() { _arrDesde = null; }
+function arrFormCerrado() { _arrDesde = null; document.getElementById('fi-sugerido')?.remove(); }
 
 // La lista se escucha apenas hay sesión (para el número del recuadro)
 if (typeof document !== 'undefined' && document.addEventListener) {

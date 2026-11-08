@@ -5,6 +5,7 @@
 // QUOTA: todas las queries usan .select() para NO traer fotos base64.
 
 import admin from 'firebase-admin';
+import { esGasto, parsearGasto, armarMovimiento, textoGastoCargado, AYUDA_GASTOS } from './_telegram-gastos.js';
 
 function getAdmin() {
   if (admin.apps.length) return admin;
@@ -168,7 +169,9 @@ const AYUDA = `🤖 <b>Consultas disponibles:</b>
 
 📦 <b>Cargar mercadería:</b>
 · <b>sumar 5 funda iphone 13</b> → suma 5 al stock (con <b>$3000</b> al final también actualiza el costo)
-· <b>nuevo Funda iPhone 15 $8000 $3000 x5</b> → crea el producto (venta $8000, costo $3000 opcional, x5 opcional)`;
+· <b>nuevo Funda iPhone 15 $8000 $3000 x5</b> → crea el producto (venta $8000, costo $3000 opcional, x5 opcional)
+
+${AYUDA_GASTOS}`;
 
 // ── Resumen de un período: ayer / semana / mes (con comparación) ──
 function _rangoPeriodo(tab) {
@@ -334,6 +337,37 @@ async function qNuevoProducto(db, texto) {
   return `✅ <b>Producto creado</b>\n📦 ${esc(nombre)} · venta ${fmt(precio)}${costo > 0 ? ` · costo ${fmt(costo)} · 📈 margen ${fmt(precio - costo)}` : ''} · stock ${cant}\n(Queda en Accesorios${costo > 0 ? '' : '; el costo lo cargás después si querés'})`;
 }
 
+// ── 💸 Gasto por Telegram → egreso en la caja (ver _telegram-gastos.js) ──
+// El último cargado se anota en config/telegramUltimoGasto para poder
+// "deshacer" con una sola lectura (sin buscar entre todos los movimientos).
+const DESHACER_MIN = 30;
+async function qGasto(db, texto) {
+  const g = parsearGasto(texto);
+  if (g.error === 'monto raro') return '🤔 Ese monto es enorme, ¿está bien? Si es así cargalo desde la app.';
+  if (g.error) return 'No entendí el monto 🤷 Probá así: <b>gasto 5000 nafta</b>\n\n' + AYUDA_GASTOS;
+  const hoy = todayAR();
+  const fecha = g.ayer ? new Date(Date.parse(hoy + 'T12:00:00Z') - 864e5).toISOString().slice(0, 10) : hoy;
+  const mov = armarMovimiento(g, fecha, new Date().toISOString());
+  const ref = await db.collection('caja_movimientos').add(mov);
+  let cajaCerrada = false;
+  try {
+    await db.collection('config').doc('telegramUltimoGasto').set({ movId: ref.id, ts: Date.now(), monto: g.monto, descripcion: g.descripcion });
+    cajaCerrada = (await db.collection('caja_cierres').doc(fecha).get()).exists;
+  } catch (e) { console.error('gasto telegram (extras):', e); }
+  return textoGastoCargado(g, fecha, { cajaCerrada });
+}
+
+async function qDeshacerGasto(db) {
+  const ref = db.collection('config').doc('telegramUltimoGasto');
+  const snap = await ref.get();
+  const u = snap.exists ? snap.data() : null;
+  if (!u || !u.movId) return 'No hay ningún gasto cargado por acá para deshacer.';
+  if (Date.now() - (u.ts || 0) > DESHACER_MIN * 60e3) return `El último gasto se cargó hace más de ${DESHACER_MIN} minutos: borralo desde la caja de la app.`;
+  await db.collection('caja_movimientos').doc(u.movId).delete();
+  await ref.delete();
+  return `🗑️ Listo, borré el gasto de <b>${fmt(u.monto)}</b> (${esc(u.descripcion || '')}).`;
+}
+
 // ── Foto recibida: adjuntarla a la reparación del N° de orden del pie ──
 async function handleFoto(db, msg) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -426,6 +460,10 @@ export default async function handler(req, res) {
     } else if (/^(sumar|agregar)\s+\d+\s+/.test(lower)) {
       const ms = text.match(/^(?:sumar|agregar)\s+(\d+)\s+(.+)$/i);
       respuesta = await qSumarStock(db, parseInt(ms[1], 10), ms[2].trim());
+    } else if (esGasto(text)) {
+      respuesta = await qGasto(db, text);
+    } else if (lower === 'deshacer' || lower === '/deshacer') {
+      respuesta = await qDeshacerGasto(db);
     } else if (lower.startsWith('nuevo ')) {
       respuesta = await qNuevoProducto(db, text.slice(6).trim());
     } else {

@@ -118,6 +118,45 @@ ok(/15/.test(run(`arrValidar({ marca: 'Moto', falla: 'x', imei: '123' })`)), 'un
   ok(DB[k].activo === false && DB[k].estado === 'a_la_venta' && DB[k].stockId === 'stock123', 'al guardarlo en el stock, sale de la lista (y queda anotado a qué equipo pasó)', DB[k]);
   ok(run('ARREGLOS.some(a => a.id === _id)') === false, 'y deja de contarse');
 
+  console.log('\n4b) Precio sugerido');
+  // Alan (08/11): "precio sugerido al poner a la venta"
+  const AHORA = Date.parse('2026-11-08T12:00:00Z');
+  const hace = d => new Date(AHORA - d * 864e5).toISOString();
+  ctx._a = { marca: 'Samsung', modelo: 'Galaxy A32', almacenamiento: '128GB', costoCompra: 90000, costoArreglo: 25000 };
+  ctx._st = [
+    { marca: 'Samsung', modelo: 'Galaxy A32', almacenamiento: '128GB', estado: 'Usado', vendido: true, precio: 180000, fecha_venta: hace(20) },
+    { marca: 'Samsung', modelo: 'A32',        almacenamiento: '128GB', estado: 'Usado', vendido: true, precio: 200000, fecha_venta: hace(60) },
+    { marca: 'Samsung', modelo: 'Galaxy A32', almacenamiento: '128GB', estado: 'Usado', vendido: true, precio: 999000, fecha_venta: hace(90) },
+    { marca: 'Samsung', modelo: 'Galaxy A32', almacenamiento: '64GB',  estado: 'Usado', vendido: true, precio: 120000, fecha_venta: hace(10) },
+    { marca: 'Samsung', modelo: 'Galaxy A32', almacenamiento: '128GB', estado: 'Usado', vendido: true, precio: 50000,  fecha_venta: hace(500) },
+    { marca: 'Samsung', modelo: 'Galaxy A32', almacenamiento: '128GB', estado: 'Nuevo', vendido: true, precio: 400000, fecha_venta: hace(5) },
+    { marca: 'Samsung', modelo: 'Galaxy A54', almacenamiento: '128GB', estado: 'Usado', vendido: true, precio: 350000, fecha_venta: hace(5) },
+  ];
+  ctx._AH = AHORA;
+  let sg = run('arrPrecioSugerido(_a, _st, { ahora: _AH })');
+  ok(sg.fuente === 'vendidos' && sg.mismaCapacidad === true && sg.n === 3, 'mira los iguales vendidos (misma capacidad, usados, último año)', sg);
+  ok(sg.precio === 200000 && sg.moneda === 'ars', 'y toma el del medio: una venta carísima no lo corre', sg.precio);
+  ok(sg.costo === 115000, 'sabe lo que costó (compra + arreglo)');
+  const txtS = run('arrSugeridoTexto(arrPrecioSugerido(_a, _st, { ahora: _AH }), 1000)');
+  ok(/Sugerido: <b>\$200\.000<\/b>/.test(txtS) && /los 3 iguales de la misma capacidad que vendiste/.test(txtS) && /ganás \$85\.000/.test(txtS), 'lo explica: por qué ese precio y cuánto ganás', txtS);
+  // Sin vendidos: lo publicado en stock
+  ctx._st2 = [{ marca: 'Apple', modelo: 'iPhone 13', almacenamiento: '128GB', estado: 'Usado', precio: 500000, moneda: 'usd', precioUSD: 380 },
+              { marca: 'Apple', modelo: 'iPhone 13', almacenamiento: '128GB', estado: 'Usado', precio: 520000, moneda: 'usd', precioUSD: 392 }];
+  sg = run(`arrPrecioSugerido({ marca: 'Apple', modelo: 'iPhone 13', almacenamiento: '128GB', costoCompra: 250000 }, _st2, { ahora: _AH })`);
+  ok(sg.fuente === 'stock' && sg.moneda === 'usd' && sg.precio === 385, 'si nunca vendiste uno: como tenés publicados los iguales, y en dólares si van en dólares', sg);
+  ok(/U\$S 385/.test(run(`arrSugeridoTexto(arrPrecioSugerido({ marca: 'Apple', modelo: 'iPhone 13', almacenamiento: '128GB', costoCompra: 250000 }, _st2, { ahora: _AH }), 1200)`)), 'en dólares lo muestra en dólares');
+  // Sin iguales: costo + margen
+  ctx._st3 = [1, 2, 3].map(i => ({ marca: 'X', modelo: 'M' + i, estado: 'Usado', vendido: true, costo: 100000, precio: 150000 }));
+  sg = run(`arrPrecioSugerido({ marca: 'Motorola', modelo: 'G52', costoCompra: 60000, costoArreglo: 20000 }, _st3, { ahora: _AH })`);
+  ok(sg.fuente === 'margen' && Math.abs(sg.margen - 0.5) < 1e-9 && sg.precio === 120000, 'si no hay iguales: tu costo + el margen que venís sacando', sg);
+  sg = run(`arrPrecioSugerido({ marca: 'Motorola', modelo: 'G52', costoCompra: 100000 }, [], { ahora: _AH })`);
+  ok(sg.margen === 0.35 && sg.precio === 135000, 'sin historia: 35%', sg);
+  ok(run(`arrPrecioSugerido({ marca: 'Motorola', modelo: 'G52' }, [], {})`) === null, 'sin iguales ni costo: no inventa un precio');
+  ok(/perdés/.test(run(`arrSugeridoTexto({ precio: 100000, moneda: 'ars', fuente: 'stock', n: 1, costo: 150000 }, 0)`)), 'si a ese precio perdés plata, lo avisa');
+  const srcS = leer('equipos-arreglar.js');
+  ok(/_arrSugerir\(a\);\n\}/.test(srcS) && /Usar este precio/.test(srcS) && /toggleMoneda\(\)/.test(srcS), 'aparece al poner a la venta, con "Usar este precio" (cambia a dólares si hace falta)');
+  ok(/function arrFormCerrado\(\) \{ _arrDesde = null; document\.getElementById\('fi-sugerido'\)\?\.remove\(\); \}/.test(srcS), 'y se va al cerrar el formulario (no queda pegado al cargar otro equipo)');
+
   console.log('\n5) Sacar de la lista');
   run('ARREGLOS.push({ id: "z", activo: true, estado: "pendiente", marca: "Moto" })');
   await run('arrBorrar("z")');
