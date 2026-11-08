@@ -71,7 +71,30 @@ run('lpElegirFondo("violeta")');
 ok(run('lpFondoGuardado()') === 'violeta', 'y se acuerda del último que elegiste');
 run('lpElegirFondo("cualquiera")');
 ok(run('lpFondoGuardado()') === 'violeta', 'un fondo que no existe no se guarda');
-ok(/lpCompartir\(_lpLista\(\), _lpPrecio, btn, _lpFondoSel \|\| lpFondoGuardado\(\)\)/.test(src0) && /sinPrecio: !conPrecio, fondo \}/.test(src0), 'el fondo elegido llega al dibujo');
+ok(/lpCompartir\(_lpLista\(\), _lpPrecio, btn, _lpFondoSel \|\| lpFondoGuardado\(\), _lpMostrar\)/.test(src0) && /sinPrecio: !conPrecio, fondo \}/.test(src0), 'el fondo elegido llega al dibujo');
+
+console.log('\n3c) Filtros: qué entra en la imagen');
+// Alan (08/11): "fijate que haya filtros para seleccionar qué hacer en la imagen"
+const M = run('lpMarcas(_L)');
+ok(M.map(m => m.marca + ':' + m.n).join() === 'Apple:7,Samsung:2', 'las marcas que hay, con cuántos, Apple primero', M);
+ok(run('lpFiltrar(_L, { marcasOff: ["Samsung"] })').every(e => e.marca === 'Apple'), 'sacando una marca: solo las otras (por ejemplo, solo iPhone)');
+ok(run('lpFiltrar(_L, { marcasOff: ["samsung"] })').length === 7, 'sin importar mayúsculas');
+ok(run('lpFiltrar(_L, { nuevos: false })').every(e => e.condicion !== 'Nuevo') && run('lpFiltrar(_L, { usados: false })').every(e => e.condicion === 'Nuevo'), 'solo usados o solo nuevos');
+ctx._k = run('_L[0]._k');
+ok(typeof ctx._k === 'string' && run('lpFiltrar(_L, { sacados: [_k] }).length') === 8, 'se puede sacar un equipo suelto');
+ok(run('lpFiltrar(_L, {}).length') === 9, 'sin filtros, van todos');
+// Qué dice cada renglón
+ctx._dos = [A('iPhone 13', '128GB', 95, 360, { color: 'Negro' }), A('iPhone 13', '128GB', 95, 360, { color: 'Azul' })];
+ctx._e = run('lpEquipos(_dos, {})[0]');
+ok(run('_e.unidades') === 2 && run('_e.colores.join()') === 'Negro,Azul', 'iguales de distinto color: uno solo, con los dos colores');
+ok(run('lpRenglon(_e, true)') === 'iPhone 13 | 128GB | 🔋95% | 360 USD', 'por defecto: capacidad y batería, sin color');
+ok(run('lpRenglon(_e, true, { color: true })') === 'iPhone 13 | 128GB | Negro/Azul | 🔋95% | 360 USD', 'con color');
+ok(run('lpRenglon(_e, true, { cap: false, bat: false })') === 'iPhone 13 | 360 USD', 'sin capacidad ni batería');
+ok(run('lpArmar([_e], true, { bat: false }).usados[0].txt') === 'iPhone 13 | 128GB | 360 USD', 'lo elegido llega a la lista armada');
+const src1 = leer('lista-precios.js');
+ok(/function _lpLista\(\) \{ return lpFiltrar\(_lpBase\(\), _lpFiltro\(\)\); \}/.test(src1), 'la imagen sale con los filtros puestos');
+ok(/Con estos filtros no queda ningún equipo/.test(src1), 'si los filtros no dejan nada, lo dice (y no arma una imagen vacía)');
+ok(/Marcas<\/div>/.test(src1) && /¿Usados o nuevos\?/.test(src1) && /¿Qué dice cada renglón\?/.test(src1) && /Elegir uno por uno/.test(src1), 'en el cuadro: marcas, usados/nuevos, qué dice cada renglón y uno por uno');
 
 console.log('\n4) Enganchado');
 const app = leer('app.js'), html = leer('index.html'), src = leer('lista-precios.js');

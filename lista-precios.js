@@ -30,10 +30,33 @@ function lpEquipos(stock, opciones) {
     // lo esconda ("consultar precio" es una decisión de la página)
     const k = [e.marca, e.modelo, e.capacidad, e.condicion, e.precio, e.moneda, e.bateria].map(_eeNorm).join('|');
     const g = grupos.get(k);
-    if (g) { g.unidades++; if (!g.fotos.length && e.fotos.length) g.fotos = e.fotos; }
-    else grupos.set(k, e);
+    if (g) {
+      g.unidades++;
+      if (!g.fotos.length && e.fotos.length) g.fotos = e.fotos;
+      if (e.color && !g.colores.includes(e.color)) g.colores.push(e.color);
+    } else { e._k = k; grupos.set(k, e); }
   }
   return [...grupos.values()];
+}
+
+// ── Filtros: qué entra en la imagen ───────────────────────
+// Alan (08/11): "fijate que haya filtros para seleccionar qué hacer en la
+// imagen". Se elige por marca, usados/nuevos, y se pueden sacar equipos
+// sueltos. `f` = { marcasOff: [...], usados, nuevos, sacados: [claves] }
+function lpMarca(e) { return String(e.marca || 'Otros').trim() || 'Otros'; }
+function lpMarcas(lista) {
+  const n = {};
+  (lista || []).forEach(e => { const m = lpMarca(e); n[m] = (n[m] || 0) + 1; });
+  return Object.keys(n).sort((a, b) => (_lpMarcaOrden(a) - _lpMarcaOrden(b)) || a.localeCompare(b)).map(m => ({ marca: m, n: n[m] }));
+}
+function lpFiltrar(lista, f) {
+  const o = f || {};
+  const off = new Set((o.marcasOff || []).map(_eeNorm));
+  const sac = new Set(o.sacados || []);
+  return (lista || []).filter(e =>
+    !off.has(_eeNorm(lpMarca(e))) &&
+    (e.condicion === 'Nuevo' ? o.nuevos !== false : o.usados !== false) &&
+    !sac.has(e._k));
 }
 
 // Apple primero (es lo que más se busca), después las marcas grandes y el resto
@@ -82,24 +105,28 @@ function lpPrecio(e) {
     : `$${Math.round(e.precio).toLocaleString('es-AR')}`;
 }
 
-// Un renglón: "iPhone 13 | 128GB | 100% | 360 USD"
-function lpRenglon(e, conPrecio) {
+// Un renglón: "iPhone 13 | 128GB | 🔋100% | 360 USD". `mostrar` elige los
+// datos: { cap, bat, color } (por defecto capacidad y batería, sin color).
+const LP_MOSTRAR_DEF = { cap: true, bat: true, color: false };
+function lpRenglon(e, conPrecio, mostrar) {
+  const m = Object.assign({}, LP_MOSTRAR_DEF, mostrar || {});
   const partes = [lpNombre(e)];
-  if (e.capacidad) partes.push(e.capacidad.replace(/\s+/g, ''));
-  if (e.condicion !== 'Nuevo' && e.bateria) partes.push(`🔋${e.bateria}%`);
+  if (m.cap && e.capacidad) partes.push(e.capacidad.replace(/\s+/g, ''));
+  if (m.color && e.colores && e.colores.length) partes.push(e.colores.join('/'));
+  if (m.bat && e.condicion !== 'Nuevo' && e.bateria) partes.push(`🔋${e.bateria}%`);
   if (conPrecio) partes.push(lpPrecio(e));
   return partes.join(' | ');
 }
 
 // La lista armada: usados con un hueco entre familias, y los nuevos aparte
-function lpArmar(lista, conPrecio) {
+function lpArmar(lista, conPrecio, mostrar) {
   const orden = lpOrdenar(lista);
   const usados = [], nuevos = [];
   let fam = null;
   orden.forEach(e => {
-    if (e.condicion === 'Nuevo') { nuevos.push(lpRenglon(e, conPrecio)); return; }
+    if (e.condicion === 'Nuevo') { nuevos.push(lpRenglon(e, conPrecio, mostrar)); return; }
     const f = lpFamilia(e);
-    usados.push({ txt: lpRenglon(e, conPrecio), hueco: fam !== null && f !== fam });
+    usados.push({ txt: lpRenglon(e, conPrecio, mostrar), hueco: fam !== null && f !== fam });
     fam = f;
   });
   return { usados, nuevos };
@@ -294,9 +321,9 @@ async function lpDibujar(pag, opciones) {
 }
 
 // ── Armar y mandar ────────────────────────────────────────
-async function lpCompartir(lista, conPrecio, btn, fondo) {
+async function lpCompartir(lista, conPrecio, btn, fondo, mostrar) {
   if (!lista.length) { toast('No hay equipos en stock para la lista', 'info'); return; }
-  const pags = lpPaginas(lpArmar(lista, conPrecio));
+  const pags = lpPaginas(lpArmar(lista, conPrecio, mostrar));
   const conFoto = lpOrdenar(lista).find(e => e.condicion === 'Nuevo' && e.fotos.length) || lpOrdenar(lista).find(e => e.fotos.length);
   const titulo = lpTitulo(lista);
   const txt = btn ? btn.textContent : '';
@@ -322,23 +349,43 @@ async function lpCompartir(lista, conPrecio, btn, fondo) {
 
 // ── El cuadro ─────────────────────────────────────────────
 let _lpPrecio = null, _lpSoloPub = false, _lpFondoSel = null;
+// Filtros (duran mientras la app está abierta; el precio se pregunta siempre)
+let _lpMarcasOff = [], _lpUsados = true, _lpNuevos = true, _lpSacados = [];
+let _lpMostrar = Object.assign({}, LP_MOSTRAR_DEF);
+
+function _lpEstilos() {
+  if (document.getElementById('lp-estilos')) return;
+  const st = document.createElement('style');
+  st.id = 'lp-estilos';
+  st.textContent = `
+.lp-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.lp-chip{padding:7px 12px;border-radius:999px;border:2px solid rgba(128,128,128,.3);background:none;color:inherit;font-size:13px;font-weight:700;cursor:pointer;opacity:.55}
+.lp-chip.on{border-color:#25D366;background:rgba(37,211,102,.12);opacity:1}
+.lp-uno summary{cursor:pointer;font-size:13px;font-weight:700;color:#2563eb;padding:4px 0;margin-bottom:6px}
+.lp-uno label{display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid rgba(128,128,128,.15);font-size:13px;cursor:pointer}
+.lp-uno input{width:18px;height:18px;flex:none}
+.lp-uno .lp-sub{opacity:.6;font-size:12px}`;
+  document.head.appendChild(st);
+}
 
 function lpAbrir() {
   if (typeof closeSheet === 'function') closeSheet();
   _lpPrecio = null;
   _eeEstilos();
+  _lpEstilos();
   eeCerrar();
   const ov = document.createElement('div');
   ov.className = 'ee-ov'; ov.id = 'ee-ov'; ov.onclick = eeCerrar;
   const m = document.createElement('div');
   m.className = 'ee-mod'; m.id = 'ee-mod';
   m.innerHTML = `<div class="ee-hd"><span>📋 Lista de precios</span><button type="button" class="ee-x" onclick="eeCerrar()">✕</button></div>
-    <p class="ee-ayuda">Una imagen para el estado con todos los equipos en stock, un renglón por equipo (modelo, capacidad, batería y precio). Los nuevos van aparte.</p>
-    <div class="ee-preg">¿Cuáles?</div>
+    <p class="ee-ayuda">Una imagen para el estado con los equipos en stock, un renglón por equipo. Elegí abajo qué entra.</p>
+    <div class="ee-preg">¿De dónde?</div>
     <div class="ee-seg">
       <button type="button" id="lp-todos" onclick="lpCuales(false)">📦 Todo el stock</button>
       <button type="button" id="lp-pub" onclick="lpCuales(true)">🌐 Los de la página</button>
     </div>
+    <div id="lp-filtros"></div>
     <div class="ee-preg">¿Va con el precio?</div>
     <div class="ee-seg">
       <button type="button" id="lp-p-si" onclick="lpConPrecio(true)">💲 Con precio</button>
@@ -368,13 +415,64 @@ function lpElegirFondo(k) {
   });
 }
 
-function _lpLista() { return lpEquipos(typeof STOCK !== 'undefined' ? STOCK : [], { soloPublicados: _lpSoloPub }); }
+// Todos los del origen elegido (antes de los filtros)
+function _lpBase() { return lpEquipos(typeof STOCK !== 'undefined' ? STOCK : [], { soloPublicados: _lpSoloPub }); }
+function _lpFiltro() { return { marcasOff: _lpMarcasOff, usados: _lpUsados, nuevos: _lpNuevos, sacados: _lpSacados }; }
+// Los que van a la imagen
+function _lpLista() { return lpFiltrar(_lpBase(), _lpFiltro()); }
+
+const _lpEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Los filtros se arman con los equipos que hay (las marcas salen de ahí)
+function _lpPintarFiltros() {
+  const caja = document.getElementById('lp-filtros');
+  if (!caja) return;
+  const base = _lpBase();
+  const off = new Set(_lpMarcasOff.map(_eeNorm));
+  const chip = (on, txt, click) => `<button type="button" class="lp-chip${on ? ' on' : ''}" onclick="${click}">${txt}</button>`;
+  const marcas = lpMarcas(base);
+  const nU = base.filter(e => e.condicion !== 'Nuevo').length, nN = base.length - nU;
+  // Uno por uno: con los filtros de marca y condición ya aplicados
+  const visibles = lpOrdenar(lpFiltrar(base, { marcasOff: _lpMarcasOff, usados: _lpUsados, nuevos: _lpNuevos }));
+  const sac = new Set(_lpSacados);
+  const abierto = document.getElementById('lp-uno')?.open ? ' open' : '';
+  caja.innerHTML = `
+    ${marcas.length > 1 ? `<div class="ee-preg">Marcas</div>
+    <div class="lp-chips">${marcas.map(m => chip(!off.has(_eeNorm(m.marca)), `${_lpEsc(m.marca)} (${m.n})`, `lpMarcaToggle('${_lpEsc(m.marca).replace(/'/g, '&#39;')}')`)).join('')}</div>` : ''}
+    <div class="ee-preg">¿Usados o nuevos?</div>
+    <div class="lp-chips">${chip(_lpUsados, `📱 Usados (${nU})`, 'lpCondToggle("usados")')}${chip(_lpNuevos, `🎁 Nuevos (${nN})`, 'lpCondToggle("nuevos")')}</div>
+    <div class="ee-preg">¿Qué dice cada renglón?</div>
+    <div class="lp-chips">${chip(_lpMostrar.cap, '💾 Capacidad', 'lpMostrarToggle("cap")')}${chip(_lpMostrar.bat, '🔋 Batería', 'lpMostrarToggle("bat")')}${chip(_lpMostrar.color, '🎨 Color', 'lpMostrarToggle("color")')}</div>
+    <details class="lp-uno" id="lp-uno"${abierto}>
+      <summary>Elegir uno por uno (${visibles.filter(e => !sac.has(e._k)).length} de ${visibles.length}) ▾</summary>
+      ${visibles.map(e => `<label><input type="checkbox" ${sac.has(e._k) ? '' : 'checked'} onchange="lpSacarToggle(${JSON.stringify(e._k).replace(/"/g, '&quot;')})">
+        <span>${_lpEsc(lpRenglon(e, false, _lpMostrar))} <span class="lp-sub">${_lpEsc(lpPrecio(e))}</span></span></label>`).join('') || '<p class="ee-ayuda">No queda ninguno con estos filtros.</p>'}
+    </details>`;
+  _lpBoton();
+}
 
 function lpCuales(soloPub) {
   _lpSoloPub = !!soloPub;
   document.getElementById('lp-todos')?.classList.toggle('on', !_lpSoloPub);
   document.getElementById('lp-pub')?.classList.toggle('on', _lpSoloPub);
-  _lpBoton();
+  _lpPintarFiltros();
+}
+function lpMarcaToggle(marca) {
+  const k = _eeNorm(marca);
+  _lpMarcasOff = _lpMarcasOff.some(m => _eeNorm(m) === k) ? _lpMarcasOff.filter(m => _eeNorm(m) !== k) : _lpMarcasOff.concat([marca]);
+  _lpPintarFiltros();
+}
+function lpCondToggle(cual) {
+  if (cual === 'usados') _lpUsados = !_lpUsados; else _lpNuevos = !_lpNuevos;
+  _lpPintarFiltros();
+}
+function lpMostrarToggle(campo) {
+  _lpMostrar[campo] = !_lpMostrar[campo];
+  _lpPintarFiltros();
+}
+function lpSacarToggle(k) {
+  _lpSacados = _lpSacados.includes(k) ? _lpSacados.filter(x => x !== k) : _lpSacados.concat([k]);
+  _lpPintarFiltros();
 }
 function lpConPrecio(v) {
   _lpPrecio = !!v;
@@ -387,11 +485,13 @@ function _lpBoton() {
   if (!b) return;
   const n = _lpLista().length;
   b.disabled = !n || _lpPrecio === null;
-  b.textContent = !n ? 'No hay equipos en stock' : _lpPrecio === null ? 'Elegí arriba si va con precio'
+  b.textContent = !_lpBase().length ? 'No hay equipos en stock'
+    : !n ? 'Con estos filtros no queda ningún equipo'
+    : _lpPrecio === null ? 'Elegí arriba si va con precio'
     : `📋 Armar la lista (${n} equipo${n === 1 ? '' : 's'})`;
 }
 
 async function lpIr(btn) {
   if (_lpPrecio === null) return;
-  await lpCompartir(_lpLista(), _lpPrecio, btn, _lpFondoSel || lpFondoGuardado());
+  await lpCompartir(_lpLista(), _lpPrecio, btn, _lpFondoSel || lpFondoGuardado(), _lpMostrar);
 }
