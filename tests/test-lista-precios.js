@@ -1,5 +1,5 @@
 // 📋 Lista de precios para los estados: una imagen con todo el stock, un
-// renglón por equipo ("iPhone 13 | 128GB | 100% | 360 USD"). Alan mandó la
+// renglón por equipo ("iPhone 13 | 128GB | 🔋100% | 360 USD"). Alan mandó la
 // historia de otro local y pidió "armar algo así con los equipos que tenemos".
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const DIR = path.join(__dirname, '..') + '/';
@@ -34,13 +34,13 @@ console.log('\n2) Los renglones');
 ctx._L = L;
 const a = run('lpArmar(_L, true)');
 const txt = a.usados.map(u => u.txt);
-ok(txt[0] === 'iPhone 13 | 128GB | 100% | 360 USD', 'como el ejemplo: modelo | capacidad | batería | precio', txt[0]);
-ok(txt.indexOf('iPhone 13 | 256GB | 100% | 390 USD') === 1 && txt.indexOf('iPhone 13 Pro | 128GB | 100% | 480 USD') === 2, 'ordenados: modelo, después capacidad', txt);
-ok(txt.indexOf('iPhone 15 Pro | 128GB | 89% | 590 USD') < txt.indexOf('iPhone 15 Pro | 256GB | 100% | 670 USD'), 'el mismo modelo, de menor a mayor capacidad');
+ok(txt[0] === 'iPhone 13 | 128GB | 🔋100% | 360 USD', 'como el ejemplo: modelo | capacidad | 🔋batería | precio', txt[0]);
+ok(txt.indexOf('iPhone 13 | 256GB | 🔋100% | 390 USD') === 1 && txt.indexOf('iPhone 13 Pro | 128GB | 🔋100% | 480 USD') === 2, 'ordenados: modelo, después capacidad', txt);
+ok(txt.indexOf('iPhone 15 Pro | 128GB | 🔋89% | 590 USD') < txt.indexOf('iPhone 15 Pro | 256GB | 🔋100% | 670 USD'), 'el mismo modelo, de menor a mayor capacidad');
 ok(txt[txt.length - 1] === 'Samsung Galaxy S23 | 256GB | $650.000', 'Apple primero; las otras marcas con su nombre y el precio en pesos', txt[txt.length - 1]);
 ok(a.usados[3].hueco === true && a.usados[1].hueco === false && a.usados[2].hueco === false, 'un hueco entre generaciones de iPhone (13 / 14 / 15), como el ejemplo', a.usados.map(u => u.hueco));
 ok(a.nuevos.length === 2 && a.nuevos[0] === 'iPhone 17 Pro Max | 256GB | 1.640 USD' && a.nuevos[1] === 'Samsung Galaxy A16 | 128GB | $280.000', 'los nuevos aparte ("¡Nuevos en caja!"), sin batería', a.nuevos);
-ok(run('lpArmar(_L, false)').usados[0].txt === 'iPhone 13 | 128GB | 100%', 'sin precio: el renglón no lo lleva');
+ok(run('lpArmar(_L, false)').usados[0].txt === 'iPhone 13 | 128GB | 🔋100%', 'sin precio: el renglón no lo lleva');
 ok(run(`lpRenglon(eeDesdeStock({ marca: 'Xiaomi', modelo: 'Redmi 13', almacenamiento: '128GB', estado: 'Usado', precio: 50 }), true)`) === 'Xiaomi Redmi 13 | 128GB | Consultar', 'precio que no puede ser: "Consultar"');
 ok(run('lpTitulo(_L)') === 'STOCK CELULARES' && run('lpTitulo(_L.filter(e => e.marca === "Apple"))') === 'STOCK IPHONES', 'el título: "STOCK IPHONES" si son todos iPhone');
 
@@ -57,6 +57,21 @@ ok(Math.abs(lugar(pg[0]) - lugar(pg[1])) <= 2, 'repartidos parejo (no una llena 
 ok(pg[1].nuevos.length === 1 && !pg[0].nuevos.length, 'los nuevos en la última');
 ok(pg.every(p => !p.usados.length || p.usados[0].hueco === false), 'ninguna arranca con un hueco');
 ok(pg.reduce((t, p) => t + p.usados.length, 0) === 40, 'no se pierde ninguno');
+
+console.log('\n3b) Emojis y fondo');
+// Alan (08/11): "¿se le puede agregar algunos emojis y cambiar el fondo?"
+const src0 = leer('lista-precios.js');
+ok(/✅ GARANTÍA.*🔄 TOMAMOS TU USADO.*💳 CUOTAS/.test(src0) && /🎁 ¡NUEVOS EN CAJA! 🎁/.test(src0) && /🕘 Lunes a sábado/.test(src0) && /`📱 \$\{o\.titulo/.test(src0),
+   'emojis en la cinta, el título, los nuevos y el horario (y 🔋 en la batería)');
+ok(run('Object.keys(LP_FONDOS).join()') === 'foto,azul,negro,violeta,verde', 'fondos para elegir: la foto de los equipos o un color');
+ok(run('Object.values(LP_FONDOS).every(f => f.acento && (f.muestra || (f.a && f.b && f.luces.length === 2)))'), 'cada uno con su muestra y su color de acento');
+ok(run('lpFondoGuardado()') === 'foto', 'si nunca elegiste, el de siempre (la foto)');
+ctx.localStorage = { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); } };
+run('lpElegirFondo("violeta")');
+ok(run('lpFondoGuardado()') === 'violeta', 'y se acuerda del último que elegiste');
+run('lpElegirFondo("cualquiera")');
+ok(run('lpFondoGuardado()') === 'violeta', 'un fondo que no existe no se guarda');
+ok(/lpCompartir\(_lpLista\(\), _lpPrecio, btn, _lpFondoSel \|\| lpFondoGuardado\(\)\)/.test(src0) && /sinPrecio: !conPrecio, fondo \}/.test(src0), 'el fondo elegido llega al dibujo');
 
 console.log('\n4) Enganchado');
 const app = leer('app.js'), html = leer('index.html'), src = leer('lista-precios.js');

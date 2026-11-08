@@ -86,7 +86,7 @@ function lpPrecio(e) {
 function lpRenglon(e, conPrecio) {
   const partes = [lpNombre(e)];
   if (e.capacidad) partes.push(e.capacidad.replace(/\s+/g, ''));
-  if (e.condicion !== 'Nuevo' && e.bateria) partes.push(`${e.bateria}%`);
+  if (e.condicion !== 'Nuevo' && e.bateria) partes.push(`🔋${e.bateria}%`);
   if (conPrecio) partes.push(lpPrecio(e));
   return partes.join(' | ');
 }
@@ -146,7 +146,46 @@ function lpTitulo(lista) {
 
 // ── El dibujo ─────────────────────────────────────────────
 // Una cinta negra de lado a lado, como la de la historia que mandó Alan
-const LP_CINTA = 'GARANTÍA  |  TOMAMOS TU USADO  |  CUOTAS  |  GARANTÍA';
+// Alan (08/11): "¿se le puede agregar algunos emojis y cambiar el fondo?"
+const LP_CINTA = '✅ GARANTÍA  |  🔄 TOMAMOS TU USADO  |  💳 CUOTAS  |  ✅ GARANTÍA';
+
+// Los fondos para elegir. "foto" es el de antes: una foto de los equipos
+// desenfocada. Los otros son de color, con dos manchas de luz para que no
+// sea un color liso. `acento` es el color del título de los nuevos.
+const LP_FONDOS = {
+  foto:    { lbl: '📷 Foto',   muestra: 'linear-gradient(135deg,#6b7280,#1f2937)', acento: '#7dd3fc' },
+  azul:    { lbl: 'Azul',      a: '#0b3a7a', b: '#020a1c', luces: ['rgba(56,189,248,.38)', 'rgba(37,99,235,.40)'], acento: '#7dd3fc' },
+  negro:   { lbl: 'Negro',     a: '#1d1d1f', b: '#000000', luces: ['rgba(250,204,21,.20)', 'rgba(250,204,21,.12)'], acento: '#FFD23F' },
+  violeta: { lbl: 'Violeta',   a: '#5b21b6', b: '#12052b', luces: ['rgba(236,72,153,.38)', 'rgba(139,92,246,.40)'], acento: '#f0abfc' },
+  verde:   { lbl: 'Verde',     a: '#065f46', b: '#01140f', luces: ['rgba(52,211,153,.32)', 'rgba(16,185,129,.28)'], acento: '#6ee7b7' },
+};
+const LP_FONDO_KEY = 'lpFondo';
+function lpFondoGuardado() {
+  try { const f = localStorage.getItem(LP_FONDO_KEY); if (LP_FONDOS[f]) return f; } catch {}
+  return 'foto';
+}
+
+function _lpFondo(x, fondo, foto) {
+  const f = LP_FONDOS[fondo] || LP_FONDOS.foto;
+  if (!f.a) {                                   // la foto de los equipos
+    _eeFondo(x, foto);
+    x.fillStyle = 'rgba(0,0,0,.28)'; x.fillRect(0, 0, EE_W, EE_H);
+    return;
+  }
+  const g = x.createLinearGradient(0, 0, EE_W * 0.4, EE_H);
+  g.addColorStop(0, f.a); g.addColorStop(1, f.b);
+  x.fillStyle = g; x.fillRect(0, 0, EE_W, EE_H);
+  [[160, 520, 620, f.luces[0]], [960, 1380, 720, f.luces[1]]].forEach(([cx, cy, r, col]) => {
+    const rg = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    rg.addColorStop(0, col); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = rg; x.fillRect(0, 0, EE_W, EE_H);
+  });
+  // Unas rayas finitas en diagonal, apenas se ven: le dan textura
+  x.save();
+  x.strokeStyle = 'rgba(255,255,255,.035)'; x.lineWidth = 2;
+  for (let d = -EE_H; d < EE_W; d += 46) { x.beginPath(); x.moveTo(d, 0); x.lineTo(d + EE_H, EE_H); x.stroke(); }
+  x.restore();
+}
 
 function _lpCinta(x, y) {
   x.fillStyle = 'rgba(0,0,0,.88)';
@@ -171,16 +210,16 @@ async function lpDibujar(pag, opciones) {
   cv.width = EE_W; cv.height = EE_H;
   const x = cv.getContext('2d');
   x.textBaseline = 'alphabetic';
-  // De fondo, una foto de los equipos desenfocada (si hay); si no, el azul
-  const foto = o.foto ? await _eeFoto(o.foto) : null;
-  _eeFondo(x, foto);
-  x.fillStyle = 'rgba(0,0,0,.28)'; x.fillRect(0, 0, EE_W, EE_H);
+  // El fondo elegido; con "foto", una de los equipos desenfocada (si hay)
+  const fondo = LP_FONDOS[o.fondo] ? o.fondo : 'foto';
+  const foto = fondo === 'foto' && o.foto ? await _eeFoto(o.foto) : null;
+  _lpFondo(x, fondo, foto);
 
   // Encabezado: el local chiquito, el título grande y la cinta
   x.textAlign = 'center'; x.fillStyle = 'rgba(255,255,255,.85)';
   _lpTexto(x, 'TECHPOINT · CASEROS', 196, 800, 34);
   x.fillStyle = '#fff';
-  const tit = o.titulo || 'STOCK CELULARES';
+  const tit = `📱 ${o.titulo || 'STOCK CELULARES'} 📱`;
   const tt = _eeEntra(x, tit, 900, 132, 70, 980);
   if ('letterSpacing' in x) x.letterSpacing = '4px';
   _lpTexto(x, tit, 330, 900, tt);
@@ -200,7 +239,7 @@ async function lpDibujar(pag, opciones) {
   const lin1 = `📍 ${dir}`;
   _lpTexto(x, lin1, 1592, 800, _eeEntra(x, lin1, 800, 36, 24, 980));
   x.fillStyle = 'rgba(255,255,255,.9)';
-  const lin2 = `💬 ${tel}  ·  Lunes a sábado de 9:30 a 19:30`;
+  const lin2 = `💬 ${tel}  ·  🕘 Lunes a sábado de 9:30 a 19:30`;
   _lpTexto(x, lin2, 1640, 700, _eeEntra(x, lin2, 700, 32, 22, 980));
   _lpCinta(x, 1680);
 
@@ -216,9 +255,9 @@ async function lpDibujar(pag, opciones) {
     x.strokeStyle = 'rgba(255,255,255,.92)'; x.lineWidth = 4;
     _eeRedondo(x, 120, top, 840, h, 34); x.stroke();
     x.restore();
-    x.fillStyle = '#7dd3fc';
+    x.fillStyle = (LP_FONDOS[fondo] || LP_FONDOS.foto).acento;
     if ('letterSpacing' in x) x.letterSpacing = '3px';
-    _lpTexto(x, '¡NUEVOS EN CAJA!', top + 68, 900, 46);
+    _lpTexto(x, '🎁 ¡NUEVOS EN CAJA! 🎁', top + 68, 900, _eeEntra(x, '🎁 ¡NUEVOS EN CAJA! 🎁', 900, 46, 30, 780));
     if ('letterSpacing' in x) x.letterSpacing = '0px';
     x.fillStyle = '#fff';
     pag.nuevos.forEach((r, i) => {
@@ -249,13 +288,13 @@ async function lpDibujar(pag, opciones) {
   }
   if (o.sinPrecio) {
     x.fillStyle = '#FFD23F';
-    _lpTexto(x, 'Consultá precios por WhatsApp', limite + (pag.nuevos.length ? 0 : 6), 800, 38);
+    _lpTexto(x, '💬 Consultá precios por WhatsApp', limite + (pag.nuevos.length ? 0 : 6), 800, 38);
   }
   return await new Promise(ok => cv.toBlob(ok, 'image/jpeg', 0.92));
 }
 
 // ── Armar y mandar ────────────────────────────────────────
-async function lpCompartir(lista, conPrecio, btn) {
+async function lpCompartir(lista, conPrecio, btn, fondo) {
   if (!lista.length) { toast('No hay equipos en stock para la lista', 'info'); return; }
   const pags = lpPaginas(lpArmar(lista, conPrecio));
   const conFoto = lpOrdenar(lista).find(e => e.condicion === 'Nuevo' && e.fotos.length) || lpOrdenar(lista).find(e => e.fotos.length);
@@ -266,7 +305,7 @@ async function lpCompartir(lista, conPrecio, btn) {
     if (btn) btn.disabled = true;
     for (let i = 0; i < pags.length; i++) {
       if (btn) btn.textContent = `Armando ${i + 1} de ${pags.length}…`;
-      const blob = await lpDibujar(pags[i], { titulo, n: i, total: pags.length, foto: conFoto ? conFoto.fotos[0] : null, sinPrecio: !conPrecio });
+      const blob = await lpDibujar(pags[i], { titulo, n: i, total: pags.length, foto: conFoto ? conFoto.fotos[0] : null, sinPrecio: !conPrecio, fondo });
       // El nombre empieza con "estado-NN-": así la carpeta de la compu borra
       // la lista vieja al guardar la nueva (estado-equipos.js)
       if (blob) archivos.push(new File([blob], `estado-${String(i + 1).padStart(2, '0')}-lista-de-precios.jpg`, { type: 'image/jpeg' }));
@@ -282,7 +321,7 @@ async function lpCompartir(lista, conPrecio, btn) {
 }
 
 // ── El cuadro ─────────────────────────────────────────────
-let _lpPrecio = null, _lpSoloPub = false;
+let _lpPrecio = null, _lpSoloPub = false, _lpFondoSel = null;
 
 function lpAbrir() {
   if (typeof closeSheet === 'function') closeSheet();
@@ -305,10 +344,28 @@ function lpAbrir() {
       <button type="button" id="lp-p-si" onclick="lpConPrecio(true)">💲 Con precio</button>
       <button type="button" id="lp-p-no" onclick="lpConPrecio(false)">🤫 Sin precio</button>
     </div>
+    <div class="ee-preg">Fondo</div>
+    <div class="lp-fondos" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px">
+      ${Object.entries(LP_FONDOS).map(([k, f]) => `<button type="button" id="lp-f-${k}" onclick="lpElegirFondo('${k}')"
+        style="height:58px;border-radius:12px;border:3px solid transparent;cursor:pointer;color:#fff;font:700 11px inherit;text-shadow:0 1px 3px #000;
+        background:${f.muestra || `radial-gradient(circle at 25% 30%, ${f.luces[0]}, transparent 60%), linear-gradient(160deg, ${f.a}, ${f.b})`}">${f.lbl}</button>`).join('')}
+    </div>
     <button type="button" class="ee-ir" id="lp-ir" onclick="lpIr(this)"></button>`;
   document.body.appendChild(ov);
   document.body.appendChild(m);
+  lpElegirFondo(_lpFondoSel || lpFondoGuardado());
   lpCuales(_lpSoloPub);
+}
+
+// Se recuerda en este aparato: si te gustó el violeta, la próxima sale violeta
+function lpElegirFondo(k) {
+  if (!LP_FONDOS[k]) return;
+  _lpFondoSel = k;
+  try { localStorage.setItem(LP_FONDO_KEY, k); } catch {}
+  Object.keys(LP_FONDOS).forEach(f => {
+    const b = document.getElementById('lp-f-' + f);
+    if (b && b.style) b.style.borderColor = f === k ? '#25D366' : 'transparent';
+  });
 }
 
 function _lpLista() { return lpEquipos(typeof STOCK !== 'undefined' ? STOCK : [], { soloPublicados: _lpSoloPub }); }
@@ -336,5 +393,5 @@ function _lpBoton() {
 
 async function lpIr(btn) {
   if (_lpPrecio === null) return;
-  await lpCompartir(_lpLista(), _lpPrecio, btn);
+  await lpCompartir(_lpLista(), _lpPrecio, btn, _lpFondoSel || lpFondoGuardado());
 }
