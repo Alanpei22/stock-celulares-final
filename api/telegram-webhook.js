@@ -5,7 +5,7 @@
 // QUOTA: todas las queries usan .select() para NO traer fotos base64.
 
 import admin from 'firebase-admin';
-import { esGasto, parsearGasto, armarMovimiento, textoGastoCargado, AYUDA_GASTOS } from './_telegram-gastos.js';
+import { esGasto, parsearGasto, armarMovDueno, efectoSaldo, textoGastoCargado, textoSaldo, AYUDA_GASTOS } from './_telegram-gastos.js';
 
 function getAdmin() {
   if (admin.apps.length) return admin;
@@ -337,35 +337,65 @@ async function qNuevoProducto(db, texto) {
   return `✅ <b>Producto creado</b>\n📦 ${esc(nombre)} · venta ${fmt(precio)}${costo > 0 ? ` · costo ${fmt(costo)} · 📈 margen ${fmt(precio - costo)}` : ''} · stock ${cant}\n(Queda en Accesorios${costo > 0 ? '' : '; el costo lo cargás después si querés'})`;
 }
 
-// ── 💸 Gasto por Telegram → egreso en la caja (ver _telegram-gastos.js) ──
-// El último cargado se anota en config/telegramUltimoGasto para poder
-// "deshacer" con una sola lectura (sin buscar entre todos los movimientos).
+// ── 💸 Gasto por Telegram → a la CAJA DUEÑO (ver _telegram-gastos.js) ──
+// Va a caja_dueno_movimientos (la caja aparte de Alan, no la del mostrador)
+// y corrige el saldo guardado (config/cajaDuenoSaldo) con increment, igual
+// que caja_extra.js. El último cargado queda en config/telegramUltimoGasto
+// para poder "deshacer" con una sola lectura.
 const DESHACER_MIN = 30;
+const saldoRef = db => db.collection('config').doc('cajaDuenoSaldo');
+async function aplicarSaldo(db, mov, quitar) {
+  const d = efectoSaldo(mov, quitar);
+  const inc = admin.firestore.FieldValue.increment;
+  await saldoRef(db).set({
+    saldo: inc(d.saldo), ingresos: inc(d.ingresos), egresos: inc(d.egresos),
+    cuentas: { efectivo: inc(d.cuentas.efectivo), banco: inc(d.cuentas.banco), mp: inc(d.cuentas.mp) },
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
+}
 async function qGasto(db, texto) {
   const g = parsearGasto(texto);
   if (g.error === 'monto raro') return '🤔 Ese monto es enorme, ¿está bien? Si es así cargalo desde la app.';
   if (g.error) return 'No entendí el monto 🤷 Probá así: <b>gasto 5000 nafta</b>\n\n' + AYUDA_GASTOS;
   const hoy = todayAR();
   const fecha = g.ayer ? new Date(Date.parse(hoy + 'T12:00:00Z') - 864e5).toISOString().slice(0, 10) : hoy;
-  const mov = armarMovimiento(g, fecha, new Date().toISOString());
-  const ref = await db.collection('caja_movimientos').add(mov);
-  let cajaCerrada = false;
+  // Si el saldo es de antes de las cuentas, se pasa a cuentas (todo era efectivo)
+  const antes = await saldoRef(db).get();
+  if (antes.exists && !antes.data().cuentas) {
+    await saldoRef(db).set({ cuentas: { efectivo: Number(antes.data().saldo) || 0, banco: 0, mp: 0 } }, { merge: true });
+  }
+  const mov = armarMovDueno(g, fecha, new Date().toISOString());
+  const ref = await db.collection('caja_dueno_movimientos').add(mov);
+  let saldoCuenta;
   try {
+    await aplicarSaldo(db, mov);
     await db.collection('config').doc('telegramUltimoGasto').set({ movId: ref.id, ts: Date.now(), monto: g.monto, descripcion: g.descripcion });
-    cajaCerrada = (await db.collection('caja_cierres').doc(fecha).get()).exists;
-  } catch (e) { console.error('gasto telegram (extras):', e); }
-  return textoGastoCargado(g, fecha, { cajaCerrada });
+    const sd = await saldoRef(db).get();
+    const c = sd.exists && sd.data().cuentas;
+    if (c && typeof c[mov.cuenta] === 'number') saldoCuenta = c[mov.cuenta];
+  } catch (e) { console.error('gasto telegram (saldo):', e); }
+  return textoGastoCargado(g, fecha, { saldoCuenta });
 }
 
 async function qDeshacerGasto(db) {
   const ref = db.collection('config').doc('telegramUltimoGasto');
   const snap = await ref.get();
   const u = snap.exists ? snap.data() : null;
-  if (!u || !u.movId) return 'No hay ningún gasto cargado por acá para deshacer.';
-  if (Date.now() - (u.ts || 0) > DESHACER_MIN * 60e3) return `El último gasto se cargó hace más de ${DESHACER_MIN} minutos: borralo desde la caja de la app.`;
-  await db.collection('caja_movimientos').doc(u.movId).delete();
+  if (!u || !u.movId) return 'No hay nada cargado por acá para deshacer.';
+  if (Date.now() - (u.ts || 0) > DESHACER_MIN * 60e3) return `Lo último se cargó hace más de ${DESHACER_MIN} minutos: borralo desde la Caja dueño en la app.`;
+  const movRef = db.collection('caja_dueno_movimientos').doc(u.movId);
+  const mov = await movRef.get();
+  if (mov.exists) {
+    await movRef.delete();
+    await aplicarSaldo(db, mov.data(), true);
+  }
   await ref.delete();
-  return `🗑️ Listo, borré el gasto de <b>${fmt(u.monto)}</b> (${esc(u.descripcion || '')}).`;
+  return `🗑️ Listo, borré <b>${fmt(u.monto)}</b> (${esc(u.descripcion || '')}) de tu caja.`;
+}
+
+async function qSaldoDueno(db) {
+  const sd = await saldoRef(db).get();
+  return textoSaldo(sd.exists ? sd.data() : null);
 }
 
 // ── Foto recibida: adjuntarla a la reparación del N° de orden del pie ──
@@ -464,6 +494,8 @@ export default async function handler(req, res) {
       respuesta = await qGasto(db, text);
     } else if (lower === 'deshacer' || lower === '/deshacer') {
       respuesta = await qDeshacerGasto(db);
+    } else if (lower === 'saldo' || lower === '/saldo' || lower === 'cuentas' || lower === 'mi caja') {
+      respuesta = await qSaldoDueno(db);
     } else if (lower.startsWith('nuevo ')) {
       respuesta = await qNuevoProducto(db, text.slice(6).trim());
     } else {

@@ -1,12 +1,16 @@
 // ══════════════════════════════════════════════════════════════
 //  💸 Cargar gastos desde el bot de Telegram
 // ══════════════════════════════════════════════════════════════
-//  Alan (08/11): "podemos cargar gastos desde el bot de Telegram". Escribís
-//  como hablás y queda en la caja como un egreso más:
+//  Alan (08/11): "podemos cargar gastos desde el bot de Telegram". Y aclaró
+//  (09/11): es para SU caja aparte (la caja dueño), no la del mostrador: lo
+//  que se guarda del local y lo que se gasta de eso, con las cuentas de
+//  efectivo, banco (transferencias) y MercadoPago. Escribís como hablás:
 //    gasto 5000 nafta
 //    gasto $25.000 pantalla a32 transferencia
 //    pagué 80 mil de luz ayer
-//    retiro 20000
+//    retiro 20000                → sale de tu caja (para vos)
+//    guardé 50000 · ingreso 30000 mp   → entra a tu caja
+//    saldo                       → cómo están las tres cuentas
 //
 //  Solo lo puede usar el dueño: el bot ya contesta únicamente a su chat
 //  (telegram-webhook.js). Las funciones de acá no tocan Firestore (las usa el
@@ -15,7 +19,17 @@
 // OJO: en JS \b no sirve con tildes ("pagué" termina en é y \b no corta
 // ahí), así que el final de palabra se escribe a mano.
 const FIN = '(?=$|[^\\p{L}\\p{N}])';
-const RE_VERBO = new RegExp('^\\s*(gasto|gast[eé]|pagu[eé]|compr[eé]|retiro|retir[eé])' + FIN, 'iu');
+const RE_VERBO = new RegExp('^\\s*(gasto|gast[eé]|pagu[eé]|compr[eé]|retiro|retir[eé]|guard[eé]|ingreso|ingres[eé]|entr[oó])' + FIN, 'iu');
+const RE_INGRESO = /^(guard|ingres|entr)/i;
+
+// Las cuentas de la caja dueño (las mismas de caja_extra.js) y cuál toca
+// según cómo se pagó. La tarjeta se paga desde el banco.
+export const CUENTAS = { efectivo: { lbl: 'Efectivo', ico: '💵' }, banco: { lbl: 'Banco', ico: '🏦' }, mp: { lbl: 'MercadoPago', ico: '📱' } };
+export function cuentaDeMetodo(metodo) {
+  if (metodo === 'MercadoPago') return 'mp';
+  if (metodo === 'Transferencia' || metodo === 'Tarjeta débito' || metodo === 'Tarjeta crédito') return 'banco';
+  return 'efectivo';
+}
 
 const CATEGORIAS = { repuesto: 'Compra repuesto', fijo: 'Gasto fijo', retiro: 'Retiro dueño', otro: 'Otro gasto' };
 
@@ -58,6 +72,7 @@ export function parsearGasto(texto) {
   if (!verbo) return { error: 'no es un gasto' };
   t = t.slice(t.toLowerCase().indexOf(verbo.toLowerCase()) + verbo.length).trim();
   const retiro = /^retir/i.test(verbo);
+  const ingreso = RE_INGRESO.test(verbo);
 
   // El monto: si alguno tiene $, ese. Si no, el número suelto más grande
   // (los números de un modelo, "a32" o "iphone 13", son chicos o van pegados
@@ -87,46 +102,65 @@ export function parsearGasto(texto) {
   desc = desc.replace(/[\s,.;:]+$/, '');
   // "internet por" (de "por transferencia") → "internet"
   for (let i = 0; i < 2; i++) desc = desc.replace(/\s+(por|con|en|de|del|al|a|y|con la|con el)$/i, '').trim();
-  const categoria = retiro ? CATEGORIAS.retiro
+  const categoria = ingreso ? 'Ingreso' : retiro ? CATEGORIAS.retiro
     : RE_REPUESTO.test(desc) ? CATEGORIAS.repuesto
     : RE_FIJO.test(desc) ? CATEGORIAS.fijo
     : CATEGORIAS.otro;
   if (!desc) desc = categoria;
   desc = desc.charAt(0).toUpperCase() + desc.slice(1);
-  return { monto: elegido.n, categoria, metodoPago, descripcion: desc.slice(0, 120), ayer };
+  return { monto: elegido.n, categoria, metodoPago, descripcion: desc.slice(0, 120), ayer,
+           tipo: ingreso ? 'ingreso' : 'egreso', cuenta: cuentaDeMetodo(metodoPago) };
 }
 
-// El movimiento de caja, igual a uno cargado desde la app (caja.js saveMov)
-export function armarMovimiento(g, fecha, ahoraIso) {
+// El movimiento de la caja dueño (como los de caja_extra.js)
+export function armarMovDueno(g, fecha, ahoraIso) {
   return {
-    tipo: 'egreso',
-    categoria: g.categoria,
-    descripcion: g.descripcion,
-    monto: g.monto,
-    metodoPago: g.metodoPago,
-    fecha,
-    createdAt: ahoraIso,
-    origen: 'telegram',
-    cargadoPor: 'Telegram (dueño)',
+    fecha, tipo: g.tipo, monto: g.monto, cuenta: g.cuenta,
+    desc: g.descripcion, rubro: g.categoria, metodoPago: g.metodoPago,
+    ts: ahoraIso, origen: 'telegram',
   };
+}
+
+// Lo que mueve en el saldo (igual que cdEfecto de caja_extra.js). Con
+// `quitar`, lo contrario (para "deshacer").
+export function efectoSaldo(mov, quitar) {
+  const s = quitar ? -1 : 1, m = s * (Number(mov.monto) || 0);
+  const c = CUENTAS[mov.cuenta] ? mov.cuenta : 'efectivo';
+  const eg = mov.tipo === 'egreso';
+  const cuentas = { efectivo: 0, banco: 0, mp: 0 };
+  cuentas[c] = eg ? -m : m;
+  return { saldo: eg ? -m : m, ingresos: eg ? 0 : m, egresos: eg ? m : 0, cuentas };
+}
+
+// El saldo guardado → las tres cuentas (el de antes de las cuentas era todo efectivo)
+export function textoSaldo(tot) {
+  const t = tot || {};
+  const c = (t.cuentas && typeof t.cuentas === 'object') ? t.cuentas : { efectivo: Number(t.saldo) || 0, banco: 0, mp: 0 };
+  const total = (Number(c.efectivo) || 0) + (Number(c.banco) || 0) + (Number(c.mp) || 0);
+  return `📦 <b>Tu caja</b>\n` + Object.entries(CUENTAS).map(([k, x]) => `${x.ico} ${x.lbl}: <b>${_fmt(c[k])}</b>`).join('\n') +
+    `\n━━━━━━━━━━\nTotal: <b>${_fmt(total)}</b>`;
 }
 
 const _fmt = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-AR');
 const _esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const _ICONOS = { 'Compra repuesto': '🛒', 'Gasto fijo': '📋', 'Retiro dueño': '🏧', 'Otro gasto': '💸' };
 
-export function textoGastoCargado(g, fecha, { cajaCerrada } = {}) {
+export function textoGastoCargado(g, fecha, { saldoCuenta } = {}) {
   const dia = g.ayer ? ` (de <b>ayer</b>, ${fecha.slice(8, 10)}/${fecha.slice(5, 7)})` : '';
-  return `✅ <b>${g.categoria === CATEGORIAS.retiro ? 'Retiro' : 'Gasto'} cargado en la caja</b>${dia}\n` +
-    `${_ICONOS[g.categoria] || '💸'} ${_esc(g.descripcion)} · <b>${_fmt(g.monto)}</b>\n` +
-    `Rubro: ${g.categoria} · ${g.metodoPago}` +
-    (cajaCerrada ? `\n⚠️ La caja de ese día ya estaba cerrada: quedó cargado igual, revisá el cierre.` : '') +
+  const cta = CUENTAS[g.cuenta] || CUENTAS.efectivo;
+  const que = g.tipo === 'ingreso' ? 'Ingreso' : g.categoria === CATEGORIAS.retiro ? 'Retiro' : 'Gasto';
+  return `✅ <b>${que} en tu caja</b>${dia}\n` +
+    `${g.tipo === 'ingreso' ? '📦' : (_ICONOS[g.categoria] || '💸')} ${_esc(g.descripcion)} · <b>${g.tipo === 'ingreso' ? '+' : '−'}${_fmt(g.monto)}</b>\n` +
+    `${cta.ico} ${cta.lbl}${g.tipo === 'ingreso' ? '' : ' · ' + g.categoria}` +
+    (typeof saldoCuenta === 'number' ? `\nQuedan en ${cta.lbl}: <b>${_fmt(saldoCuenta)}</b>` : '') +
     `\n\n¿Te equivocaste? Mandá <b>deshacer</b> (hasta 30 minutos).`;
 }
 
-export const AYUDA_GASTOS = `💸 <b>Cargar gastos en la caja:</b>
-· <b>gasto 5000 nafta</b> → egreso en efectivo
-· <b>gasto $25.000 pantalla a32 transferencia</b> → con cómo lo pagaste (transferencia, mp, débito, crédito)
-· <b>pagué 80 mil de luz ayer</b> → en la caja de ayer
-· <b>retiro 20000</b> → retiro del dueño
+export const AYUDA_GASTOS = `📦 <b>Tu caja (efectivo 💵, banco 🏦, MercadoPago 📱):</b>
+· <b>gasto 5000 nafta</b> → sale del efectivo
+· <b>gasto $25.000 pantalla a32 transferencia</b> → sale del banco (mp = MercadoPago)
+· <b>pagué 80 mil de luz ayer</b> → con fecha de ayer
+· <b>retiro 20000</b> → plata que sacás para vos
+· <b>guardé 50000</b> / <b>ingreso 30000 mp</b> → entra a tu caja
+· <b>saldo</b> → cómo están las cuentas
 · <b>deshacer</b> → borra el último que cargaste (hasta 30 min)`;

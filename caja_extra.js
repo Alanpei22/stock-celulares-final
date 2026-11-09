@@ -505,6 +505,93 @@ function buildCajaAnualHTML(movs) {
 // ══════════════════════════════════════════
 //  CAJA DUEÑO
 // ══════════════════════════════════════════
+// Alan (09/11): "hacer una caja mía aparte con lo que guardo del local, gasto
+// del local de lo que se guardó, y llevar cuentas de las cuentas de
+// transferencia y MercadoPago". La caja dueño ya existía (un solo saldo, en
+// efectivo). Ahora tiene TRES cuentas: lo que guardás en efectivo, el banco
+// (donde caen las transferencias) y MercadoPago. Cada movimiento dice de qué
+// cuenta es; los viejos, sin cuenta, son efectivo (era lo único que había).
+//   ingreso / egreso → suman o restan en su cuenta (y en el total)
+//   pase   → de una cuenta a otra (sacar del banco, pasar MP al banco…):
+//            el total no cambia
+//   ajuste → "en el banco hay $X": corrige la cuenta a lo real (comisiones
+//            de MP, intereses…). No cuenta como ingreso ni como gasto.
+// La misma cuenta la hace el bot de Telegram (api/_telegram-gastos.js).
+const CD_CUENTAS = {
+  efectivo: { lbl: 'Efectivo',    ico: '💵' },
+  banco:    { lbl: 'Banco',       ico: '🏦' },
+  mp:       { lbl: 'MercadoPago', ico: '📱' },
+};
+function cdCuenta(c) { return CD_CUENTAS[c] ? c : 'efectivo'; }
+
+// Estilos de las cuentas: viajan con el JS (el CSS se sirve del caché)
+function _cdEstilos() {
+  if (typeof document === 'undefined' || !document.head || document.getElementById('cd-estilos')) return;
+  const st = document.createElement('style');
+  st.id = 'cd-estilos';
+  st.textContent = `
+.cd-cuentas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.cd-cuenta{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border-radius:12px;border:1.5px solid var(--border,rgba(128,128,128,.25));background:var(--card,#fff);color:inherit;cursor:pointer;font-family:inherit}
+.cd-cuenta-ico{font-size:20px}.cd-cuenta-lbl{font-size:12px;opacity:.75;font-weight:600}
+.cd-cuenta b{font-size:15px}.cd-cuenta small{font-size:10px;opacity:.5}
+.cd-acciones{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.cd-btn-pase{padding:.6rem;border-radius:14px;border:0;background:#DBEAFE;color:#1E40AF;font-weight:700;font-size:.88rem;cursor:pointer}
+.cd-add-lbl{font-size:12px;font-weight:700;opacity:.7;margin:6px 0 4px}
+.cd-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.cd-chip{padding:7px 10px;border-radius:999px;border:2px solid rgba(128,128,128,.3);background:none;color:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.cd-chip.on{border-color:#25D366;background:rgba(37,211,102,.12)}`;
+  document.head.appendChild(st);
+}
+
+// Cuánto mueve un movimiento: { saldo, ingresos, egresos, cuentas: {...} }
+function cdEfecto(m) {
+  const monto = Number(m && m.monto) || 0;
+  const c = cdCuenta(m && m.cuenta);
+  const d = { saldo: 0, ingresos: 0, egresos: 0, cuentas: { efectivo: 0, banco: 0, mp: 0 } };
+  const tipo = m && m.tipo;
+  if (tipo === 'egreso') { d.saldo = -monto; d.egresos = monto; d.cuentas[c] -= monto; }
+  else if (tipo === 'pase') { d.cuentas[c] -= monto; d.cuentas[cdCuenta(m.cuentaDestino)] += monto; }
+  else if (tipo === 'ajuste') { d.saldo = monto; d.cuentas[c] += monto; }
+  else { d.saldo = monto; d.ingresos = monto; d.cuentas[c] += monto; }
+  return d;
+}
+function cdSumar(movs) {
+  const t = { saldo: 0, ingresos: 0, egresos: 0, cuentas: { efectivo: 0, banco: 0, mp: 0 } };
+  (movs || []).forEach(m => {
+    const d = cdEfecto(m);
+    t.saldo += d.saldo; t.ingresos += d.ingresos; t.egresos += d.egresos;
+    Object.keys(t.cuentas).forEach(k => { t.cuentas[k] += d.cuentas[k]; });
+  });
+  return t;
+}
+// El saldo guardado antes de las cuentas: todo era efectivo
+function cdConCuentas(tot) {
+  if (!tot) return tot;
+  if (tot.cuentas && typeof tot.cuentas === 'object') {
+    const c = tot.cuentas;
+    return { ...tot, cuentas: { efectivo: Number(c.efectivo) || 0, banco: Number(c.banco) || 0, mp: Number(c.mp) || 0 } };
+  }
+  return { ...tot, cuentas: { efectivo: Number(tot.saldo) || 0, banco: 0, mp: 0 } };
+}
+
+// Lo cobrado (menos lo pagado) con un medio en los movimientos de la caja
+// del mostrador. Con pago dividido, solo la parte de ese medio.
+function cdNetoMetodo(movs, metodo) {
+  let n = 0;
+  (movs || []).forEach(m => {
+    const monto = Number(m.monto) || 0, m2 = Number(m.monto2) || 0;
+    let parte = 0;
+    if (m.metodoPago === metodo) parte += m.metodoPago2 ? monto - m2 : monto;
+    if (m.metodoPago2 === metodo) parte += m2;
+    n += m.tipo === 'egreso' ? -parte : parte;
+  });
+  return n;
+}
+// Qué cuenta toca cada medio del cierre
+const CD_CIERRE = [
+  { metodo: 'Transferencia', cuenta: 'banco', lbl: 'Transferencias' },
+  { metodo: 'MercadoPago',   cuenta: 'mp',    lbl: 'MercadoPago' },
+];
 
 // -- Prompt post-cierre --
 
@@ -526,6 +613,36 @@ function openCajaDuenoPrompt(suggestedAmount, cajaChica = 0) {
   document.getElementById('cd-prompt-overlay').classList.remove('hidden');
   document.getElementById('cd-prompt-modal').classList.remove('hidden');
   if (inp) setTimeout(() => inp.select(), 150);
+  _cdEstilos();
+  _cdPintarCierreCuentas();
+}
+
+// Lo cobrado hoy por transferencia y MercadoPago ya está en esas cuentas:
+// en el cierre se ofrece anotarlo en la caja dueño (tildado). Si ese día ya
+// se anotó (cierre repetido para corregir algo), no se ofrece de nuevo.
+let _cdCierreOfrecido = [];
+async function _cdPintarCierreCuentas() {
+  _cdCierreOfrecido = [];
+  const caja = document.getElementById('cd-prompt-cuentas');
+  if (!caja) return;
+  caja.innerHTML = '';
+  const movs = (typeof MOVIMIENTOS !== 'undefined' && Array.isArray(MOVIMIENTOS)) ? MOVIMIENTOS : [];
+  const fecha = (typeof currentDate !== 'undefined' && currentDate) ? currentDate : _todayAR();
+  let ya = [];
+  try {
+    const snap = await db.collection('caja_dueno_movimientos').where('fecha', '==', fecha).get();
+    ya = snap.docs.map(d => d.data().origen).filter(Boolean);
+  } catch (e) { console.warn('[caja dueño] cierre ya anotado:', e); }
+  _cdCierreOfrecido = CD_CIERRE
+    .map(x => ({ ...x, monto: Math.round(cdNetoMetodo(movs, x.metodo)), fecha, ya: ya.includes('cierre-' + x.cuenta) }))
+    .filter(x => x.monto > 0);
+  if (!_cdCierreOfrecido.length) return;
+  caja.innerHTML = `<p class="arqueo-sub" style="margin:10px 0 4px;font-weight:700">Y lo cobrado hoy que ya está en tus cuentas:</p>` +
+    _cdCierreOfrecido.map((x, i) => x.ya
+      ? `<div class="arqueo-sub" style="opacity:.6">${CD_CUENTAS[x.cuenta].ico} ${x.lbl}: ${fmt(x.monto)} · ya anotado hoy</div>`
+      : `<label style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:14px;cursor:pointer">
+          <input type="checkbox" id="cd-prompt-c${i}" checked style="width:18px;height:18px">
+          <span>${CD_CUENTAS[x.cuenta].ico} ${x.lbl} de hoy: <b>${fmt(x.monto)}</b> → ${CD_CUENTAS[x.cuenta].lbl}</span></label>`).join('');
 }
 
 function closeCajaDuenoPrompt() {
@@ -535,17 +652,30 @@ function closeCajaDuenoPrompt() {
 
 async function saveCajaDuenoFromCierre() {
   const monto = parseInt(document.getElementById('cd-prompt-monto').value) || 0;
-  if (monto <= 0) { closeCajaDuenoPrompt(); return; }
+  // Transferencias / MP del día tildadas (y no anotadas ya)
+  const cuentas = _cdCierreOfrecido.filter((x, i) => !x.ya && document.getElementById('cd-prompt-c' + i)?.checked);
+  if (monto <= 0 && !cuentas.length) { closeCajaDuenoPrompt(); return; }
   const desc = (document.getElementById('cd-prompt-desc').value || '').trim()
     || ('Cierre ' + _todayAR());
   try {
+    for (const x of cuentas) {
+      const mc = { fecha: x.fecha, tipo: 'ingreso', monto: x.monto, cuenta: x.cuenta, origen: 'cierre-' + x.cuenta,
+                   desc: `${x.lbl} del día ${x.fecha.slice(8, 10)}/${x.fecha.slice(5, 7)}`, ts: new Date().toISOString() };
+      await db.collection('caja_dueno_movimientos').add(mc);
+      await _cdAplicar(mc);
+    }
+    if (monto <= 0) {
+      closeCajaDuenoPrompt();
+      toast('📦 ' + cuentas.map(x => `${x.lbl} ${fmt(x.monto)}`).join(' y ') + ' anotado en caja dueño', 'success');
+      return;
+    }
     await db.collection('caja_dueno_movimientos').add({
-      fecha: _todayAR(), tipo: 'ingreso', monto, desc,
+      fecha: _todayAR(), tipo: 'ingreso', monto, desc, cuenta: 'efectivo',
       ts: new Date().toISOString()
     });
     await _cdAjustarSaldo('ingreso', monto);
     closeCajaDuenoPrompt();
-    toast('📦 ' + fmt(monto) + ' guardado en caja dueño', 'success');
+    toast('📦 ' + fmt(monto) + ' guardado en caja dueño' + (cuentas.length ? ' (y ' + cuentas.map(x => x.lbl).join(' y ') + ')' : ''), 'success');
     // 📨 Aviso Telegram: apartado a caja dueño en el cierre
     if (typeof tgNotify === 'function') {
       tgNotify(`📦 <b>${tgMonto(monto)} a caja dueño</b>\n${desc ? esc(desc) + '\n' : ''}🕐 ${tgHora()}`);
@@ -560,6 +690,7 @@ function openCajaDueno() {
     requireCajaOwnerPin(() => openCajaDueno(), 'PIN de dueño para acceder');
     return;
   }
+  _cdEstilos();
   document.getElementById('cd-mgmt-overlay').classList.remove('hidden');
   document.getElementById('cd-mgmt-modal').classList.remove('hidden');
   closeCajaDuenoMovForm();
@@ -586,17 +717,21 @@ const _cdSaldoRef = () => db.collection('config').doc('cajaDuenoSaldo');
 // `quitar` es para cuando se BORRA un movimiento: no alcanza con sumar lo
 // contrario, porque entonces el total de ingresos subiría al borrar un egreso.
 // Hay que descontarlo de su propia columna.
-async function _cdAjustarSaldo(tipo, monto, quitar) {
-  const m = Number(monto) || 0;
-  if (!m) return;
-  const signo = quitar ? -1 : 1;
-  const esEgreso = tipo === 'egreso';
+async function _cdAjustarSaldo(tipo, monto, quitar, extra) {
+  return _cdAplicar(Object.assign({ tipo, monto }, extra || {}), quitar);
+}
+// Aplica lo que mueve un movimiento (o lo revierte, al borrarlo), cuentas incluidas
+async function _cdAplicar(mov, quitar) {
+  if (!(Number(mov && mov.monto))) return;
+  const d = cdEfecto(mov);
+  const s = quitar ? -1 : 1;
   const inc = firebase.firestore.FieldValue.increment;
   try {
     await _cdSaldoRef().set({
-      saldo:    inc(signo * (esEgreso ? -m : m)),
-      ingresos: inc(esEgreso ? 0 : signo * m),
-      egresos:  inc(esEgreso ? signo * m : 0),
+      saldo:    inc(s * d.saldo),
+      ingresos: inc(s * d.ingresos),
+      egresos:  inc(s * d.egresos),
+      cuentas:  { efectivo: inc(s * d.cuentas.efectivo), banco: inc(s * d.cuentas.banco), mp: inc(s * d.cuentas.mp) },
       updatedAt: new Date().toISOString(),
     }, { merge: true });
   } catch (err) { console.error('[caja dueño] saldo:', err); }
@@ -607,13 +742,8 @@ async function _cdAjustarSaldo(tipo, monto, quitar) {
 async function recalcularSaldoCajaDueno(avisar) {
   const snap = await db.collection('caja_dueno_movimientos').get();
   if (typeof cupoContar === 'function') cupoContar('caja_dueno_movimientos', snap.size);
-  let ingresos = 0, egresos = 0;
-  snap.docs.forEach(d => {
-    const m = d.data();
-    if (m.tipo === 'egreso') egresos += Number(m.monto) || 0;
-    else ingresos += Number(m.monto) || 0;
-  });
-  const tot = { saldo: ingresos - egresos, ingresos, egresos, updatedAt: new Date().toISOString() };
+  const t = cdSumar(snap.docs.map(d => d.data()));
+  const tot = { ...t, updatedAt: new Date().toISOString() };
   await _cdSaldoRef().set(tot);
   if (avisar) { toast('🔄 Saldo recalculado sobre ' + snap.size + ' movimientos', 'success'); _loadCajaDueno(); }
   return tot;
@@ -635,6 +765,14 @@ async function _loadCajaDueno() {
       if (sd.exists) tot = sd.data();
     } catch (err) { console.error('[caja dueño] leer saldo:', err); }
     if (!tot) tot = await recalcularSaldoCajaDueno(false);
+    // Saldo de antes de las cuentas: todo era efectivo. Se anota una vez.
+    if (!tot.cuentas) {
+      tot = cdConCuentas(tot);
+      try { await _cdSaldoRef().set({ cuentas: tot.cuentas }, { merge: true }); } catch (err) { console.error('[caja dueño] cuentas:', err); }
+    }
+    tot = cdConCuentas(tot);
+    _cdTot = tot;
+    _cdPintarCuentas(tot);
     const totalIng = Number(tot.ingresos) || 0;
     const totalEg  = Number(tot.egresos) || 0;
     const saldo    = Number(tot.saldo) || 0;
@@ -653,15 +791,19 @@ async function _loadCajaDueno() {
     }
 
     list.innerHTML = movs.map(m => {
-      const isIng = m.tipo === 'ingreso';
+      const c = CD_CUENTAS[cdCuenta(m.cuenta)];
+      const esPase = m.tipo === 'pase', esAjuste = m.tipo === 'ajuste';
+      const isIng = m.tipo === 'ingreso' || (esAjuste && Number(m.monto) >= 0);
+      const cuentaTxt = esPase ? c.ico + '→' + CD_CUENTAS[cdCuenta(m.cuentaDestino)].ico : c.ico;
+      const signo = esPase ? '⇄ ' : (isIng ? '+' : '−');
       return '<div class="cd-mov-row">' +
         '<div class="cd-mov-info">' +
-        '<span class="cd-mov-fecha">' + esc(m.fecha || '') + '</span>' +
-        '<span class="cd-mov-desc">' + esc(m.desc || (isIng ? 'Ingreso' : 'Egreso')) + '</span>' +
+        '<span class="cd-mov-fecha">' + esc(m.fecha || '') + ' · ' + cuentaTxt + (m.origen === 'telegram' ? ' · 🤖' : '') + '</span>' +
+        '<span class="cd-mov-desc">' + esc(m.desc || (esPase ? 'Pase entre cuentas' : isIng ? 'Ingreso' : 'Egreso')) + '</span>' +
         '</div>' +
         '<div class="cd-mov-right">' +
-        '<span class="cd-mov-monto ' + (isIng ? 'cd-pos' : 'cd-neg') + '">' +
-          (isIng ? '+' : '−') + fmt(m.monto) +
+        '<span class="cd-mov-monto ' + (esPase ? '' : isIng ? 'cd-pos' : 'cd-neg') + '">' +
+          signo + fmt(Math.abs(Number(m.monto) || 0)) +
         '</span>' +
         '<button class="cd-del-btn" onclick="deleteCajaDueno(\'' + esc(m.id) + '\')">🗑</button>' +
         '</div>' +
@@ -680,11 +822,56 @@ async function deleteCajaDueno(id) {
       const doc = await ref.get();
       const m = doc.exists ? doc.data() : null;
       await ref.delete();
-      if (m) await _cdAjustarSaldo(m.tipo, m.monto, true);
+      if (m) await _cdAplicar(m, true);
       toast('Movimiento eliminado', 'success');
       _loadCajaDueno();
     } catch(e) { toast('Error al eliminar', 'error'); }
   }, 'PIN de dueño para eliminar');
+}
+
+let _cdTot = null;          // el último saldo leído (para "ajustar")
+
+// Las tres cuentas arriba, con su saldo y ✏️ para ajustarlo a lo real
+function _cdPintarCuentas(tot) {
+  const caja = document.getElementById('cd-cuentas');
+  if (!caja) return;
+  const t = cdConCuentas(tot) || { cuentas: { efectivo: 0, banco: 0, mp: 0 } };
+  caja.innerHTML = Object.entries(CD_CUENTAS).map(([k, c]) => {
+    const v = t.cuentas[k] || 0;
+    return `<button type="button" class="cd-cuenta" onclick="cdAjustar('${k}')" title="Tocá para poner el saldo real">
+      <span class="cd-cuenta-ico">${c.ico}</span><span class="cd-cuenta-lbl">${c.lbl}</span>
+      <b class="${v >= 0 ? 'cd-pos' : 'cd-neg'}">${fmt(v)}</b><small>✏️ ajustar</small></button>`;
+  }).join('');
+}
+
+// Elegir cuenta en el formulario (y el destino, en un pase)
+function cdElegirCuenta(campo, k) {
+  const inp = document.getElementById(campo);
+  if (inp) inp.value = cdCuenta(k);
+  document.querySelectorAll(`[data-cd-campo="${campo}"]`).forEach(b => b.classList.toggle('on', b.dataset.k === k));
+}
+function _cdChipsCuenta(campo, elegida) {
+  return Object.entries(CD_CUENTAS).map(([k, c]) =>
+    `<button type="button" class="cd-chip${k === elegida ? ' on' : ''}" data-cd-campo="${campo}" data-k="${k}" onclick="cdElegirCuenta('${campo}','${k}')">${c.ico} ${c.lbl}</button>`).join('');
+}
+
+// "En el banco hay $X": la diferencia queda como ajuste
+async function cdAjustar(k) {
+  const c = CD_CUENTAS[cdCuenta(k)];
+  const actual = (_cdTot && _cdTot.cuentas && _cdTot.cuentas[k]) || 0;
+  const r = prompt(`¿Cuánto hay HOY en ${c.lbl}? (la app dice ${fmt(actual)})`, '');
+  if (r === null) return;
+  const real = parseInt(String(r).replace(/[^\d-]/g, ''), 10);
+  if (!isFinite(real)) { toast('Poné un número', 'error'); return; }
+  const dif = real - actual;
+  if (!dif) { toast('Ya estaba bien 👍', 'info'); return; }
+  const m = { fecha: _todayAR(), tipo: 'ajuste', monto: dif, cuenta: cdCuenta(k), desc: `Ajuste: hay ${fmt(real)} en ${c.lbl}`, ts: new Date().toISOString() };
+  try {
+    await db.collection('caja_dueno_movimientos').add(m);
+    await _cdAplicar(m);
+    toast(`${c.ico} ${c.lbl} ajustado a ${fmt(real)}`, 'success');
+    _loadCajaDueno();
+  } catch (e) { toast('Error al ajustar', 'error'); }
 }
 
 function openCajaDuenoMovForm(tipo) {
@@ -692,7 +879,16 @@ function openCajaDuenoMovForm(tipo) {
   document.getElementById('cd-add-monto').value = '';
   document.getElementById('cd-add-desc').value = '';
   const title = document.getElementById('cd-add-title');
-  if (title) title.textContent = tipo === 'egreso' ? 'Nuevo egreso' : 'Nuevo ingreso';
+  if (title) title.textContent = tipo === 'pase' ? 'Pasar plata de una cuenta a otra' : tipo === 'egreso' ? 'Nuevo gasto' : 'Nuevo ingreso';
+  // Cuenta (y destino, si es un pase)
+  const cc = document.getElementById('cd-add-cuentas');
+  if (cc) {
+    cc.innerHTML = `<div class="cd-add-lbl">${tipo === 'pase' ? 'Sale de' : tipo === 'egreso' ? 'Lo pagaste con' : 'Entra en'}</div>
+      <div class="cd-chips">${_cdChipsCuenta('cd-add-cuenta', tipo === 'pase' ? 'banco' : 'efectivo')}</div>
+      ${tipo === 'pase' ? `<div class="cd-add-lbl">Va a</div><div class="cd-chips">${_cdChipsCuenta('cd-add-destino', 'efectivo')}</div>` : ''}`;
+  }
+  const ic = document.getElementById('cd-add-cuenta'); if (ic) ic.value = tipo === 'pase' ? 'banco' : 'efectivo';
+  const idn = document.getElementById('cd-add-destino'); if (idn) idn.value = 'efectivo';
   document.getElementById('cd-add-section').classList.remove('hidden');
   setTimeout(() => document.getElementById('cd-add-monto').focus(), 80);
 }
@@ -706,17 +902,22 @@ async function saveCajaDuenoMov() {
   const tipo  = document.getElementById('cd-add-tipo').value;
   const monto = parseInt(document.getElementById('cd-add-monto').value) || 0;
   const desc  = document.getElementById('cd-add-desc').value.trim();
+  const cuenta = cdCuenta(document.getElementById('cd-add-cuenta')?.value);
+  const destino = cdCuenta(document.getElementById('cd-add-destino')?.value);
   if (monto <= 0) { toast('Ingresá un monto válido', 'error'); return; }
+  if (tipo === 'pase' && cuenta === destino) { toast('Elegí dos cuentas distintas', 'error'); return; }
+  const mov = {
+    fecha: _todayAR(), tipo, monto, cuenta,
+    desc: desc || (tipo === 'pase' ? `${CD_CUENTAS[cuenta].lbl} → ${CD_CUENTAS[destino].lbl}` : tipo === 'egreso' ? 'Egreso' : 'Ingreso'),
+    ts: new Date().toISOString()
+  };
+  if (tipo === 'pase') mov.cuentaDestino = destino;
   try {
-    await db.collection('caja_dueno_movimientos').add({
-      fecha: _todayAR(), tipo, monto,
-      desc: desc || (tipo === 'egreso' ? 'Egreso' : 'Ingreso'),
-      ts: new Date().toISOString()
-    });
-    await _cdAjustarSaldo(tipo, monto);
+    await db.collection('caja_dueno_movimientos').add(mov);
+    await _cdAplicar(mov);
     closeCajaDuenoMovForm();
     _loadCajaDueno();
-    toast((tipo === 'ingreso' ? '📦 Ingreso' : '💸 Egreso') + ' guardado', 'success');
+    toast((tipo === 'pase' ? '⇄ Pase' : tipo === 'ingreso' ? '📦 Ingreso' : '💸 Egreso') + ' guardado', 'success');
     // 📨 Aviso Telegram: movimiento manual de caja dueño
     if (typeof tgNotify === 'function') {
       tgNotify(`📦 <b>Caja dueño: ${tipo === 'ingreso' ? 'ingreso' : 'egreso'} ${tgMonto(monto)}</b>\n${desc ? esc(desc) + '\n' : ''}🕐 ${tgHora()}`);

@@ -723,6 +723,8 @@
   <div class="fg">
     <input id="cd-prompt-desc" class="fi" type="text" placeholder="Nota opcional (ej: ganancia lunes...)" maxlength="60">
   </div>
+  <!-- Transferencias / MercadoPago del día → a las cuentas de la caja dueño (caja_extra.js) -->
+  <div id="cd-prompt-cuentas"></div>
   <div style="display:flex;gap:10px;margin-top:12px">
     <button class="btn-secondary" onclick="closeCajaDuenoPrompt()" style="flex:1">Omitir</button>
     <button class="btn-primary" onclick="saveCajaDuenoFromCierre()" style="flex:2">📦 Guardar</button>
@@ -738,21 +740,27 @@
   </div>
   <!-- Saldo -->
   <div class="cd-saldo-card">
-    <span class="cd-saldo-lbl">Saldo acumulado</span>
+    <span class="cd-saldo-lbl">Total entre las tres cuentas</span>
     <span class="cd-saldo-val" id="cd-saldo-val">$0</span>
     <span class="cd-saldo-sub" id="cd-saldo-sub"></span>
       <button type="button" class="cd-recalc" onclick="recalcularSaldoCajaDueno(true)"
               title="Volver a contar todos los movimientos">🔄 Recalcular</button>
   </div>
+  <!-- Las cuentas: efectivo, banco, MercadoPago (caja_extra.js) -->
+  <div id="cd-cuentas" class="cd-cuentas"></div>
   <!-- Botones acción -->
   <div class="cd-acciones">
-    <button class="cd-btn-eg" onclick="openCajaDuenoMovForm('egreso')">− Egreso</button>
+    <button class="cd-btn-eg" onclick="openCajaDuenoMovForm('egreso')">− Gasto</button>
     <button class="cd-btn-ing" onclick="openCajaDuenoMovForm('ingreso')">+ Ingreso</button>
+    <button class="cd-btn-pase" onclick="openCajaDuenoMovForm('pase')">⇄ Pasar</button>
   </div>
   <!-- Formulario inline agregar movimiento -->
   <div id="cd-add-section" class="cd-add-section hidden">
     <input type="hidden" id="cd-add-tipo" value="egreso">
+    <input type="hidden" id="cd-add-cuenta" value="efectivo">
+    <input type="hidden" id="cd-add-destino" value="efectivo">
     <p class="cd-add-title" id="cd-add-title">Nuevo egreso</p>
+    <div id="cd-add-cuentas"></div>
     <div class="mov-monto-area" style="margin:.4rem 0 .3rem">
       <span class="mov-monto-prefix">$</span>
       <input id="cd-add-monto" class="mov-monto-big" type="number" placeholder="0" min="0" inputmode="numeric">
