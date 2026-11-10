@@ -393,7 +393,7 @@ function toast(msg, tipo) {
   // arreglar, estados, lista de precios) van en 2000: el aviso quedaba
   // DETRÁS. Imprimiendo desde otro equipo no se veía "🖨️ Mandado a la
   // impresora" y parecía que no hacía nada (y se tocaba dos veces).
-  el.style.zIndex = '100000';
+  if (el.style) el.style.zIndex = '100000';
   // Un respiro antes de `show` para que la transición se vea también la
   // primera vez, cuando el div acaba de nacer.
   setTimeout(() => el.classList.add('show'), 10);
