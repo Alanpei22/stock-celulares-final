@@ -37,6 +37,9 @@ let ARREGLOS = [];
 let _arrUnsub = null;
 let _arrFiltro = 'todos';
 let _arrEditId = null;
+// El recién anotado: arriba de la lista sale "Imprimir su etiqueta" (la
+// impresión tiene que salir de un toque, y guardar ya usó el anterior)
+let _arrRecien = null;
 // Mientras el formulario del stock está abierto desde "Poner a la venta",
 // acá queda de qué equipo viene (para cerrarlo al guardar).
 let _arrDesde = null;
@@ -120,6 +123,8 @@ function _arrEstilos() {
 .eqa-hd{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:18px;margin-bottom:4px}
 .eqa-x{background:none;border:0;font-size:20px;cursor:pointer;color:inherit}
 .eqa-sub{font-size:13px;opacity:.7;margin:0 0 10px}
+.eqa-recien{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-radius:12px;background:rgba(34,197,94,.12);border:1.5px solid #22c55e;margin-bottom:10px;font-size:14px}
+.eqa-recien button{margin-left:auto;padding:8px 12px;border-radius:10px;border:0;background:#22c55e;color:#fff;font-weight:700;cursor:pointer}
 .eqa-nuevo{width:100%;padding:12px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-weight:700;font-size:15px;cursor:pointer;margin-bottom:10px}
 .eqa-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .eqa-chip{padding:6px 12px;border-radius:999px;border:1.5px solid rgba(128,128,128,.3);background:none;color:inherit;font-size:13px;font-weight:600;cursor:pointer}
@@ -170,6 +175,7 @@ function _arrModal(html) {
 }
 
 function arrCerrar() {
+  _arrRecien = null;
   document.getElementById('eqa-ov')?.remove();
   document.getElementById('eqa-mod')?.remove();
 }
@@ -218,6 +224,9 @@ function arrPintarLista() {
   }).join('');
   cuerpo.innerHTML = `<div class="eqa-hd"><span>🔧 Equipos para arreglar</span><button type="button" class="eqa-x" onclick="arrCerrar()">✕</button></div>
     <p class="eqa-sub">Los celus del local que necesitan un arreglo antes de venderse. No están en el stock: cuando quedan listos, los ponés a la venta desde acá.${verPlata && r.invertido ? ` Hay <b>${_arrPlata(r.invertido)}</b> invertidos esperando.` : ''}</p>
+    ${(() => { const nu = _arrRecien && ARREGLOS.find(x => x.id === _arrRecien);
+      return nu ? `<div class="eqa-recien"><span>✅ Anotado: <b>${_arrEsc(arrNombre(nu))}</b></span>
+        <button type="button" onclick="arrEtiqueta('${_arrEsc(nu.id)}')">🏷️ Imprimir su etiqueta</button></div>` : ''; })()}
     <button type="button" class="eqa-nuevo" onclick="arrEditar()">＋ Anotar un equipo</button>
     <div class="eqa-chips">${chip('todos', 'Todos', r.total)}${chip('pendiente', '🔴 Por arreglar', r.pendiente)}${chip('arreglando', '🔧 Arreglando', r.arreglando)}${chip('listo', '✅ Listos', r.listo)}</div>
     ${lista.length ? `<button type="button" class="eqa-chip" style="margin-bottom:10px" onclick="arrEtiquetasTodas()">🏷️ Imprimir ${lista.length === 1 ? 'la etiqueta' : `las ${lista.length} etiquetas`}${_arrFiltro === 'todos' ? '' : ' de este paso'}</button>` : ''}
@@ -309,7 +318,8 @@ async function arrGuardarForm() {
       const nuevo = { ...d, estado: 'pendiente', activo: true, fecha: new Date().toISOString() };
       await _arrGuardar(id, nuevo);
       if (!ARREGLOS.some(x => x.id === id)) ARREGLOS.push({ id, ...nuevo });
-      toast('🔧 Anotado. Tocá 🏷️ para imprimirle la etiqueta', 'success');
+      _arrRecien = id;
+      toast('🔧 Anotado', 'success');
     }
     arrPintarContador();
     arrAbrir();

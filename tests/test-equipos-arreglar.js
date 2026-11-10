@@ -65,6 +65,10 @@ ok(/15/.test(run(`arrValidar({ marca: 'Moto', falla: 'x', imei: '123' })`)), 'un
   ok(!!d && d.estado === 'pendiente' && d.activo === true && d.falla === 'Cambio de módulo', 'queda anotado "por arreglar", en su propia colección (no en el stock)', d);
   ok(d.costoCompra === 90000 && d.bateria === 84 && d.imei === '356938035643809', 'con lo que se pagó y los datos', d);
   ok(!Object.keys(DB).some(x => x.startsWith('stock/')), 'el stock (lo que se vende) ni se toca');
+  // Al anotarlo, arriba de la lista: "Imprimir su etiqueta" (un toque nuevo:
+  // la impresión no puede esperar a que se guarde)
+  ok(/Anotado: <b>Samsung Galaxy A32 128 gb<\/b>/i.test((NODOS['eqa-cuerpo'] || {}).innerHTML || '') && /Imprimir su etiqueta/.test(NODOS['eqa-cuerpo'].innerHTML),
+     'recién anotado: botón para imprimir su etiqueta ahí mismo', (NODOS['eqa-cuerpo'] || {}).innerHTML);
   const id = k.split('/')[1];
   ctx._id = id;
 
@@ -193,6 +197,14 @@ ok(/15/.test(run(`arrValidar({ marca: 'Moto', falla: 'x', imei: '123' })`)), 'un
   const fnImp = (src.match(/function _arrImprimir[\s\S]*?\n\}/) || [''])[0];
   ok(fnImp && !/await/.test(fnImp), 'imprime en el mismo toque (si espera algo, Chrome bloquea la ventana)');
   ok(/onclick="arrEtiqueta\('\$\{id\}'\)"/.test(src) && /onclick="arrEtiquetasTodas\(\)"/.test(src), 'los botones están en la lista');
+
+  // Los avisos (toast) quedaban DETRÁS del cuadro: imprimiendo desde otro
+  // equipo no se veía "Mandado a la impresora" y parecía que no andaba
+  const ut = leer('utils.js');
+  const fnToast = (ut.match(/function toast\(msg, tipo\) \{[\s\S]*?\n\}/) || [''])[0];
+  const zMod = Number((leer('equipos-arreglar.js').match(/\.eqa-mod\{[^}]*z-index:(\d+)/) || [])[1]);
+  const zToast = Number((fnToast.match(/zIndex = '(\d+)'/) || [])[1]);
+  ok(zToast > zMod && zMod > 0, `los avisos van arriba del cuadro (${zToast} > ${zMod})`, [zToast, zMod]);
 
   console.log('\n7) Enganchado');
   const app = leer('app.js'), html = leer('index.html');
