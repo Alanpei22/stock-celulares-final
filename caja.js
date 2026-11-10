@@ -4038,6 +4038,8 @@ async function saveMov() {
       data.montoReparacion = repAmt;
       data.montoProductos  = (Number(monto) || 0) - repAmt;
     }
+    // Acá la ganancia es la de los productos; la de la reparación se suma
+    // abajo, en el cobro (antes no se sumaba y en el tablero contaba $0).
     data.gananciaARS   = (Number(monto) || 0) - repAmt - costoTotal;
     // Compat: si es un solo producto, mantené los campos viejos (reportes/borrado legacy)
     if (items.length === 1) {
@@ -4072,6 +4074,18 @@ async function saveMov() {
         if (!ok) return;
       }
       data.esCobro = true;
+      // La ganancia de la reparación (la orden entera, como en el cobro desde
+      // la ficha). Antes un cobro desde la caja no la guardaba: en el tablero
+      // la reparación contaba $0. Si el costo se carga después, se corrige
+      // (repActualizarCobro en utils.js).
+      if (typeof repCostoEfectivo === 'function') {
+        const cRep = repCostoEfectivo(repair);
+        const precioOrden = Number(repair.monto) || repAmt;
+        data.costoReparacionARS = cRep;
+        data.gananciaARS   = (typeof data.gananciaARS === 'number' ? data.gananciaARS : 0) + (precioOrden - cRep);
+        data.costoARSTotal = (Number(data.costoARSTotal) || 0) + cRep;
+        if (!(cRep > 0)) data.sinCosto = true;
+      }
       const upd = {
         cobrado: true,
         metodoCobro: metodoPago,

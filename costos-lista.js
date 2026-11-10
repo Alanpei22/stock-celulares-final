@@ -12,9 +12,30 @@
 // ganancia, reportes) no nota la diferencia:
 //   · equipo   → stock.costo en pesos (sin costo = se borra el campo)
 //   · repuesto → precioCompra en pesos + precioCostoUSD al dólar de hoy
+//   · reparación → repairs.costo en pesos (lo que costó arreglarla: repuesto
+//                  y lo que haga falta). Si ya estaba cobrada, también se
+//                  corrige la ganancia de ese cobro en la caja.
 // Solo el dueño: el costo no lo ven los empleados.
 
+// Las reparaciones: de la más nueva a la más vieja (no por nombre), sin las
+// que no se hicieron
+const _COSTOS_REP_FUERA = /^(no va|no van|cancelad)/i;
 const _COSTOS_CFG = {
+  reparacion: {
+    titulo: '🔧 Costos de reparaciones',
+    col: 'repairs',
+    lista: () => (typeof REPAIRS !== 'undefined' ? REPAIRS : []).filter(r => !_COSTOS_REP_FUERA.test(String(r.estado || ''))),
+    orden: (a, b) => String(b.fechaIngreso || '').localeCompare(String(a.fechaIngreso || '')),
+    nombre: r => `#${r.nOrden || '?'} ${r.marca || ''} ${r.modelo || ''}`.replace(/\s+/g, ' ').trim(),
+    sub: r => [r.arreglo || (Array.isArray(r.arreglos) ? r.arreglos.map(a => a && (a.txt || a.nombre)).filter(Boolean).join(' + ') : ''),
+               r.estado, r.fechaIngreso ? new Date(r.fechaIngreso).toLocaleDateString('es-AR') : '',
+               (!(Number(r.costo) > 0) && Number(r.costoRepuesto) > 0) ? 'costo del repuesto usado' : ''].filter(Boolean).join(' · '),
+    venta: r => Number(r.monto) || 0,
+    costo: r => Math.round((typeof repCostoEfectivo === 'function' ? repCostoEfectivo(r) : Number(r.costo)) || 0),
+    // "Sin repuesto" (solo mano de obra) ya tiene su costo: 0
+    falta: r => !(Number(r.costo) > 0 || Number(r.costoRepuesto) > 0 || r.sinRepuesto),
+    historial: true,
+  },
   equipo: {
     titulo: '📱 Costos de equipos',
     col: 'stock',
@@ -68,10 +89,11 @@ function abrirCostosLista(tipo) {
   if (!cfg) return;
   if (!_costosEsDueno()) { toast('🔒 Activá el modo dueño para cargar costos', 'error'); return; }
   const lista = cfg.lista().slice()
-    .sort((a, b) => cfg.nombre(a).localeCompare(cfg.nombre(b), 'es'));
+    .sort(cfg.orden || ((a, b) => cfg.nombre(a).localeCompare(cfg.nombre(b), 'es')));
   if (!lista.length) { toast('No hay nada en la lista que estás viendo', 'error'); return; }
   _costosTipo = tipo;
-  const faltan = lista.filter(x => !cfg.costo(x)).length;
+  const falta = x => (cfg.falta ? cfg.falta(x) : !cfg.costo(x));
+  const faltan = lista.filter(falta).length;
 
   document.getElementById('costos-lista-modal')?.remove();
   const m = document.createElement('div');
@@ -84,7 +106,11 @@ function abrirCostosLista(tipo) {
       <button class="modal-close" onclick="cerrarCostosLista()">✕</button>
     </div>
     <div style="padding:8px 16px 0;font-size:12px;color:var(--t3)">
-      Costo en pesos. Enter pasa al siguiente. Son los de la lista que estabas viendo (con tus filtros).
+      ${tipo === 'reparacion'
+        ? `Lo que te costó cada una (repuesto y lo que haga falta), en pesos. Enter pasa a la siguiente. Si ya estaba cobrada, se corrige la ganancia en la caja.
+           ${cfg.historial && typeof _cargarHistorialRep === 'function' && (typeof repAlcance !== 'function' || repAlcance() !== 'todo')
+             ? `<button type="button" class="btn-secondary" style="min-height:0;padding:4px 10px;font-size:12px;margin-left:6px" onclick="_costosTraerTodas()">🗂️ Traer también las viejas</button>` : ''}`
+        : 'Costo en pesos. Enter pasa al siguiente. Son los de la lista que estabas viendo (con tus filtros).'}
       <label style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;cursor:pointer">
         <input type="checkbox" id="costos-solo-faltan" onchange="_costosSoloFaltan(this.checked)"> solo sin costo
       </label>
@@ -102,7 +128,7 @@ function abrirCostosLista(tipo) {
     <div class="modal-body" style="max-height:62vh;overflow:auto;gap:0">
       ${lista.map(x => {
         const val = cfg.costo(x), venta = cfg.venta(x);
-        return `<div class="costos-fila" data-falta="${val ? '0' : '1'}" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+        return `<div class="costos-fila" data-falta="${falta(x) ? '1' : '0'}" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(cfg.nombre(x) || '(sin nombre)')}</div>
             <div style="font-size:12px;color:var(--t3)">${esc(cfg.sub(x))}</div>
@@ -263,6 +289,16 @@ function _costosSoloFaltan(solo) {
   });
 }
 
+// Las reparaciones de hace más de 30 días no están en memoria: se traen
+// (una vez, como el "Todo" de la lista de reparaciones) y se reabre.
+async function _costosTraerTodas() {
+  if (_costosContarCambios() && !confirm('Tenés costos sin guardar: se pierden si traés las viejas. ¿Seguir?')) return;
+  document.getElementById('costos-lista-modal')?.remove();
+  toast('🗂️ Trayendo todas las reparaciones…', 'info');
+  const ok = await _cargarHistorialRep();
+  if (ok) abrirCostosLista('reparacion');
+}
+
 function cerrarCostosLista() {
   const n = _costosContarCambios();
   if (n && !confirm(`Tenés ${n} costo${n === 1 ? '' : 's'} sin guardar. ¿Cerrar igual?`)) return;
@@ -281,6 +317,9 @@ function _costosCambios(tipo, inputs, dolar, del) {
     if (tipo === 'equipo') {
       // Igual que el formulario: sin costo, el campo no queda en 0, se borra.
       data = { costo: nuevo > 0 ? nuevo : del };
+    } else if (tipo === 'reparacion') {
+      // El que se escribe es el costo de la reparación (pisa al del repuesto)
+      data = { costo: nuevo };
     } else {
       data = { precioCompra: nuevo, precioCostoUSD: (typeof repCostoUSD === 'function') ? repCostoUSD(nuevo, dolar)
                : (nuevo > 0 && dolar > 0 ? Math.round((nuevo / dolar) * 100) / 100 : 0) };
@@ -289,6 +328,20 @@ function _costosCambios(tipo, inputs, dolar, del) {
     out.push({ id: el.dataset.id, data });
   });
   return out;
+}
+
+// Después de guardar costos de reparaciones: la copia local, y la ganancia
+// de los cobros que ya estaban hechos
+async function _costosRepDespues(cambios) {
+  let corregidos = 0;
+  for (const c of cambios) {
+    const r = (typeof REPAIRS !== 'undefined' ? REPAIRS : []).find(x => x.id === c.id);
+    if (!r) continue;
+    const costoAntes = Number(r.costo) || 0;
+    if (typeof _repPatchLocal === 'function') _repPatchLocal(c.id, c.data); else Object.assign(r, c.data);
+    if (r.cobrado && typeof repActualizarCobro === 'function') corregidos += await repActualizarCobro(r, c.data.costo, costoAntes);
+  }
+  if (corregidos) toast(`📈 Ganancia corregida en ${corregidos} cobro${corregidos === 1 ? '' : 's'} de la caja`, 'success');
 }
 
 async function guardarCostosLista() {
@@ -325,6 +378,7 @@ async function guardarCostosLista() {
     }
     m.remove();
     toast(`✅ ${cambios.length} costo${cambios.length === 1 ? '' : 's'} guardado${cambios.length === 1 ? '' : 's'}`, 'success');
+    if (_costosTipo === 'reparacion') await _costosRepDespues(cambios);
   } catch (e) {
     console.error('costos:', e);
     toast('Error al guardar los costos', 'error');

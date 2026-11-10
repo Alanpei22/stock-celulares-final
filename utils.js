@@ -703,6 +703,72 @@ function tarjetaCalculo(mov, cfg) {
 }
 
 // Se llama justo antes de guardar un ingreso en la caja. Cambia `mov`.
+// ══════════════════════════════════════════════════════════
+//  COSTO DE UNA REPARACIÓN → GANANCIA DE SU COBRO
+// ══════════════════════════════════════════════════════════
+// Alan (10/11): "necesito cargar los costos de todo… de las reparaciones ya
+// ingresadas y las que ingresen luego". El tablero suma la ganancia que
+// quedó guardada en el cobro de la caja (gananciaARS), calculada el día del
+// cobro. Dos problemas:
+//   1) si el costo se cargaba DESPUÉS de cobrar, el cobro seguía con la
+//      ganancia sin costo (la reparación parecía ganar el precio entero);
+//   2) las cobradas DESDE LA CAJA no guardaban ganancia de la reparación:
+//      en el tablero contaban $0.
+// repActualizarCobro corrige el cobro cada vez que se carga o cambia el costo.
+
+// El costo de la reparación: el que se escribió a mano o, si no hay, el del
+// repuesto que se descontó al marcarla lista.
+function repCostoEfectivo(r) {
+  return Number(r && r.costo) > 0 ? Number(r.costo) : (Number(r && r.costoRepuesto) || 0);
+}
+
+// Lo que hay que cambiarle al cobro. `costoViejo` es el costo con el que se
+// cobró (r.costo de ese momento), para los cobros de antes de esta marca.
+function repGananciaPatch(mov, r, costoNuevo, costoViejo) {
+  const cn = Math.max(0, Math.round(Number(costoNuevo) || 0));
+  const patch = { costoReparacionARS: cn, sinCosto: !(cn > 0) };
+  const gan = typeof mov.gananciaARS === 'number' ? mov.gananciaARS : null;
+  if (mov.costoReparacionARS != null) {
+    // Ya incluye la reparación con un costo conocido: se corrige la diferencia
+    const delta = cn - (Number(mov.costoReparacionARS) || 0);
+    patch.gananciaARS = (gan || 0) - delta;
+    patch.costoARSTotal = Math.max(0, (Number(mov.costoARSTotal) || 0) + delta);
+  } else if (mov.repairMode || gan === null) {
+    // Cobrada desde la caja (o muy vieja): la ganancia no tenía la reparación.
+    // Se suma la de la orden entera, como en el cobro desde la ficha. La
+    // comisión de la tarjeta se descontaba aparte en los cobros sin ganancia;
+    // ahora que la tiene, va adentro.
+    const precioOrden = Number(r && r.monto) || Number(mov.montoReparacion) || Number(mov.monto) || 0;
+    const base = gan !== null ? gan : -(Number(mov.comisionTarjeta) || 0);
+    patch.gananciaARS = base + (precioOrden - cn);
+    patch.costoARSTotal = (Number(mov.costoARSTotal) || 0) + cn;
+  } else {
+    // Cobrada desde la ficha, antes de esta marca: se cobró con costoViejo
+    const delta = cn - (Number(costoViejo) || 0);
+    patch.gananciaARS = gan - delta;
+    patch.costoARSTotal = Math.max(0, (Number(mov.costoARSTotal) || 0) + delta);
+  }
+  return patch;
+}
+
+// ¿Este movimiento es el cobro de la reparación? (no la seña)
+function repEsCobro(m) {
+  return !!m && m.tipo === 'ingreso' && !m.esSena && (m.esCobro || m.repairMode === 'cobro' || typeof m.gananciaARS === 'number');
+}
+
+async function repActualizarCobro(r, costoNuevo, costoViejo) {
+  if (!r || !r.id || typeof db === 'undefined') return 0;
+  try {
+    const snap = await db.collection('caja_movimientos').where('repairId', '==', r.id).get();
+    const cobros = snap.docs.filter(d => repEsCobro(d.data()));
+    for (const d of cobros) await d.ref.update(repGananciaPatch(d.data(), r, costoNuevo, costoViejo));
+    return cobros.length;
+  } catch (e) {
+    console.error('[costo reparación] cobro:', e);
+    return 0;
+  }
+}
+
 function tarjetaAplicar(mov) {
   try {
     if (!mov || mov.tipo === 'egreso') return mov;

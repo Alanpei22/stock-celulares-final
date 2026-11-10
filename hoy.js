@@ -111,6 +111,20 @@ function hoyItems(ctx) {
     });
   }
 
+  // 4b) Reparaciones entregadas en el último mes sin costo cargado. Alan
+  // (10/11) quiere saber cuánto gana: sin el costo, cada una parece ganar el
+  // precio entero. Un toque abre la lista para cargarlos todos juntos.
+  if (ctx.verPlata) {
+    const sinCostoRep = reps.filter(r => r && r.estado === 'entregado'
+      && !(Number(r.costo) > 0 || Number(r.costoRepuesto) > 0 || r.sinRepuesto)
+      && (() => { const d = _hoyDias(r.fechaEntrega || r.fechaListo || r.fechaIngreso, ahora); return d !== null && d <= 30; })()).length;
+    if (sinCostoRep) out.push({
+      clave: 'sincostorep:' + hoy + ':' + sinCostoRep, nivel: 'aviso', ico: '🔧',
+      texto: `${sinCostoRep} ${_hoyPlural(sinCostoRep, 'reparación entregada este mes no tiene', 'reparaciones entregadas este mes no tienen')} el costo cargado.`,
+      acciones: [{ txt: '💵 Cargar costos', fn: 'costosRep' }],
+    });
+  }
+
   // 5) Equipos que no se venden hace meses: plata parada
   (Array.isArray(ctx.equipos) ? ctx.equipos : [])
     .filter(e => e && !e.vendido && !e.eliminado && !e.reservado)
@@ -273,6 +287,12 @@ async function hoyAccion(clave, i) {
     else if (a.fn === 'verPedido' && typeof openPedidosModal === 'function') openPedidosModal();
     else if (a.fn === 'ia') hoyIA(a.pj, a.pregunta);
     else if (a.fn === 'cerrarViejas') await hoyCerrarViejas();
+    else if (a.fn === 'costosRep' && typeof abrirCostosLista === 'function') {
+      abrirCostosLista('reparacion');
+      // Que se vean solo las que faltan
+      const chk = document.getElementById('costos-solo-faltan');
+      if (chk) { chk.checked = true; if (typeof _costosSoloFaltan === 'function') _costosSoloFaltan(true); }
+    }
     else if (a.fn === 'pedido') {
       await db.collection('pedidos').doc('auto_' + a.id).set({
         nombre: a.nombre, cantidad: a.cantidad, categoria: a.categoria || 'Otro', prioridad: 'normal', proveedor: null,

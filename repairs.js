@@ -2091,6 +2091,12 @@ async function saveRepair() {
       } else if (sena < senaAntes) {
         toast('Bajaste la seña: si ya estaba en la caja, corregí ese movimiento allá', 'info');
       }
+      // Cambió el costo de una reparación ya cobrada: el cobro de la caja
+      // guardó la ganancia con el costo de antes
+      if (existing.cobrado && typeof repActualizarCobro === 'function'
+          && repCostoEfectivo(updateData) !== repCostoEfectivo(existing)) {
+        repActualizarCobro({ ...updateData, id: editingRepairId }, repCostoEfectivo(updateData), Number(existing.costo) || 0);
+      }
       // Seguimiento público (QR): si cambió el modelo, el IMEI o la fecha
       // estimada, el cliente tiene que verlo al escanear.
       if (typeof upsertSeguimientoPublico === 'function') {
@@ -2956,7 +2962,8 @@ async function confirmarCobro() {
     // se lleva algo, entra todo junto en el mismo movimiento.
     const repAmt = _saldoACobrar(r);
     const monto  = repAmt + artTotal;
-    const costo  = Number(r.costo)  || 0;
+    // El costo escrito a mano o, si no hay, el del repuesto que se descontó
+    const costo  = (typeof repCostoEfectivo === 'function') ? repCostoEfectivo(r) : (Number(r.costo) || 0);
 
     // ── Ingreso: cobro al cliente ──────────────────────────
     // Con la seña cubriendo todo no hay nada que ingresar: solo se marca cobrada.
@@ -2994,6 +3001,9 @@ async function confirmarCobro() {
       const precioRep = repAmt + (Number(r.sena) || 0);
       datos.costoARSTotal = costo + artCosto;
       datos.gananciaARS   = (precioRep - costo) + (artTotal - artCosto);
+      // Con qué costo se cobró: si después se carga o cambia, se corrige la
+      // diferencia (repActualizarCobro en utils.js)
+      datos.costoReparacionARS = costo;
       if (costo <= 0) datos.sinCosto = true;   // para poder listar las que faltan
       // Venta mixta: los mismos campos que usa la caja, para que los informes
       // y el resumen de Telegram la lean igual que cualquier otra.
@@ -5148,8 +5158,11 @@ async function confirmCostoRequerido() {
   }
 
   try {
+    const costoAntes = Number(r.costo) || 0;
     await db.collection('repairs').doc(r.id).update(update);
     _repPatchLocal(r.id, update);
+    // Si ya estaba cobrada, el cobro tiene que enterarse del costo
+    if (r.cobrado && typeof repActualizarCobro === 'function') repActualizarCobro(r, Number(update.costo) || 0, costoAntes);
     // Actualizar snapshot local
     Object.assign(r, update);
     closeCostoRequeridoModal(true);
