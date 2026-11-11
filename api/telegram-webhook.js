@@ -5,6 +5,7 @@
 // QUOTA: todas las queries usan .select() para NO traer fotos base64.
 
 import admin from 'firebase-admin';
+import { ordenDePregunta, comandoCosto, leerCosto, patchReparacion, esCobro, gananciaPatch, textoCostoCargado, AYUDA_COSTOS } from './_telegram-costos.js';
 import { esGasto, parsearGasto, armarMovDueno, efectoSaldo, textoGastoCargado, textoSaldo, AYUDA_GASTOS } from './_telegram-gastos.js';
 
 function getAdmin() {
@@ -171,7 +172,9 @@ const AYUDA = `🤖 <b>Consultas disponibles:</b>
 · <b>sumar 5 funda iphone 13</b> → suma 5 al stock (con <b>$3000</b> al final también actualiza el costo)
 · <b>nuevo Funda iPhone 15 $8000 $3000 x5</b> → crea el producto (venta $8000, costo $3000 opcional, x5 opcional)
 
-${AYUDA_GASTOS}`;
+${AYUDA_GASTOS}
+
+${AYUDA_COSTOS}`;
 
 // ── Resumen de un período: ayer / semana / mes (con comparación) ──
 function _rangoPeriodo(tab) {
@@ -337,6 +340,32 @@ async function qNuevoProducto(db, texto) {
   return `✅ <b>Producto creado</b>\n📦 ${esc(nombre)} · venta ${fmt(precio)}${costo > 0 ? ` · costo ${fmt(costo)} · 📈 margen ${fmt(precio - costo)}` : ''} · stock ${cant}\n(Queda en Accesorios${costo > 0 ? '' : '; el costo lo cargás después si querés'})`;
 }
 
+// ── 💲 Costo de una reparación por Telegram (ver _telegram-costos.js) ──
+async function qCostoReparacion(db, orden, textoCosto) {
+  const costo = leerCosto(textoCosto);
+  if (costo === null) return `No entendí el costo 🤷 Respondé solo con el número, ej: <b>15000</b> (o <b>0</b> si no usaste repuesto).`;
+  const snap = await db.collection('repairs').where('nOrden', '==', orden)
+    .select('nOrden', 'marca', 'modelo', 'monto', 'sena', 'costo', 'cobrado').limit(1).get();
+  if (snap.empty) return `No encontré la reparación #${orden} 🤷`;
+  const doc = snap.docs[0];
+  const r = { id: doc.id, ...doc.data() };
+  const costoViejo = Number(r.costo) || 0;
+  await doc.ref.update(patchReparacion(costo));
+  // Si ya estaba cobrada, la ganancia guardada en el cobro tiene que enterarse
+  let corregidos = 0;
+  if (r.cobrado) {
+    try {
+      const movs = await db.collection('caja_movimientos').where('repairId', '==', doc.id).get();
+      for (const m of movs.docs) {
+        if (!esCobro(m.data())) continue;
+        await m.ref.update(gananciaPatch(m.data(), r, costo, costoViejo));
+        corregidos++;
+      }
+    } catch (e) { console.error('costo telegram (cobro):', e); }
+  }
+  return textoCostoCargado(r, costo, corregidos);
+}
+
 // ── 💸 Gasto por Telegram → a la CAJA DUEÑO (ver _telegram-gastos.js) ──
 // Va a caja_dueno_movimientos (la caja aparte de Alan, no la del mostrador)
 // y corrige el saldo guardado (config/cajaDuenoSaldo) con increment, igual
@@ -474,7 +503,15 @@ export default async function handler(req, res) {
   try {
     const db = getAdmin().firestore();
     const lower = text.toLowerCase();
-    if (lower === '/start' || lower === 'ayuda' || lower === 'help' || lower === '?') {
+    // Respuesta a "💲 Falta el costo de la #…": va ANTES que todo, porque el
+    // texto es un número pelado y si no se tomaría como un N° de orden.
+    const ordenPreg = ordenDePregunta(msg.reply_to_message && msg.reply_to_message.text);
+    const cmdCosto = comandoCosto(text);
+    if (ordenPreg) {
+      respuesta = await qCostoReparacion(db, ordenPreg, text);
+    } else if (cmdCosto) {
+      respuesta = await qCostoReparacion(db, cmdCosto.orden, cmdCosto.resto);
+    } else if (lower === '/start' || lower === 'ayuda' || lower === 'help' || lower === '?') {
       respuesta = AYUDA;
     } else if (/^\/?\d{1,7}$/.test(text.replace('/', ''))) {
       respuesta = await qRepairByOrden(db, parseInt(text.replace('/', ''), 10));

@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-telegram-costos.js': '💲 Reparación lista o entregada sin costo: el bot pregunta por Telegram y la respuesta carga el costo (y corrige la ganancia si ya estaba cobrada)',
   'test-repuesto-al-listo.js': '🔩 Al marcar listo: los repuestos se cargan aunque no hayas entrado a Repuestos, se descuenta el elegido o se anota el costo a mano',
   'test-costos-reparaciones.js': '🔧 Costos de reparaciones en lista (las viejas también) y la ganancia de la caja corregida al cargarlos; cobrar desde la caja ya suma la reparación',
   'test-telegram-gastos.js': '💸 Gastos por Telegram: "gasto 5000 nafta" queda como egreso en la caja (rubro y medio de pago por lo que dice), con deshacer',

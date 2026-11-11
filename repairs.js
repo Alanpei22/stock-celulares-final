@@ -2647,12 +2647,16 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}, opts = {}) {
     // Refrescar referencia local
     const r2 = REPAIRS.find(x => x.id === id);
     if (r2) Object.assign(r, r2);
+    // Eligió "Entregar sin cargar el costo": se pregunta por Telegram
+    _tgPreguntarCosto(r);
   }
 
   // Al marcar como "listo", preguntar qué repuesto se usó
   if (newStatus === 'listo') {
     openRepUsoModal(async (repuestoId, costoManual) => {
       await _doChangeRepairStatus(id, newStatus, r, faseExtra, opts);
+      // Quedó lista sin repuesto ni costo: se le pregunta al dueño por Telegram
+      if (!repuestoId && !(costoManual > 0)) _tgPreguntarCosto(r);
       // Costo escrito a mano (repuesto que no está cargado, o comprado para
       // esta reparación): queda como costo de la reparación. Si además se
       // eligió un repuesto, el stock se descuenta igual y manda este número.
@@ -5001,6 +5005,21 @@ async function deleteMarca(idx) {
 // ══════════════════════════════════════════════════════════
 
 // Devuelve true si la reparación NO tiene info de costo cargada todavía
+// 💲 Preguntar el costo por Telegram. Alan (11/11): "si se rellena sin
+// costo, ¿se me puede preguntar por Telegram y que se cargue?". El bot
+// (api/telegram-webhook.js) saca el N° de orden de ESTE texto cuando Alan
+// responde el mensaje: la frase "Falta el costo de la #N" no se puede
+// cambiar sin cambiarla allá (api/_telegram-costos.js).
+// Se pregunta una sola vez por reparación (costoPreguntado).
+function _tgPreguntarCosto(r) {
+  if (!r || !r.nOrden || r.costoPreguntado || typeof tgNotify !== 'function' || !_faltaCargarCosto(r)) return;
+  r.costoPreguntado = true;
+  db.collection('repairs').doc(r.id).update({ costoPreguntado: true }).catch(() => {});
+  const que = String(r.arreglo || '').trim();
+  tgNotify(`💲 <b>Falta el costo de la #${r.nOrden}</b>\n${esc(r.marca || '')} ${esc(r.modelo || '')}${que ? ' — ' + esc(que) : ''}` +
+    `${Number(r.monto) > 0 ? ' · se cobra ' + tgMonto(r.monto) : ''}\n\n↩️ <b>Respondé este mensaje</b> con lo que te costó (ej. 15000). Poné 0 si no usaste repuesto.`);
+}
+
 function _faltaCargarCosto(r) {
   if (!r) return false;
   if (r.sinRepuesto === true) return false; // declarada solo MO
