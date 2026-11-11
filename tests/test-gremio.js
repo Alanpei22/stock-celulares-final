@@ -28,8 +28,17 @@ selMarca.options = [{ value: '', textContent: 'Todas' }];
 selMarca.remove = i => selMarca.options.splice(i, 1);
 selMarca.appendChild = o => selMarca.options.push(o);
 
+// Reloj fijo en el 13/10 (el mismo "hoy" que _todayAR). La lista muestra los
+// últimos 30 días: con el reloj de verdad, las reparaciones de prueba (12/10)
+// quedaron afuera el 11/11 y la prueba empezó a fallar sola.
+const _AHORA_FIJO = Date.parse('2026-10-13T15:00:00.000Z');
+class FechaFija extends Date {
+  constructor(...a) { super(...(a.length ? a : [_AHORA_FIJO])); }
+  static now() { return _AHORA_FIJO; }
+}
+
 const ctx = {
-  console, setTimeout: f => f(), clearTimeout, Date, Math, JSON, Set, Map,
+  console, setTimeout: f => f(), clearTimeout, Date: FechaFija, Math, JSON, Set, Map,
   parseInt, parseFloat, isNaN,
   document: {
     getElementById: id => els[id] || el(id),

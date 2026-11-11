@@ -1882,8 +1882,11 @@
   <input id="rep-uso-search" class="fi" type="text" placeholder="Buscar repuesto…" oninput="renderRepUsoList()" autocomplete="off">
   <div id="rep-uso-list" class="rep-uso-list"></div>
   <div id="rep-uso-selected" class="rep-uso-selected hidden"></div>
+  <!-- Costo a mano: repuesto que no está cargado, o comprado para esta reparación -->
+  <label class="fl" style="margin:.5rem 0 .2rem;display:block">¿No está en la lista? Poné lo que te costó $</label>
+  <input id="rep-uso-costo" class="fi" type="number" min="0" inputmode="numeric" placeholder="0" oninput="repUsoCostoCambio()" autocomplete="off">
   <div class="nota-modal-btns">
-    <button type="button" class="btn-nota-clear" onclick="skipRepUso()">⚡ No usé del stock</button>
+    <button type="button" class="btn-nota-clear" onclick="skipRepUso()">⚡ No usé repuesto</button>
     <button type="button" class="btn-nota-save" id="rep-uso-confirm-btn" onclick="confirmRepUso()" disabled>✅ Descontar y confirmar</button>
   </div>
 </div>

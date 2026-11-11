@@ -2651,8 +2651,17 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}, opts = {}) {
 
   // Al marcar como "listo", preguntar qué repuesto se usó
   if (newStatus === 'listo') {
-    openRepUsoModal(async (repuestoId) => {
+    openRepUsoModal(async (repuestoId, costoManual) => {
       await _doChangeRepairStatus(id, newStatus, r, faseExtra, opts);
+      // Costo escrito a mano (repuesto que no está cargado, o comprado para
+      // esta reparación): queda como costo de la reparación. Si además se
+      // eligió un repuesto, el stock se descuenta igual y manda este número.
+      if (costoManual > 0) {
+        const upd = { costo: costoManual, costoRepuesto: costoManual };
+        db.collection('repairs').doc(id).update(upd)
+          .then(() => { if (typeof _repPatchLocal === 'function') _repPatchLocal(id, upd); if (!repuestoId) toast('💰 Costo anotado: $' + costoManual.toLocaleString('es-AR'), 'success'); })
+          .catch(() => toast('No se pudo guardar el costo', 'error'));
+      }
       if (repuestoId && typeof REPUESTOS !== 'undefined') {
         const rep = REPUESTOS.find(x => x.id === repuestoId);
         if (rep) {
@@ -2665,7 +2674,7 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}, opts = {}) {
             ? Math.round(costoUSD * dolar)
             : (Number(rep.precioCompra) || 0);
           const repairUpdate = {
-            costoRepuesto: costoARS,
+            costoRepuesto: costoManual > 0 ? costoManual : costoARS,
             repuestoId: rep.id,
             repuestoNombre: rep.nombre || '',
             costoRepuestoUSD: costoUSD,
@@ -2683,7 +2692,7 @@ async function changeRepairStatus(id, newStatus, faseExtra = {}, opts = {}) {
             .catch(() => toast('Error al descontar repuesto', 'error'));
         }
       }
-    });
+    }, r);
     return;
   }
 
@@ -4482,15 +4491,29 @@ async function _doStatusChange(id, newStatus, extra = {}) {
 let _repUsoCallback   = null;
 let _repUsoSelectedId = null;
 
-function openRepUsoModal(callback) {
+// Alan (11/11): "necesito descontar los repuestos cuando les pongo listo, o
+// por lo menos poner el costo de la reparación". Dos cosas fallaban:
+//  · la lista de repuestos solo se cargaba al entrar a la sección Repuestos:
+//    si no habías pasado por ahí, el cuadro decía "Sin repuestos cargados" y
+//    no había qué descontar. Ahora se piden al abrir el cuadro (una vez).
+//  · no había dónde poner el costo a mano (repuesto que no está cargado).
+// Además arranca buscando el modelo del equipo, que es lo que casi siempre
+// se usa.
+function openRepUsoModal(callback, r) {
   _repUsoCallback   = callback;
   _repUsoSelectedId = null;
+  if (typeof listenRepuestos === 'function') listenRepuestos();
   const searchEl = document.getElementById('rep-uso-search');
-  if (searchEl) searchEl.value = '';
+  if (searchEl) {
+    searchEl.value = '';
+    const mod = String((r && r.modelo) || '').trim();
+    if (mod && typeof REPUESTOS !== 'undefined' && REPUESTOS.some(x => searchMatch([x.nombre, x.marca, x.modelo, x.tipo], mod))) searchEl.value = mod;
+  }
+  const costoEl = document.getElementById('rep-uso-costo');
+  if (costoEl) costoEl.value = '';
   const selEl = document.getElementById('rep-uso-selected');
   if (selEl) selEl.classList.add('hidden');
-  const confirmBtn = document.getElementById('rep-uso-confirm-btn');
-  if (confirmBtn) confirmBtn.disabled = true;
+  repUsoCostoCambio();
   renderRepUsoList();
   document.getElementById('rep-uso-overlay').classList.remove('hidden');
   document.getElementById('rep-uso-modal').classList.remove('hidden');
@@ -4509,7 +4532,7 @@ function renderRepUsoList() {
   const list = document.getElementById('rep-uso-list');
   if (!list) return;
   if (typeof REPUESTOS === 'undefined' || !REPUESTOS.length) {
-    list.innerHTML = '<p class="rep-uso-empty">Sin repuestos cargados</p>';
+    list.innerHTML = '<p class="rep-uso-empty">Cargando los repuestos… (si no tenés ninguno cargado, poné el costo abajo)</p>';
     return;
   }
   let items = REPUESTOS;
@@ -4538,13 +4561,22 @@ function selectRepUsoItem(id) {
     selEl.textContent = `✔ ${r.nombre}${equipoRep ? ` (${equipoRep})` : ''} — Stock actual: ${r.cantidad ?? 0}`;
     selEl.classList.remove('hidden');
   }
-  const confirmBtn = document.getElementById('rep-uso-confirm-btn');
-  if (confirmBtn) confirmBtn.disabled = false;
+  repUsoCostoCambio();
   renderRepUsoList();
 }
 
+function _repUsoCosto() {
+  return Math.max(0, Math.round(parseFloat(document.getElementById('rep-uso-costo')?.value) || 0));
+}
+// Se puede confirmar con un repuesto elegido o con un costo escrito
+function repUsoCostoCambio() {
+  const b = document.getElementById('rep-uso-confirm-btn');
+  if (!b) return;
+  b.disabled = !_repUsoSelectedId && !(_repUsoCosto() > 0);
+  b.textContent = _repUsoSelectedId ? '✅ Descontar y confirmar' : '✅ Guardar el costo';
+}
 function confirmRepUso() {
-  if (_repUsoCallback) _repUsoCallback(_repUsoSelectedId);
+  if (_repUsoCallback) _repUsoCallback(_repUsoSelectedId, _repUsoCosto());
   closeRepUsoModal();
 }
 
@@ -4984,6 +5016,9 @@ function _faltaCargarCosto(r) {
 // cliente esperando. Si no se carga acá, se puede cargar después editando la
 // reparación (campo "Costo" de la ficha).
 function openCostoRequeridoModal(r) {
+  // Lo mismo que en "¿Qué repuesto usaste?": sin haber entrado a Repuestos,
+  // el buscador del catálogo no encontraba nada
+  if (typeof listenRepuestos === 'function') listenRepuestos();
   return new Promise(resolve => {
     _costoRequiredCb = resolve;
     _costoRequiredRepair = r;
