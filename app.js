@@ -736,7 +736,9 @@ function toggleRepMenu() {
         sub: (typeof waAppActiva === 'function' && waAppActiva()) ? '✅ Activado en esta PC · tocá para volver a wa.me' : 'Sin la página intermedia (necesita WhatsApp instalado)',
         onClick: () => (typeof toggleWaApp === 'function') && toggleWaApp() },
     ]),
-    sheetGrupo(toggleRepMenu, 'Mantenimiento', '⚙️', 'Mantenimiento', 'Contador de órdenes, fichas e importación', [
+    sheetGrupo(toggleRepMenu, 'Mantenimiento', '⚙️', 'Mantenimiento', 'Cruce con la caja, contador de órdenes, fichas', [
+      { icon: '🔀', label: 'Cruzar con la caja', sub: 'Cobradas que no figuran entregadas',
+        onClick: () => (typeof cruceAbrir === 'function') && cruceAbrir() },
       { icon: '🔢', label: 'Próximo N° de orden', sub: 'Corregir el contador de órdenes', hide: _soloDueno(),
         onClick: () => (typeof corregirContadorOrdenes === 'function') && corregirContadorOrdenes() },
       { icon: '👤', label: 'Generar fichas de clientes', sub: 'Desde tu historial de reparaciones', onClick: () => (typeof migrarClientesDesdeHistorial === 'function') && migrarClientesDesdeHistorial() },

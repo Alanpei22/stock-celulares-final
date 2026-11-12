@@ -125,6 +125,23 @@ function hoyItems(ctx) {
     });
   }
 
+  // 4c) Cruce caja ↔ reparaciones (cruce-caja.js): cobradas que no figuran
+  // entregadas, y cobros de hoy de "Reparación" sin orden vinculada
+  if (typeof cruceCobradasSinEntregar === 'function') {
+    const cob = cruceCobradasSinEntregar(reps, ahora, true).length;
+    const sueltos = cruceCobrosSueltos((caja.movs) || [], reps).length;
+    if (cob) out.push({
+      clave: 'cruce:' + hoy + ':' + cob, nivel: 'aviso', ico: '🔀',
+      texto: `${cob} ${_hoyPlural(cob, 'reparación está cobrada pero no figura entregada', 'reparaciones están cobradas pero no figuran entregadas')}.`,
+      acciones: [{ txt: 'Revisar', fn: 'cruce' }],
+    });
+    if (sueltos) out.push({
+      clave: 'crucesuelto:' + hoy + ':' + sueltos, nivel: 'aviso', ico: '🧾',
+      texto: `Hoy se ${_hoyPlural(sueltos, 'cobró 1 reparación', 'cobraron ' + sueltos + ' reparaciones')} en la caja sin elegir la orden: esa orden sigue como sin cobrar.`,
+      acciones: [{ txt: 'Ver cuál', fn: 'cruce' }],
+    });
+  }
+
   // 5) Equipos que no se venden hace meses: plata parada
   (Array.isArray(ctx.equipos) ? ctx.equipos : [])
     .filter(e => e && !e.vendido && !e.eliminado && !e.reservado)
@@ -287,6 +304,7 @@ async function hoyAccion(clave, i) {
     else if (a.fn === 'verPedido' && typeof openPedidosModal === 'function') openPedidosModal();
     else if (a.fn === 'ia') hoyIA(a.pj, a.pregunta);
     else if (a.fn === 'cerrarViejas') await hoyCerrarViejas();
+    else if (a.fn === 'cruce' && typeof cruceAbrir === 'function') cruceAbrir();
     else if (a.fn === 'costosRep' && typeof abrirCostosLista === 'function') {
       abrirCostosLista('reparacion');
       // Que se vean solo las que faltan
