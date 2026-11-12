@@ -237,7 +237,10 @@ ok(/Juan Pérez · 11 5555-5555/.test(rp), 'de quién es');
 ok(/Batería/.test(rp), 'y qué hay que hacerle');
 ok(/IMEI …643809/.test(rp), 'los últimos 6 del IMEI, para no confundir dos iguales');
 ok(/Batería/.test(rp), 'y el arreglo, que ahora entra porque no están las barras');
-ok(!/<svg/.test(rp), 'SIN código de barras: no se escanea, se lee', (rp.match(/<svg[^>]*>/) || [])[0]);
+ok(!/class="etq-bc/.test(rp), 'SIN código de barras (las barras le sacaban el lugar a la falla)');
+// Alan (12/11): un QR que, escaneado con la cámara de cualquier celu, abre
+// la ficha de esa reparación en la app.
+ok(/class="etqr-qr"><svg/.test(rp) && /etqr--qr/.test(rp), 'con un QR para abrir la ficha desde la cámara de otro equipo');
 ok(/24\/0?9/.test(rp), 'con la fecha de ingreso', (rp.match(/class="etqr-fecha">[^<]*/) || [])[0]);
 // Si algún día se le quiere poner el código: la caja ya sabe abrir el cobro
 // con el número de orden suelto, así que alcanzaría con volver a dibujarlo.
@@ -282,7 +285,7 @@ const w40 = Number((eq40.match(/width="([\d.]+)mm"/) || [])[1]);
 ok(wA4 > w40, `en A4 el mismo código sale más ancho (${wA4}mm contra ${w40}mm)`, [wA4, w40]);
 const repA4 = imprimir('printEtiquetasReparaciones', [{ nOrden: 7123, marca: 'Motorola', modelo: 'G54', falla: 'x' }]);
 ok(/grid-template-columns:repeat\(2,97mm\)/.test(repA4), 'la de reparación en A4 sigue siendo la grande');
-ok(!/<svg/.test(repA4), 'y tampoco lleva código de barras');
+ok(!/class="etq-bc/.test(repA4), 'y tampoco lleva código de barras');
 // Apaisada dada vuelta: hay drivers que tiran el rollo al revés y Chrome no
 // deja girar la página, así que se gira acá. Misma página, contenido a 180°.
 vm.runInContext("setEtqFormato('40x30r')", pCtx);
@@ -425,7 +428,7 @@ ok(/class="etqr-patron"><svg/.test(conClave), 'el patrón sale dibujado');
 ok((conClave.match(/<line /g) || []).length === 4, 'una línea por tramo del patrón', (conClave.match(/<line /g) || []).length);
 ok(/marker-end/.test(conClave) && /r="8" fill="#000"/.test(conClave), 'con el punto de arranque marcado y flecha al final: se sabe para dónde va');
 ok(!/#6366f1|#0f172a/.test(conClave), 'en negro: el violeta sobre oscuro de la app en térmica es una mancha');
-ok(/class="etqr etqr--clave"/.test(conClave), 'y con clave la falla corta antes, para que entre todo');
+ok(/class="etqr etqr--clave/.test(conClave), 'y con clave la falla corta antes, para que entre todo');
 const sinClave = imprimir('printEtiquetasReparaciones', [{ nOrden: 7502, marca: 'Moto', modelo: 'G54', falla: 'x', patron: [4] }]);
 ok(!/Clave:/.test(sinClave) && !/class="etqr-patron"/.test(sinClave) && !/class="etqr etqr--clave"/.test(sinClave),
    'sin clave ni patrón (o un patrón de un solo punto) queda como antes');

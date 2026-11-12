@@ -294,6 +294,30 @@ function _etiquetaProdHtml(p) {
 // de verdad se mira — la falla y el arreglo — que en 30mm de alto no entraba.
 // (Si algún día hace falta escanearla: la caja ya sabe abrir el cobro con el
 // número de orden suelto, ver `_movDesdeCodigo`.)
+//
+// Lleva un QR (Alan, 12/11): se escanea con la cámara de cualquier celu y
+// abre la ficha de esa reparación en la app, para pasarla a listo/entregado
+// o ver los datos del cliente. El link es corto a propósito (?r=N° de orden
+// y no el id largo): menos cuadraditos, que en la térmica tienen que medir
+// 3 puntos cada uno (0,375mm) para que la cámara los lea. Lo abre
+// _handleUrlAction en app.js; pide iniciar sesión como toda la app.
+const ETQ_APP_URL = 'https://stock-celulares-final.vercel.app/';
+function etqRepUrl(r) {
+  const n = parseInt(r && r.nOrden, 10);
+  return n > 0 ? ETQ_APP_URL + '?r=' + n : '';
+}
+function _etqRepQr(r) {
+  const url = etqRepUrl(r);
+  if (!url || typeof qrSvg !== 'function' || typeof qrMatriz !== 'function') return '';
+  try {
+    // Cada módulo = 3 puntos de la impresora (203 dpi). De margen blanco, 1
+    // módulo: alrededor ya hay blanco (el borde de la etiqueta y la separación
+    // con el texto), y cada milímetro que se le saca al QR es texto que entra.
+    const lado = (qrMatriz(url).length + 2) * 3 * 25.4 / 203;
+    return qrSvg(url, Math.round(lado * 1000) / 1000, 1);
+  } catch (e) { console.error('QR etiqueta:', e); return ''; }
+}
+
 function _etiquetaRepHtml(r) {
   const eq = [r.marca, r.modelo].filter(Boolean).join(' ').trim() || 'Equipo';
   const cli = [r.nombre, r.tlf].filter(Boolean).join(' · ');
@@ -307,7 +331,12 @@ function _etiquetaRepHtml(r) {
   // es lo que mira el técnico para desbloquearlo.
   const clave = String(r.codigo || '').trim();
   const patron = _patronEtqSvg(r.patron);
-  return `<div class="etqr${clave || patron ? ' etqr--clave' : ''}">
+  const qr = _etqRepQr(r);
+  // A la derecha, de arriba a abajo: el QR y el patrón. A la izquierda, todo
+  // el texto. (Antes el patrón iba al lado del texto, debajo del N°.)
+  return `<div class="etqr${clave || patron ? ' etqr--clave' : ''}${qr ? ' etqr--qr' : ''}">
+   <div class="etqr-fila">
+   <div class="etqr-izq">
     <div class="etqr-top">
       <div class="etqr-nro">N° ${_escEtq(nro)}</div>
       ${ing ? `<div class="etqr-fecha">${_escEtq(ing)}</div>` : ''}
@@ -319,10 +348,15 @@ function _etiquetaRepHtml(r) {
         ${falla ? `<div class="etqr-falla"><b>Falla:</b> ${_escEtq(falla)}</div>` : ''}
         ${arreglo ? `<div class="etqr-arr">${_escEtq(arreglo)}</div>` : ''}
         ${clave ? `<div class="etqr-clave">Clave: ${_escEtq(clave)}</div>` : ''}
-        <div class="etqr-pie">${r.imei ? 'IMEI …' + _escEtq(String(r.imei).slice(-6)) : ''}</div>
+        <div class="etqr-pie">${[qr && ing ? _escEtq(ing) : '', r.imei ? 'IMEI …' + _escEtq(String(r.imei).slice(-6)) : ''].filter(Boolean).join(' · ')}</div>
       </div>
-      ${patron ? `<div class="etqr-patron">${patron}</div>` : ''}
     </div>
+   </div>
+   ${qr || patron ? `<div class="etqr-der">
+      ${qr ? `<div class="etqr-qr">${qr}</div>` : ''}
+      ${patron ? `<div class="etqr-patron">${patron}</div>` : ''}
+   </div>` : ''}
+   </div>
   </div>`;
 }
 
@@ -380,6 +414,10 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;b
 .etqr-cuerpo{display:flex;gap:2mm;flex:1;min-height:0}
 .etqr-txt{flex:1;min-width:0;display:flex;flex-direction:column}
 .etqr-clave{font-size:8pt;font-weight:800;margin-top:.8mm;word-break:break-all}
+.etqr-fila{display:flex;gap:1mm;flex:1;min-height:0}
+.etqr-izq{flex:1;min-width:0;display:flex;flex-direction:column}
+.etqr-der{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:.6mm}
+.etqr-qr svg{display:block}
 .etqr-patron{flex:0 0 16mm;align-self:center}
 .etqr-patron svg{display:block;width:16mm;height:16mm}
 @media print{.etq,.etqr{border-color:#ddd}}`;
@@ -425,12 +463,24 @@ body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;margin:0;color:#000;b
 .etqr-cuerpo{display:flex;gap:1mm;flex:1;min-height:0}
 .etqr-txt{flex:1;min-width:0;display:flex;flex-direction:column}
 .etqr-clave{font-size:7.5pt;font-weight:800;margin-top:.5mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.etqr-patron{flex:0 0 11mm;align-self:flex-end}
+.etqr-fila{display:flex;gap:1mm;flex:1;min-height:0}
+.etqr-izq{flex:1;min-width:0;display:flex;flex-direction:column}
+.etqr-der{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:.6mm}
+.etqr-qr svg{display:block}
+/* Con el QR el N° tiene menos ancho: un toque más chico para que entre */
+.etqr--qr .etqr-nro{font-size:13pt}
+.etqr-patron{flex:0 0 11mm;align-self:center}
 .etqr-patron svg{display:block;width:11mm;height:11mm}
 /* En 30mm de alto no hay lugar para estirar nada: cada línea mide lo suyo */
 .etqr-txt > *{flex-shrink:0}
 /* La clave le quita una línea a la falla: con 4 no entra todo */
-.etqr--clave .etqr-falla{-webkit-line-clamp:2}`;
+.etqr--clave .etqr-falla{-webkit-line-clamp:2}
+/* Con el QR la columna del texto mide ~23mm: el equipo va en dos renglones
+   (antes se cortaba "Samsung Gal…"), la falla en dos, y la fecha baja al pie */
+.etqr--qr .etqr-eq{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.etqr--qr .etqr-falla{-webkit-line-clamp:2}
+.etqr--qr .etqr-top .etqr-fecha{display:none}
+.etqr--qr .etqr-der{padding-top:.3mm}`;
 
 // El mismo CSS, con la página y el giro del sentido elegido.
 function _cssEtqTermica() {

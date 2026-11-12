@@ -2870,6 +2870,42 @@ function initPWA() {
   else if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
+// Abre la ficha de la reparación con ese N° de orden (el QR de la etiqueta).
+// Primero la busca entre las que ya están cargadas; si es vieja (más de 30
+// días) la pide a la base: una sola lectura.
+function abrirRepairPorOrden(nOrden) {
+  const listo = () => { try { sessionStorage.removeItem('tpRepQr'); } catch {} };
+  const enMemoria = () => (typeof REPAIRS !== 'undefined' ? REPAIRS : []).find(r => Number(r.nOrden) === nOrden);
+  let pedida = false;
+  const probar = (retry = 0) => {
+    const app = document.getElementById('app');
+    if (!app || app.classList.contains('app-hidden')) {       // todavía sin sesión
+      if (retry < 40) setTimeout(() => probar(retry + 1), 400);
+      return;
+    }
+    if (retry === 0 || typeof REPAIRS === 'undefined' || !REPAIRS.length) {
+      if (typeof switchSection === 'function') switchSection('repairs');   // ahí se cargan
+    }
+    const r = enMemoria();
+    if (r && typeof openRepairDetail === 'function') { listo(); openRepairDetail(r.id); return; }
+    // Ya llegaron las de los últimos 30 días y no está: es más vieja
+    if (!pedida && retry >= 6 && typeof db !== 'undefined' && db) {
+      pedida = true;
+      db.collection('repairs').where('nOrden', '==', nOrden).limit(1).get().then(snap => {
+        if (typeof cupoContar === 'function') cupoContar('repairs (QR)', snap.size);
+        if (snap.empty) { listo(); toast(`No encontré la reparación N° ${nOrden}`, 'error'); return; }
+        const d = snap.docs[0], rep = { id: d.id, ...d.data() };
+        if (!enMemoria() && typeof _repHistorial !== 'undefined') { _repHistorial.push(rep); if (typeof _repPintar === 'function') _repPintar(); }
+        listo();
+        if (typeof openRepairDetail === 'function') openRepairDetail(rep.id);
+      }).catch(e => { console.error('QR reparación:', e); toast('No se pudo abrir la reparación', 'error'); });
+      return;
+    }
+    if (!pedida && retry < 40) setTimeout(() => probar(retry + 1), 400);
+  };
+  setTimeout(() => probar(0), 500);
+}
+
 // ── URL action handler (?action=nueva-reparacion desde el shortcut de la app) ──
 function _handleUrlAction() {
   try {
@@ -2916,6 +2952,23 @@ function _handleUrlAction() {
       };
       setTimeout(() => tryRep(0), 600);
     }
+
+    // ?r=<N° de orden> → abrir esa ficha. Es el QR de la etiqueta que va
+    // pegada al equipo (print.js, etqRepUrl). Si no hay sesión, la app manda
+    // al login y esto se perdería: queda guardado 10 minutos y se abre al volver.
+    let nOrdenQr = parseInt(params.get('r'), 10) || 0;
+    try {
+      if (nOrdenQr) {
+        sessionStorage.setItem('tpRepQr', JSON.stringify({ n: nOrdenQr, t: Date.now() }));
+        params.delete('r');
+        const s3 = params.toString();
+        history.replaceState({}, '', location.pathname + (s3 ? '?' + s3 : ''));
+      } else {
+        const p = JSON.parse(sessionStorage.getItem('tpRepQr') || 'null');
+        if (p && p.n && Date.now() - p.t < 10 * 60 * 1000) nOrdenQr = p.n;
+      }
+    } catch { /* sin sessionStorage: anda igual si ya hay sesión */ }
+    if (nOrdenQr) abrirRepairPorOrden(nOrdenQr);
 
     const action = params.get('action');
     if (!action) return;
