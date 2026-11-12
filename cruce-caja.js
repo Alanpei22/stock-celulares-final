@@ -132,6 +132,7 @@ function crucePintar() {
   cuerpo.innerHTML = `<div class="cr-hd"><span>🔀 Caja y reparaciones</span><button type="button" class="cr-x" onclick="cruceCerrar()">✕</button></div>
     <p class="cr-sub">Lo que la caja dice que se cobró, contra el estado de cada reparación.</p>
     <div class="cr-tit">💵 Cobradas que no figuran entregadas (${A.length})</div>
+    ${cruceParaTodas(A).length > 1 ? `<button type="button" class="cr-btn cr-btn--si" style="width:100%;margin-bottom:10px;padding:13px;font-size:15px" onclick="cruceEntregarTodas(this)">📦 Marcar las ${cruceParaTodas(A).length} como entregadas</button>` : ''}
     ${itemsA || '<div class="cr-vacio">Ninguna: todo lo cobrado está entregado 👍</div>'}
     <div class="cr-tit">🧾 Cobros de hoy de "Reparación" sin orden (${B.length})</div>
     ${itemsB || '<div class="cr-vacio">Ninguno.</div>'}`;
@@ -162,6 +163,52 @@ async function cruceEntregada(id) {
     console.error('[cruce] entregar:', e);
     toast('No se pudo marcar — revisá la conexión', 'error');
   }
+}
+
+// Alan (12/11): "si están todas cobradas, poner entregadas de una".
+// Van todas las de la lista MENOS las que marcaste "sigue en el local" esta
+// semana: esas dijiste que no se entregaron.
+function cruceParaTodas(lista) {
+  return (lista || []).filter(x => !(x.sigue !== null && x.sigue < CRUCE_DIAS_SIGUE));
+}
+
+async function cruceEntregarTodas(btn) {
+  if (typeof tpFrenar === 'function' && tpFrenar('reparaciones', 'marcar reparaciones entregadas')) return;
+  const reps = (typeof REPAIRS !== 'undefined' && Array.isArray(REPAIRS)) ? REPAIRS : [];
+  const todas = cruceCobradasSinEntregar(reps, Date.now());
+  const van = cruceParaTodas(todas);
+  if (!van.length) return;
+  const quedan = todas.length - van.length;
+  if (!confirm(`¿Marcar ${van.length} reparaciones como ENTREGADAS?\n\n` +
+    `Son las que están cobradas y siguen como "Lista" o "Reparando". Quedan con la fecha en que se cobraron. No se le avisa nada al cliente.` +
+    (quedan ? `\n\nNo se tocan ${quedan} que marcaste "sigue en el local".` : '') +
+    `\n\nSi alguna sigue en el local, después la reabrís desde su ficha.`)) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Marcando…'; }
+  const ahora = new Date().toISOString();
+  try {
+    const cambios = van.map(({ r }) => {
+      const patch = cruceEntregaPatch(r, ahora);
+      patch.cruceMasivo = ahora.slice(0, 10);     // por si hay que encontrarlas después
+      if (typeof _tpSyncFase === 'function') { try { Object.assign(patch, _tpSyncFase(r, 'entregado', patch.fechaEntrega)); } catch (e) { /* sin fase */ } }
+      return { r, patch };
+    });
+    // Firestore acepta hasta 500 escrituras por tanda
+    for (let i = 0; i < cambios.length; i += 400) {
+      const batch = db.batch();
+      cambios.slice(i, i + 400).forEach(c => batch.update(db.collection('repairs').doc(c.r.id), c.patch));
+      await batch.commit();
+    }
+    cambios.forEach(c => {
+      Object.assign(c.r, c.patch);
+      if (typeof _repPatchLocal === 'function') _repPatchLocal(c.r.id, c.patch);
+      if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(c.r);
+    });
+    toast(`📦 ${cambios.length} reparaciones quedaron entregadas`, 'success');
+  } catch (e) {
+    console.error('[cruce] entregar todas:', e);
+    toast('No se pudieron marcar — revisá la conexión', 'error');
+  }
+  crucePintar();
 }
 
 async function cruceSigue(id) {

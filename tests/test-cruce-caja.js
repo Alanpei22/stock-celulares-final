@@ -63,6 +63,24 @@ console.log('\n3) "Ya se entregó" / "Sigue en el local"');
   const fnE = (src.match(/async function cruceEntregada[\s\S]*?\n\}/) || [''])[0];
   ok(!/tgNotify|triggerWaNotify|openCobroModal|changeRepairStatus/.test(fnE), 'sin avisarle al cliente ni volver a ofrecer el cobro: es poner al día algo que ya pasó');
 
+  console.log('\n3b) Todas de una');
+  // Alan (12/11): "si están todas cobradas, poner entregadas de una"
+  const LOTE = [];
+  ctx.db.batch = () => ({ update: (ref, d) => LOTE.push([ref.__id, d]), commit: async () => {} });
+  const colOrig = ctx.db.collection;
+  ctx.db.collection = c => ({ doc: id => ({ __id: id, update: async d => { DB[c + '/' + id] = d; } }) });
+  let PREG = '';
+  ctx.confirm = t => { PREG = t; return false; };
+  await run('cruceEntregarTodas()');
+  ok(LOTE.length === 0 && /¿Marcar 2 reparaciones como ENTREGADAS\?/.test(PREG) && /No se tocan 2 que marcaste "sigue en el local"/.test(PREG), 'pregunta antes, diciendo cuántas son y cuáles no toca', PREG);
+  ctx.confirm = () => true;
+  await run('cruceEntregarTodas()');
+  ok(LOTE.map(x => x[0]).sort().join() === 'b,g', 'marca todas las cobradas, menos las que dijiste "sigue en el local" esta semana (c y f)', LOTE.map(x => x[0]));
+  const pg = LOTE.find(x => x[0] === 'g')[1];
+  ok(pg.estado === 'entregado' && pg.fechaEntrega === hace(20) && pg.cruceMasivo, 'cada una con la fecha de su cobro, y marcadas por si hay que encontrarlas', pg);
+  ok(run('cruceCobradasSinEntregar(R, AH)').map(x => x.r.id).sort().join() === 'c,f', 'en la lista quedan solo las que siguen en el local');
+  ok(/cruceParaTodas\(A\)\.length > 1 \?/.test(leer('cruce-caja.js')), 'el botón aparece cuando hay más de una');
+
   console.log('\n4) Enganchado');
   const hy = leer('hoy.js'), ap = leer('app.js');
   ok(/cruceCobradasSinEntregar\(reps, ahora, true\)/.test(hy) && /fn: 'cruce'/.test(hy) && /a\.fn === 'cruce' && typeof cruceAbrir === 'function'\) cruceAbrir\(\)/.test(hy), '"Para hacer hoy" lo avisa, con botón Revisar');
