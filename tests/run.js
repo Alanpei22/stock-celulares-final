@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-precios-historial.js':'La lista de precios sacada de lo que cobraste en cada reparacion',
   'test-cruce-caja.js': '🔀 Cruce caja ↔ reparaciones: cobradas que no figuran entregadas y cobros de Reparación sin orden; se ponen al día con la fecha del cobro',
   'test-etiqueta-qr.js': '📱 QR en la etiqueta de reparación: escaneado con la cámara de otro celu abre la ficha (aunque sea vieja o haya que iniciar sesión)',
   'test-telegram-costos.js': '💲 Reparación lista o entregada sin costo: el bot pregunta por Telegram y la respuesta carga el costo (y corrige la ganancia si ya estaba cobrada)',

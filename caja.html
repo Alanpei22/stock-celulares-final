@@ -909,11 +909,53 @@
   <div class="precios-filter-chips" id="precios-filter-chips"></div>
   <div id="precios-list" class="precios-list"></div>
   <div id="precios-empty" class="precios-empty hidden"></div>
-  <button class="btn-secondary" onclick="openAjustePrecios()" style="width:100%;margin-top:10px">📈 Ajustar precios por %</button>
+  <button class="btn-secondary" onclick="phAbrir()" style="width:100%;margin-top:10px">📊 Sacar precios del historial</button>
+  <button class="btn-secondary" onclick="openAjustePrecios()" style="width:100%;margin-top:8px">📈 Ajustar precios por %</button>
   <div style="display:flex;gap:8px;margin-top:8px">
     <button class="btn-secondary" onclick="openPreciosBulk()" style="flex:1">📋 Carga masiva</button>
     <button class="btn-primary" onclick="openPrecioForm()" style="flex:1">➕ Agregar precio</button>
   </div>
+</div>
+
+<!-- MODAL: PRECIOS SACADOS DEL HISTORIAL (precios-historial.js)
+     Junta lo cobrado en las reparaciones hechas y propone la lista. -->
+<div id="ph-overlay" class="nota-overlay hidden" onclick="phCerrar()"></div>
+<div id="ph-modal" class="arqueo-modal hidden" style="max-width:520px">
+  <div class="nota-modal-hdr">
+    <span>&#128202; Precios del historial</span>
+    <button onclick="phCerrar()">&#10005;</button>
+  </div>
+  <p class="fi-helper">Sale de lo que cobraste de verdad en cada reparaci&oacute;n. Revis&aacute; los precios antes de cargarlos.</p>
+
+  <div class="ph-filtros">
+    <label>De los &uacute;ltimos
+      <select id="ph-meses" class="fs" onchange="phBuscar()">
+        <option value="3">3 meses</option>
+        <option value="6" selected>6 meses</option>
+        <option value="12">12 meses</option>
+        <option value="0">todo</option>
+      </select>
+    </label>
+    <label>Precio que propone
+      <select id="ph-criterio" class="fs" onchange="phCriterio()">
+        <option value="ultimo" selected>el &uacute;ltimo cobrado</option>
+        <option value="moda">el que m&aacute;s se repite</option>
+        <option value="mediana">el del medio</option>
+      </select>
+    </label>
+  </div>
+  <p class="fi-helper" id="ph-nota"></p>
+
+  <div class="lwa-barra">
+    <span class="lwa-barra-btns">
+      <button type="button" onclick="phTodos(true)">Todos</button>
+      <button type="button" onclick="phTodos(false)">Ninguno</button>
+    </span>
+  </div>
+  <div class="lwa-sel ph-lista" id="ph-lista"></div>
+
+  <button class="btn-primary" id="ph-guardar" onclick="phGuardar(this)" style="width:100%;margin-top:10px" disabled>&#128190; Cargar a la lista</button>
+  <button class="btn-secondary" onclick="phCerrar()" style="width:100%;margin-top:8px">Cerrar</button>
 </div>
 
 <!-- ═══════════ MODAL: AJUSTE MASIVO POR % ═══════════ -->
@@ -1121,6 +1163,7 @@
 <script src="finanzas-report.js"></script>
 <script src="modulos_catalog.js"></script>
 <script src="precios.js"></script>
+<script src="precios-historial.js"></script>
 <script src="bluetooth-print.js"></script>
 <script src="notifications.js"></script>
 <script src="webpush.js"></script>
