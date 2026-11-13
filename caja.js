@@ -1067,12 +1067,15 @@ function toggleCajaMenu() {
     ]),
     // Facturación y la comisión de Getnet juntas: las dos son "lo que pasa
     // con un cobro digital" (y el menú tiene un tope de opciones, test-menus)
-    sheetGrupo(toggleCajaMenu, 'Facturación y tarjetas', '🧾', 'Facturación y tarjetas', 'Facturas de ARCA y comisión de Getnet', [
+    sheetGrupo(toggleCajaMenu, 'Facturación y tarjetas', '🧾', 'Facturación y tarjetas', 'Facturas de ARCA, comisión de Getnet y promos', [
       { icon: '🧾', label: 'Sin facturar', sub: 'Cobros digitales que todavía no tienen factura', onClick: () => (typeof abrirSinFacturar === 'function') && abrirSinFacturar() },
       { icon: '📊', label: 'Facturado y tope', sub: 'Cuánto facturaste y cuánto te falta para el tope del monotributo', hide: !isOwner, onClick: () => (typeof abrirFacturado === 'function') && abrirFacturado() },
       { icon: '🏪', label: 'Datos del local en la factura', sub: 'Ingresos Brutos, inicio de actividades, domicilio', hide: !isOwner, onClick: () => (typeof editarDatosFactura === 'function') && editarDatosFactura() },
       { icon: '💳', label: 'Comisión de tarjetas (Getnet)', sub: (() => { const c = (typeof tarjetaCfg === 'function') ? tarjetaCfg() : {}; return (c.debito || c.credito) ? `Débito ${c.debito}% · Crédito ${c.credito}%` : 'Cuánto te descuenta Getnet de cada cobro'; })(),
         hide: !isOwner, onClick: configurarComisionTarjetas },
+      // 🏷️ Promos acá porque el menú tiene un tope de opciones (test-menus)
+      { icon: '🏷️', label: 'Promos', sub: (() => { const n = (typeof PROMOS !== 'undefined' ? PROMOS : []).filter(p => p.activa !== false).length; return n ? `${n} prendida${n === 1 ? '' : 's'} · la caja las aplica sola` : '2x1, 2 x $tanto, 3x2… la caja las aplica sola'; })(),
+      hide: !isOwner, onClick: () => (typeof promosAbrir === 'function') && promosAbrir() },
     ]),
     { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
     { icon: '💬', label: 'WhatsApp: abrir la app de escritorio',
@@ -2781,6 +2784,7 @@ function _asegurarDatosVenta() {
   // sin pasar por ahí, ni el buscador ni el lector los encontraban.
   // Es el mismo listener, con la misma traba de no duplicarse.
   if (typeof _listenProductos === 'function') _listenProductos();
+  if (typeof promosEscuchar === 'function') promosEscuchar();   // 🏷️ las promos prendidas
 }
 
 // Se cumple cuando esa lista trajo su primer snapshot (o ya tenía datos).
@@ -2975,6 +2979,7 @@ function _onMovDescInput() {
           id: p.id,
           nombre: p.nombre || '(sin nombre)',
           extra: [p.categoria, p.codigo].filter(Boolean).join(' · '),
+          categoria: p.categoria || '',   // 🏷️ para las promos por categoría
           stock: Number(p.stock) || 0,
           precio: Number(p.precioVenta) || 0,
           costoUSD: Number(p.precioCostoUSD) || 0,
@@ -3313,6 +3318,7 @@ function _movDesdeCodigo(cod, opts = {}) {
     _addToCart({
       source: 'producto', id: prod.id, nombre: prod.nombre || '(sin nombre)',
       extra: [prod.categoria, prod.codigo].filter(Boolean).join(' · '),
+      categoria: prod.categoria || '',
       stock: Number(prod.stock) || 0, precio: Number(prod.precioVenta) || 0,
       costoUSD: Number(prod.precioCostoUSD) || 0,
       costoARS: (typeof invCostoARS === 'function') ? invCostoARS(prod) : (Number(prod.precioCosto) || 0), icon: '📦',
@@ -3405,8 +3411,20 @@ function _selectMovSuggestion(idx) {
 //  CARRITO DE VENTA (varios productos)
 // ══════════════════════════════════════════
 
+// 🏷️ Promos (promos.js): acomoda el precio de los renglones que entran en una
+// promo prendida (2x1 en fundas…). Se llama antes de sumar y antes de dibujar,
+// así no hay forma de que el total y los renglones digan cosas distintas.
+function _cartPromos() {
+  if (typeof promosAplicar !== 'function' || editingMovId) return 0;
+  return promosAplicar(_cart, typeof PROMOS !== 'undefined' ? PROMOS : []);
+}
+
 function _cartTotal() {
-  return _cart.reduce((s, it) => s + (Number(it.precio) || 0) * it.qty, 0);
+  const conPromo = _cartPromos() > 0;
+  const t = _cart.reduce((s, it) => s + (Number(it.precio) || 0) * it.qty, 0);
+  // Con promo el precio por unidad puede tener centavos (3 por $10.000): el
+  // total se redondea para que dé la promo justa.
+  return conPromo ? Math.round(t) : t;
 }
 
 function _cartSummary() {
@@ -3467,6 +3485,7 @@ function _addFreeFromSearch() {
 // muestre el subtotal nuevo.
 function _setCartPrice(i, val) {
   if (!_cart[i]) return;
+  _cartPrecioMano(_cart[i], val);
   _cart[i].precio = Math.max(0, parseFloat(val) || 0);
   _syncMontoFromCart();
   _renderCart();
@@ -3479,7 +3498,27 @@ function _setCartPrice(i, val) {
 // perdía: eso es el "hay que apretar varias veces".
 function _setCartPrecioVivo(i, val) {
   if (!_cart[i]) return;
+  _cartPrecioMano(_cart[i], val);
   _cart[i].precio = Math.max(0, parseFloat(val) || 0);
+  _syncMontoFromCart();
+  _updateMovResumen();
+}
+
+// 🏷️ Un precio escrito a mano manda sobre la promo: ese renglón queda afuera
+// (si no, la promo lo pisaba al toque). Tocar el campo sin cambiar el número
+// no cuenta. Volver al precio de lista (↩) lo deja entrar de nuevo.
+function _cartPrecioMano(it, val) {
+  const nuevo = Math.max(0, parseFloat(val) || 0);
+  if (Math.abs(nuevo - (Number(it.precio) || 0)) < 0.005) return;
+  it.precioMano = true;
+}
+
+// 🏷️ Sacar un renglón de la promo (el cliente no la quiere, o no corresponde)
+function _sacarDePromo(i) {
+  const it = _cart[i];
+  if (!it) return;
+  it.sinPromo = true;
+  _renderCart();
   _syncMontoFromCart();
   _updateMovResumen();
 }
@@ -3488,6 +3527,7 @@ function _setCartPrecioVivo(i, val) {
 function _volverPrecioLista(i) {
   const it = _cart[i];
   if (!it || !(Number(it.precioLista) > 0)) return;
+  it.precioMano = false;
   it.precio = Number(it.precioLista);
   _syncMontoFromCart();
   _renderCart();
@@ -3520,6 +3560,7 @@ function _addToCart(r) {
       costoUSD: r.costoUSD || 0, costoARS: r.costoARS || 0,
       icon: r.icon || '📦', stock: r.stock, qty: 1,
       extra: r.extra || '',
+      categoria: r.categoria || '',   // 🏷️ para las promos por categoría
     });
     // Con una reparación vinculada (retiro + un vidrio, por ejemplo) la
     // categoría sigue siendo Reparación/Seña: el cobro es el de la reparación
@@ -3569,6 +3610,10 @@ function _renderCart() {
   }
 
   const repairLine = _selectedRepairItem ? _repairCartLineHtml() : '';
+  _cartPromos();   // 🏷️ los precios de promo, antes de dibujar
+  if (typeof _promosEstilos === 'function') _promosEstilos();
+  const avisosPromo = (typeof promosAvisos === 'function' && !editingMovId)
+    ? promosAvisos(_cart, typeof PROMOS !== 'undefined' ? PROMOS : []) : [];
 
   // Cada línea va en dos filas: arriba el nombre a todo el ancho, abajo la
   // cantidad y el subtotal. Antes iba todo en una fila y al nombre le quedaban
@@ -3594,7 +3639,8 @@ function _renderCart() {
     // Hacer precio es lo normal llevando varias cosas, pero tiene que verse: si
     // no, un precio tocado sin querer se va en la venta y nadie se entera.
     const lista = Number(it.precioLista) || 0;
-    const hecho = lista > 0 && precio > 0 && precio !== lista;
+    const enPromo = !!it.promo;
+    const hecho = !enPromo && lista > 0 && precio > 0 && precio !== lista;
 
     return `
       <div class="cart-line${sinPrecio ? ' cart-line--sinprecio' : ''}">
@@ -3621,10 +3667,11 @@ function _renderCart() {
                        value="" placeholder="$ precio c/u" onchange="_setCartPrice(${i}, this.value)">
               </div>`
             : `
-              <button type="button" class="cart-line-precio${hecho ? ' cart-line-precio--hecho' : ''}" onclick="_editarPrecioLinea(${i})" title="Tocá para hacer precio">
-                <small>${hecho ? '✏️ precio hecho · antes ' + fmt(lista) : detallePrecio}</small>
+              <button type="button" class="cart-line-precio${hecho ? ' cart-line-precio--hecho' : ''}${enPromo ? ' cart-line-precio--promo' : ''}" onclick="_editarPrecioLinea(${i})" title="Tocá para hacer precio">
+                <small>${enPromo ? '🏷️ Promo ' + esc(it.promo.nombre) + ' · antes ' + fmt(lista * it.qty) : hecho ? '✏️ precio hecho · antes ' + fmt(lista) : detallePrecio}</small>
                 <b>${fmt(sub)} <span class="cart-precio-lapiz">✏️</span></b>
               </button>
+              ${enPromo ? `<button type="button" class="cart-precio-volver" onclick="_sacarDePromo(${i})" title="Sacarlo de la promo (va a precio de lista)">↩</button>` : ''}
               ${hecho ? `<button type="button" class="cart-precio-volver" onclick="_volverPrecioLista(${i})" title="Volver al precio de la lista">↩</button>` : ''}`}
             ${!isEquipo && !regalo ? `<button type="button" class="cart-regalo-btn" onclick="_toggleRegalo(${i})" title="Sin cargo: va en $0 y se descuenta del stock">🎁</button>` : ''}
           </div>
@@ -3638,7 +3685,8 @@ function _renderCart() {
       </div>`;
   }).join('');
 
-  wrap.innerHTML = `<div class="cart-box">${repairLine}${lines}</div>`;
+  const avisos = avisosPromo.map(a => `<div class="cart-promo-aviso">${esc(a)}</div>`).join('');
+  wrap.innerHTML = `<div class="cart-box">${repairLine}${lines}${avisos}</div>`;
   wrap.classList.remove('hidden');
 }
 
@@ -4010,6 +4058,9 @@ async function saveMov() {
         costoUSDUnit: it.costoUSD || 0,
         costoARSUnit,
         ...(it.regalo ? { regalo: true } : {}),   // 🎁 sin cargo (comprobante y registro)
+        // 🏷️ con qué promo salió y cuánto valía (para el ticket y para saber
+        // después cuánto se fue en promos)
+        ...(it.promo ? { promo: it.promo.nombre, precioListaUnit: Number(it.precioLista) || 0 } : {}),
       });
       if (esEquipo) {
         // Equipo del stock → se marca como vendido (no descuenta cantidad)

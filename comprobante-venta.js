@@ -32,7 +32,8 @@ function _cvRenglones(mov) {
   const r = items.map(it => {
     const qty = Math.max(1, Number(it.qty) || 1);
     const unit = Number(it.precioUnit) || 0;
-    return { nombre: (it.nombre || 'Artículo') + (it.regalo ? ' (sin cargo)' : ''), qty, unit, total: qty * unit };
+    // 🏷️ con promo el precio por unidad puede traer centavos: el renglón se redondea
+    return { nombre: (it.nombre || 'Artículo') + (it.regalo ? ' (sin cargo)' : '') + (it.promo ? ' (promo ' + it.promo + ')' : ''), qty, unit, total: it.promo ? Math.round(qty * unit) : qty * unit };
   });
   // Venta mixta: la parte de la reparación también va escrita.
   const rep = Number(mov.montoReparacion) || 0;
