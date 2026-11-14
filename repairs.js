@@ -1832,6 +1832,8 @@ function openRepairForm(id) {
       const el = document.getElementById(fid);
       if (el) el.value = '';
     });
+    // El aviso del cliente (por DNI o teléfono) era del ingreso anterior
+    document.getElementById('rep-cliente-hint')?.classList.add('hidden');
     document.getElementById('rep-fi-arreglo').value = '';
     document.getElementById('rep-fi-arreglo-custom').style.display = 'none';
     document.getElementById('rep-fi-arreglo-custom').value = '';

@@ -700,7 +700,9 @@
         <div class="sell-cli-row">
           <div class="fg">
             <label class="fl">DNI</label>
-            <input id="sell-cli-dni" class="fi" type="text" placeholder="26427682" inputmode="numeric">
+            <input id="sell-cli-dni" class="fi" type="text" placeholder="26427682" inputmode="numeric"
+                   onblur="_sellDniAutocomplete(this.value)"
+                   oninput="if (this.value.replace(/\D/g,'').length >= 8) _sellDniAutocomplete(this.value)">
           </div>
           <div class="fg">
             <label class="fl">Teléfono</label>
@@ -1157,19 +1159,23 @@
             <span><b>🤝 Equipo de gremio</b><small>De otro taller. Al guardar sale solo la etiqueta, sin la hoja para el cliente.</small></span>
           </label>
         </div>
+        <!-- El DNI primero: al ponerlo se cargan nombre y teléfono si ya vino -->
+        <div class="fg fg--full">
+          <label class="fl">DNI <small style="opacity:.7">— si ya vino, se cargan sus datos</small></label>
+          <input id="rep-fi-dni" class="fi" type="text" placeholder="26427682" inputmode="numeric"
+            onblur="_repDniAutocomplete(this.value)"
+            oninput="if (this.value.replace(/\D/g,'').length >= 8) _repDniAutocomplete(this.value)"
+            onkeydown="if (event.key === 'Enter') { event.preventDefault(); _repDniAutocomplete(this.value, true); }">
+          <div id="rep-cliente-hint" class="rep-cliente-hint hidden"></div>
+        </div>
         <div class="fg fg--full">
           <label class="fl" id="rep-lbl-nombre">Nombre del cliente</label>
           <input id="rep-fi-nombre" class="fi" type="text" placeholder="Juan García" autocomplete="off">
         </div>
-        <div class="fg">
+        <div class="fg fg--full">
           <label class="fl">Teléfono</label>
           <input id="rep-fi-tlf" class="fi" type="tel" placeholder="1155667788" inputmode="numeric"
             onblur="_repTelAutocomplete(this.value)">
-          <div id="rep-cliente-hint" class="rep-cliente-hint hidden"></div>
-        </div>
-        <div class="fg">
-          <label class="fl">DNI</label>
-          <input id="rep-fi-dni" class="fi" type="text" placeholder="26427682" inputmode="numeric">
         </div>
 
         <div class="fg">

@@ -16,6 +16,13 @@ function _cliKey(tlf) {
   return digits.length > 10 ? digits.slice(-10) : digits;
 }
 
+// DNI → solo dígitos ("30.123.456" → "30123456"). Sirve para buscar igual
+// aunque uno lo haya escrito con puntos y otro sin.
+function _cliDni(dni) {
+  const d = String(dni || '').replace(/\D/g, '');
+  return d.length >= 6 && d.length <= 9 ? d : '';
+}
+
 function _cliEsc(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
@@ -33,7 +40,7 @@ async function upsertCliente({ tlf, nombre, dni, email }) {
       // Actualizar solo campos que vengan con valor (no pisar con vacío)
       const upd = { updatedAt: ahora, ultimaVez: ahora };
       if (nombre) upd.nombre = nombre;
-      if (dni)    upd.dni = dni;
+      if (dni)    { upd.dni = dni; upd.dniKey = _cliDni(dni); }
       if (email)  upd.email = email;
       if (tlf)    upd.telefonoRaw = tlf;
       await ref.set(upd, { merge: true });
@@ -43,6 +50,7 @@ async function upsertCliente({ tlf, nombre, dni, email }) {
         telefonoRaw: tlf || '',
         nombre: nombre || '',
         dni: dni || '',
+        dniKey: _cliDni(dni),   // para encontrarlo por DNI al tomar un equipo
         email: email || '',
         notas: '',
         primeraVez: ahora,
@@ -242,6 +250,106 @@ async function _telAutocomplete(tlf, ids) {
 }
 
 // ══════════════════════════════════════════
+//  POR DNI: poner el DNI y que se carguen los datos
+// ══════════════════════════════════════════
+// Alan (14/11): "quiero poner el DNI del cliente y que se carguen sus datos
+// cuando tomo un equipo". Antes solo se autocompletaba por teléfono, y el
+// teléfono es lo que más cambia (y lo que más se escribe mal); el DNI no.
+
+// Lo que ya está en memoria (reparaciones y celulares vendidos), sin gastar
+// lecturas. Devuelve el dato más nuevo que tenga ese DNI.
+function cliBuscarDniLocal(dni, repairs, stock) {
+  const k = _cliDni(dni);
+  if (!k) return null;
+  const cands = [];
+  (Array.isArray(repairs) ? repairs : []).forEach(r => {
+    if (r && !r._borrado && _cliDni(r.dni) === k) cands.push({ nombre: r.nombre || '', tlf: r.tlf || '', fecha: r.fechaIngreso || '', de: 'rep' });
+  });
+  (Array.isArray(stock) ? stock : []).forEach(e => {
+    if (e && _cliDni(e.clienteDni) === k) cands.push({ nombre: e.clienteNombre || '', tlf: e.clienteTel || '', fecha: e.fecha_venta || '', de: 'compra' });
+  });
+  if (!cands.length) return null;
+  cands.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  // El nombre y el teléfono, del más nuevo que los tenga (uno viejo puede
+  // tener el teléfono y el último no)
+  const nombre = (cands.find(c => c.nombre) || {}).nombre || '';
+  const tlf = (cands.find(c => _cliKey(c.tlf)) || {}).tlf || '';
+  return {
+    nombre, tlf,
+    reparaciones: cands.filter(c => c.de === 'rep').length,
+    compras: cands.filter(c => c.de === 'compra').length,
+  };
+}
+
+// Si no está en memoria (cliente de hace mucho), la ficha en Firestore.
+// Las fichas nuevas tienen `dniKey`; las viejas solo `dni` como se escribió,
+// así que se prueba también sin puntos y con puntos. Es una consulta por
+// cliente nuevo, nada más.
+async function cliBuscarDniFicha(dni) {
+  const k = _cliDni(dni);
+  if (!k || typeof db === 'undefined' || !db) return null;
+  const conPuntos = k.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const intentos = [['dniKey', k], ['dni', k], ['dni', conPuntos]];
+  for (const [campo, valor] of intentos) {
+    try {
+      const s = await db.collection('clientes').where(campo, '==', valor).limit(1).get();
+      if (!s.empty) { const d = s.docs[0]; return { id: d.id, ...d.data() }; }
+    } catch (e) { console.warn('cliente por DNI:', e); return null; }
+  }
+  return null;
+}
+
+// Para no buscar dos veces lo mismo (blur + Enter)
+let _cliDniUltimo = '';
+
+async function _dniAutocomplete(dni, ids, forzar) {
+  const k = _cliDni(dni);
+  const hint = document.getElementById(ids.hint);
+  if (!k) return;
+  // Ya buscado y con el nombre puesto: no repetir (el blur después del oninput)
+  if (!forzar && k === _cliDniUltimo && ((document.getElementById(ids.nombre) || {}).value || '').trim()) return;
+  _cliDniUltimo = k;
+  let cli = cliBuscarDniLocal(k, typeof REPAIRS !== 'undefined' ? REPAIRS : [], typeof STOCK !== 'undefined' ? STOCK : []);
+  let deFicha = false;
+  if (!cli || !cli.nombre || !_cliKey(cli.tlf)) {
+    const f = await cliBuscarDniFicha(k);
+    if (f) {
+      deFicha = true;
+      cli = Object.assign({ reparaciones: 0, compras: 0 }, cli || {});
+      if (!cli.nombre) cli.nombre = f.nombre || '';
+      if (!_cliKey(cli.tlf)) cli.tlf = f.telefonoRaw || f.telefono || '';
+    }
+  }
+  if (_cliDni((document.getElementById(ids.dni) || {}).value) !== k) return;   // cambió mientras buscaba
+  if (!cli || (!cli.nombre && !_cliKey(cli.tlf))) {
+    if (hint) { hint.innerHTML = '🆕 Cliente nuevo: cargá nombre y teléfono'; hint.classList.remove('hidden'); }
+    return;
+  }
+  // Completar lo vacío (no pisar lo que ya escribieron)
+  const nomEl = document.getElementById(ids.nombre);
+  const telEl = document.getElementById(ids.tel);
+  if (nomEl && !nomEl.value.trim() && cli.nombre) nomEl.value = cli.nombre;
+  if (telEl && !telEl.value.trim() && cli.tlf) telEl.value = cli.tlf;
+  if (hint) {
+    const partes = [];
+    if (cli.reparaciones) partes.push(`<b>${cli.reparaciones}</b> ${cli.reparaciones !== 1 ? 'reparaciones' : 'reparación'}`);
+    if (cli.compras) partes.push(`<b>${cli.compras}</b> compra${cli.compras !== 1 ? 's' : ''} de celular`);
+    const ficha = cli.tlf ? ` <a onclick="openClienteFicha('${_cliEsc(cli.tlf)}')">Ver ficha →</a>` : '';
+    hint.innerHTML = `✅ <b>${_cliEsc(cli.nombre || 'Cliente')}</b> ya vino` + (partes.length ? ` — ${partes.join(' y ')}` : deFicha ? ' (tiene ficha)' : '') +
+      `. Revisá que el teléfono siga siendo el mismo.${ficha}`;
+    hint.classList.remove('hidden');
+  }
+}
+
+function _repDniAutocomplete(dni, forzar) {
+  return _dniAutocomplete(dni, { hint: 'rep-cliente-hint', nombre: 'rep-fi-nombre', tel: 'rep-fi-tlf', dni: 'rep-fi-dni' }, forzar);
+}
+
+function _sellDniAutocomplete(dni, forzar) {
+  return _dniAutocomplete(dni, { hint: 'sell-cli-hint', nombre: 'sell-cli-nombre', tel: 'sell-cli-tel', dni: 'sell-cli-dni' }, forzar);
+}
+
+// ══════════════════════════════════════════
 //  MIGRACIÓN — generar fichas desde el historial
 // ══════════════════════════════════════════
 async function migrarClientesDesdeHistorial() {
@@ -285,6 +393,7 @@ async function migrarClientesDesdeHistorial() {
         telefonoRaw: c.tlf || '',
         nombre: c.nombre || '',
         dni: c.dni || '',
+        dniKey: _cliDni(c.dni),
         primeraVez: fechas[0] || ahora,
         ultimaVez: fechas[fechas.length - 1] || ahora,
         updatedAt: ahora,
