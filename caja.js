@@ -1075,7 +1075,8 @@ function toggleCajaMenu() {
         hide: !isOwner, onClick: configurarComisionTarjetas },
       // 🏷️ Promos acá porque el menú tiene un tope de opciones (test-menus)
       { icon: '🏷️', label: 'Promos', sub: (() => { const n = (typeof PROMOS !== 'undefined' ? PROMOS : []).filter(p => p.activa !== false).length; return n ? `${n} prendida${n === 1 ? '' : 's'} · la caja las aplica sola` : '2x1, 2 x $tanto, 3x2… la caja las aplica sola'; })(),
-      hide: !isOwner, onClick: () => (typeof promosAbrir === 'function') && promosAbrir() },
+      // Con la cuenta del dueño alcanza: antes pedía además el PIN y Alan no la encontraba
+      hide: !(isOwner || (typeof tpEsDueno === 'function' && tpEsDueno())), onClick: () => (typeof promosAbrir === 'function') && promosAbrir() },
     ]),
     { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
     { icon: '💬', label: 'WhatsApp: abrir la app de escritorio',

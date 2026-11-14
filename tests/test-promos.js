@@ -98,7 +98,8 @@ ok(/_cartPrecioMano\(_cart\[i\], val\);/.test(cj) && /it\.precioMano = false;\s*
 ok(/onclick="_sacarDePromo\(\$\{i\}\)"/.test(cj) && /🏷️ Promo ' \+ esc\(it\.promo\.nombre\)/.test(cj), 'el renglón muestra la promo y se puede sacar');
 ok(/it\.promo \? \{ promo: it\.promo\.nombre, precioListaUnit:/.test(cj), 'queda guardado en la venta con qué promo salió');
 ok(/stockUpdates\.push\(\{ collection, id: it\.id, stockField, qty, nombre: it\.nombre, regalo: !!it\.regalo \}\)/.test(cj), 'el stock baja por la cantidad entera (las 2 fundas), no por lo cobrado');
-ok(/label: 'Promos'/.test(cj) && /hide: !isOwner, onClick: \(\) => \(typeof promosAbrir === 'function'\) && promosAbrir\(\)/.test(cj), 'menú de la caja → 🏷️ Promos (solo el dueño)');
+ok(/label: 'Promos'/.test(cj) && /hide: !\(isOwner \|\| \(typeof tpEsDueno === 'function' && tpEsDueno\(\)\)\), onClick: \(\) => \(typeof promosAbrir === 'function'\) && promosAbrir\(\)/.test(cj), 'menú de la caja → 🏷️ Promos: con la cuenta del dueño, sin pedir el PIN');
+ok(/class="pill solo-dueno" onclick="promosAbrir\(\)"/.test(leer('caja.html')), 'y un botón 🏷️ Promos a la vista en Accesorios (solo el dueño)');
 ok(/promosEscuchar\(\);   \/\/ 🏷️ las promos prendidas/.test(cj) && /collection\('config'\)\.doc\('promos'\)/.test(leer('promos.js')), 'se leen una vez al abrir la caja (un solo documento)');
 ok(/\(promo ' \+ it\.promo \+ '\)'/.test(cv), 'el ticket dice la promo');
 

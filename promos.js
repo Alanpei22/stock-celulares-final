@@ -203,7 +203,9 @@ function _promosEstilos() {
 }
 
 function promosAbrir() {
-  if (typeof tpEsDueno === 'function' && !tpEsDueno()) { toast('Las promos las arma el dueño', 'error'); return; }
+  // La cuenta del dueño, o el modo dueño con PIN desde otra cuenta
+  const dueno = (typeof tpEsDueno === 'function' && tpEsDueno()) || (typeof _cajaIsOwner !== 'undefined' && _cajaIsOwner);
+  if (typeof tpEsDueno === 'function' && !dueno) { toast('Las promos las arma el dueño', 'error'); return; }
   promosCerrar();
   _promosEstilos();
   promosEscuchar();
