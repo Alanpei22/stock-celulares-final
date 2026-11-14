@@ -88,6 +88,16 @@ let av = ctx.promosAvisos([F(1, 6000)], DOSxUNO);
 ok(av.length === 1 && /Con 1 más de Fundas entra la promo 2x1/.test(av[0]), 'con una funda avisa "con 1 más entra la promo" (para ofrecerla)', av);
 ok(ctx.promosAvisos([F(2, 6000)], DOSxUNO).length === 0, 'y con la promo completa no avisa nada');
 
+console.log('\n4b) Que no quede armada en una categoría sin artículos');
+// Alan (14/11): "cuando voy a cobrar no me aparece la promo". La categoría
+// venía elegida de entrada ("Accesorio") y la promo quedaba en otra que la
+// de las fundas.
+const PRODS = [{ categoria: 'Funda / Cover' }, { categoria: 'Funda / Cover' }, { categoria: 'Cable', activo: false }];
+ok(ctx.promoArticulos({ categoria: 'Funda / Cover' }, PRODS) === 2 && ctx.promoArticulos({ categoria: 'Accesorio' }, PRODS) === 0 && ctx.promoArticulos({ categoria: 'Cable' }, PRODS) === 0, 'cuenta los artículos (activos) de esa categoría');
+const pj = leer('promos.js');
+ok(/<option value="">— Elegí la categoría —<\/option>/.test(pj), 'la categoría ya no viene elegida de entrada: hay que elegirla');
+ok(/Ningún artículo tiene la categoría/.test(pj) && /así no sale en la caja/.test(pj), 'una promo en una categoría sin artículos avisa en rojo (y al guardarla pregunta)');
+
 console.log('\n5) Enganchado en la caja');
 const cj = leer('caja.js'), html = leer('caja.html'), cv = leer('comprobante-venta.js');
 ok(/<script src="promos\.js"><\/script>/.test(html), 'cargado en la caja');

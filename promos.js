@@ -22,6 +22,15 @@ let PROMOS = [];
 const _promoFmt = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-AR');
 const _promoCat = s => String(s == null ? '' : s).trim().toLowerCase();
 
+// ¿Cuántos artículos del inventario tienen esa categoría? Si son 0, la promo
+// nunca va a salir: antes la categoría venía elegida de entrada ("Accesorio",
+// la primera de la lista) y si no se cambiaba, la promo quedaba en otra
+// categoría que la de las fundas y en la caja no aparecía.
+function promoArticulos(p, productos) {
+  const c = _promoCat(p && p.categoria);
+  return (Array.isArray(productos) ? productos : []).filter(x => x && x.activo !== false && _promoCat(x.categoria) === c).length;
+}
+
 // Cómo se llama en el carrito y en el ticket
 function promoNombre(p) {
   if (!p) return '';
@@ -229,13 +238,22 @@ function _promosPintar() {
   // No pisar lo que se está escribiendo en el formulario
   const previo = {};
   ['pr-cat', 'pr-tipo', 'pr-n', 'pr-m', 'pr-precio', 'pr-pct'].forEach(id => { const e = document.getElementById(id); if (e) previo[id] = e.value; });
-  const cats = (typeof invCategorias === 'function') ? invCategorias() : [];
-  const filas = PROMOS.length ? PROMOS.map((p, i) => `
+  const prods = typeof PRODUCTOS !== 'undefined' ? PRODUCTOS : [];
+  // Primero las categorías que de verdad tienen artículos (con cuántos)
+  const todas = (typeof invCategorias === 'function') ? invCategorias() : [];
+  const cuantos = c => promoArticulos({ categoria: c }, prods);
+  const cats = todas.filter(c => cuantos(c) > 0).concat(todas.filter(c => !cuantos(c)));
+  const filas = PROMOS.length ? PROMOS.map((p, i) => {
+    const n = promoArticulos(p, prods);
+    const sub = !prods.length ? `en ${esc(p.categoria)}`
+      : n ? `en ${esc(p.categoria)} · ${n} artículo${n === 1 ? '' : 's'}`
+      : `<span style="color:#ef4444;font-weight:700">⚠️ Ningún artículo tiene la categoría "${esc(p.categoria)}": así no sale en la caja. Borrala y armala con la categoría de tus artículos.</span>`;
+    return `
     <div class="pr-item${p.activa === false ? ' pr-item--off' : ''}">
-      <div class="pr-item-main"><b>🏷️ ${esc(promoNombre(p))}</b><small>en ${esc(p.categoria)}</small></div>
+      <div class="pr-item-main"><b>🏷️ ${esc(promoNombre(p))}</b><small>${sub}</small></div>
       <button type="button" class="pr-btn ${p.activa === false ? 'pr-btn--off' : 'pr-btn--on'}" onclick="promosPrender(${i})">${p.activa === false ? 'Apagada' : '✓ Prendida'}</button>
       <button type="button" class="pr-btn pr-btn--del" onclick="promosBorrar(${i})" title="Borrar">🗑</button>
-    </div>`).join('') : '<div class="pr-sub">Todavía no armaste ninguna promo.</div>';
+    </div>`; }).join('') : '<div class="pr-sub">Todavía no armaste ninguna promo.</div>';
   m.innerHTML = `
     <h3>🏷️ Promos</h3>
     <div class="pr-sub">La caja las aplica sola al escanear. Escaneá <b>todas</b> las unidades que se llevan: cada una baja del stock.</div>
@@ -243,7 +261,7 @@ function _promosPintar() {
     <div class="pr-form">
       <b>Nueva promo</b>
       <label>¿En qué categoría?
-        <select id="pr-cat">${cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select>
+        <select id="pr-cat" onchange="_promosEjemplo()"><option value="">— Elegí la categoría —</option>${cats.map(c => { const n = cuantos(c); return `<option value="${esc(c)}">${esc(c)}${n ? ` (${n} artículo${n === 1 ? '' : 's'})` : ''}</option>`; }).join('')}</select>
       </label>
       <label>¿Qué promo?
         <select id="pr-tipo" onchange="_promosTipo()">
@@ -296,7 +314,10 @@ function _promosEjemplo() {
 
 async function promosAgregar() {
   const p = _promosDelForm();
-  if (!p.categoria) { toast('Elegí la categoría (cargá primero los productos en el inventario)', 'error'); return; }
+  if (!p.categoria) { toast('Elegí la categoría de los artículos (por ejemplo, la de las fundas)', 'error'); return; }
+  if (typeof PRODUCTOS !== 'undefined' && PRODUCTOS.length && !promoArticulos(p, PRODUCTOS)) {
+    if (!confirm(`Ningún artículo tiene la categoría "${p.categoria}", así que la promo no va a salir en la caja.\n\n¿Guardarla igual?`)) return;
+  }
   if (!promoValida(p)) { toast('Revisá los números de la promo', 'error'); return; }
   p.id = 'p' + Date.now().toString(36);
   try {
