@@ -1314,11 +1314,56 @@ function _stockFiltrado() {
     if (fVendedor && p.vendedor !== fVendedor) return false;
     if (fUbi && p.ubicacion !== fUbi) return false;
     if (q) {
-      const hay = `${p.marca || ''} ${p.modelo || ''} ${p.almacenamiento || ''} ${p.imei || ''} ${p.notas || ''}`;
+      // El código de la etiqueta también (el largo y el corto TP#####): antes
+      // escanear la etiqueta en el buscador no encontraba el equipo.
+      const hay = `${p.marca || ''} ${p.modelo || ''} ${p.almacenamiento || ''} ${p.imei || ''} ${p.imei2 || ''} ${p.codigo || ''} ${p.codigoCorto || ''} ${p.notas || ''}`;
       return searchMatch(hay, q);
     }
     return true;
   });
+}
+
+// ══════════════════════════════════════════
+//  📷 Escanear un celular en el Stock
+// ══════════════════════════════════════════
+// Alan (14/11): "desde el stock de celulares, escanear el código de barras y
+// que lo busque". El código puede ser el de nuestra etiqueta (codigo o el
+// corto TP#####) o el IMEI de la caja del equipo.
+function stockPorCodigo(cod, lista) {
+  const t = String(cod || '').trim().toUpperCase();
+  if (!t) return null;
+  const igual = c => c != null && String(c).trim().toUpperCase() === t;
+  const todos = (Array.isArray(lista) ? lista : []).filter(p => [p.codigo, p.codigoCorto, p.imei, p.imei2].some(igual));
+  // Si el mismo código está en uno vendido y en uno en stock, el que está
+  return todos.find(p => !p.vendido) || todos[0] || null;
+}
+
+// Lo muestra en la lista (con el código en el buscador). Devuelve false si
+// no es de ningún celular, para que quien llame siga con lo de siempre.
+function stockEscaneado(cod) {
+  const p = stockPorCodigo(cod, typeof STOCK !== 'undefined' ? STOCK : []);
+  if (!p) return false;
+  const s = document.getElementById('search');
+  if (s) s.value = String(cod).trim();
+  // Si ya se vendió, que se vea igual (con el filtro "En stock" no aparecería)
+  const fv = document.getElementById('f-vendido');
+  if (fv && p.vendido && fv.value === '0') fv.value = '';
+  render();
+  const nombre = [p.marca, p.modelo, p.almacenamiento].filter(Boolean).join(' ') || 'Equipo';
+  if (typeof toast === 'function') toast(p.vendido ? `📱 ${nombre} — ya está VENDIDO` : `📱 ${nombre}`, p.vendido ? 'error' : 'success');
+  return true;
+}
+
+// Con la cámara (el botón 📷 del buscador del stock)
+async function stockEscanearCam() {
+  if (typeof abrirEscaner !== 'function') { toast('El lector no está disponible acá', 'error'); return; }
+  await abrirEscaner(cod => {
+    if (stockEscaneado(cod)) return;
+    // No es de ningún celular: queda en el buscador por si coincide con algo
+    const s = document.getElementById('search');
+    if (s) { s.value = String(cod).trim(); render(); }
+    toast(`No hay ningún celular con el código ${cod}`, 'error');
+  }, { titulo: 'Escaneá la etiqueta o el IMEI del celular' });
 }
 
 function render() {

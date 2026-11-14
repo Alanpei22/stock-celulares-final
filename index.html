@@ -82,7 +82,10 @@
       </div>
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input id="search" type="search" placeholder="Buscar marca, modelo, IMEI..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <input id="search" type="search" placeholder="Buscar o escanear: marca, modelo, IMEI, código..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding-right:56px">
+        <!-- 📷 Escanear la etiqueta o el IMEI con la cámara (en la compu, la pistola anda sola) -->
+        <button type="button" onclick="stockEscanearCam()" title="Escanear con la cámara"
+          style="position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;font-size:22px;cursor:pointer;padding:6px 8px">📷</button>
       </div>
       <div class="filters">
         <select class="pill" id="f-marca"><option value="">Todas las marcas</option></select>

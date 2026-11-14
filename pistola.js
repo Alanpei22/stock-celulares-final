@@ -33,9 +33,10 @@ function _pisEditable(el) {
 }
 
 // Lo mismo que _pareceCodigo de la caja: de fábrica o nuestro
+// 15 cifras = el IMEI de la caja de un celular (para buscarlo en el Stock)
 function pistolaEsCodigo(s) {
   const t = String(s || '').trim();
-  return /^\d{8,14}$/.test(t) || /^TP\d{3,}$/i.test(t);
+  return /^\d{8,15}$/.test(t) || /^TP\d{3,}$/i.test(t);
 }
 
 // Recibe cada tecla. Devuelve el código cuando se completó uno, o null.
@@ -52,6 +53,23 @@ function pistolaTecla(e, ahora) {
   if (typeof e.key === 'string' && e.key.length === 1) _pisBuf += e.key;
   else _pisBuf = '';
   return null;
+}
+
+// En el Stock de celulares, si el código es de un celular se busca ahí (Alan,
+// 14/11: "escanear el código y que lo busque"). Si no es de ningún celular
+// (un accesorio), sigue a la caja como siempre.
+function pistolaEnStock(cod) {
+  const sec = document.getElementById('stock-section');
+  if (!sec || typeof stockEscaneado !== 'function') return false;
+  if (!sec.classList.contains('section-hidden')) return stockEscaneado(cod);
+  // Un IMEI (15 cifras) solo puede ser de un celular: desde otra pantalla
+  // también se va al Stock a mostrarlo
+  if (/^\d{15}$/.test(String(cod).trim()) && typeof stockPorCodigo === 'function' &&
+      stockPorCodigo(cod, typeof STOCK !== 'undefined' ? STOCK : [])) {
+    if (typeof switchSection === 'function') switchSection('stock');
+    return stockEscaneado(cod);
+  }
+  return false;
 }
 
 // El código va a la caja
@@ -71,6 +89,12 @@ function pistolaACaja(cod) {
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('keydown', e => {
     const cod = pistolaTecla(e, (typeof performance !== 'undefined' ? performance.now() : Date.now()));
-    if (cod) { e.preventDefault(); pistolaACaja(cod); }
+    if (!cod) return;
+    e.preventDefault();
+    if (pistolaEnStock(cod)) return;
+    // Un IMEI que no es de ningún celular del stock: a la caja no va (allá se
+    // cargaría como un artículo llamado "3567…")
+    if (/^\d{15}$/.test(cod)) { if (typeof toast === 'function') toast(`No hay ningún celular con el IMEI ${cod}`, 'error'); return; }
+    pistolaACaja(cod);
   }, true);
 }
