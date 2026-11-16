@@ -671,6 +671,8 @@ function renderStats() {
 
   // Feature 6: comparativa "vs ayer" (usa _yesterdayNeto cargado por _loadYesterdayStats)
   _renderVsYesterday(neto);
+  // 📱 Los equipos vendidos en el día (equipos-dia.js)
+  if (typeof renderEquiposDia === 'function') renderEquiposDia();
 
   // Desglose del día — usa _efecMonto para respetar el split.
   // Los tres primeros números tienen que PODER SUMARSE: efectivo de ventas +
