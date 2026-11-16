@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-ventas-meses.js':   'Equipos vendidos mes a mes: si venis para arriba o para abajo',
   'test-equipos-dia.js': '📱 Resumen de equipos vendidos en el día en la caja (desde la caja, el Stock o el carrito; sin señas), con ganancia solo para el dueño',
   'test-stock-escanear.js': '📷 Escanear un celular en el Stock (etiqueta TP#####, código largo o IMEI) con la pistola o la cámara y que aparezca en la lista',
   'test-cliente-dni.js': '🪪 Poner el DNI al tomar un equipo (reparación o venta de celular) y que se carguen nombre y teléfono si el cliente ya vino',

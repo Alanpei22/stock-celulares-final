@@ -999,6 +999,27 @@ body.dark .cajachica-contado-val { color: #F2F2F7; }
 .ph-item .ph-precio { width: 92px; flex: none; text-align: right; }
 .ph-ya { color: var(--warn); font-weight: 700; }
 
+/* ── Equipos vendidos por mes ── */
+.vm-tot { display: flex; gap: 8px; margin: 10px 0; }
+.vm-tot div { flex: 1; background: var(--bg1); border-radius: 12px; padding: 10px; text-align: center; }
+.vm-tot small { display: block; font-size: .68rem; color: var(--text2); }
+.vm-tot b { font-size: 1rem; }
+.vm-tend { font-size: .8rem; margin: 0 0 10px; }
+.vm-barras { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.vm-fila { display: flex; align-items: center; gap: 8px; font-size: .78rem; }
+.vm-mes { flex: 0 0 52px; color: var(--text2); }
+/* Dos barras encimadas: la ganancia (llena) y los equipos (una línea arriba),
+   para ver de un vistazo si un mes vendió mucho pero ganó poco. */
+.vm-bar-wrap { flex: 1; min-width: 0; position: relative; height: 18px; background: var(--bg1); border-radius: 6px; overflow: hidden; }
+.vm-bar { position: absolute; left: 0; top: 0; bottom: 0; background: var(--grn2, #10b981); opacity: .75; border-radius: 6px; }
+.vm-bar-eq { position: absolute; left: 0; bottom: 0; height: 4px; background: var(--accent); border-radius: 0 3px 3px 0; }
+.vm-num { flex: 0 0 74px; text-align: right; line-height: 1.1; }
+.vm-num small { display: block; font-size: .68rem; color: var(--text2); }
+.vm-tabla { width: 100%; border-collapse: collapse; font-size: .76rem; }
+.vm-tabla th, .vm-tabla td { padding: 6px 4px; border-bottom: 1px solid var(--border); text-align: left; }
+.vm-tabla .num { text-align: right; }
+.vm-tabla th { color: var(--text2); font-weight: 600; }
+
 /* Badge de modo en el card inline */
 .repair-mode-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 

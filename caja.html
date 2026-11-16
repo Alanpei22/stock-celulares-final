@@ -963,6 +963,25 @@
   <button class="btn-secondary" onclick="phCerrar()" style="width:100%;margin-top:8px">Cerrar</button>
 </div>
 
+<!-- MODAL: VENTAS DE EQUIPOS MES A MES (ventas-meses.js)
+     El informe de finanzas da UN mes en PDF; esto es la tendencia. -->
+<div id="vm-overlay" class="nota-overlay hidden" onclick="vmCerrar()"></div>
+<div id="vm-modal" class="arqueo-modal hidden" style="max-width:560px">
+  <div class="nota-modal-hdr">
+    <span>&#128200; Equipos vendidos por mes</span>
+    <button onclick="vmCerrar()">&#10005;</button>
+  </div>
+  <label class="fl">Per&iacute;odo
+    <select id="vm-meses" class="fs" onchange="vmBuscar()">
+      <option value="6" selected>últimos 6 meses</option>
+      <option value="12">últimos 12 meses</option>
+      <option value="24">últimos 24 meses</option>
+    </select>
+  </label>
+  <div id="vm-cuerpo"></div>
+  <button class="btn-secondary" onclick="vmCerrar()" style="width:100%;margin-top:10px">Cerrar</button>
+</div>
+
 <!-- ═══════════ MODAL: AJUSTE MASIVO POR % ═══════════ -->
 <div id="ajuste-precios-overlay" class="nota-overlay hidden" onclick="closeAjustePrecios()"></div>
 <div id="ajuste-precios-modal" class="arqueo-modal hidden" style="max-width:380px">
@@ -1171,6 +1190,7 @@
 <script src="modulos_catalog.js"></script>
 <script src="precios.js"></script>
 <script src="precios-historial.js"></script>
+<script src="ventas-meses.js"></script>
 <script src="bluetooth-print.js"></script>
 <script src="notifications.js"></script>
 <script src="webpush.js"></script>

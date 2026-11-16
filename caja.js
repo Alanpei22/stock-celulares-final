@@ -1066,6 +1066,8 @@ function toggleCajaMenu() {
       { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', hide: no('reporte'), onClick: openReporteModal },
       { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
       { icon: '📄', label: 'Reporte financiero', sub: 'Exportar a PDF por período', hide: !isOwner, onClick: () => (typeof openFinanzasReport === 'function') && openFinanzasReport() },
+      { icon: '📈', label: 'Equipos vendidos por mes', sub: 'Los últimos meses juntos: si venís para arriba o para abajo', hide: !isOwner,
+        onClick: () => (typeof vmAbrir === 'function') && vmAbrir() },
     ]),
     // Facturación y la comisión de Getnet juntas: las dos son "lo que pasa
     // con un cobro digital" (y el menú tiene un tope de opciones, test-menus)
