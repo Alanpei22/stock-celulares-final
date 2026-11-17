@@ -7,14 +7,20 @@ const ok = (c, l, x) => { console.log((c ? '  OK  ' : '  FAIL') + ' · ' + l + (
 const leer = f => fs.readFileSync(DIR + f, 'utf8');
 
 const DB = {}, TOASTS = [];
-const ctx = { console, Math, Number, String, Array, Object, JSON, Date, isFinite,
+// Reloj fijo: los datos son "hace N días" desde el 12/11. Con el reloj real,
+// a la semana la marca de "sigue en el local" se vencía y la prueba fallaba.
+const AHORA = Date.parse('2026-11-12T15:00:00Z');
+class FechaFija extends Date {
+  constructor(...a) { if (a.length) super(...a); else super(AHORA); }
+  static now() { return AHORA; }
+}
+const ctx = { console, Math, Number, String, Array, Object, JSON, Date: FechaFija, isFinite,
   document: { getElementById: () => null }, toast: m => TOASTS.push(m), tpFrenar: () => false,
   db: { collection: c => ({ doc: id => ({ update: async d => { DB[c + '/' + id] = d; } }) }) } };
 vm.createContext(ctx);
 vm.runInContext(leer('cruce-caja.js'), ctx, { filename: 'cruce-caja.js' });
 const run = c => vm.runInContext(c, ctx);
 
-const AHORA = Date.parse('2026-11-12T15:00:00Z');
 const hace = d => new Date(AHORA - d * 864e5).toISOString();
 ctx.AH = AHORA;
 ctx.R = [

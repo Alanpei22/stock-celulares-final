@@ -1171,6 +1171,7 @@
 <script src="venta-articulos.js"></script>
 <script src="promos.js"></script>
 <script src="equipos-dia.js"></script>
+<script src="canje.js"></script>
 <script src="roturas.js"></script>
 <script src="instalar.js"></script>
 <script src="qz-print.js"></script>
@@ -1585,7 +1586,8 @@ function switchCajaTab(tab) {
 
     <div class="ventaeq-g2">
       <div class="precio-fg"><label>Precio total *</label>
-        <input id="ve-precio" class="precio-input" type="number" inputmode="numeric" placeholder="520000"></div>
+        <input id="ve-precio" class="precio-input" type="number" inputmode="numeric" placeholder="520000"
+               oninput="if (typeof _canjeTotales === 'function') _canjeTotales()"></div>
       <div class="precio-fg"><label>Forma de pago</label>
         <select id="ve-pago" class="precio-input" onchange="_veToggleCuotas()">
           <option>Efectivo</option><option>Transferencia</option><option>MercadoPago</option>
@@ -1598,6 +1600,9 @@ function switchCajaTab(tab) {
       <div class="precio-fg"><label>Garantía (meses)</label>
         <input id="ve-garantia" class="precio-input" type="number" inputmode="numeric" placeholder="0"></div>
     </div>
+
+    <!-- 🔄 Plan canje (canje.js): el celular que deja en parte de pago -->
+    <div id="ve-canje"></div>
 
     <div class="ventaeq-sec">Comprador</div>
     <div class="precio-fg"><label>Apellido y nombre</label>

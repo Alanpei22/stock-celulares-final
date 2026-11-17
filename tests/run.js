@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-canje.js': '🔄 Plan canje en la venta de equipo: valor sugerido por el stock, a la caja entra solo la diferencia y el usado entra al stock o a "para arreglar"',
   'test-ventas-meses.js':   'Equipos vendidos mes a mes: si venis para arriba o para abajo',
   'test-equipos-dia.js': '📱 Resumen de equipos vendidos en el día en la caja (desde la caja, el Stock o el carrito; sin señas), con ganancia solo para el dueño',
   'test-stock-escanear.js': '📷 Escanear un celular en el Stock (etiqueta TP#####, código largo o IMEI) con la pistola o la cámara y que aparezca en la lista',

@@ -30,6 +30,7 @@ function eqDiaLista(movs) {
         precio, cobrado: Number(m.monto) || 0,
         ganancia: typeof m.gananciaARS === 'number' && !m.sinCosto ? m.gananciaARS : null,
         saldo: /\(saldo/.test(m.descripcion || ''),
+        canje: Number(m.montoCanje) || 0,
       }));
       return;
     }
@@ -103,7 +104,7 @@ function renderEquiposDia() {
     <div class="eqd-fila">
       <div class="eqd-main">
         <b>📱 ${e(x.nombre)}</b>
-        <small>${[x.hora, x.metodo, x.vendedor && 'vendió ' + x.vendedor, x.cliente].filter(Boolean).map(e).join(' · ')}${x.saldo ? ' · <i>saldo de una seña</i>' : ''}</small>
+        <small>${[x.hora, x.metodo, x.vendedor && 'vendió ' + x.vendedor, x.cliente].filter(Boolean).map(e).join(' · ')}${x.saldo ? ' · <i>saldo de una seña</i>' : ''}${x.canje ? ` · 🔄 canje ${f(x.canje)}` : ''}</small>
       </div>
       <div class="eqd-plata">
         <b>${f(x.precio)}</b>

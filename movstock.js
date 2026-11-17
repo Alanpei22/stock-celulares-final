@@ -33,6 +33,7 @@ const MS_MOTIVOS = {
   reserva:    { ico: '🔖', txt: 'Reservado' },
   liberado:   { ico: '🔓', txt: 'Reserva cancelada' },
   reactivado: { ico: '♻️', txt: 'Vuelve al stock' },
+  canje:      { ico: '🔄', txt: 'Entró por plan canje' },
 };
 const MS_TIPOS = { equipo: '📱 Equipo', repuesto: '🔩 Repuesto', accesorio: '🏷️ Accesorio' };
 
