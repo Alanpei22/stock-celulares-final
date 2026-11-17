@@ -304,10 +304,11 @@ ok((printSrc.match(/\.tk \+ \.tk\{page-break-before:always\}/g) || []).length ==
 
 console.log('\n11) La seña ya no se cuenta dos veces al vender');
 const appSrc = fs.readFileSync(DIR + 'app.js', 'utf8');
-const venta = appSrc.slice(appSrc.indexOf('async function confirmSell'), appSrc.indexOf('async function confirmSell') + 4000);
+const venta = appSrc.slice(appSrc.indexOf('async function confirmSell'), appSrc.indexOf('async function confirmSell') + 8000);   // creció con el plan canje
 ok(/const aCobrar = Math\.max\(0, \(Number\(p\?\.precio\) \|\| 0\) - yaEntregado\)/.test(venta),
    'la venta cobra el precio menos lo que ya había dejado');
-ok(/monto: aCobrar/.test(venta), 'y ese es el monto del movimiento de caja');
+// Con plan canje, además se le resta lo que se tomó del usado
+ok(/monto: (canje \? canjeSaldo\(aCobrar, canje\.valor\) : )?aCobrar,/.test(venta), 'y ese es el monto del movimiento de caja');
 ok(!/monto: p\.precio,/.test(venta), 'ya no registra el precio completo');
 ok(/printReserva/.test(appSrc) && /printReservaDe/.test(appSrc),
    'y el detalle del equipo puede reimprimir la reserva');

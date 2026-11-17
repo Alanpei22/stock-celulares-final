@@ -27,7 +27,7 @@ ok(/salen en el comprobante/.test(html),
 // Opcionales: la venta no puede frenarse por esto.
 // Ventana amplia: confirmSell es larga y el CRM se llama después del commit.
 const cuerpoSell = appjs.slice(appjs.indexOf('async function confirmSell'),
-                               appjs.indexOf('async function confirmSell') + 6000);
+                               appjs.indexOf('async function confirmSell') + 10000);   // creció con el plan canje
 ok(!/toast\([^)]*comprador/i.test(cuerpoSell),
    'no son obligatorios: la venta sigue sin ellos');
 

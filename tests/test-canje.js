@@ -64,5 +64,16 @@ ok(/canjeValidar\(canje, total, \{ nombre: d\.clienteNombre, dni: d\.clienteDni 
 ok(/canje:      \{ ico: '🔄', txt: 'Entró por plan canje' \}/.test(leer('movstock.js')), 'el registro de stock dice "Entró por plan canje"');
 ok(/🔄 canje \$\{f\(x\.canje\)\}/.test(leer('equipos-dia.js')), 'el resumen de equipos del día muestra el canje');
 
+console.log('\n5) También al vender desde el Stock');
+// Alan (17/11): "sí, agregalo (en la venta del Stock), igual no encuentro lo primero"
+const ap = leer('app.js'), ix = leer('index.html');
+ok(/id="sell-canje"/.test(ix) && /<script defer src="canje\.js"><\/script>/.test(ix), 'la sección 🔄 Plan canje está en "Registrar venta" del Stock');
+ok(/canjeEn\(\{ caja: 'sell-canje', stock: \(\) => STOCK,/.test(ap), 'compara con el stock de esa pantalla, y lo que falta pagar descuenta la seña si estaba reservado');
+ok(/monto: canje \? canjeSaldo\(aCobrar, canje\.valor\) : aCobrar,/.test(ap) && /movData\.montoCanje  = canje\.valor;/.test(ap), 'a la caja entra solo la diferencia');
+ok(/stockUpdate\.permutaValor = canje\.valor;/.test(ap), 'el comprobante lo imprime');
+ok(/await canjeGuardarEquipo\(canje, \{ nombre: cliNombre/.test(ap) && ap.indexOf('await canjeGuardarEquipo') > ap.indexOf('await batch.commit();'), 'el usado se carga después de guardar la venta');
+ok(/canjeValidar\(canje, aPagar, \{ nombre: cliNombre, dni: cliDni \}\)/.test(ap), 'exige nombre y DNI igual que en la caja');
+ok(/Vender equipo · 🔄 canje/.test(leer('caja.html')) && /if \(typeof canjeEn === 'function'\) canjeEn\(\);/.test(leer('caja.js')), 'en la caja, el botón ＋ dice "Vender equipo · 🔄 canje" (antes decía "Comprobante" y no se encontraba)');
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

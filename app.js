@@ -2073,6 +2073,13 @@ function openSellModal(id) {
     if (el) el.value = '';
   });
   document.getElementById('sell-cli-hint')?.classList.add('hidden');
+  // 🔄 Plan canje (canje.js): lo que queda por pagar es el precio menos la
+  // seña si estaba reservado, y se compara con el stock de esta pantalla
+  if (typeof canjeEn === 'function') {
+    const p = STOCK.find(x => x.id === id);
+    canjeEn({ caja: 'sell-canje', stock: () => STOCK,
+      total: () => Math.max(0, (Number(p?.precio) || 0) - (Number(p?.reservaSena) || 0)) });
+  }
   document.getElementById('sell-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
@@ -2096,6 +2103,18 @@ async function confirmSell() {
   const cliTel     = (document.getElementById('sell-cli-tel')    || {}).value?.trim() || '';
 
   const ahora = new Date().toISOString();
+
+  // 🔄 Plan canje: el celular que deja en parte de pago. A la caja entra solo
+  // la diferencia; el usado entra al stock (o a "para arreglar").
+  const canje = (typeof canjeLeer === 'function') ? canjeLeer() : null;
+  const aPagar = Math.max(0, (Number(p?.precio) || 0) - (Number(p?.reservaSena) || 0));
+  if (canje) {
+    const err = canjeValidar(canje, aPagar, { nombre: cliNombre, dni: cliDni });
+    if (err) { toast(err, 'error'); return; }
+    if (canje.imei && typeof imeiConfirmar === 'function' && !imeiConfirmar(canje.imei, 'IMEI del equipo que deja')) return;
+    if (!canje.imeiOk && !confirm('🔄 No marcaste que consultaste el IMEI del equipo que deja.\n\nSi resulta robado, el problema es del local. ¿Seguir igual?')) return;
+  }
+
   const confirmBtn = document.getElementById('sell-confirm');
   if (confirmBtn) confirmBtn.disabled = true;
 
@@ -2123,6 +2142,12 @@ async function confirmSell() {
     // Un equipo vendido ya no está reservado. Se apaga la bandera pero se
     // deja `reservaSena` y compañía: es el registro de que hubo seña.
     if (p?.reservado) stockUpdate.reservado = false;
+    // 🔄 El comprobante (print.js) ya sabe imprimir la permuta
+    if (canje) {
+      stockUpdate.permuta = [canjeNombre(canje), canje.imei ? 'IMEI ' + canje.imei : ''].filter(Boolean).join(' · ');
+      stockUpdate.permutaValor = canje.valor;
+      stockUpdate.saldoAbonado = canjeSaldo(aPagar, canje.valor);
+    }
     batch.update(db.collection('stock').doc(id), stockUpdate);
 
     // ── Registrar en caja (si toggle activo y tiene precio) ──
@@ -2135,7 +2160,8 @@ async function confirmSell() {
     if (regCaja && aCobrar > 0) {
       const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' ');
       const desc  = `Venta: ${p.marca} ${p.modelo}${specs ? ' ' + specs : ''}`
-                  + (yaEntregado > 0 ? ` (saldo · ya había dejado $${yaEntregado.toLocaleString('es-AR')})` : '');
+                  + (yaEntregado > 0 ? ` (saldo · ya había dejado $${yaEntregado.toLocaleString('es-AR')})` : '')
+                  + (canje ? ` · canje: ${canjeNombre(canje)} ($${canje.valor.toLocaleString('es-AR')})` : '');
       const movRef = db.collection('caja_movimientos').doc();
       movRefId = movRef.id;
       // Snapshot del costo para reportar margen real
@@ -2143,7 +2169,8 @@ async function confirmSell() {
         tipo: 'ingreso',
         categoria: 'Venta',
         descripcion: desc,
-        monto: aCobrar,
+        // Con canje entra solo la diferencia (lo que se le tomó no es plata)
+        monto: canje ? canjeSaldo(aCobrar, canje.valor) : aCobrar,
         metodoPago: formaPago,
         fecha: todayAR(),
         createdAt: ahora,
@@ -2161,6 +2188,13 @@ async function confirmSell() {
         movData.gananciaARS = p.precio - p.costo;
       }
       if (yaEntregado > 0) movData.senaPrevia = yaEntregado;
+      // La ganancia de arriba es la del equipo a su precio entero: el usado
+      // que entra queda como mercadería, con su costo en el stock
+      if (canje) {
+        movData.montoEquipo = p.precio;
+        movData.montoCanje  = canje.valor;
+        movData.canje = { equipo: canjeNombre(canje), imei: canje.imei || '', valor: canje.valor, destino: canje.destino };
+      }
       if (typeof tarjetaAplicar === 'function') tarjetaAplicar(movData);   // 💳 lo que se queda Getnet
       batch.set(movRef, movData);
     }
@@ -2188,9 +2222,22 @@ async function confirmSell() {
         .catch(e => console.warn('upsertCliente (venta stock):', e));
     }
 
+    // 🔄 El usado que dejó: al stock o a "para arreglar". Después de la venta,
+    // así si falla la venta no se pierde (se carga a mano)
+    let canjeDonde = '';
+    if (canje) {
+      try {
+        const r = await canjeGuardarEquipo(canje, { nombre: cliNombre, dni: cliDni, tel: cliTel }, `${p.marca || ''} ${p.modelo || ''}`.trim());
+        canjeDonde = r.donde === 'arreglo' ? ' · 🔧 el usado quedó en "Para arreglar"' : ' · 📱 el usado entró al stock';
+      } catch (e) {
+        console.error('canje → stock:', e);
+        toast('Venta registrada, pero no pude cargar el equipo del canje: cargalo a mano', 'error');
+      }
+    }
+
     closeSellModal();
     closeDetail();
-    toast(regCaja ? 'Venta registrada en caja ✅' : 'Venta registrada ✅', 'success');
+    toast((regCaja ? 'Venta registrada en caja ✅' : 'Venta registrada ✅') + canjeDonde, 'success');
     // 🧾 Ofrecer comprobante de venta (con garantía) para el cliente
     if (typeof printVentaTicket === 'function') {
       setTimeout(() => {
@@ -2209,6 +2256,7 @@ async function confirmSell() {
       ];
       if (p.costo > 0) lineas.push(`Costo ${tgMonto(p.costo)} · 📈 <b>Ganancia ${tgMonto((p.precio || 0) - p.costo)}</b>`);
       if (p.imei) lineas.push(`🔑 IMEI: ${esc(p.imei)}`);
+      if (canje) lineas.push(`🔄 Canje: ${esc(canjeNombre(canje))} tomado en ${tgMonto(canje.valor)} · pagó ${tgMonto(canjeSaldo(aPagar, canje.valor))}`);
       if (p.garantiaMeses > 0) lineas.push(`🛡️ Garantía ${p.garantiaMeses} meses`);
       lineas.push(`💳 ${esc(formaPago || '—')}${regCaja ? '' : ' ⚠️ (sin registrar en caja)'} · 👤 ${esc(vendedor || '—')} · 🕐 ${tgHora()}`);
       tgNotify(lineas.join('\n'));

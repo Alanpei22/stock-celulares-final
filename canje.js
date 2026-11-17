@@ -23,6 +23,23 @@ try { const c = JSON.parse(localStorage.getItem('tpCanjeCfg') || 'null'); if (c 
 let _canjeOn = false;
 let _canjeCfgLeida = false;
 
+// Dónde está el formulario: en la venta de equipo de la caja o en "Registrar
+// venta" del Stock (index.html). Cada pantalla dice de dónde sale el total y
+// con qué stock se compara. Arranca en la de la caja.
+const _CJ_CAJA = {
+  caja: 've-canje',
+  total: () => (parseInt(String(document.getElementById('ve-precio')?.value || '').replace(/\D/g, ''), 10) || 0)
+             + ((typeof vaTotal === 'function') ? vaTotal() : 0),
+  stock: () => (typeof CAJA_STOCK !== 'undefined' ? CAJA_STOCK : []),
+};
+let _cjCtx = _CJ_CAJA;
+
+// La pantalla de venta del Stock la usa así: canjeEn({ caja, total, stock })
+function canjeEn(ctx) {
+  _cjCtx = Object.assign({}, _CJ_CAJA, ctx || {});
+  canjeReset();
+}
+
 const _cjNorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
 const _cjCap = s => String(s || '').replace(/\D/g, '');
 
@@ -138,7 +155,7 @@ function canjeLeer() {
 
 function canjeReset() {
   _canjeOn = false;
-  const box = document.getElementById('ve-canje');
+  const box = document.getElementById(_cjCtx.caja);
   if (box) box.innerHTML = _canjeBotonHtml();
 }
 
@@ -150,7 +167,7 @@ function canjeActivar() {
   _canjeOn = true;
   _canjeEstilos();
   _canjeLeerCfg();
-  const box = document.getElementById('ve-canje');
+  const box = document.getElementById(_cjCtx.caja);
   if (!box) return;
   box.innerHTML = `
     <div class="cj-box">
@@ -203,7 +220,7 @@ function canjeRecalcular() {
   const el = document.getElementById('cj-sug');
   if (!c || !el) return;
   const dolar = (typeof getCurrentDolar === 'function' ? getCurrentDolar() : 0) || 0;
-  const s = canjeSugerido(c, typeof CAJA_STOCK !== 'undefined' ? CAJA_STOCK : [], CANJE_CFG, dolar);
+  const s = canjeSugerido(c, _cjCtx.stock(), CANJE_CFG, dolar);
   _canjeUltSug = s;
   const f = n => (typeof fmt === 'function' ? fmt(n) : '$' + Math.round(n).toLocaleString('es-AR'));
   if (!c.modelo) el.innerHTML = '';
@@ -222,9 +239,7 @@ function canjeUsarSugerido() {
 // Total − canje = lo que paga
 function _canjeTotales() {
   const el = document.getElementById('cj-tot');
-  const precio = parseInt(_cjV('ve-precio').replace(/\D/g, ''), 10) || 0;
-  const art = (typeof vaTotal === 'function') ? vaTotal() : 0;
-  const total = precio + art;
+  const total = _cjCtx.total();
   const c = canjeLeer();
   if (!el || !c) return;
   const f = n => (typeof fmt === 'function' ? fmt(n) : '$' + Math.round(n).toLocaleString('es-AR'));
@@ -275,7 +290,7 @@ async function canjeGuardarEquipo(c, cliente, ventaNombre) {
     return { donde: 'arreglo', id };
   }
   const dolar = (typeof getCurrentDolar === 'function' ? getCurrentDolar() : 0) || 0;
-  const s = canjeSugerido(c, typeof CAJA_STOCK !== 'undefined' ? CAJA_STOCK : [], CANJE_CFG, dolar);
+  const s = canjeSugerido(c, _cjCtx.stock(), CANJE_CFG, dolar);
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const doc = { id, ...canjeDocStock(c, cliente, ventaNombre, ahora, s ? s.ref : 0),
                 _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null };

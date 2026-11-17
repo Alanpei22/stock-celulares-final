@@ -2063,7 +2063,7 @@ function openVentaEqModal(id) {
   // (venta-articulos.js). Van en la misma venta y en el mismo comprobante.
   if (typeof vaMontar === 'function') vaMontar('ve-articulos');
   // 🔄 Plan canje (canje.js): arranca cerrado, con el botón para agregarlo
-  if (typeof canjeReset === 'function') canjeReset();
+  if (typeof canjeEn === 'function') canjeEn();
 
   document.getElementById('ventaeq-overlay')?.classList.remove('hidden');
   document.getElementById('ventaeq-modal')?.classList.remove('hidden');
