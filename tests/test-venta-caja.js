@@ -250,6 +250,10 @@ setTimeout(() => {
     ok(/− \$120\.000/.test(largo), 'el valor tomado se descuenta');
     ok(/SALDO ABONADO[\s\S]{0,60}400\.000/.test(largo), 'el saldo abonado');
     ok(/legítimo titular/.test(largo), 'con permuta aparece la cláusula de procedencia lícita');
+    // Alan (18/11): qué pasa si después le dan de baja el usado
+    ok(/bloqueado o dado de baja/.test(largo) && /dentro de las 72 horas/.test(largo) && /ni deuda, financiación o bloqueo/.test(largo),
+       'y qué pasa si después le dan de baja el IMEI: desbloquearlo o devolver lo tomado en 72 h');
+    ok(/devolver el valor tomado \(\$\s?120\.000\)/.test(largo) && /iPhone 8 · IMEI 111/.test(largo), 'con el monto y el IMEI del usado escritos en la cláusula', largo.slice(largo.indexOf('5. Equipo'), largo.indexOf('5. Equipo') + 700));
     ok(/6\. Conformidad/.test(largo), 'y las condiciones se renumeran', (largo.match(/\d\. Conformidad/) || [])[0]);
     ok(/Pérez, Juan/.test(largo) && /38412907/.test(largo), 'datos del comprador');
     ok(/GARANTÍA 6 MESES/.test(largo), 'garantía');

@@ -1026,6 +1026,10 @@ function _ventaA5Body(d, label) {
 
   const accs    = _prLista(p.accesorios);
   const pruebas = _prLista(p.pruebas);
+  // Permuta: con canje, la cláusula 5 dice además qué pasa si después le dan
+  // de baja el IMEI al usado (Alan, 18/11): desbloquearlo o devolver lo que
+  // se le tomó en 72 h. Es el caso típico: deja el celu y a los días lo
+  // denuncia o lo bloquea la compañía por cuotas impagas.
   // Permuta: el equipo que se toma en parte de pago. Va en la tabla de
   // totales para que se lea de dónde sale el número final.
   const permutaVal = Number(p.permutaValor) || 0;
@@ -1102,7 +1106,7 @@ function _ventaA5Body(d, label) {
       <p><b>2. Garantía.</b> Cuando corresponda, cubre fallas de funcionamiento no provocadas por el uso, conforme la Ley 24.240 de Defensa del Consumidor. Se hace válida únicamente presentando este comprobante.</p>
       <p><b>3. Exclusiones.</b> No cubre golpes, caídas, contacto con líquidos o humedad, sobretensión del cargador, fallas de software o configuración, ni equipos abiertos o intervenidos por terceros.</p>
       <p><b>4. Datos y cuentas.</b> El equipo se entrega sin cuentas vinculadas y con los datos borrados. El respaldo de la información posterior a la compra queda a cargo del comprador.</p>
-      ${p.permuta ? `<p><b>5. Equipo entregado en parte de pago.</b> El comprador declara ser el legítimo titular del equipo que entrega en permuta, que su procedencia es lícita y que no registra denuncia de robo o extravío, haciéndose responsable por cualquier reclamo de terceros sobre el mismo.</p>` : ''}
+      ${p.permuta ? `<p><b>5. Equipo entregado en parte de pago.</b> El comprador declara ser el legítimo titular del equipo que entrega en permuta${p.permuta ? ` (${_pr(p.permuta)})` : ''}, que su procedencia es lícita, que no registra denuncia de robo, hurto o extravío, ni deuda, financiación o bloqueo con ninguna compañía, y se compromete a no denunciarlo ni pedir su bloqueo. Si su IMEI fuera bloqueado o dado de baja por causas atribuibles al comprador o a terceros vinculados a él, deberá gestionar el desbloqueo o devolver el valor tomado${permutaVal > 0 ? ` (${_prMoney(permutaVal)})` : ''} dentro de las 72 horas de ser notificado, quedando el vendedor facultado a iniciar las acciones civiles y penales que correspondan y a entregar a las autoridades los datos e imágenes registrados en esta operación. Se hace responsable por cualquier reclamo de terceros sobre el equipo.</p>` : ''}
       <p><b>${p.permuta ? '6' : '5'}. Conformidad.</b> La firma del presente implica la aceptación del estado del equipo y de estas condiciones.</p>
     </div>
   </div>
