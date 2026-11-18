@@ -2035,6 +2035,8 @@ function _veToggleMas() {
 // blanco, para vender un equipo que no está cargado.
 function openVentaEqModal(id) {
   const p = id ? (CAJA_STOCK || []).find(x => x.id === id) : null;
+  // Un usado de canje: espera, IMEI consultado y bloqueado (canje.js)
+  if (p && typeof canjeAntesDeVender === 'function' && !canjeAntesDeVender(p)) return;
   _veStockId = p ? p.id : null;
 
   _veChkHtml('ve-accesorios', VE_ACCESORIOS);

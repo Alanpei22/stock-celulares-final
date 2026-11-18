@@ -1504,6 +1504,7 @@ function render() {
             ${p.reservado && !p.vendido ? '<span class="badge bg-reservado">⏳ RESERVADO</span>' : ''}
             ${p.garantiaMeses > 0 && !p.vendido ? `<span class="badge bg-garantia">🛡️ ${p.garantiaMeses}m</span>` : ''}
             ${p.publicar && !p.vendido ? '<span class="badge bg-publicado" title="Se ve en la página de equipos">🌐 En la página</span>' : ''}
+            ${typeof canjeBadgeHtml === 'function' ? canjeBadgeHtml(p) : ''}
           </div>
         </div>
         <div class="card-bottom">
@@ -1786,11 +1787,7 @@ function openDetail(id) {
       </div>
     ` : ''}
     ${p.notas ? `<div class="det-row det-row--full"><span class="det-label">Notas</span><span class="det-val">${esc(p.notas)}</span></div>` : ''}
-    ${p.origen === 'canje' && p.canje ? `<div class="det-row det-row--full" style="background:rgba(200,150,90,.1);padding:10px 12px;border-radius:10px;border:1px solid rgba(200,150,90,.35)">
-        <span class="det-label">🔄 Entró por plan canje</span>
-        <span class="det-val">${esc(p.canje.cliente || '')}${p.canje.dni ? ' · DNI ' + esc(p.canje.dni) : ''}${p.canje.tel ? ' · ' + esc(p.canje.tel) : ''}${p.canje.fecha ? ' · ' + fmtDate(p.canje.fecha) : ''}
-        ${p.canje.fotos ? `<br><button type="button" class="btn-ai" style="margin-top:6px" onclick="canjeVerFotos('${p.id}')">📸 Ver fotos del canje (DNI y equipo)</button>` : ''}</span>
-      </div>` : ''}
+    ${typeof canjeFichaHtml === 'function' ? canjeFichaHtml(p) : ''}
     ${(p.fotos && p.fotos.length) || !p.vendido ? `<div class="det-row det-row--full"><span class="det-label">📷 Fotos</span></div>${typeof buildPhotoGalleryHTML === 'function' ? buildPhotoGalleryHTML(p) : ''}` : ''}
     ${!p.vendido && p.precio ? buildPriceTable(p.precio) : ''}
     ${p.vendido ? '<div class="det-sold-badge">VENDIDO</div>' : ''}
@@ -1992,7 +1989,12 @@ function copyInfo(id) {
 }
 
 // ── Acciones ──────────────────────────────────────────────
-function markSold(id) { openSellModal(id); }
+// Un usado de canje se frena antes de venderlo: espera, IMEI y bloqueado (canje.js)
+function markSold(id) {
+  const p = STOCK.find(x => x.id === id);
+  if (p && typeof canjeAntesDeVender === 'function' && !canjeAntesDeVender(p)) return;
+  openSellModal(id);
+}
 
 async function markUnsold(id) {
   const p = STOCK.find(x => x.id === id);

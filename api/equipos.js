@@ -92,7 +92,7 @@ function capacidad(s) {
 
 // Un doc de `stock` → la ficha que ve el cliente, o null si no va.
 export function equipoPublico(p, ahora = Date.now()) {
-  if (!p || p.publicar !== true || p.eliminado) return null;
+  if (!p || p.publicar !== true || p.eliminado || p.bloqueado) return null;   // 🚫 canje dado de baja: no se publica
   let estado = 'disponible';
   if (p.vendido) {
     const t = Date.parse(p.fecha_venta || '');

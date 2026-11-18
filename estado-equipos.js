@@ -53,7 +53,7 @@ function eeDesdeStock(p) {
 function eeParaEstados(stock) {
   const grupos = new Map();
   for (const p of (stock || [])) {
-    if (!p || !p.publicar || p.vendido || p.reservado || p.eliminado) continue;
+    if (!p || !p.publicar || p.vendido || p.reservado || p.eliminado || p.bloqueado) continue;   // 🚫 canje dado de baja
     const e = eeDesdeStock(p);
     const k = [e.marca, e.modelo, e.capacidad, e.condicion, e.precio, e.moneda, e.garantiaMeses, e.bateria].map(_eeNorm).join('|');
     const g = grupos.get(k);

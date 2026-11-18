@@ -22,7 +22,7 @@ function lpEquipos(stock, opciones) {
   const soloPub = !!(opciones && opciones.soloPublicados);
   const grupos = new Map();
   for (const p of (stock || [])) {
-    if (!p || p.vendido || p.reservado || p.eliminado) continue;
+    if (!p || p.vendido || p.reservado || p.eliminado || p.bloqueado) continue;   // 🚫 canje dado de baja
     if (soloPub && !p.publicar) continue;
     if (!p.marca && !p.modelo) continue;
     const e = eeDesdeStock(p);

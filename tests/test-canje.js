@@ -92,7 +92,43 @@ ok(/collection\('canje_fotos'\)\.doc\(id\)\.set\(doc\)/.test(cj7) && !/stock-pho
 ok(/canjeAchicarFoto\(file, 1000, 0\.7\)/.test(cj7), 'achicadas, para que las tres entren en un documento');
 ok(cj7.indexOf("await _canjeGuardarFotos(c, cliente, id, 'stock', ahora)") < cj7.indexOf("await db.collection('stock').doc(id).set(doc)"), 'se guardan antes que el equipo (que queda marcado con cuántas tiene)');
 ok(/fotos: Object\.assign\(\{\}, _cjFotos\)/.test(cj7) && /_cjFotos = \{\};/.test(cj7), 'viajan con el resto del canje y se borran al empezar otra venta');
-ok(/onclick="canjeVerFotos\('\$\{p\.id\}'\)"/.test(leer('app.js')) && /🔄 Entró por plan canje/.test(leer('app.js')), 'en la ficha del equipo: de quién vino (DNI, teléfono) y botón para ver las fotos');
+ok(/canjeVerFotos\('\$\{p\.id\}'\)/.test(leer('canje.js')) && /🔄 Entró por plan canje/.test(leer('canje.js')) && /canjeFichaHtml\(p\)/.test(leer('app.js')), 'en la ficha del equipo: de quién vino (DNI, teléfono) y botón para ver las fotos');
+
+console.log('\n8) Espera y "lo dieron de baja"');
+// Alan (18/11): "dale, dejalo todo armado". La trampa: deja el celu, cobra
+// la diferencia y a los días lo denuncia o lo bloquea la compañía.
+const T0 = Date.parse('2026-11-18T12:00:00Z');
+run('CANJE_CFG.diasEspera = 10');
+const nuevo = run(`canjeDocStock({ marca: 'Apple', modelo: 'iPhone 11', valor: 300000, imei: '356789012345678' }, { nombre: 'Juan Pérez', dni: '30123456', tel: '1155556666' }, 'Apple iPhone 13', '2026-11-18T12:00:00Z', 500000)`);
+ok(nuevo.canje.esperaHasta === '2026-11-28T12:00:00.000Z' && nuevo.canje.imei === '356789012345678', 'entra con 10 días de espera (y el IMEI anotado en el canje)', nuevo.canje);
+ctx.P = Object.assign({ id: 'u1' }, nuevo);
+let e = run(`canjeEstado(P, ${T0 + 3 * 864e5})`);
+ok(e.tipo === 'espera' && e.dias === 7, 'a los 3 días: en espera, faltan 7', e);
+ok(run(`canjeEstado(P, ${T0 + 11 * 864e5}).tipo`) === 'revisar', 'pasada la espera: se puede vender, pero antes hay que consultar el IMEI');
+ctx.P.canje.imeiRevisado = new Date(T0 + 11 * 864e5).toISOString();
+ok(run(`canjeEstado(P, ${T0 + 12 * 864e5}).tipo`) === 'ok' && run(`canjeEstado(P, ${T0 + 14 * 864e5}).tipo`) === 'revisar', 'consultado hace poco: listo; a los 2 días hay que consultarlo de nuevo');
+ctx.P.bloqueado = true;
+ok(run(`canjeEstado(P, ${T0}).tipo`) === 'bloqueado', 'bloqueado manda sobre todo');
+ok(run(`canjeEstado({ marca: 'X' })`) === null, 'uno que no vino por canje: nada');
+// Antes de vender
+ctx.alert = () => {}; let preguntas = [];
+ctx.confirm = m => { preguntas.push(m); return true; };
+ctx.db = { collection: () => ({ doc: () => ({ update: async () => {} }) }) };
+ok(run(`canjeAntesDeVender(P, ${T0})`) === false, 'bloqueado: no se puede vender');
+ctx.P.bloqueado = false; delete ctx.P.canje.imeiRevisado;
+preguntas = [];
+ok(run(`canjeAntesDeVender(P, ${T0 + 3 * 864e5})`) === true && preguntas.length === 2 && /en espera hasta el/.test(preguntas[0]) && /volvé a consultar el IMEI 356789012345678/.test(preguntas[1]), 'en espera: avisa, y pide confirmar que se consultó el IMEI', preguntas);
+ctx.confirm = () => false;
+ok(run(`canjeAntesDeVender(P, ${T0 + 11 * 864e5})`) === false, 'si no lo consultó, no sigue');
+// El reclamo
+const msg = run(`canjeReclamoTexto(P, 'TechPoint')`);
+ok(/Hola Juan/.test(msg) && /IMEI 356789012345678/.test(msg) && /72 horas/.test(msg) && /\$300\.000/.test(msg), 'el WhatsApp de reclamo: equipo, IMEI, las 72 h del comprobante y el monto', msg);
+// Enganchado
+const ap8 = leer('app.js');
+ok(/function markSold\(id\) \{[\s\S]{0,200}canjeAntesDeVender\(p\)/.test(ap8) && /canjeAntesDeVender\(p\)\) return;/.test(leer('caja.js')), 'se frena antes de vender, desde el Stock y desde la caja');
+ok(/canjeFichaHtml\(p\)/.test(ap8) && /canjeBadgeHtml\(p\)/.test(ap8), 'en la ficha (estado y botones) y en la tarjeta de la lista (⏳ / 🚫)');
+ok(/p\.bloqueado\) continue;/.test(leer('lista-precios.js')) && /p\.bloqueado\) continue;/.test(leer('estado-equipos.js')) && /p\.eliminado \|\| p\.bloqueado\) return null;/.test(leer('api/equipos.js')), 'un bloqueado no sale en la lista de precios, los estados ni la página');
+ok(/bloqueado: true, bloqueadoFecha: ahora, publicar: false/.test(leer('canje.js')), 'marcarlo bloqueado lo saca de la página');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

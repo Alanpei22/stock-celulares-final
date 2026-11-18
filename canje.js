@@ -17,9 +17,17 @@
 //   · el comprobante lo dice (permuta, valor tomado y lo que abonó).
 
 const CANJE_MARGEN_DEF = 35;   // % que se le descuenta al precio de venta de uno igual
+// Días que un usado de canje espera antes de venderse. Alan (18/11): la
+// trampa típica es dejar el celu, cobrar la diferencia y a los días
+// denunciarlo (o lo bloquea la compañía por cuotas). El IMEI está limpio
+// el día del canje y se "ensucia" después.
+const CANJE_ESPERA_DEF = 10;
+// Antes de vender un usado de canje, el IMEI se vuelve a consultar: vale
+// por este tiempo (si lo consultaste ayer, no pregunta de nuevo hoy)
+const CANJE_REVISION_MS = 2 * 864e5;
 
-let CANJE_CFG = { margen: CANJE_MARGEN_DEF };
-try { const c = JSON.parse(localStorage.getItem('tpCanjeCfg') || 'null'); if (c && c.margen >= 0) CANJE_CFG = c; } catch {}
+let CANJE_CFG = { margen: CANJE_MARGEN_DEF, diasEspera: CANJE_ESPERA_DEF };
+try { const c = JSON.parse(localStorage.getItem('tpCanjeCfg') || 'null'); if (c && c.margen >= 0) CANJE_CFG = Object.assign({ diasEspera: CANJE_ESPERA_DEF }, c); } catch {}
 let _canjeOn = false;
 let _canjeCfgLeida = false;
 
@@ -129,8 +137,15 @@ function canjeDocStock(c, cliente, venta, ahoraIso, precioSugerido) {
     costo: Number(c.valor) || 0,
     origen: 'canje',
     canje: { cliente: cliente.nombre || '', dni: cliente.dni || '', tel: cliente.tel || '',
-             valor: Number(c.valor) || 0, fecha: ahoraIso, venta: venta || '' },
+             valor: Number(c.valor) || 0, fecha: ahoraIso, venta: venta || '',
+             imei: c.imei || '' },
   };
+  // ⏳ La espera antes de venderlo
+  const dias = Number(CANJE_CFG.diasEspera ?? CANJE_ESPERA_DEF) || 0;
+  if (dias > 0) {
+    const t = Date.parse(ahoraIso);
+    if (!isNaN(t)) d.canje.esperaHasta = new Date(t + dias * 864e5).toISOString();
+  }
   if (c.bateria) d.bateria = Number(c.bateria);
   if (c.color) d.color = c.color;
   // Sin precio de referencia, que se note que falta ponérselo
@@ -148,6 +163,160 @@ function canjeDocArreglo(c, cliente, venta, ahoraIso) {
     costoCompra: Number(c.valor) || 0, costoArreglo: 0,
     estado: 'pendiente', activo: true, fecha: ahoraIso, origen: 'canje',
   };
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ⏳ Espera y 🚫 baja de los usados de canje
+// ══════════════════════════════════════════════════════════════
+// En qué anda un usado de canje: null si no vino por canje;
+// { tipo: 'bloqueado' } · { tipo: 'espera', hasta, dias } (todavía no se
+// vende) · { tipo: 'revisar' } (se puede vender, pero antes hay que volver a
+// consultar el IMEI) · { tipo: 'ok' } (IMEI consultado hace poco).
+function canjeEstado(p, ahora) {
+  if (!p || (p.origen !== 'canje' && !p.canje)) return null;
+  if (p.bloqueado) return { tipo: 'bloqueado' };
+  const t = typeof ahora === 'number' ? ahora : Date.now();
+  const hasta = p.canje && Date.parse(p.canje.esperaHasta || '');
+  if (hasta && hasta > t) return { tipo: 'espera', hasta: p.canje.esperaHasta, dias: Math.ceil((hasta - t) / 864e5) };
+  const rev = p.canje && Date.parse(p.canje.imeiRevisado || '');
+  if (rev && t - rev < CANJE_REVISION_MS) return { tipo: 'ok' };
+  return { tipo: 'revisar' };
+}
+
+const _cjFecha = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }); };
+
+// Antes de vender (desde el Stock o la caja). Devuelve false si no hay que
+// seguir. Es sincrónica: las preguntas son confirm() y lo que se anota se
+// guarda atrás.
+function canjeAntesDeVender(p, ahora) {
+  const e = canjeEstado(p, ahora);
+  if (!e || e.tipo === 'ok') return true;
+  const imei = (p.canje && p.canje.imei) || p.imei || '';
+  if (e.tipo === 'bloqueado') {
+    alert('🚫 Este equipo está marcado como BLOQUEADO / dado de baja.\n\nNo se puede vender así: reclamale al cliente que lo dejó (ficha del equipo) o marcalo como resuelto si ya lo desbloquearon.');
+    return false;
+  }
+  if (e.tipo === 'espera' && !confirm(`⏳ Este equipo entró por plan canje y está en espera hasta el ${_cjFecha(e.hasta)} (faltan ${e.dias} día${e.dias === 1 ? '' : 's'}).\n\nEs por si el cliente lo denuncia o se lo bloquea la compañía después.\n\n¿Venderlo igual?`)) return false;
+  if (!confirm(`🔎 Antes de vender un usado de canje, volvé a consultar el IMEI${imei ? ' ' + imei : ''} en ENACOM.\n\n¿Lo consultaste hoy y está limpio (sin denuncia ni bloqueo)?`)) return false;
+  canjeAnotarRevision(p.id);
+  return true;
+}
+
+// "Revisé el IMEI y está limpio"
+function canjeAnotarRevision(id, aviso) {
+  if (!id || typeof db === 'undefined' || !db) return;
+  const ahora = new Date().toISOString();
+  db.collection('stock').doc(id).update({ 'canje.imeiRevisado': ahora })
+    .then(() => { if (aviso) toast('✅ Anotado: IMEI consultado y limpio', 'success'); })
+    .catch(e => console.warn('canje revisión:', e));
+  const p = (typeof STOCK !== 'undefined' ? STOCK : []).find(x => x.id === id);
+  if (p && p.canje) p.canje.imeiRevisado = ahora;
+}
+
+// El botón de la ficha: anota y vuelve a dibujar la ficha (solo existe en el Stock)
+function canjeRevisadoDesdeFicha(id) {
+  canjeAnotarRevision(id, true);
+  if (typeof openDetail === 'function') setTimeout(() => openDetail(id), 300);
+}
+
+// El mensaje para reclamarle al cliente que lo dejó
+function canjeReclamoTexto(p, negocio) {
+  const c = p.canje || {};
+  const eq = [p.marca, p.modelo, p.almacenamiento].filter(Boolean).join(' ');
+  const imei = c.imei || p.imei || '';
+  const valor = Number(c.valor) || 0;
+  const fecha = c.fecha ? new Date(c.fecha).toLocaleDateString('es-AR') : '';
+  return `Hola ${String(c.cliente || '').split(/[ ,]/).filter(Boolean)[0] || ''}, te escribimos de ${negocio || 'TechPoint'}. `
+    + `El ${eq}${imei ? ' (IMEI ' + imei + ')' : ''} que dejaste en parte de pago${fecha ? ' el ' + fecha : ''} figura bloqueado / dado de baja. `
+    + `Según el comprobante que firmaste, tenés 72 horas para desbloquearlo o devolver el valor que se te tomó${valor ? ' ($' + valor.toLocaleString('es-AR') + ')' : ''}. `
+    + `Avisanos cómo lo resolvemos. Gracias.`;
+}
+
+function _cjTelWa(tlf) {
+  if (typeof _waPhone === 'function') return _waPhone(tlf);
+  let d = String(tlf || '').replace(/\D/g, '');
+  if (d.length === 10) d = '549' + d;
+  return d;
+}
+
+function canjeReclamar(id) {
+  const p = (typeof STOCK !== 'undefined' ? STOCK : []).find(x => x.id === id);
+  if (!p || !p.canje) return;
+  if (!p.canje.tel) { toast('No hay teléfono del cliente: buscalo con su DNI (' + (p.canje.dni || '—') + ')', 'error'); return; }
+  const url = 'https://wa.me/' + _cjTelWa(p.canje.tel) + '?text=' + encodeURIComponent(canjeReclamoTexto(p, (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint'));
+  if (typeof waAbrir === 'function') waAbrir(url); else window.open(url, '_blank');
+}
+
+// 🚫 "Lo dieron de baja": sale de la venta y de la página, queda anotado y
+// se ofrece reclamarle al cliente
+async function canjeMarcarBloqueado(id) {
+  const p = (typeof STOCK !== 'undefined' ? STOCK : []).find(x => x.id === id);
+  if (!p) return;
+  if (!confirm(`🚫 ¿Marcar ${[p.marca, p.modelo].filter(Boolean).join(' ')} como BLOQUEADO / dado de baja?\n\nSale de la venta y de la página de equipos hasta que lo marques como resuelto.`)) return;
+  const ahora = new Date().toISOString();
+  try {
+    await db.collection('stock').doc(id).update({ bloqueado: true, bloqueadoFecha: ahora, publicar: false });
+    if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc: p, cant: 0, motivo: 'ajuste', detalle: '🚫 IMEI bloqueado / dado de baja' });
+    if (typeof tgNotify === 'function') tgNotify(`🚫 <b>Equipo de canje bloqueado</b>\n${[p.marca, p.modelo, p.almacenamiento].filter(Boolean).join(' ')}${p.imei ? '\n🔑 ' + p.imei : ''}`
+      + (p.canje ? `\n👤 ${p.canje.cliente || ''}${p.canje.dni ? ' · DNI ' + p.canje.dni : ''}${p.canje.tel ? ' · ' + p.canje.tel : ''}\n💸 Se le tomó en $${(Number(p.canje.valor) || 0).toLocaleString('es-AR')}` : ''));
+    Object.assign(p, { bloqueado: true, bloqueadoFecha: ahora, publicar: false });
+    toast('🚫 Marcado como bloqueado', 'success');
+    if (typeof openDetail === 'function') openDetail(id);
+    if (p.canje && p.canje.tel && confirm('¿Le mandás ahora el reclamo por WhatsApp al cliente que lo dejó?\n\n(El mensaje ya está escrito: le recuerda las 72 horas del comprobante.)')) canjeReclamar(id);
+  } catch (e) { console.error('canje bloqueado:', e); toast('No se pudo guardar', 'error'); }
+}
+
+async function canjeDesbloqueado(id) {
+  const p = (typeof STOCK !== 'undefined' ? STOCK : []).find(x => x.id === id);
+  if (!p || !confirm('✅ ¿Ya lo desbloquearon? Vuelve a estar a la venta.')) return;
+  try {
+    await db.collection('stock').doc(id).update({ bloqueado: false, desbloqueadoFecha: new Date().toISOString() });
+    if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc: p, cant: 0, motivo: 'ajuste', detalle: '✅ IMEI desbloqueado' });
+    p.bloqueado = false;
+    toast('✅ De nuevo a la venta', 'success');
+    if (typeof openDetail === 'function') openDetail(id);
+  } catch (e) { console.error('canje desbloqueado:', e); toast('No se pudo guardar', 'error'); }
+}
+
+// Lo que se muestra en la ficha del equipo (Stock)
+function canjeFichaHtml(p) {
+  if (!p || p.origen !== 'canje' || !p.canje) return '';
+  const e = canjeEstado(p);
+  const c = p.canje;
+  const x = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  const b = (txt, fn, fondo) => `<button type="button" class="btn-ai" style="margin:6px 6px 0 0${fondo ? ';background:' + fondo + ';color:#fff;border-color:' + fondo : ''}" onclick="${fn}">${txt}</button>`;
+  const quien = `${x(c.cliente)}${c.dni ? ' · DNI ' + x(c.dni) : ''}${c.tel ? ' · ' + x(c.tel) : ''}${c.fecha ? ' · ' + _cjFecha(c.fecha) : ''}${c.valor ? ' · se tomó en $' + Number(c.valor).toLocaleString('es-AR') : ''}`;
+  let estado = '', botones = '';
+  if (!p.vendido && e) {
+    if (e.tipo === 'bloqueado') {
+      estado = `<div style="color:#dc2626;font-weight:800;margin-top:4px">🚫 BLOQUEADO / DADO DE BAJA${p.bloqueadoFecha ? ' desde el ' + _cjFecha(p.bloqueadoFecha) : ''}</div>`;
+      botones = b('📲 Reclamarle por WhatsApp', `canjeReclamar('${p.id}')`, '#16a34a') + b('✅ Ya lo desbloquearon', `canjeDesbloqueado('${p.id}')`);
+    } else {
+      estado = e.tipo === 'espera'
+        ? `<div style="color:#b45309;font-weight:700;margin-top:4px">⏳ En espera hasta el ${_cjFecha(e.hasta)} (faltan ${e.dias} día${e.dias === 1 ? '' : 's'}): no venderlo todavía</div>`
+        : e.tipo === 'ok' ? `<div style="color:#16a34a;font-weight:700;margin-top:4px">✅ IMEI consultado el ${_cjFecha(c.imeiRevisado)}: limpio</div>`
+        : `<div style="color:#b45309;font-weight:700;margin-top:4px">🔎 Antes de venderlo, volvé a consultar el IMEI</div>`;
+      botones = (e.tipo !== 'ok' ? b('✅ Consulté el IMEI: está limpio', `canjeRevisadoDesdeFicha('${p.id}')`) : '')
+              + b('🚫 Lo dieron de baja', `canjeMarcarBloqueado('${p.id}')`, '#dc2626');
+    }
+  }
+  const fotos = c.fotos ? b('📸 Ver fotos (DNI y equipo)', `canjeVerFotos('${p.id}')`) : '';
+  return `<div class="det-row det-row--full" style="display:block;background:rgba(200,150,90,.1);padding:10px 12px;border-radius:10px;border:1px solid rgba(200,150,90,.35)">
+      <div><b>🔄 Entró por plan canje</b></div>
+      <div style="font-size:13px;margin-top:2px">${quien}</div>
+      ${estado}
+      <div>${botones}${fotos}</div>
+    </div>`;
+}
+
+// El cartelito en la tarjeta de la lista del Stock
+function canjeBadgeHtml(p) {
+  if (!p || p.vendido) return '';
+  const e = canjeEstado(p);
+  if (!e) return '';
+  if (e.tipo === 'bloqueado') return '<span class="badge" style="background:#dc2626;color:#fff">🚫 BLOQUEADO</span>';
+  if (e.tipo === 'espera') return `<span class="badge" style="background:#f59e0b;color:#111" title="Entró por canje: esperar antes de venderlo">⏳ Canje · ${_cjFecha(e.hasta)}</span>`;
+  return '<span class="badge" style="background:rgba(200,150,90,.25)" title="Entró por plan canje">🔄 Canje</span>';
 }
 
 // ── Formulario (dentro de la venta de equipo de la caja) ─────────────
@@ -389,7 +558,8 @@ async function _canjeLeerCfg() {
   try {
     const d = await db.collection('config').doc('canje').get();
     if (d.exists && Number(d.data().margen) >= 0) {
-      CANJE_CFG = { margen: Number(d.data().margen) };
+      const de = Number(d.data().diasEspera);
+      CANJE_CFG = { margen: Number(d.data().margen), diasEspera: de >= 0 ? de : CANJE_ESPERA_DEF };
       try { localStorage.setItem('tpCanjeCfg', JSON.stringify(CANJE_CFG)); } catch {}
       canjeRecalcular();
     }
@@ -403,11 +573,16 @@ async function canjeConfigurar() {
   const n = parseFloat(String(r).replace(',', '.'));
   if (!(n >= 0 && n <= 90)) { toast('Poné un número entre 0 y 90', 'error'); return; }
   if (!_canjeDueno()) { toast('El margen lo define el dueño', 'error'); return; }
+  const rd = prompt('⏳ ¿Cuántos días espera un usado de canje antes de venderlo?\n\n'
+    + 'Por si el cliente lo denuncia o se lo bloquea la compañía después. 0 = sin espera.', String(CANJE_CFG.diasEspera ?? CANJE_ESPERA_DEF));
+  if (rd === null) return;
+  const dias = parseInt(rd, 10);
+  if (!(dias >= 0 && dias <= 60)) { toast('Poné un número de días entre 0 y 60', 'error'); return; }
   try {
-    await db.collection('config').doc('canje').set({ margen: n, actualizado: new Date().toISOString() });
-    CANJE_CFG = { margen: n };
+    await db.collection('config').doc('canje').set({ margen: n, diasEspera: dias, actualizado: new Date().toISOString() });
+    CANJE_CFG = { margen: n, diasEspera: dias };
     try { localStorage.setItem('tpCanjeCfg', JSON.stringify(CANJE_CFG)); } catch {}
-    toast(`🔄 Plan canje: se sugiere el precio de venta menos ${n}%`, 'success');
+    toast(`🔄 Plan canje: se sugiere el precio de venta menos ${n}% · espera ${dias} día${dias === 1 ? '' : 's'} antes de venderlo`, 'success');
     canjeRecalcular();
   } catch (e) { console.error('canje cfg:', e); toast('No se pudo guardar', 'error'); }
 }
