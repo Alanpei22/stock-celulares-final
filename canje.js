@@ -31,6 +31,7 @@ const _CJ_CAJA = {
   total: () => (parseInt(String(document.getElementById('ve-precio')?.value || '').replace(/\D/g, ''), 10) || 0)
              + ((typeof vaTotal === 'function') ? vaTotal() : 0),
   stock: () => (typeof CAJA_STOCK !== 'undefined' ? CAJA_STOCK : []),
+  cli: ['ve-cli-nombre', 've-cli-dni'],   // nombre y DNI del cliente en esta pantalla
 };
 let _cjCtx = _CJ_CAJA;
 
@@ -169,41 +170,59 @@ function canjeActivar() {
   _canjeLeerCfg();
   const box = document.getElementById(_cjCtx.caja);
   if (!box) return;
+  // Clases propias (cj-…): antes usaba las de la caja (precio-fg,
+  // ventaeq-g2) y en "Registrar venta" del Stock, que no las tiene, se veía
+  // todo desarmado.
   box.innerHTML = `
     <div class="cj-box">
-      <div class="cj-hd"><b>🔄 Plan canje · el equipo que deja</b>${_canjeDueno() ? `<button type="button" class="cj-cfg" onclick="canjeConfigurar()" title="Cuánto se le descuenta al precio de venta">⚙️ margen ${CANJE_CFG.margen}%</button>` : ''}<button type="button" class="cj-x" onclick="canjeReset();_canjeTotales()" title="Sacar el canje">✕</button></div>
-      <div class="ventaeq-g2">
-        <div class="precio-fg"><label>Marca</label><input id="cj-marca" class="precio-input" type="text" placeholder="Apple" autocomplete="off" oninput="canjeRecalcular()"></div>
-        <div class="precio-fg"><label>Modelo</label><input id="cj-modelo" class="precio-input" type="text" placeholder="iPhone 11" autocomplete="off" oninput="canjeRecalcular()"></div>
+      <div class="cj-hd">
+        <div><b>🔄 Plan canje</b><small>El equipo que deja en parte de pago</small></div>
+        ${_canjeDueno() ? `<button type="button" class="cj-cfg" onclick="canjeConfigurar()" title="Cuánto se le descuenta al precio de venta">⚙️ ${CANJE_CFG.margen}%</button>` : ''}
+        <button type="button" class="cj-x" onclick="canjeReset();_canjeTotales()" title="Sacar el canje">✕</button>
       </div>
-      <div class="ventaeq-g2">
-        <div class="precio-fg"><label>Capacidad</label><input id="cj-cap" class="precio-input" type="text" placeholder="128GB" autocomplete="off" oninput="canjeRecalcular()"></div>
-        <div class="precio-fg"><label>Batería (%)</label><input id="cj-bat" class="precio-input" type="number" inputmode="numeric" placeholder="86" oninput="canjeRecalcular()"></div>
-      </div>
-      <div class="ventaeq-g2">
-        <div class="precio-fg"><label>Estética</label>
-          <select id="cj-estetico" class="precio-input" onchange="canjeRecalcular()">
-            <option value="A">A · impecable</option><option value="B">B · marcas de uso</option><option value="C">C · bastante marcado</option>
+      <div class="cj-cli hidden" id="cj-cli"></div>
+      <div class="cj-fg"><label>IMEI <small>(marcá *#06# o escanealo)</small></label>
+        <div class="cj-fila"><input id="cj-imei" class="cj-in" type="text" inputmode="numeric" maxlength="15" placeholder="15 números" autocomplete="off" oninput="canjeRecalcular()">
+        <button type="button" class="cj-cam" onclick="canjeEscanearImei()" title="Escanear el IMEI">📷</button></div></div>
+      <div class="cj-g2">
+        <div class="cj-fg"><label>Marca</label><input id="cj-marca" class="cj-in" type="text" placeholder="iPhone" autocomplete="off" oninput="canjeRecalcular()"></div>
+        <div class="cj-fg"><label>Modelo</label><input id="cj-modelo" class="cj-in" type="text" placeholder="iPhone 11" autocomplete="off" oninput="canjeRecalcular()"></div>
+        <div class="cj-fg"><label>Capacidad</label><input id="cj-cap" class="cj-in" type="text" placeholder="128GB" autocomplete="off" oninput="canjeRecalcular()"></div>
+        <div class="cj-fg"><label>Batería %</label><input id="cj-bat" class="cj-in" type="number" inputmode="numeric" placeholder="86" oninput="canjeRecalcular()"></div>
+        <div class="cj-fg"><label>Estética</label>
+          <select id="cj-estetico" class="cj-in" onchange="canjeRecalcular()">
+            <option value="A">A · impecable</option><option value="B">B · marcas de uso</option><option value="C">C · muy marcado</option>
           </select></div>
-        <div class="precio-fg"><label>Color</label><input id="cj-color" class="precio-input" type="text" autocomplete="off"></div>
+        <div class="cj-fg"><label>Color</label><input id="cj-color" class="cj-in" type="text" placeholder="Negro" autocomplete="off"></div>
       </div>
-      <div class="precio-fg"><label>IMEI (marcá *#06#)</label><input id="cj-imei" class="precio-input" type="text" inputmode="numeric" autocomplete="off"></div>
       <div class="cj-sug" id="cj-sug"></div>
-      <div class="precio-fg"><label>Se le toma en *</label><input id="cj-valor" class="precio-input cj-valor" type="number" inputmode="numeric" placeholder="$" oninput="_canjeTotales()"></div>
-      <div>
-        <div class="precio-fg"><label>¿Adónde va?</label>
-          <select id="cj-destino" class="precio-input" onchange="_canjeDestino()">
-            <option value="stock">📱 Al stock, para vender</option>
-            <option value="arreglo">🔧 Necesita arreglo</option>
+      <div class="cj-fg"><label>Se le toma en *</label><input id="cj-valor" class="cj-in cj-valor" type="number" inputmode="numeric" placeholder="$ 0" oninput="_canjeTotales()"></div>
+      <div class="cj-g2">
+        <div class="cj-fg"><label>¿Adónde va?</label>
+          <select id="cj-destino" class="cj-in" onchange="_canjeDestino()">
+            <option value="stock">📱 Al stock</option>
+            <option value="arreglo">🔧 A arreglar</option>
           </select></div>
-        <div class="precio-fg hidden" id="cj-falla-wrap"><label>¿Qué necesita?</label><input id="cj-falla" class="precio-input" type="text" placeholder="Batería, módulo…" autocomplete="off"></div>
+        <div class="cj-fg hidden" id="cj-falla-wrap"><label>¿Qué necesita?</label><input id="cj-falla" class="cj-in" type="text" placeholder="Batería, módulo…" autocomplete="off"></div>
       </div>
-      <label class="cj-chk"><input type="checkbox" id="cj-chk-imei"> Consulté el IMEI en ENACOM: no tiene denuncia de robo ni extravío</label>
-      <label class="cj-chk"><input type="checkbox" id="cj-chk-cuentas"> Tiene iCloud / Google borrado y está restablecido</label>
+      <label class="cj-chk"><input type="checkbox" id="cj-chk-imei"> <span>Consulté el IMEI en ENACOM: no tiene denuncia</span></label>
+      <label class="cj-chk"><input type="checkbox" id="cj-chk-cuentas"> <span>iCloud / Google borrado y restablecido</span></label>
       <div class="cj-tot" id="cj-tot"></div>
     </div>`;
+  // Que el aviso de "falta el DNI" se vaya apenas lo escriben
+  (_cjCtx.cli || []).forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el._cjOye) { el.addEventListener('input', _canjeTotales); el._cjOye = true; }
+  });
   canjeRecalcular();
-  setTimeout(() => document.getElementById('cj-modelo')?.focus(), 50);
+  setTimeout(() => document.getElementById('cj-imei')?.focus(), 50);
+}
+
+// 📷 El IMEI del equipo que deja, con la cámara. El lector de siempre lo
+// valida y, por los primeros números, completa marca y modelo.
+function canjeEscanearImei() {
+  if (typeof escanearImei === 'function') escanearImei('cj-imei', { marca: 'cj-marca', modelo: 'cj-modelo' });
+  else toast('El lector no está disponible acá', 'error');
 }
 
 function _canjeDueno() {
@@ -244,6 +263,16 @@ function _canjeTotales() {
   if (!el || !c) return;
   const f = n => (typeof fmt === 'function' ? fmt(n) : '$' + Math.round(n).toLocaleString('es-AR'));
   if (!total) { el.innerHTML = '<small>Poné el precio del equipo que se lleva para ver la diferencia.</small>'; return; }
+  // Sin nombre y DNI no se puede confirmar: avisarlo acá y no al final
+  const cliEl = document.getElementById('cj-cli');
+  if (cliEl) {
+    const [nId, dId] = _cjCtx.cli || [];
+    const faltan = [];
+    if (nId && !String(document.getElementById(nId)?.value || '').trim()) faltan.push('nombre');
+    if (dId && !String(document.getElementById(dId)?.value || '').trim()) faltan.push('DNI');
+    cliEl.classList.toggle('hidden', !faltan.length);
+    cliEl.textContent = faltan.length ? `⚠️ Para el canje cargá ${faltan.join(' y ')} del cliente (arriba, en los datos del comprador)` : '';
+  }
   const pasa = c.valor > total;
   el.innerHTML = `
     <div><span>Se lleva</span><b>${f(total)}</b></div>
@@ -305,22 +334,40 @@ function _canjeEstilos() {
   s.id = 'cj-css';
   // Desde acá: el CSS se sirve del caché
   s.textContent = `
-  .cj-add { width: 100%; margin: 10px 0 4px; padding: 13px; border-radius: 12px; border: 2px dashed var(--accent, #C8965A);
-    background: transparent; color: inherit; font-size: 14px; cursor: pointer; text-align: left; }
-  .cj-box { margin: 10px 0; border: 2px solid var(--accent, #C8965A); border-radius: 14px; padding: 12px; background: rgba(200,150,90,.06); }
-  .cj-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .cj-cfg { margin-left: auto; margin-right: 6px; border: 1px solid rgba(128,128,128,.4); border-radius: 8px; background: transparent; color: inherit; font-size: 12px; padding: 4px 8px; cursor: pointer; }
-  .cj-x { border: 0; background: transparent; font-size: 18px; cursor: pointer; color: inherit; }
-  .cj-sug { font-size: 13.5px; margin: 4px 0 8px; line-height: 1.35; }
-  .cj-sug small { display: block; opacity: .75; }
+  .cj-add { width: 100%; margin: 12px 0 6px; padding: 14px; border-radius: 12px; border: 2px dashed var(--accent, #C8965A);
+    background: transparent; color: inherit; font-size: 14px; cursor: pointer; text-align: left; line-height: 1.3; }
+  .cj-box { margin: 12px 0; border: 2px solid var(--accent, #C8965A); border-radius: 14px; padding: 14px; background: rgba(200,150,90,.06); }
+  .cj-hd { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .cj-hd > div { flex: 1; min-width: 0; }
+  .cj-hd b { display: block; font-size: 16px; }
+  .cj-hd small { display: block; font-size: 12px; opacity: .7; }
+  .cj-cfg { border: 1px solid rgba(128,128,128,.4); border-radius: 8px; background: transparent; color: inherit; font-size: 12px; padding: 5px 8px; cursor: pointer; white-space: nowrap; }
+  .cj-x { border: 0; background: transparent; font-size: 18px; cursor: pointer; color: inherit; padding: 4px 6px; }
+  .cj-cli { background: rgba(239,68,68,.12); color: #ef4444; border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .cj-g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+  .cj-fg { margin-bottom: 10px; min-width: 0; }
+  .cj-fg label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; opacity: .7; margin-bottom: 4px; }
+  .cj-fg label small { text-transform: none; font-weight: 500; letter-spacing: 0; }
+  .cj-in { width: 100%; box-sizing: border-box; padding: 11px 12px; border: 1.5px solid var(--border, rgba(128,128,128,.35)); border-radius: 10px;
+    background: var(--card, #fff); color: var(--text, inherit); font-size: 15px; font-family: inherit; outline: none; -webkit-appearance: none; appearance: none; }
+  .cj-in:focus { border-color: var(--accent, #C8965A); }
+  select.cj-in { background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 28px; }
+  .cj-fila { display: flex; gap: 8px; }
+  .cj-fila .cj-in { flex: 1; }
+  .cj-cam { flex: 0 0 auto; width: 48px; border-radius: 10px; border: 1.5px solid var(--accent, #C8965A); background: transparent; font-size: 20px; cursor: pointer; }
+  .cj-sug { font-size: 13.5px; margin: 2px 0 10px; line-height: 1.35; }
+  .cj-sug:empty { display: none; }
+  .cj-sug small { display: block; opacity: .75; margin-top: 2px; }
   .cj-sug-no { opacity: .75; }
-  .cj-usar { margin-top: 4px; border: 0; border-radius: 8px; padding: 6px 12px; background: var(--accent, #C8965A); color: #111; font-weight: 700; cursor: pointer; }
-  .cj-valor { font-size: 18px !important; font-weight: 800; }
-  .cj-chk { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; margin: 6px 0; cursor: pointer; }
-  .cj-chk input { margin-top: 2px; }
-  .cj-tot { margin-top: 8px; border-top: 1px dashed rgba(128,128,128,.4); padding-top: 8px; font-size: 14px; }
-  .cj-tot div { display: flex; justify-content: space-between; padding: 2px 0; }
-  .cj-paga { font-size: 17px; font-weight: 800; color: #10b981; }
-  .cj-mal { color: #ef4444; font-size: 14px; }`;
+  .cj-usar { margin-top: 6px; border: 0; border-radius: 8px; padding: 7px 14px; background: var(--accent, #C8965A); color: #111; font-weight: 700; cursor: pointer; }
+  .cj-valor { font-size: 20px; font-weight: 800; }
+  .cj-chk { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; margin: 6px 0; cursor: pointer; line-height: 1.3; }
+  .cj-chk input { margin-top: 2px; flex: 0 0 auto; }
+  .cj-tot { margin-top: 10px; border-top: 1px dashed rgba(128,128,128,.4); padding-top: 10px; font-size: 14px; }
+  .cj-tot div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+  .cj-paga { font-size: 18px; font-weight: 800; color: #10b981; }
+  .cj-mal { color: #ef4444; font-size: 14px; }
+  .cj-box .hidden { display: none !important; }`;
   document.head.appendChild(s);
 }

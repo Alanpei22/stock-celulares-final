@@ -2077,7 +2077,7 @@ function openSellModal(id) {
   // seña si estaba reservado, y se compara con el stock de esta pantalla
   if (typeof canjeEn === 'function') {
     const p = STOCK.find(x => x.id === id);
-    canjeEn({ caja: 'sell-canje', stock: () => STOCK,
+    canjeEn({ caja: 'sell-canje', stock: () => STOCK, cli: ['sell-cli-nombre', 'sell-cli-dni'],
       total: () => Math.max(0, (Number(p?.precio) || 0) - (Number(p?.reservaSena) || 0)) });
   }
   document.getElementById('sell-modal').classList.remove('hidden');

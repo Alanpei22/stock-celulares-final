@@ -75,5 +75,12 @@ ok(/await canjeGuardarEquipo\(canje, \{ nombre: cliNombre/.test(ap) && ap.indexO
 ok(/canjeValidar\(canje, aPagar, \{ nombre: cliNombre, dni: cliDni \}\)/.test(ap), 'exige nombre y DNI igual que en la caja');
 ok(/Vender equipo · 🔄 canje/.test(leer('caja.html')) && /if \(typeof canjeEn === 'function'\) canjeEn\(\);/.test(leer('caja.js')), 'en la caja, el botón ＋ dice "Vender equipo · 🔄 canje" (antes decía "Comprobante" y no se encontraba)');
 
+console.log('\n6) Pulido (Alan, 18/11: "hay que pulir el tema plan canje")');
+const cjs = leer('canje.js');
+const form = cjs.slice(cjs.indexOf('function canjeActivar()'), cjs.indexOf('function canjeEscanearImei'));
+ok(!/class="(precio-fg|precio-input|ventaeq-g2)/.test(form) && /\.cj-in \{/.test(cjs) && /\.cj-g2 \{/.test(cjs), 'estilos propios: en el Stock se veía desarmado (usaba los de la caja)');
+ok(/onclick="canjeEscanearImei\(\)"/.test(form) && /escanearImei\('cj-imei', \{ marca: 'cj-marca', modelo: 'cj-modelo' \}\)/.test(cjs), '📷 para escanear el IMEI del usado (y completa marca y modelo)');
+ok(/Para el canje cargá \$\{faltan\.join\(' y '\)\} del cliente/.test(cjs) && /cli: \['sell-cli-nombre', 'sell-cli-dni'\]/.test(leer('app.js')) && /cli: \['ve-cli-nombre', 've-cli-dni'\]/.test(cjs), 'avisa en el momento si faltan nombre o DNI del cliente (en las dos pantallas)');
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);
