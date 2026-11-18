@@ -139,6 +139,15 @@ ok(call('cartLlevaBateria', { marca: 'Apple', modelo: 'iPhone 11' }) === false, 
 ok(call('cartLlevaBateria', { marca: 'iPhone', modelo: '12', bateria: 88 }) === true,
    'y "iPhone" cargado como marca cuenta igual: en el stock está de las dos formas');
 
+console.log('\n3b) La batería al elegir los carteles');
+// Alan (18/11): "lo que quiero es que figuren al momento de seleccionar los
+// que voy a imprimir"
+const cs = leer('carteles.js');
+const lista = cs.slice(cs.indexOf('function cartRender()'), cs.indexOf('function cartPintarColores'));
+ok(/cartLlevaBateria\(pin\)[\s\S]{0,200}🔋 \$\{Math\.min\(100/.test(lista), 'en la lista para elegir se ve la batería de cada equipo');
+ok(/🔋 sin cargar/.test(lista) && /!cartEsNuevo\(pin\)/.test(lista), 'y si es usado y no la tiene cargada, lo avisa');
+ok(/id="cart-ed-bateria"/.test(lista) && /r\.bateria = bateria/.test(cs) && /if \(Number\(r\.bateria\) > 0\) out\.bateria = Number\(r\.bateria\);/.test(cs), 'con ✏️ se le puede poner para este cartel');
+
 console.log('\n4) Sin RAM, el almacenamiento ocupa todo');
 // Una casilla vacía al lado hace que el cartel parezca a medio hacer.
 h = call('cartelHtml', EQ.mt);

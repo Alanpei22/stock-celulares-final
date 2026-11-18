@@ -388,6 +388,7 @@ function cartPintado(p) {
   const out = { ...p };
   if (r.modelo) out.modelo = r.modelo;
   if (Number(r.precio) > 0) { out.precio = Number(r.precio); out.precioUSD = 0; out.moneda = 'ars'; }
+  if (Number(r.bateria) > 0) out.bateria = Number(r.bateria);
   return out;
 }
 
@@ -455,9 +456,13 @@ function cartEditar(id) {
 function cartGuardarRetoque(id) {
   const modelo = _cartV('cart-ed-modelo');
   const precio = Number(String(_cartV('cart-ed-precio')).replace(/[^\d]/g, '')) || 0;
+  const bateria = Math.round(Number(String(_cartV('cart-ed-bateria')).replace(/[^\d]/g, '')) || 0);
+  const base = _cartBase.find(p => p.id === id) || {};
   const r = {};
   if (modelo) r.modelo = modelo;
   if (precio > 0) r.precio = precio;
+  // Solo si cambió la del stock (si no, no es un retoque)
+  if (bateria >= 1 && bateria <= 100 && bateria !== Math.round(Number(base.bateria) || 0)) r.bateria = bateria;
   if (Object.keys(r).length) _cartRetoques[id] = r; else delete _cartRetoques[id];
   _cartEditando = null;
   cartRender();
@@ -480,13 +485,18 @@ function cartRender() {
       const pos = _cartSel.indexOf(p.id) + 1;
       const pin = cartPintado(p);
       const meta = [cartMedida(pin.almacenamiento), cartEstadoTxt(pin)].filter(Boolean).join(' · ');
+      // La batería a la vista al elegir (Alan, 18/11): la que va a salir en el
+      // cartel, o un aviso si es usado y no la tiene cargada
+      const bat = cartLlevaBateria(pin)
+        ? `<span class="cart-bat" style="font-weight:700;white-space:nowrap">🔋 ${Math.min(100, Math.round(Number(pin.bateria)))}%</span>`
+        : (!cartEsNuevo(pin) ? '<span class="cart-bat cart-bat--falta" style="color:#d97706;font-weight:600;white-space:nowrap" title="Tocá ✏️ para ponerla">🔋 sin cargar</span>' : '');
       const tocado = !!_cartRetoques[p.id];
       const abierto = _cartEditando === p.id;
       return `<div class="lwa-item cart-item${on ? ' lwa-item--on' : ''}" data-cid="${_cartEsc(p.id)}" onclick="cartTocar('${_cartEsc(p.id)}')">
         <input type="checkbox" ${on ? 'checked' : ''} onclick="event.stopPropagation();cartTocar('${_cartEsc(p.id)}')">
         <span class="lwa-item-txt">
           <span class="lwa-item-nom">${on ? `<b class="cart-nro">${pos}</b>` : ''}${_cartEsc(pin.marca || '')} ${_cartEsc(pin.modelo || '')}${tocado ? ' <span class="cart-tag">retocado</span>' : ''}</span>
-          ${meta ? `<span class="lwa-item-meta">${_cartEsc(meta)}</span>` : ''}
+          ${meta || bat ? `<span class="lwa-item-meta">${_cartEsc(meta)}${bat ? (meta ? ' · ' : '') + bat : ''}</span>` : ''}
         </span>
         <b class="lwa-item-precio">${cartPlata(cartRedondear(cartPrecioArs(pin)))}</b>
         <button type="button" class="cart-lapiz" title="Retocar este cartel"
@@ -496,6 +506,7 @@ function cartRender() {
         <p class="cart-ed-nota">Solo para esta impresión. El equipo en el stock no se toca.</p>
         <input id="cart-ed-modelo" class="fi" type="text" placeholder="Modelo del cartel" value="${_cartEsc((_cartRetoques[p.id] || {}).modelo || pin.modelo || '')}">
         <input id="cart-ed-precio" class="fi" type="number" inputmode="numeric" placeholder="Precio del cartel" value="${(_cartRetoques[p.id] || {}).precio || ''}">
+        <input id="cart-ed-bateria" class="fi" type="number" inputmode="numeric" min="1" max="100" placeholder="🔋 Batería % (ej: 88)" value="${(_cartRetoques[p.id] || {}).bateria || (Number(p.bateria) > 0 ? p.bateria : '')}">
         <div class="cart-ed-btns">
           <button type="button" class="tpent-btn tpent-btn--si" onclick="cartGuardarRetoque('${_cartEsc(p.id)}')">Listo</button>
           <button type="button" class="tpent-btn" onclick="cartBorrarRetoque('${_cartEsc(p.id)}')">Como está en el stock</button>
