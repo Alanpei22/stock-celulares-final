@@ -82,5 +82,17 @@ ok(!/class="(precio-fg|precio-input|ventaeq-g2)/.test(form) && /\.cj-in \{/.test
 ok(/onclick="canjeEscanearImei\(\)"/.test(form) && /escanearImei\('cj-imei', \{ marca: 'cj-marca', modelo: 'cj-modelo' \}\)/.test(cjs), '📷 para escanear el IMEI del usado (y completa marca y modelo)');
 ok(/Para el canje cargá \$\{faltan\.join\(' y '\)\} del cliente/.test(cjs) && /cli: \['sell-cli-nombre', 'sell-cli-dni'\]/.test(leer('app.js')) && /cli: \['ve-cli-nombre', 've-cli-dni'\]/.test(cjs), 'avisa en el momento si faltan nombre o DNI del cliente (en las dos pantallas)');
 
+console.log('\n7) Fotos del canje (DNI y equipo)');
+// Alan (18/11) eligió esto: si el usado aparece robado, son el respaldo.
+const fd = run(`canjeDocFotos({ dniFrente: 'data:image/jpeg;base64,AAA', equipo: 'data:image/jpeg;base64,BBB' }, { nombre: 'Juan', dni: '30123456', tel: '11' }, 'eq1', 'stock', '2026-11-18T10:00:00Z')`);
+ok(fd.dniFrente && fd.equipo && !fd.dniDorso && fd.dni === '30123456' && fd.equipoId === 'eq1', 'guarda solo las que se sacaron, con de quién es y a qué equipo va', fd);
+ok(run(`canjeDocFotos({}, { nombre: 'Juan' }, 'eq1', 'stock', 'x')`) === null, 'sin fotos no guarda nada');
+const cj7 = leer('canje.js');
+ok(/collection\('canje_fotos'\)\.doc\(id\)\.set\(doc\)/.test(cj7) && !/stock-photos/.test(cj7.replace(/\/\/.*$/gm, '')), 'van a canje_fotos (solo cuentas del negocio), NO a las fotos públicas de los equipos');
+ok(/canjeAchicarFoto\(file, 1000, 0\.7\)/.test(cj7), 'achicadas, para que las tres entren en un documento');
+ok(cj7.indexOf("await _canjeGuardarFotos(c, cliente, id, 'stock', ahora)") < cj7.indexOf("await db.collection('stock').doc(id).set(doc)"), 'se guardan antes que el equipo (que queda marcado con cuántas tiene)');
+ok(/fotos: Object\.assign\(\{\}, _cjFotos\)/.test(cj7) && /_cjFotos = \{\};/.test(cj7), 'viajan con el resto del canje y se borran al empezar otra venta');
+ok(/onclick="canjeVerFotos\('\$\{p\.id\}'\)"/.test(leer('app.js')) && /🔄 Entró por plan canje/.test(leer('app.js')), 'en la ficha del equipo: de quién vino (DNI, teléfono) y botón para ver las fotos');
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

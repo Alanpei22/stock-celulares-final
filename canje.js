@@ -23,6 +23,19 @@ try { const c = JSON.parse(localStorage.getItem('tpCanjeCfg') || 'null'); if (c 
 let _canjeOn = false;
 let _canjeCfgLeida = false;
 
+// 📸 Fotos del canje: DNI (frente y dorso) y el equipo que deja. Alan
+// (18/11) las pidió: si el usado aparece robado, sirven de respaldo.
+// OJO dónde se guardan: NO en Storage/stock-photos, que se lee con el link
+// sin cuenta (lo usa la página pública). Van a la colección canje_fotos de
+// Firestore, que solo leen las cuentas del negocio. Achicadas (1000 px) las
+// tres entran en un documento (límite 1 MB).
+const CANJE_FOTOS = [
+  { k: 'dniFrente', lbl: 'DNI frente', ico: '🪪' },
+  { k: 'dniDorso', lbl: 'DNI dorso', ico: '🪪' },
+  { k: 'equipo', lbl: 'El equipo', ico: '📱' },
+];
+let _cjFotos = {};
+
 // Dónde está el formulario: en la venta de equipo de la caja o en "Registrar
 // venta" del Stock (index.html). Cada pantalla dice de dónde sale el total y
 // con qué stock se compara. Arranca en la de la caja.
@@ -151,11 +164,13 @@ function canjeLeer() {
     destino: _cjV('cj-destino') || 'stock', falla: _cjV('cj-falla'),
     imeiOk: !!document.getElementById('cj-chk-imei')?.checked,
     cuentasOk: !!document.getElementById('cj-chk-cuentas')?.checked,
+    fotos: Object.assign({}, _cjFotos),
   };
 }
 
 function canjeReset() {
   _canjeOn = false;
+  _cjFotos = {};
   const box = document.getElementById(_cjCtx.caja);
   if (box) box.innerHTML = _canjeBotonHtml();
 }
@@ -205,6 +220,8 @@ function canjeActivar() {
           </select></div>
         <div class="cj-fg hidden" id="cj-falla-wrap"><label>¿Qué necesita?</label><input id="cj-falla" class="cj-in" type="text" placeholder="Batería, módulo…" autocomplete="off"></div>
       </div>
+      <div class="cj-fg"><label>📸 Fotos <small>(te cubren si alguna vez lo reclaman)</small></label>
+        <div class="cj-fotos" id="cj-fotos">${_canjeFotosHtml()}</div></div>
       <label class="cj-chk"><input type="checkbox" id="cj-chk-imei"> <span>Consulté el IMEI en ENACOM: no tiene denuncia</span></label>
       <label class="cj-chk"><input type="checkbox" id="cj-chk-cuentas"> <span>iCloud / Google borrado y restablecido</span></label>
       <div class="cj-tot" id="cj-tot"></div>
@@ -216,6 +233,91 @@ function canjeActivar() {
   });
   canjeRecalcular();
   setTimeout(() => document.getElementById('cj-imei')?.focus(), 50);
+}
+
+function _canjeFotosHtml() {
+  return CANJE_FOTOS.map(f => _cjFotos[f.k]
+    ? `<button type="button" class="cj-foto cj-foto--ok" onclick="canjeFoto('${f.k}')" title="Sacarla de nuevo">
+         <img src="${_cjFotos[f.k]}" alt=""><span>✓ ${f.lbl}</span></button>`
+    : `<button type="button" class="cj-foto" onclick="canjeFoto('${f.k}')"><b>${f.ico}</b><span>${f.lbl}</span></button>`).join('');
+}
+
+// Saca (o vuelve a sacar) una de las fotos con la cámara de atrás
+function canjeFoto(k) {
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*'; inp.capture = 'environment';
+  inp.onchange = async () => {
+    const file = inp.files && inp.files[0];
+    if (!file) return;
+    try {
+      _cjFotos[k] = await canjeAchicarFoto(file, 1000, 0.7);
+      const box = document.getElementById('cj-fotos');
+      if (box) box.innerHTML = _canjeFotosHtml();
+    } catch { toast('No pude abrir la foto', 'error'); }
+  };
+  inp.click();
+}
+
+// Foto del celu (varios MB) → JPG chico, en texto (dataURL)
+function canjeAchicarFoto(file, max, q) {
+  return new Promise((ok, mal) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      ok(c.toDataURL('image/jpeg', q));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('foto')); };
+    img.src = url;
+  });
+}
+
+// El documento de canje_fotos (solo las que se sacaron)
+function canjeDocFotos(fotos, cliente, equipoId, donde, ahoraIso) {
+  const d = { equipoId, donde, cliente: cliente.nombre || '', dni: cliente.dni || '', tel: cliente.tel || '', fecha: ahoraIso };
+  let n = 0;
+  CANJE_FOTOS.forEach(f => { if (fotos && fotos[f.k]) { d[f.k] = fotos[f.k]; n++; } });
+  return n ? d : null;
+}
+
+// Guarda las fotos; devuelve cuántas (0 si no había o si falló: la venta y
+// el equipo no se frenan por esto)
+async function _canjeGuardarFotos(c, cliente, id, donde, ahora) {
+  const doc = canjeDocFotos(c.fotos, cliente, id, donde, ahora);
+  if (!doc) return 0;
+  try {
+    await db.collection('canje_fotos').doc(id).set(doc);
+    return CANJE_FOTOS.filter(f => doc[f.k]).length;
+  } catch (e) {
+    console.error('fotos del canje:', e);
+    toast('No se pudieron guardar las fotos del canje (el equipo sí quedó cargado)', 'error');
+    return 0;
+  }
+}
+
+// Ver las fotos de un canje (desde la ficha del equipo)
+async function canjeVerFotos(id) {
+  _canjeEstilos();
+  let d = null;
+  try { const s = await db.collection('canje_fotos').doc(id).get(); d = s.exists ? s.data() : null; }
+  catch (e) { console.error('fotos del canje:', e); }
+  if (!d) { toast('No encontré las fotos de este canje', 'error'); return; }
+  document.getElementById('cj-ver')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'cj-ver';
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  const fotos = CANJE_FOTOS.filter(f => d[f.k]).map(f =>
+    `<figure><img src="${d[f.k]}" alt="${f.lbl}" onclick="window.open(this.src)"><figcaption>${f.lbl}</figcaption></figure>`).join('');
+  const e = s => String(s || '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  ov.innerHTML = `<div class="cj-ver-box">
+    <div class="cj-hd"><div><b>🔄 Fotos del canje</b><small>${e(d.cliente)}${d.dni ? ' · DNI ' + e(d.dni) : ''}${d.fecha ? ' · ' + new Date(d.fecha).toLocaleDateString('es-AR') : ''}</small></div>
+    <button type="button" class="cj-x" onclick="document.getElementById('cj-ver').remove()">✕</button></div>
+    <div class="cj-ver-g">${fotos}</div></div>`;
+  document.body.appendChild(ov);
 }
 
 // 📷 El IMEI del equipo que deja, con la cámara. El lector de siempre lo
@@ -315,17 +417,22 @@ async function canjeGuardarEquipo(c, cliente, ventaNombre) {
   const ahora = new Date().toISOString();
   if (c.destino === 'arreglo') {
     const id = 'arr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    await db.collection('equipos_arreglo').doc(id).set(canjeDocArreglo(c, cliente, ventaNombre, ahora));
-    return { donde: 'arreglo', id };
+    const nFotos = await _canjeGuardarFotos(c, cliente, id, 'arreglo', ahora);
+    const docA = canjeDocArreglo(c, cliente, ventaNombre, ahora);
+    if (nFotos) docA.canjeFotos = nFotos;
+    await db.collection('equipos_arreglo').doc(id).set(docA);
+    return { donde: 'arreglo', id, fotos: nFotos };
   }
   const dolar = (typeof getCurrentDolar === 'function' ? getCurrentDolar() : 0) || 0;
   const s = canjeSugerido(c, _cjCtx.stock(), CANJE_CFG, dolar);
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const doc = { id, ...canjeDocStock(c, cliente, ventaNombre, ahora, s ? s.ref : 0),
                 _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null };
+  const nFotos = await _canjeGuardarFotos(c, cliente, id, 'stock', ahora);
+  if (nFotos) doc.canje.fotos = nFotos;
   await db.collection('stock').doc(id).set(doc);
   if (typeof movStock === 'function') movStock({ tipo: 'equipo', id, doc, cant: 1, motivo: 'canje', detalle: 'de ' + (cliente.nombre || '') });
-  return { donde: 'stock', id };
+  return { donde: 'stock', id, fotos: nFotos };
 }
 
 function _canjeEstilos() {
@@ -368,6 +475,20 @@ function _canjeEstilos() {
   .cj-tot div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
   .cj-paga { font-size: 18px; font-weight: 800; color: #10b981; }
   .cj-mal { color: #ef4444; font-size: 14px; }
-  .cj-box .hidden { display: none !important; }`;
+  .cj-box .hidden { display: none !important; }
+  .cj-fotos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .cj-foto { position: relative; height: 78px; border-radius: 10px; border: 1.5px dashed var(--border, rgba(128,128,128,.5));
+    background: transparent; color: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; overflow: hidden; padding: 0; }
+  .cj-foto b { font-size: 22px; }
+  .cj-foto span { font-size: 11.5px; font-weight: 600; }
+  .cj-foto--ok { border: 2px solid #10b981; }
+  .cj-foto--ok img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cj-foto--ok span { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(16,185,129,.9); color: #fff; padding: 2px 0; }
+  #cj-ver { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .cj-ver-box { background: var(--card, #fff); color: var(--text, #111); border-radius: 16px; padding: 14px; width: min(560px, 100%); max-height: 90vh; overflow: auto; }
+  .cj-ver-g { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .cj-ver-g figure { margin: 0; }
+  .cj-ver-g img { width: 100%; border-radius: 10px; cursor: zoom-in; display: block; }
+  .cj-ver-g figcaption { font-size: 12px; text-align: center; opacity: .75; margin-top: 4px; }`;
   document.head.appendChild(s);
 }

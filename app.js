@@ -1786,6 +1786,11 @@ function openDetail(id) {
       </div>
     ` : ''}
     ${p.notas ? `<div class="det-row det-row--full"><span class="det-label">Notas</span><span class="det-val">${esc(p.notas)}</span></div>` : ''}
+    ${p.origen === 'canje' && p.canje ? `<div class="det-row det-row--full" style="background:rgba(200,150,90,.1);padding:10px 12px;border-radius:10px;border:1px solid rgba(200,150,90,.35)">
+        <span class="det-label">🔄 Entró por plan canje</span>
+        <span class="det-val">${esc(p.canje.cliente || '')}${p.canje.dni ? ' · DNI ' + esc(p.canje.dni) : ''}${p.canje.tel ? ' · ' + esc(p.canje.tel) : ''}${p.canje.fecha ? ' · ' + fmtDate(p.canje.fecha) : ''}
+        ${p.canje.fotos ? `<br><button type="button" class="btn-ai" style="margin-top:6px" onclick="canjeVerFotos('${p.id}')">📸 Ver fotos del canje (DNI y equipo)</button>` : ''}</span>
+      </div>` : ''}
     ${(p.fotos && p.fotos.length) || !p.vendido ? `<div class="det-row det-row--full"><span class="det-label">📷 Fotos</span></div>${typeof buildPhotoGalleryHTML === 'function' ? buildPhotoGalleryHTML(p) : ''}` : ''}
     ${!p.vendido && p.precio ? buildPriceTable(p.precio) : ''}
     ${p.vendido ? '<div class="det-sold-badge">VENDIDO</div>' : ''}
@@ -2229,6 +2234,7 @@ async function confirmSell() {
       try {
         const r = await canjeGuardarEquipo(canje, { nombre: cliNombre, dni: cliDni, tel: cliTel }, `${p.marca || ''} ${p.modelo || ''}`.trim());
         canjeDonde = r.donde === 'arreglo' ? ' · 🔧 el usado quedó en "Para arreglar"' : ' · 📱 el usado entró al stock';
+        if (r.fotos) canjeDonde += ` (con ${r.fotos} foto${r.fotos === 1 ? '' : 's'})`;
       } catch (e) {
         console.error('canje → stock:', e);
         toast('Venta registrada, pero no pude cargar el equipo del canje: cargalo a mano', 'error');

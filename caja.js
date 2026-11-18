@@ -2261,6 +2261,7 @@ async function confirmVentaEquipo() {
       try {
         const r = await canjeGuardarEquipo(canje, { nombre: d.clienteNombre, dni: d.clienteDni, tel: d.clienteTel }, equipo);
         canjeDonde = r.donde === 'arreglo' ? ' · 🔧 el usado quedó en "Para arreglar"' : ' · 📱 el usado entró al stock';
+        if (r.fotos) canjeDonde += ` (con ${r.fotos} foto${r.fotos === 1 ? '' : 's'})`;
       } catch (e) {
         console.error('canje → stock:', e);
         toast('Venta registrada, pero no pude cargar el equipo del canje: cargalo a mano en el Stock', 'error');
