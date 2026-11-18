@@ -14,7 +14,7 @@ const leer = f => fs.readFileSync(DIR + f, 'utf8');
 (async () => {
 console.log('\n1) Lo que devuelve la IA → ticket');
 const api = leer('api/ai.js');
-const fn = api.slice(api.indexOf('export function parsearTicket')).replace('export function', 'function');
+const fn = api.slice(api.indexOf('export function parsearTicket')).replace(/^export function/gm, 'function');   // hay más funciones después (parsearEtiqueta)
 const pctx = {}; vm.createContext(pctx); vm.runInContext(fn + '\nthis.parsearTicket = parsearTicket;', pctx);
 const P = pctx.parsearTicket;
 let t = P('Acá va: {"legible":true,"proveedor":"Mayorista Cel","fecha":"2026-10-08","items":[{"nombre":"Pantalla A13","cantidad":2,"precio":"$ 45.000,50"},{"nombre":"Batería G32","cantidad":1,"precio":12000}],"total":"102.000","rubro":"Compra repuesto"}');

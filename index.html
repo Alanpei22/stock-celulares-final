@@ -508,6 +508,10 @@
           <label class="fl">Modelo *</label>
           <input id="fi-modelo" class="fi" type="text" placeholder="Galaxy A54, iPhone 14…" autocomplete="off">
         </div>
+        <!-- 📸 Desde el celu: una foto de la etiqueta del proveedor completa todo (etiqueta-equipo.js) -->
+        <div class="fg fg--full">
+          <button type="button" class="btn-ai" id="etq-leer-btn" onclick="etqLeerEtiqueta()" style="width:100%;padding:12px;font-size:15px">📸 Leer la etiqueta con una foto</button>
+        </div>
         <div class="fg fg--full ai-btn-row">
           <button type="button" class="btn-ai" onclick="aiStockSpecs()">🤖 Auto-specs</button>
           <button type="button" class="btn-ai" onclick="aiStockPrice()">🤖 Precio sugerido</button>
@@ -570,7 +574,11 @@
         </div>
         <div class="fg fg--full">
           <label class="fl">IMEI</label>
-          <input id="fi-imei" class="fi" type="text" placeholder="356938035643809" maxlength="15" inputmode="numeric">
+          <div style="display:flex;gap:8px">
+            <input id="fi-imei" class="fi" type="text" placeholder="356938035643809" maxlength="15" inputmode="numeric" style="flex:1;min-width:0">
+            <!-- 📷 El código de barras de la etiqueta es el IMEI -->
+            <button type="button" class="btn-ai" onclick="etqEscanearImei()" title="Escanear el código de barras" style="flex:0 0 auto;padding:0 14px;font-size:20px">📷</button>
+          </div>
         </div>
         <div class="fg owner-only">
           <label class="fl">💵 Costo (ARS) <small style="color:var(--t3);font-weight:400">— privado, no se muestra al cliente</small></label>
@@ -2442,6 +2450,7 @@
 <script defer src="horas.js"></script>
 <script defer src="movstock.js"></script>
 <script defer src="canje.js"></script>
+<script defer src="etiqueta-equipo.js"></script>
 <script defer src="taller.js"></script>
 <script defer src="hoy.js"></script>
 <script defer src="roturas.js"></script>

@@ -251,6 +251,56 @@ Reglas:
     }
   }
 
+  // ── leerEtiquetaEquipo: foto de la etiqueta del proveedor → datos del equipo ──
+  // Alan (18/11) carga los equipos desde el celu. La etiqueta trae el IMEI en
+  // código de barras y el resto escrito (modelo, capacidad, color, batería,
+  // grado). Lo que no se lee, vacío: nunca se inventa (y menos el IMEI).
+  if (action === 'leerEtiquetaEquipo') {
+    const img = String(data.imageBase64 || '');
+    if (!img) return json({ error: 'Falta la foto' }, 400);
+    if (img.length > 6_000_000) return json({ error: 'Foto demasiado grande' }, 413);
+    const prompt =
+`Esta es la foto de la etiqueta pegada en un celular que compró un local de celulares en Argentina (o de la caja del equipo).
+Leé lo que dice y respondé ÚNICAMENTE con este JSON (sin texto antes ni después, sin markdown):
+{"legible":true,"imei":"","marca":"","modelo":"","almacenamiento":"","color":"","bateria":0,"grado":""}
+Reglas:
+- legible: false si no es una etiqueta de un celular o no se puede leer; en ese caso dejá todo lo demás vacío o en 0.
+- imei: los 15 números que están debajo del código de barras (o al lado de "IMEI"). Copialos exactos; si no se leen los 15, dejalo vacío.
+- marca: Apple, Samsung, Motorola, Xiaomi… (si dice iPhone, la marca es Apple).
+- modelo: el nombre sin la capacidad, por ejemplo "iPhone 13", "iPhone 14 Pro Max", "Galaxy S23".
+- almacenamiento: la capacidad como "128GB", "256GB", "1TB".
+- color: tal como figura (por ejemplo "RED", "MIDNIGHT", "BLUE").
+- bateria: el porcentaje de salud de batería como número entero (76% → 76). 0 si no figura.
+- grado: la calificación del estado si figura (por ejemplo "AA", "A", "B", "C"); vacío si no.
+- Si un dato no se lee bien, dejalo vacío o en 0: no lo inventes.`;
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-opus-5-5',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: data.imageMediaType || 'image/jpeg', data: img } },
+              { type: 'text', text: prompt }
+            ]
+          }]
+        })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error?.message || 'Error de API');
+      if (result.stop_reason === 'refusal') return json({ error: 'No se pudo leer la etiqueta' }, 422);
+      const texto = (result.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      const etiqueta = parsearEtiqueta(texto);
+      if (!etiqueta) return json({ error: 'No se pudo leer la etiqueta' }, 422);
+      return json({ etiqueta });
+    } catch (err) {
+      return json({ error: err.message }, 500);
+    }
+  }
+
   // ── oficina: un personaje de 🏢 La oficina "lo piensa" con IA ──
   // El cliente manda quién es (pj), lo que vio (hallazgos), los datos de su
   // parte ya resumidos y, si querés, una pregunta. Vuelve un JSON fijo
@@ -465,4 +515,27 @@ export function parsearTicket(texto) {
     items, total,
     rubro: String(o.rubro || '').trim().slice(0, 40),
   };
+}
+
+// La respuesta del modelo → los datos de la etiqueta, con tipos sanos. Un
+// IMEI que no tiene 15 números no se usa (mejor vacío que uno equivocado).
+export function parsearEtiqueta(texto) {
+  const m = String(texto || '').match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  let o;
+  try { o = JSON.parse(m[0]); } catch { return null; }
+  if (!o || o.legible === false) return null;
+  const txt = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+  const imei = txt(o.imei, 30).replace(/\D/g, '');
+  const bat = Math.round(Number(o.bateria) || 0);
+  const r = {
+    imei: imei.length === 15 ? imei : '',
+    marca: txt(o.marca, 30), modelo: txt(o.modelo, 50),
+    almacenamiento: txt(o.almacenamiento, 10), color: txt(o.color, 30),
+    bateria: bat >= 1 && bat <= 100 ? bat : 0,
+    grado: txt(o.grado, 4),
+  };
+  // Sin nada útil, es que no se pudo leer
+  if (!r.imei && !r.modelo) return null;
+  return r;
 }
