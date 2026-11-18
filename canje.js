@@ -224,11 +224,11 @@ function canjeReclamoTexto(p, negocio) {
   const c = p.canje || {};
   const eq = [p.marca, p.modelo, p.almacenamiento].filter(Boolean).join(' ');
   const imei = c.imei || p.imei || '';
-  const valor = Number(c.valor) || 0;
   const fecha = c.fecha ? new Date(c.fecha).toLocaleDateString('es-AR') : '';
   return `Hola ${String(c.cliente || '').split(/[ ,]/).filter(Boolean)[0] || ''}, te escribimos de ${negocio || 'TechPoint'}. `
     + `El ${eq}${imei ? ' (IMEI ' + imei + ')' : ''} que dejaste en parte de pago${fecha ? ' el ' + fecha : ''} figura bloqueado / dado de baja. `
-    + `Según el comprobante que firmaste, tenés 72 horas para desbloquearlo o devolver el valor que se te tomó${valor ? ' ($' + valor.toLocaleString('es-AR') + ')' : ''}. `
+    // Sin el monto: Alan (18/11) no quiere que figure en qué se tomó
+    + `Según el comprobante que firmaste, tenés 72 horas para desbloquearlo o devolver el valor que se te reconoció por ese equipo. `
     + `Avisanos cómo lo resolvemos. Gracias.`;
 }
 

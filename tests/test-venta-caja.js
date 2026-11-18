@@ -247,13 +247,19 @@ setTimeout(() => {
     ok(/Pantalla · Cámaras/.test(largo), 'funciones probadas');
     ok(/3 cuotas/.test(largo), 'las cuotas al lado de la forma de pago');
     ok(/iPhone 8 · IMEI 111/.test(largo), 'el equipo tomado en permuta');
-    ok(/− \$120\.000/.test(largo), 'el valor tomado se descuenta');
-    ok(/SALDO ABONADO[\s\S]{0,60}400\.000/.test(largo), 'el saldo abonado');
+    // El valor en que se tomó ya no se imprime (Alan, 18/11): solo el total
+    // y la diferencia que puso
+    ok(!/− \$120\.000/.test(largo), 'el valor tomado NO se imprime');
+    ok(/DIFERENCIA ABONADA[\s\S]{0,60}400\.000/.test(largo), 'la diferencia que puso');
     ok(/legítimo titular/.test(largo), 'con permuta aparece la cláusula de procedencia lícita');
     // Alan (18/11): qué pasa si después le dan de baja el usado
     ok(/bloqueado o dado de baja/.test(largo) && /dentro de las 72 horas/.test(largo) && /ni deuda, financiación o bloqueo/.test(largo),
        'y qué pasa si después le dan de baja el IMEI: desbloquearlo o devolver lo tomado en 72 h');
-    ok(/devolver el valor tomado \(\$\s?120\.000\)/.test(largo) && /iPhone 8 · IMEI 111/.test(largo), 'con el monto y el IMEI del usado escritos en la cláusula', largo.slice(largo.indexOf('5. Equipo'), largo.indexOf('5. Equipo') + 700));
+    ok(/iPhone 8 · IMEI 111/.test(largo) && /valor que se le reconoció por ese equipo/.test(largo), 'con el IMEI del usado escrito en la cláusula');
+    // Alan (18/11): "no tiene que figurar cuánto lo tomé, solo el valor del
+    // equipo que se lleva y la diferencia que puso"
+    ok(!/120\.000/.test(largo) && !/Valor tomado/.test(largo), 'NO figura en cuánto se tomó el usado (ni en la tabla ni en la cláusula)');
+    ok(/DIFERENCIA ABONADA/.test(largo) && /400\.000/.test(largo), 'sí el total del equipo y la diferencia que puso');
     ok(/6\. Conformidad/.test(largo), 'y las condiciones se renumeran', (largo.match(/\d\. Conformidad/) || [])[0]);
     ok(/Pérez, Juan/.test(largo) && /38412907/.test(largo), 'datos del comprador');
     ok(/GARANTÍA 6 MESES/.test(largo), 'garantía');

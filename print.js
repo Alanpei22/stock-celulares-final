@@ -1081,12 +1081,13 @@ function _ventaA5Body(d, label) {
     ${p.forma_pago ? `<tr><td class="a">Forma de pago</td><td>${_pr(p.forma_pago)}${
       Number(p.cuotas) > 1 ? ` · ${p.cuotas} cuotas` : ''}</td></tr>` : ''}
     ${p.permuta ? `<tr><td class="a">Recibido en parte de pago</td><td>${_pr(p.permuta)}</td></tr>` : ''}
-    ${permutaVal > 0 ? `<tr><td class="a">Valor tomado</td><td>− ${_prMoney(permutaVal)}</td></tr>` : ''}
+    ${''/* Alan (18/11): el valor en que se tomó el usado NO va en el comprobante:
+          solo el precio del equipo que se lleva y la diferencia que puso. */}
     ${Array.isArray(p.articulos) && p.articulos.length ? `
       <tr><td class="a">${_pr(p.marca)} ${_pr(p.modelo)}</td><td>${_prMoney(p.precio)}</td></tr>
       ${p.articulos.map(a => `<tr><td class="a">${_pr(a.nombre)}${a.qty > 1 ? ` x${a.qty}` : ''}</td><td>${a.regalo ? 'Sin cargo' : _prMoney((a.precioUnit || 0) * (a.qty || 1))}</td></tr>`).join('')}` : ''}
     <tr class="hl"><td class="a">TOTAL</td><td>${_prMoney(p.precioTotal || p.precio)}</td></tr>
-    ${saldoAb > 0 ? `<tr class="hl"><td class="a">SALDO ABONADO</td><td>${_prMoney(saldoAb)}</td></tr>` : ''}
+    ${saldoAb > 0 ? `<tr class="hl"><td class="a">${p.permuta ? 'DIFERENCIA ABONADA' : 'SALDO ABONADO'}</td><td>${_prMoney(saldoAb)}</td></tr>` : ''}
   </table>
 
   ${p.garantiaMeses > 0 ? `
@@ -1106,7 +1107,7 @@ function _ventaA5Body(d, label) {
       <p><b>2. Garantía.</b> Cuando corresponda, cubre fallas de funcionamiento no provocadas por el uso, conforme la Ley 24.240 de Defensa del Consumidor. Se hace válida únicamente presentando este comprobante.</p>
       <p><b>3. Exclusiones.</b> No cubre golpes, caídas, contacto con líquidos o humedad, sobretensión del cargador, fallas de software o configuración, ni equipos abiertos o intervenidos por terceros.</p>
       <p><b>4. Datos y cuentas.</b> El equipo se entrega sin cuentas vinculadas y con los datos borrados. El respaldo de la información posterior a la compra queda a cargo del comprador.</p>
-      ${p.permuta ? `<p><b>5. Equipo entregado en parte de pago.</b> El comprador declara ser el legítimo titular del equipo que entrega en permuta${p.permuta ? ` (${_pr(p.permuta)})` : ''}, que su procedencia es lícita, que no registra denuncia de robo, hurto o extravío, ni deuda, financiación o bloqueo con ninguna compañía, y se compromete a no denunciarlo ni pedir su bloqueo. Si su IMEI fuera bloqueado o dado de baja por causas atribuibles al comprador o a terceros vinculados a él, deberá gestionar el desbloqueo o devolver el valor tomado${permutaVal > 0 ? ` (${_prMoney(permutaVal)})` : ''} dentro de las 72 horas de ser notificado, quedando el vendedor facultado a iniciar las acciones civiles y penales que correspondan y a entregar a las autoridades los datos e imágenes registrados en esta operación. Se hace responsable por cualquier reclamo de terceros sobre el equipo.</p>` : ''}
+      ${p.permuta ? `<p><b>5. Equipo entregado en parte de pago.</b> El comprador declara ser el legítimo titular del equipo que entrega en permuta${p.permuta ? ` (${_pr(p.permuta)})` : ''}, que su procedencia es lícita, que no registra denuncia de robo, hurto o extravío, ni deuda, financiación o bloqueo con ninguna compañía, y se compromete a no denunciarlo ni pedir su bloqueo. Si su IMEI fuera bloqueado o dado de baja por causas atribuibles al comprador o a terceros vinculados a él, deberá gestionar el desbloqueo o devolver el valor que se le reconoció por ese equipo en esta operación dentro de las 72 horas de ser notificado, quedando el vendedor facultado a iniciar las acciones civiles y penales que correspondan y a entregar a las autoridades los datos e imágenes registrados en esta operación. Se hace responsable por cualquier reclamo de terceros sobre el equipo.</p>` : ''}
       <p><b>${p.permuta ? '6' : '5'}. Conformidad.</b> La firma del presente implica la aceptación del estado del equipo y de estas condiciones.</p>
     </div>
   </div>

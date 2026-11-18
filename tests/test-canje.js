@@ -122,7 +122,7 @@ ctx.confirm = () => false;
 ok(run(`canjeAntesDeVender(P, ${T0 + 11 * 864e5})`) === false, 'si no lo consultó, no sigue');
 // El reclamo
 const msg = run(`canjeReclamoTexto(P, 'TechPoint')`);
-ok(/Hola Juan/.test(msg) && /IMEI 356789012345678/.test(msg) && /72 horas/.test(msg) && /\$300\.000/.test(msg), 'el WhatsApp de reclamo: equipo, IMEI, las 72 h del comprobante y el monto', msg);
+ok(/Hola Juan/.test(msg) && /IMEI 356789012345678/.test(msg) && /72 horas/.test(msg) && !/300\.000/.test(msg), 'el WhatsApp de reclamo: equipo, IMEI y las 72 h del comprobante (sin decir en cuánto se tomó)', msg);
 // Enganchado
 const ap8 = leer('app.js');
 ok(/function markSold\(id\) \{[\s\S]{0,200}canjeAntesDeVender\(p\)/.test(ap8) && /canjeAntesDeVender\(p\)\) return;/.test(leer('caja.js')), 'se frena antes de vender, desde el Stock y desde la caja');
