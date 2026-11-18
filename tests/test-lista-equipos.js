@@ -89,11 +89,11 @@ console.log('\n3) Cada línea: modelo · memoria · estado — precio');
 ok(/• Galaxy A54 · 128GB · Nuevo — \$520\.000/.test(t), 'formato de la línea', t.split('\n').find(l => /A54/.test(l)));
 ok(/• iPhone 13 · 128GB · Nuevo — \$720\.000/.test(t), 'otra línea');
 
-console.log('\n4) En los iPhone va la batería (y en los demás no)');
+console.log('\n4) La batería va en los usados de todas las marcas');
 ok(/iPhone 11 · 64GB · Usado · 🔋87% —/.test(t), 'el iPhone usado muestra la salud de batería',
    t.split('\n').find(l => /iPhone 11/.test(l)));
-ok(!/Galaxy S21[^\n]*🔋/.test(t), 'el Samsung usado NO, aunque tenga el dato cargado',
-   t.split('\n').find(l => /S21/.test(l)));
+// Alan (18/11): la batería en todos los usados, no solo en los iPhone
+ok(/Galaxy S21[^\n]*🔋91%/.test(t), 'el Samsung usado también, si tiene el dato cargado', t.split('\n').find(l => /Galaxy S21/.test(l)));
 ok(!/iPhone 13[^\n]*🔋/.test(t), 'y un iPhone sin batería cargada tampoco');
 
 console.log('\n5) Los precios en dólares salen convertidos a pesos');

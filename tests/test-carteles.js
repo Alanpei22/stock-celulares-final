@@ -124,13 +124,17 @@ ok(/\$525\.000/.test(h), 'y la cuota');
 ok(!/1\.575\.000/.test(h), 'el total con tarjeta NO se muestra: solo la cuota');
 
 h = call('cartelHtml', EQ.sm);
-ok(!/%/.test(h), 'en un Samsung no va la batería aunque esté cargada', h.match(/\d+%/g));
+// Alan (18/11): la batería en todos los equipos, no solo en los iPhone
+ok(!/c-bat/.test(h), 'un equipo nuevo: no (el 100% de la caja cerrada no dice nada)');
 ok(/NUEVO/.test(h) && /8 GB/.test(h), 'nuevo, y la RAM en su casilla');
 ok(/Garantía 12 meses/.test(h), 'garantía de 12 meses');
 
-// La batería es la pregunta del que compra un iPhone usado; en el resto es ruido.
+// La batería va en todos los equipos que la tengan cargada (Alan, 18/11)
 ok(call('cartLlevaBateria', EQ.ip) === true, 'iPhone con dato: lleva');
-ok(call('cartLlevaBateria', EQ.sm) === false, 'Samsung: no');
+const smUsado = Object.assign({}, EQ.sm, { estado: 'Usado', bateria: 91 });
+ok(call('cartLlevaBateria', smUsado) === true, 'Samsung usado con dato: también');
+ok(/c-bat[\s\S]{0,600}91%/.test(call('cartelHtml', smUsado)), 'y sale en el cartel');
+ok(call('cartLlevaBateria', Object.assign({}, smUsado, { bateria: 0 })) === false, 'sin el dato cargado: no');
 ok(call('cartLlevaBateria', { marca: 'Apple', modelo: 'iPhone 11' }) === false, 'iPhone sin el dato cargado: tampoco');
 ok(call('cartLlevaBateria', { marca: 'iPhone', modelo: '12', bateria: 88 }) === true,
    'y "iPhone" cargado como marca cuenta igual: en el stock está de las dos formas');

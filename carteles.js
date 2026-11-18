@@ -134,13 +134,14 @@ function cartPublicable(p) {
   return cartRedondear(cartPrecioArs(p)) >= CART_PRECIO_MIN;
 }
 
-// La batería solo tiene sentido en los iPhone: es lo primero que pregunta el
-// que compra uno usado. En un Samsung nadie la mira y ocupa lugar.
+// La batería va en todos los equipos que la tengan cargada. Antes iba solo
+// en los iPhone (se pensaba que en un Samsung nadie la miraba); Alan
+// (18/11): "fijate que en los equipos también figure su condición de
+// batería". Sin el dato cargado no sale nada (no se inventa un 100%), y en
+// uno nuevo tampoco: un 100% en la caja cerrada no dice nada (igual que en
+// la lista de precios).
 function cartLlevaBateria(p) {
-  const esIphone = (typeof _esIphone === 'function')
-    ? _esIphone(p)
-    : /iphone|apple/i.test(`${(p && p.marca) || ''} ${(p && p.modelo) || ''}`);
-  return !!(esIphone && Number(p && p.bateria) > 0);
+  return Number(p && p.bateria) > 0 && !cartEsNuevo(p);
 }
 
 function cartEsNuevo(p) { return String(p && p.estado) === 'Nuevo'; }
@@ -229,7 +230,7 @@ function cartelHtml(p, cfg) {
     <div class="c-modelo" style="font-size:${cartTamModelo(modelo)}px">${_cartEsc(modelo)}</div>
   </div>
   ${casillas.length ? `<div class="c-casillas${casillas.length === 1 ? ' c-casillas--una' : ''}">${casillas.join('')}</div>` : ''}
-  ${gar || bat ? `<div class="c-fila-gar">
+  ${gar || bat ? `<div class="c-fila-gar${gar && bat ? ' c-fila-gar--2' : ''}">
     ${gar ? `<div class="c-gar">${_CART_ESCUDO}<span>Garantía ${_cartEsc(gar)}</span></div>` : ''}
     ${bat ? `<div class="c-bat">${_CART_PILA}<span>${bat}%</span></div>` : ''}
   </div>` : ''}
@@ -299,10 +300,11 @@ body{font-family:${f.fam},'Segoe UI',system-ui,sans-serif;color:#16161D;backgrou
 .c-lbl{font-size:13px;font-weight:${f.medio};color:#3E3E52}
 .c-val{font-size:24px;font-weight:${f.peso};line-height:1.1}
 .c-fila-gar{display:flex;gap:8px}
-.c-gar{flex:1;border:2px solid ${color};border-radius:14px;padding:8px 10px;color:${color};
+.c-gar{flex:1;min-width:0;overflow:hidden;border:2px solid ${color};border-radius:14px;padding:8px 10px;color:${color};
   font-size:16px;font-weight:${f.peso};white-space:nowrap;display:flex;align-items:center;gap:6px}
 .c-bat{background:#E3E5EE;border-radius:14px;padding:8px 10px;font-size:16px;font-weight:${f.peso};
-  display:flex;align-items:center;gap:5px;white-space:nowrap}
+  display:flex;align-items:center;gap:5px;white-space:nowrap;flex:none}
+.c-fila-gar--2 .c-gar{font-size:14.5px;padding:8px 8px;gap:5px}
 .c-ico{width:18px;height:18px;flex:none}
 .c-sp{flex-grow:1}
 .c-efec{display:flex;flex-direction:column}

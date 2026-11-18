@@ -283,8 +283,8 @@ function _listaLinea(p) {
   const partes = [p.modelo || 'Equipo'];
   if (p.almacenamiento) partes.push(p.almacenamiento);
   if (p.estado) partes.push(p.estado);
-  // La batería solo en los iPhone: es el dato que siempre preguntan.
-  if (_esIphone(p) && Number(p.bateria) > 0) partes.push('🔋' + p.bateria + '%');
+  // La batería en todos los usados que la tengan cargada (antes solo los iPhone)
+  if (Number(p.bateria) > 0 && p.estado !== 'Nuevo') partes.push('🔋' + p.bateria + '%');
   return `• ${partes.join(' · ')} — ${_listaPrecio(p)}`;
 }
 

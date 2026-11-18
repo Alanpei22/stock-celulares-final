@@ -1479,8 +1479,8 @@ function render() {
       dateLabel = `<span class="card-date${oldCls}" title="Ingresó hace ${diasStr}">📅 ${diasStr}</span>`;
     }
 
-    // Battery badge for non-sold iPhones (marca "Apple" or contains "iPhone")
-    const bateriaBadge = (!p.vendido && p.bateria && (/iphone/i.test(p.marca) || /apple/i.test(p.marca)))
+    // La batería en la tarjeta: de cualquier marca que la tenga cargada
+    const bateriaBadge = (!p.vendido && p.bateria)
       ? `<span class="card-bateria">🔋 ${p.bateria}%</span>`
       : '';
 
@@ -1887,10 +1887,12 @@ function toggleStockLowBanner() {
   if (chevron) chevron.classList.toggle('open', !isOpen);
 }
 
-function _updateBateriaVisibility(marca) {
+// El casillero de batería va en TODOS los equipos (antes solo en los iPhone,
+// y en un Samsung no había forma de anotarla para el cartel). Alan, 18/11.
+function _updateBateriaVisibility() {
   const wrap = document.getElementById('fi-bateria-wrap');
   if (!wrap) return;
-  wrap.style.display = (/iphone/i.test(marca) || /apple/i.test(marca)) ? '' : 'none';
+  wrap.style.display = '';
 }
 
 // Variantes de precio para la tarjeta del equipo (transferencia + cuotas)
