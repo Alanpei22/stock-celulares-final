@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-escaner-etiqueta.js': '📷 El lector de la cámara lee las etiquetas de los equipos (Code 128 finito con el IMEI): recorta la franja del medio justo en las barras',
   'test-etiqueta-equipo.js': '📸 Agregar equipo escaneando la etiqueta: 📷 código de barras → IMEI, y una foto de la etiqueta completa modelo, capacidad, color, batería y grado con IA',
   'test-canje.js': '🔄 Plan canje en la venta de equipo: valor sugerido por el stock, a la caja entra solo la diferencia y el usado entra al stock o a "para arreglar"',
   'test-ventas-meses.js':   'Equipos vendidos mes a mes: si venis para arriba o para abajo',

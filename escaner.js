@@ -68,6 +68,98 @@ function _escCargarZxing() {
   return _escZxingCarga;
 }
 
+// ── Recortes del cuadro ─────────────────────────────────────
+// Alan (18/11): "no funciona el lector de código de barras" con la etiqueta
+// del proveedor (un Code 128 finito con el IMEI). Probado con su foto: sobre
+// el cuadro ENTERO el lector no lo encuentra nunca (0 de 4), y recortando la
+// franja del código lo lee siempre. Con todo el cuadro, el celular, el
+// plástico y el texto de la etiqueta lo confunden.
+// Así que además del cuadro entero se prueban franjas horizontales del
+// medio, que es donde está el recuadro blanco en el que apuntás.
+const ESC_FRANJAS = [0.16, 0.10, 0.26];   // alto de la franja (parte del cuadro)
+let _escLienzo = null;
+
+function escRecortes(vw, vh) {
+  // El recuadro va de 8% a 92% del ancho: se toma un poco más, por si no
+  // quedó centrado justo
+  const x = Math.round(vw * 0.04), w = Math.round(vw * 0.92);
+  return ESC_FRANJAS.map(k => {
+    const h = Math.max(40, Math.round(vh * k));
+    return { x, y: Math.round((vh - h) / 2), w, h };
+  });
+}
+
+// Dibuja la franja en un lienzo de hasta 1000 px de ancho (agrandarla no
+// ayuda: probado, a 2x deja de leer)
+function _escFranja(video, r) {
+  if (!_escLienzo) _escLienzo = document.createElement('canvas');
+  const k = Math.min(1, 1000 / r.w);
+  _escLienzo.width = Math.round(r.w * k);
+  _escLienzo.height = Math.round(r.h * k);
+  _escLienzo.getContext('2d').drawImage(video, r.x, r.y, r.w, r.h, 0, 0, _escLienzo.width, _escLienzo.height);
+  return _escLienzo;
+}
+
+// Dónde empiezan y terminan las barras dentro de la franja: las columnas
+// donde el brillo cambia mucho (negro-blanco-negro…). Probado con la foto de
+// Alan: el lector de respaldo SOLO lee si el recorte arranca pegado a las
+// barras (a 1% del ancho sí; a 2% o 4% ya no, aunque sea papel blanco).
+// Devuelve [desde, hasta] en píxeles del lienzo, o null.
+function escBordesBarras(datos, ancho, alto) {
+  if (!ancho || !alto) return null;
+  const act = new Float32Array(ancho);
+  for (const fr of [0.3, 0.4, 0.5, 0.6, 0.7]) {
+    const y = Math.min(alto - 1, Math.round(alto * fr));
+    let prev = -1;
+    for (let x = 0; x < ancho; x++) {
+      const i = (y * ancho + x) * 4;
+      const v = datos[i] * 0.3 + datos[i + 1] * 0.59 + datos[i + 2] * 0.11;
+      if (prev >= 0 && Math.abs(v - prev) > 40) act[x]++;
+      prev = v;
+    }
+  }
+  // Suavizado (ventana de 4% del ancho) para que las barras formen un bloque
+  const R = Math.max(2, Math.round(ancho * 0.02));
+  const sm = new Float32Array(ancho);
+  let acc = 0;
+  for (let x = 0; x < ancho; x++) {
+    acc += act[x];
+    if (x - 2 * R - 1 >= 0) acc -= act[x - 2 * R - 1];
+    sm[Math.max(0, x - R)] = acc;
+  }
+  let mx = 0;
+  for (let x = 0; x < ancho; x++) if (sm[x] > mx) mx = sm[x];
+  if (mx < 4) return null;
+  const umbral = mx * 0.25;
+  let mejor = null, ini = -1;
+  for (let x = 0; x <= ancho; x++) {
+    const on = x < ancho && sm[x] > umbral;
+    if (on && ini < 0) ini = x;
+    if (!on && ini >= 0) { if (!mejor || x - ini > mejor[1] - mejor[0]) mejor = [ini, x]; ini = -1; }
+  }
+  // Muy angosto no es un código de barras
+  if (!mejor || mejor[1] - mejor[0] < ancho * 0.15) return null;
+  return mejor;
+}
+
+// El lector del navegador (Android) también prueba las franjas si en el
+// cuadro entero no encontró nada
+function _escLectorNativo() {
+  const det = new BarcodeDetector({ formats: ESCANER_FORMATOS });
+  let vuelta = 0;
+  return {
+    async detect(video) {
+      const r = await det.detect(video);
+      if (r && r.length) return r;
+      // Una franja por vuelta, para no cargar el celu
+      const rs = escRecortes(video.videoWidth, video.videoHeight);
+      const f = rs[vuelta++ % rs.length];
+      try { return await det.detect(_escFranja(video, f)); } catch { return []; }
+    },
+    stop() {},
+  };
+}
+
 // Envoltorio con la MISMA forma que BarcodeDetector: detect(video) → [{rawValue}].
 // Así el resto del archivo no sabe cuál de los dos motores está usando.
 function _escLectorZxing() {
@@ -87,12 +179,50 @@ function _escLectorZxing() {
   // DOS intentos por cuadro: esta versión de ZXing falla uno sí y uno no sobre
   // la MISMA imagen (medido: 10 de 20 con un intento, 20 de 20 con dos). Cada
   // intento cuesta ~17 ms, así que sale gratis.
+  const texto = r => r && (typeof r.getText === 'function' ? r.getText() : r.text);
+  const leer = lienzo => {
+    try {
+      const bm = new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(lienzo)));
+      return texto(reader.decodeBitmap(bm)) || '';
+    } catch { return ''; }
+  };
+  let _ajustado = null;
+  // Una franja recortada → código (o nada). Primero recortada justo en las
+  // barras (con poco margen), que es como lee las etiquetas finitas.
+  const deFranja = (video, rec) => {
+    const lienzo = _escFranja(video, rec);
+    try {
+      const g = lienzo.getContext('2d');
+      const b = escBordesBarras(g.getImageData(0, 0, lienzo.width, lienzo.height).data, lienzo.width, lienzo.height);
+      if (b) {
+        if (!_ajustado) _ajustado = document.createElement('canvas');
+        for (const k of [0.01, 0.005, 0.02]) {
+          const m = Math.round(lienzo.width * k);
+          const x0 = Math.max(0, b[0] - m), x1 = Math.min(lienzo.width, b[1] + m);
+          _ajustado.width = x1 - x0; _ajustado.height = lienzo.height;
+          _ajustado.getContext('2d').drawImage(lienzo, x0, 0, x1 - x0, lienzo.height, 0, 0, x1 - x0, lienzo.height);
+          const t = leer(_ajustado);
+          if (t) return t;
+        }
+      }
+    } catch { /* sigue con la franja entera */ }
+    return leer(lienzo);
+  };
   return {
     async detect(video) {
+      // Primero las franjas del medio (así lee la etiqueta de los equipos)
+      // (typeof: las pruebas cargan solo esta función, sin las de recortes)
+      if (video.videoWidth && typeof escRecortes === 'function' && typeof document !== 'undefined' && document.createElement
+          && Z.HTMLCanvasElementLuminanceSource && Z.HybridBinarizer) {
+        for (const rec of escRecortes(video.videoWidth, video.videoHeight)) {
+          const t = deFranja(video, rec);
+          if (t) return [{ rawValue: t }];
+        }
+      }
+      // Después el cuadro entero, como siempre (así lee los EAN de las cajas)
       for (let i = 0; i < 2; i++) {
         try {
-          const r = reader.decode(video);
-          const txt = r && (typeof r.getText === 'function' ? r.getText() : r.text);
+          const txt = texto(reader.decode(video));
           if (txt) return [{ rawValue: txt }];
         } catch { /* cuadro sin código: no es un error */ }
       }
@@ -185,15 +315,17 @@ async function abrirEscaner(cb, opts = {}) {
   _escZoomUtil();
   _escMostrarLinterna();
 
-  _escLector = nativo ? new BarcodeDetector({ formats: ESCANER_FORMATOS }) : _escLectorZxing();
+  _escLector = nativo ? _escLectorNativo() : _escLectorZxing();
   _escEstado('Buscando el código…');
   // Si a los 8 segundos no leyó nada, el problema suele ser distancia o luz.
   // Sin este aviso te quedás mirando la pantalla sin saber qué está pasando.
   _escAyudaTimer = setTimeout(() => {
-    if (_escStream && !_escUltimo.cod) _escEstado('No lo estoy leyendo. Alejá el celu unos 15 cm, buscá más luz y que el código entre entero en el recuadro.');
+    // Las etiquetas de los equipos tienen barras muy finas: tienen que llenar
+    // el recuadro (probado: más chicas, no se leen)
+    if (_escStream && !_escUltimo.cod) _escEstado('No lo estoy leyendo. Que el código llene casi todo el ancho del recuadro, derecho, con luz y sin reflejo.');
   }, 8000);
   // El de respaldo tarda más por cuadro: se le da aire para no trabar la pantalla.
-  _escTimer = setInterval(() => _escBuscar(_escLector, video), nativo ? 220 : 300);
+  _escTimer = setInterval(() => _escBuscar(_escLector, video), nativo ? 220 : 350);
   return true;
 }
 

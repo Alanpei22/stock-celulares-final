@@ -47,7 +47,9 @@ ok(vm.runInContext(`etqImeiRepetido('352472591721837', [{ imei: '352472591721837
 
 console.log('\n3) Enganchado en "Agregar equipo"');
 const html = leer('index.html');
-ok(/onclick="etqEscanearImei\(\)"/.test(html) && html.indexOf('onclick="etqEscanearImei()"') > html.indexOf('id="fi-imei"'), '📷 al lado del IMEI: escanea el código de barras');
+// El 📷 del IMEI es el de siempre (imeiBotonCam: valida el IMEI y completa
+// marca y modelo); el que había agregado era repetido
+ok(!/onclick="etqEscanearImei\(\)"/.test(html) && /imeiBotonCam\('fi-imei'\)/.test(leer('app.js')), '📷 al lado del IMEI: el de siempre, sin uno repetido');
 ok(/id="etq-leer-btn" onclick="etqLeerEtiqueta\(\)"/.test(html), '📸 "Leer la etiqueta con una foto"');
 ok(/<script defer src="etiqueta-equipo\.js"><\/script>/.test(html), 'cargado en la app');
 ok(/inp\.capture = 'environment'/.test(leer('etiqueta-equipo.js')), 'en el celu abre directo la cámara de atrás');
