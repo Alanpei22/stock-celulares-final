@@ -54,5 +54,14 @@ ok(/id="etq-leer-btn" onclick="etqLeerEtiqueta\(\)"/.test(html), '📸 "Leer la 
 ok(/<script defer src="etiqueta-equipo\.js"><\/script>/.test(html), 'cargado en la app');
 ok(/inp\.capture = 'environment'/.test(leer('etiqueta-equipo.js')), 'en el celu abre directo la cámara de atrás');
 
+console.log('\n4) Un solo escaneo lee la etiqueta completa');
+// Alan (18/11): "fijate también que lea la info completa". El código de
+// barras es solo el IMEI: la foto del mismo escaneo va a la IA para el resto.
+const esc = leer('escaner.js'), etq = leer('etiqueta-equipo.js');
+ok(/const foto = _escOpts\.conFoto \? escFotoDelCuadro\(video\) : null;/.test(esc) && esc.indexOf('escFotoDelCuadro(video) : null') < esc.indexOf('if (!_escOpts.continuo) cerrarEscaner();'), 'al leer, guarda lo que veía la cámara antes de apagarla');
+ok(/conFoto: inputId === 'fi-imei'/.test(esc) && /if \(foto && inputId === 'fi-imei' && typeof etqCompletarDesdeFoto === 'function'\) etqCompletarDesdeFoto\(foto\);/.test(esc), 'en Agregar equipo, esa foto completa modelo, capacidad, color, batería y grado');
+ok(/async function etqCompletarDesdeFoto\(dataUrl\)/.test(etq) && /return etqCompletarDesdeFoto\(dataUrl\);/.test(etq), 'la misma lectura que el botón 📸');
+ok(/set\('fi-imei', f\.imei, 'IMEI'\);/.test(etq), 'el IMEI escaneado no lo pisa lo que lea la IA (completa solo lo vacío)');
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

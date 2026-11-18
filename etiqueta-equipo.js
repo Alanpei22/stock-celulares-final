@@ -138,11 +138,19 @@ function etqLeerEtiqueta() {
 }
 
 async function _etqProcesarFoto(file) {
+  let dataUrl;
+  try { dataUrl = await _etqAchicar(file, 1400); }
+  catch { toast('No pude abrir la foto', 'error'); return; }
+  return etqCompletarDesdeFoto(dataUrl);
+}
+
+// Una foto (de la cámara del escáner o sacada a mano) → completa el formulario
+async function etqCompletarDesdeFoto(dataUrl) {
   const btn = document.getElementById('etq-leer-btn');
   const txt = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Leyendo la etiqueta…'; }
+  toast('📸 Leyendo el resto de la etiqueta…', 'info');
   try {
-    const dataUrl = await _etqAchicar(file, 1400);
     const res = await apiFetch('/api/ai', {
       method: 'POST',
       body: JSON.stringify({ action: 'leerEtiquetaEquipo', data: { imageBase64: dataUrl.split(',')[1], imageMediaType: 'image/jpeg' } }),

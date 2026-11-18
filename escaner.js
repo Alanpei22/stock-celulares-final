@@ -360,8 +360,24 @@ async function _escBuscar(detector, video) {
 
   _escAvisar(valor);
   const cb = _escCb;
+  // opts.conFoto: se guarda también lo que veía la cámara (antes de apagarla),
+  // para leer con IA el resto de la etiqueta (modelo, capacidad, color…)
+  const foto = _escOpts.conFoto ? escFotoDelCuadro(video) : null;
   if (!_escOpts.continuo) cerrarEscaner();
-  if (typeof cb === 'function') cb(valor);
+  if (typeof cb === 'function') cb(valor, foto);
+}
+
+// El cuadro de la cámara como foto (JPG, hasta 1400 px)
+function escFotoDelCuadro(video) {
+  try {
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return null;
+    const k = Math.min(1, 1400 / Math.max(vw, vh));
+    const c = document.createElement('canvas');
+    c.width = Math.round(vw * k); c.height = Math.round(vh * k);
+    c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.85);
+  } catch { return null; }
 }
 
 // Que se note que leyó, sin mirar la pantalla.
@@ -485,7 +501,7 @@ function cerrarEscaner() {
 function escanearImei(inputId, campos) {
   const inp = document.getElementById(inputId);
   if (!inp) return Promise.resolve(false);
-  return abrirEscaner(imei => {
+  return abrirEscaner((imei, foto) => {
     inp.value = imei;
     // 'input' para que el cartelito de validación se vuelva a pintar
     try { inp.dispatchEvent(new Event('input', { bubbles: true })); } catch {}
@@ -493,11 +509,16 @@ function escanearImei(inputId, campos) {
     toast('📷 IMEI ' + imei, 'success');
     // Y de paso, qué equipo es
     _autocompletarPorImei(imei, campos || _CAMPOS_EQUIPO[inputId]);
+    // Alan (18/11): "fijate que lea la info completa". El código de barras
+    // trae solo el IMEI; el resto de la etiqueta está escrito. Al cargar un
+    // equipo, la foto del mismo escaneo va a la IA y completa lo demás.
+    if (foto && inputId === 'fi-imei' && typeof etqCompletarDesdeFoto === 'function') etqCompletarDesdeFoto(foto);
   }, {
     titulo: 'Escaneá el IMEI de la etiqueta',
     // Sigue leyendo hasta encontrar uno válido: las cajas tienen varios
     // códigos juntos (IMEI, serie, EAN del producto).
     continuo: false,
+    conFoto: inputId === 'fi-imei',   // agregar equipo: leer también el resto de la etiqueta
     validar: raw => (typeof imeiDesdeCodigo === 'function' ? imeiDesdeCodigo(raw) : null),
     noSirve: 'Ese no es el IMEI (puede ser la serie o el código del producto). Probá con el otro.',
   });
