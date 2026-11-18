@@ -55,6 +55,19 @@ ok(job.pngs.join() === 'PAG1,PAG2' && job.altos.join() === '60,61' && !('html' i
 ok(job.de === 'Celu de Nacho' && job.pag.papelAncho === 58, 'quién lo mandó y el tamaño del papel');
 ok(TOASTS.some(([k, m]) => /Mandado a la impresora de Compu caja/.test(m)), 'avisa adónde fue');
 
+console.log('\n1b) Tocar varias veces no imprime varias');
+// Alan (18/11): "desde el celu se imprimen 3 etiquetas" (un equipo para
+// arreglar). Entre el toque y el aviso pasan un par de segundos y se tocaba
+// de nuevo: cada toque era un pedido.
+const antesRep = Object.keys(DB).filter(k => k.startsWith('cola_impresion/')).length;
+TOASTS.length = 0;
+await run(`Promise.all([qzImprimir('etiqueta', '<div class="pag">A</div>'), qzImprimir('etiqueta', '<div class="pag">A</div>'), qzImprimir('etiqueta', '<div class="pag">A</div>')])`);
+const despues = Object.keys(DB).filter(k => k.startsWith('cola_impresion/')).length;
+ok(despues - antesRep === 1, 'la misma etiqueta tocada 3 veces seguidas: sale una sola', despues - antesRep);
+ok(TOASTS.some(([k, m]) => /Mandando a la impresora de Compu caja/.test(m)) && TOASTS.some(([k, m]) => /Esa ya la mandé recién/.test(m)), 'avisa en el momento que la está mandando, y que la repetida ya salió');
+await run(`qzImprimir('etiqueta', '<div class="pag">B</div>')`);
+ok(Object.keys(DB).filter(k => k.startsWith('cola_impresion/')).length - despues === 1, 'otra etiqueta distinta sí sale enseguida');
+
 console.log('\n2) Pedidos grandes');
 const partes = run(`qzPartirPaginas(['a'.repeat(400), 'b'.repeat(400), 'c'.repeat(400)], [1, 2, 3], 900)`);
 ok(partes.length === 2 && partes[0].pngs.length === 2 && partes[1].altos[0] === 3, 'se parten para que entren en un documento');

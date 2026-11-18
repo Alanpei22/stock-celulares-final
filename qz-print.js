@@ -421,11 +421,34 @@ function qzPartirPaginas(pngs, altos, max) {
   return out;
 }
 
+// ── Toques repetidos ──
+// Alan (18/11): "cuando ingreso un equipo [para arreglar] desde el celu se
+// imprimen 3 etiquetas". La etiqueta se arma bien (una sola, 40×30), pero
+// desde el celu entre el toque y el aviso de "mandado" pasan un par de
+// segundos (arma la imagen y la sube) sin que se vea nada, y se vuelve a
+// tocar: cada toque era una etiqueta más. Ahora avisa en el momento y el
+// mismo pedido repetido enseguida no se manda de nuevo.
+const QZ_REMOTA_REPETIDO_MS = 8000;
+let _qzRemUltimo = { clave: '', t: 0 };
+function qzClavePedido(tipo, html) {
+  const s = String(html || '');
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return tipo + ':' + s.length + ':' + h;
+}
+
 // ── El equipo SIN impresora: manda el pedido ──
 async function qzMandarRemoto(tipo, html) {
   const pag = _qzPagina(tipo);
   if (!pag || typeof db === 'undefined' || !db) return false;
   const r = _qzRemota() || {};
+  const clave = qzClavePedido(tipo, html), ahora = Date.now();
+  if (clave === _qzRemUltimo.clave && ahora - _qzRemUltimo.t < QZ_REMOTA_REPETIDO_MS) {
+    if (typeof toast === 'function') toast('🖨️ Esa ya la mandé recién. Si querés otra copia, tocá de nuevo en unos segundos.', 'info');
+    return true;   // true: que no abra el diálogo como plan B
+  }
+  _qzRemUltimo = { clave, t: ahora };
+  if (typeof toast === 'function') toast(`🖨️ Mandando a la impresora de ${r.nombre || 'la caja'}…`, 'info');
   try {
     const pngs = await _qzPaginasPng(html, pag.selector, pag.ancho, pag.alto, pag.dpi, pag.byn);
     if (!pngs.length) throw new Error('no se armó ninguna página');
@@ -444,6 +467,7 @@ async function qzMandarRemoto(tipo, html) {
     return true;
   } catch (e) {
     console.error('impresión remota:', e);
+    _qzRemUltimo = { clave: '', t: 0 };   // que se pueda reintentar enseguida
     if (typeof toast === 'function') toast('🖨️ No se pudo mandar a la caja (' + ((e && e.message) || e) + ') · sale el diálogo', 'error');
     return false;
   }
