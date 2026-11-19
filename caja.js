@@ -1073,7 +1073,7 @@ function toggleCajaMenu() {
     ]),
     // Facturación y la comisión de Getnet juntas: las dos son "lo que pasa
     // con un cobro digital" (y el menú tiene un tope de opciones, test-menus)
-    sheetGrupo(toggleCajaMenu, 'Facturación y tarjetas', '🧾', 'Facturación y tarjetas', 'Facturas de ARCA, comisión de Getnet y promos', [
+    sheetGrupo(toggleCajaMenu, 'Facturación y tarjetas', '🧾', 'Facturación y tarjetas', 'Facturas de ARCA, Getnet, promos y QR de reseñas', [
       { icon: '🧾', label: 'Sin facturar', sub: 'Cobros digitales que todavía no tienen factura', onClick: () => (typeof abrirSinFacturar === 'function') && abrirSinFacturar() },
       { icon: '📊', label: 'Facturado y tope', sub: 'Cuánto facturaste y cuánto te falta para el tope del monotributo', hide: !isOwner, onClick: () => (typeof abrirFacturado === 'function') && abrirFacturado() },
       { icon: '🏪', label: 'Datos del local en la factura', sub: 'Ingresos Brutos, inicio de actividades, domicilio', hide: !isOwner, onClick: () => (typeof editarDatosFactura === 'function') && editarDatosFactura() },
@@ -1083,6 +1083,10 @@ function toggleCajaMenu() {
       { icon: '🏷️', label: 'Promos', sub: (() => { const n = (typeof PROMOS !== 'undefined' ? PROMOS : []).filter(p => p.activa !== false).length; return n ? `${n} prendida${n === 1 ? '' : 's'} · la caja las aplica sola` : '2x1, 2 x $tanto, 3x2… la caja las aplica sola'; })(),
       // Con la cuenta del dueño alcanza: antes pedía además el PIN y Alan no la encontraba
       hide: !(isOwner || (typeof tpEsDueno === 'function' && tpEsDueno())), onClick: () => (typeof promosAbrir === 'function') && promosAbrir() },
+      // ⭐ El cartel con el QR para que dejen reseña en Google (resenas.js).
+      // Acá adentro por el tope de opciones del menú (test-menus). Imprimir lo
+      // puede cualquiera; cambiar el link, solo el dueño.
+      { icon: '⭐', label: 'QR de reseñas en Google', sub: 'El cartel para el mostrador', onClick: () => (typeof resAbrir === 'function') && resAbrir() },
     ]),
     { icon: '💲', label: 'Precios de reparación', sub: 'Consultar / cargar precios', onClick: () => (typeof openPreciosModal === 'function') && openPreciosModal() },
     { icon: '💬', label: 'WhatsApp: abrir la app de escritorio',
