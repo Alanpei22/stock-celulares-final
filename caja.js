@@ -1066,6 +1066,8 @@ function toggleCajaMenu() {
       { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', hide: no('reporte'), onClick: openReporteModal },
       { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
       { icon: '📄', label: 'Reporte financiero', sub: 'Exportar a PDF por período', hide: !isOwner, onClick: () => (typeof openFinanzasReport === 'function') && openFinanzasReport() },
+      // 📥 La caja vieja de las planillas de Drive (importar-historial.js)
+      { icon: '📥', label: 'Importar historial', sub: 'La caja de las planillas de Drive (2025…)', hide: !(isOwner || (typeof tpEsDueno === 'function' && tpEsDueno())), onClick: () => (typeof impAbrir === 'function') && impAbrir() },
       { icon: '📈', label: 'Equipos vendidos por mes', sub: 'Los últimos meses juntos: si venís para arriba o para abajo', hide: !isOwner,
         onClick: () => (typeof vmAbrir === 'function') && vmAbrir() },
     ]),
