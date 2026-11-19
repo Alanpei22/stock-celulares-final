@@ -19,6 +19,10 @@ const IMP_CATEGORIAS = {
   egreso: ['Compra repuesto', 'Gasto fijo', 'Retiro dueño', 'Otro gasto'],
 };
 const IMP_MAX = 5000;
+// Las cajas diarias de 2026 (un Excel por mes) sí dicen cómo se cobró (transf,
+// mp, débito…): se respeta. Solo se aceptan las formas de pago de la caja; si
+// no viene o es otra cosa, queda "Planilla" como en 2025.
+const IMP_METODOS = ['Efectivo', 'Transferencia', 'MercadoPago', 'Tarjeta débito', 'Tarjeta crédito'];
 
 let _impArchivo = null;   // { origen, nombre, movimientos }
 
@@ -47,7 +51,7 @@ function impValidar(datos) {
       fecha: m.fecha, tipo: m.tipo, categoria: m.categoria, monto,
       descripcion: String(m.descripcion || m.categoria).slice(0, 120),
       // No se sabe cómo se pagó: la planilla no lo dice
-      metodoPago: 'Planilla',
+      metodoPago: IMP_METODOS.includes(m.metodoPago) ? m.metodoPago : 'Planilla',
       createdAt: m.fecha + 'T12:00:00.000Z',
       importado: origen, historico: true,
     };
@@ -76,7 +80,7 @@ function impAbrir() {
   if (!dueno) { toast('Esto lo hace el dueño', 'error'); return; }
   _impArchivo = null;
   _impPintar(`
-    <p class="imp-sub">Subí el archivo <b>.json</b> que te armé con la planilla de la caja (por ejemplo <b>caja-2025-planilla.json</b>).
+    <p class="imp-sub">Subí el archivo <b>.json</b> que te armé con la planilla de la caja (por ejemplo <b>caja-2025-planilla.json</b> o <b>caja-2026-ene-mar.json</b>).
     Antes de guardar te muestro qué tiene. Importarlo dos veces no duplica nada.</p>
     <label class="imp-file">📂 Elegir el archivo<input type="file" accept=".json,application/json" onchange="impElegido(this.files && this.files[0])" hidden></label>
     <div class="imp-borrar"><button type="button" class="imp-link" onclick="impBorrarPregunta()">🗑 Borrar un historial importado</button></div>`);
@@ -90,6 +94,7 @@ async function impElegido(file) {
   const v = impValidar(datos);
   if (v.error) { toast(v.error, 'error'); return; }
   _impArchivo = v;
+  const choque = await _impYaCargado(v.movimientos);
   const f = n => (typeof fmt === 'function' ? fmt(n) : '$' + Math.round(n).toLocaleString('es-AR'));
   const meses = impResumen(v.movimientos);
   const tot = meses.reduce((a, m) => ({ i: a.i + m.ingresos, e: a.e + m.egresos }), { i: 0, e: 0 });
@@ -99,8 +104,26 @@ async function impElegido(file) {
     <table class="imp-tabla"><tr><th>Mes</th><th>Entró</th><th>Salió</th></tr>
       ${meses.map(m => `<tr><td>${N[+m.mes.slice(5)]} ${m.mes.slice(0, 4)}</td><td>${f(m.ingresos)}</td><td>${f(m.egresos)}</td></tr>`).join('')}
       <tr class="imp-tot"><td>Total</td><td>${f(tot.i)}</td><td>${f(tot.e)}</td></tr></table>
-    <p class="imp-sub">Neto: <b>${f(tot.i - tot.e)}</b>. Quedan en la caja de cada día como "importado de la planilla" (cómo se pagó: "Planilla").</p>
+    <p class="imp-sub">Neto: <b>${f(tot.i - tot.e)}</b>. Quedan en la caja de cada día como "importado de la planilla".</p>
+    ${choque ? `<p class="imp-ojo">⚠️ Ojo: en esas fechas la app ya tiene <b>${choque.n}${choque.mas ? ' o más' : ''}</b> movimientos cargados a mano (el primero, el ${_impEsc(choque.desde)}). Si esos días ya están en la app, se van a contar dos veces.</p>` : ''}
     <button type="button" class="imp-ok" id="imp-ok" onclick="impGuardar()">📥 Importar ${v.movimientos.length} movimientos</button>`);
+}
+
+// ¿La app ya tiene movimientos propios (no importados) en las fechas del
+// archivo? Las cajas de 2026 llegan hasta fines de marzo y por esos días se
+// empezó a usar la app: importar encima duplicaría esos días. Lee pocos
+// documentos (tope 300) para no gastar el cupo de Firebase.
+async function _impYaCargado(movs) {
+  if (typeof db === 'undefined' || !db || !movs.length) return null;
+  const fechas = movs.map(x => x.data.fecha).sort();
+  try {
+    const snap = await db.collection('caja_movimientos')
+      .where('fecha', '>=', fechas[0]).where('fecha', '<=', fechas[fechas.length - 1])
+      .orderBy('fecha').limit(300).get();
+    const propios = snap.docs.map(d => d.data()).filter(m => !m.importado);
+    if (!propios.length) return null;
+    return { n: propios.length, mas: snap.size === 300, desde: propios[0].fecha.split('-').reverse().join('/') };
+  } catch (e) { console.warn('importar: no pude revisar si ya había movimientos', e); return null; }
 }
 
 async function impGuardar() {
@@ -131,7 +154,7 @@ async function impGuardar() {
 }
 
 async function impBorrarPregunta() {
-  const origen = prompt('¿Qué historial importado borro?\n\nEscribí su origen (el de la planilla de 2025 es: planilla-2025)', 'planilla-2025');
+  const origen = prompt('¿Qué historial importado borro?\n\nEscribí su origen: planilla-2025, caja-2026 o caja-2026-telefonia', 'planilla-2025');
   if (!origen) return;
   try {
     const snap = await db.collection('caja_movimientos').where('importado', '==', origen.trim()).get();
@@ -178,6 +201,7 @@ function _impEstilos() {
   .imp-tabla th, .imp-tabla td { padding: 6px 4px; border-bottom: 1px solid rgba(128,128,128,.25); text-align: right; }
   .imp-tabla th:first-child, .imp-tabla td:first-child { text-align: left; }
   .imp-tot td { font-weight: 800; }
+  .imp-ojo { font-size: 13.5px; line-height: 1.4; margin: 8px 0; padding: 10px; border-radius: 10px; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.45); }
   .imp-ok { width: 100%; padding: 13px; border: 0; border-radius: 12px; background: var(--accent, #C8965A); color: #111; font-weight: 800; font-size: 15px; cursor: pointer; margin-top: 8px; }
   .imp-borrar { text-align: center; margin-top: 4px; }
   .imp-link { border: 0; background: transparent; color: #ef4444; cursor: pointer; font-size: 13px; text-decoration: underline; }`;

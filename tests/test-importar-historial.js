@@ -33,6 +33,11 @@ ok(/fecha/.test(mal({ fecha: '2/6' })) && /id/.test(mal({ id: 'cualquiera' })), 
 ok(/repetido/.test(run(`impValidar(${JSON.stringify(Object.assign({}, base, { movimientos: [base.movimientos[0], base.movimientos[0]] }))}).error`)), 'un movimiento repetido, no');
 ok(run('impValidar({ movimientos: [] }).error') && run('impValidar(null).error'), 'un archivo vacío o de otra cosa, no');
 
+// 2026 (Alan, 19/11): las cajas diarias dicen cómo se cobró y se respeta
+const conMetodo = metodo => run(`impValidar(${JSON.stringify(Object.assign({}, base, { movimientos: [Object.assign({}, base.movimientos[0], { metodoPago: metodo })] }))}).movimientos[0].data.metodoPago`);
+ok(conMetodo('Transferencia') === 'Transferencia' && conMetodo('Efectivo') === 'Efectivo' && conMetodo('Tarjeta débito') === 'Tarjeta débito', 'la forma de pago de la planilla se respeta');
+ok(conMetodo('Cualquiera') === 'Planilla' && conMetodo(undefined) === 'Planilla', 'una forma de pago que la caja no tiene → "Planilla"');
+
 console.log('\n2) El resumen antes de importar');
 const r = run('impResumen(impValidar(B).movimientos)');
 ok(r.length === 2 && r[0].mes === '2025-06' && r[0].ingresos === 595000 && r[0].egresos === 800000 && r[1].egresos === 500000, 'por mes: lo que entró y lo que salió', r);
@@ -44,5 +49,16 @@ ok(/where\('importado', '==', origen\.trim\(\)\)/.test(src), 'se puede borrar to
 ok(/label: 'Importar historial'/.test(leer('caja.js')) && /<script src="importar-historial\.js"><\/script>/.test(leer('caja.html')), 'menú de la caja → Informes → Importar historial (solo el dueño)');
 ok(!/hist2025_2025-0[5-9]|hist2025_2025-1/.test(leer('caja.js') + leer('caja.html')), 'los datos de la planilla no están en el código');
 
-console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
-process.exit(fails ? 1 : 0);
+console.log('\n4) Aviso si esos días ya están cargados en la app');
+const docs = arr => ({ size: arr.length, docs: arr.map(x => ({ data: () => x })) });
+const dbFalsa = lista => ({ collection: () => { const q = { where: () => q, orderBy: () => q, limit: () => q, get: async () => docs(lista) }; return q; } });
+(async () => {
+  ctx.db = dbFalsa([{ fecha: '2025-06-02', importado: 'planilla-2025' }]);
+  ok(await run('_impYaCargado(impValidar(B).movimientos)') === null, 'si lo único que hay es lo importado antes: no avisa');
+  ctx.db = dbFalsa([{ fecha: '2025-06-02', importado: 'planilla-2025' }, { fecha: '2025-07-01', monto: 5 }]);
+  const c = await run('_impYaCargado(impValidar(B).movimientos)');
+  ok(c && c.n === 1 && c.desde === '01/07/2025', 'si la app ya tiene movimientos propios en esas fechas: avisa desde cuándo', c);
+  ok(/imp-ojo/.test(src) && /_impYaCargado\(v\.movimientos\)/.test(src), 'el aviso sale antes de importar');
+  console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
+  process.exit(fails ? 1 : 0);
+})();
