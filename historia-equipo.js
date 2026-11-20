@@ -123,12 +123,24 @@ function heAjustarBordes(q, grad, margen) {
       // a igual borde, se prefiere no moverse (la IA casi siempre anda cerca)
       return s * (1 - Math.abs(o) / margen * 0.15);
     };
-    // Arranca en lo que dijo la IA y solo se mueve si encuentra un borde
-    // más claro (si la foto es pareja, no se toca)
-    let mejor = 0, mejorV = puntaje(0);
-    for (let o = -margen; o <= margen; o += Math.max(1, margen / 12)) {
-      const s = puntaje(o);
-      if (s > mejorV) { mejorV = s; mejor = o; }
+    // Cerca del teléfono suele haber VARIOS bordes (pantalla/marco,
+    // marco/mano, mano/fondo). Quedarse con el más marcado a veces elige el
+    // de la mano y queda un hilito de piel. Por eso: de los bordes claros
+    // (al menos la mitad del más marcado), el más cercano a lo que dijo la
+    // IA; si hay dos igual de cerca, el de adentro (perder un pelito de
+    // marco no se nota, un pedazo de mano sí). Si la foto es pareja, nada.
+    const paso = Math.max(1, margen / 12), os = [], ss = [];
+    for (let o = -margen; o <= margen + 1e-9; o += paso) { os.push(o); ss.push(puntaje(o)); }
+    const max = Math.max(...ss);
+    let mejor = 0;
+    if (max > 0) {
+      let dist = Infinity;
+      for (let k = 0; k < os.length; k++) {
+        const pico = ss[k] >= max * 0.5 && (k === 0 || ss[k] >= ss[k - 1]) && (k === os.length - 1 || ss[k] >= ss[k + 1]);
+        if (!pico) continue;
+        const dd = Math.abs(os[k]) + (os[k] > 0 ? 0.5 : 0);   // a igual distancia, gana el de adentro
+        if (dd < dist) { dist = dd; mejor = os[k]; }
+      }
     }
     return { nx, ny, o: mejor };
   });
@@ -223,7 +235,7 @@ function heRecortar(cv, esquinas) {
   let q = heEsquinasPx(esquinas, cv.width, cv.height);
   const m0 = heMedidas(q);
   q = heAjustarBordes(q, _heGradiente(cv), Math.max(3, Math.min(m0.ancho, m0.alto) * 0.035));
-  q = heAchicar(q, Math.max(2, Math.min(m0.ancho, m0.alto) * 0.01));
+  q = heAchicar(q, Math.max(2, Math.min(m0.ancho, m0.alto) * 0.026));
   const m = heMedidas(q);
   // Que quede parado aunque en la foto esté acostado
   let giro = m.giro, ancho = m.ancho, alto = m.alto;
@@ -287,16 +299,18 @@ function heFondo(x, cv) {
       mx.drawImage(src, 0, 0, m.width, m.height);
       src = m;
     }
-    const chico = _heCanvas(18, 32);
+    // 36×64: desenfocado pero se reconoce el lugar (Alan, 20/11: como las
+    // historias de las casas de celulares, "fondo real")
+    const chico = _heCanvas(36, 64);
     const c = chico.getContext('2d');
     c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
-    const k = Math.max(18 / src.width, 32 / src.height);
-    c.drawImage(src, (18 - src.width * k) / 2, (32 - src.height * k) / 2, src.width * k, src.height * k);
+    const k = Math.max(36 / src.width, 64 / src.height);
+    c.drawImage(src, (36 - src.width * k) / 2, (64 - src.height * k) / 2, src.width * k, src.height * k);
     // Dos pasadas (chico → mediano → grande): queda más parejo, sin cuadros
     const medio = _heCanvas(108, 192);
     const mc = medio.getContext('2d');
     mc.imageSmoothingEnabled = true; mc.imageSmoothingQuality = 'high';
-    mc.drawImage(chico, -4, -4, 116, 200);
+    mc.drawImage(chico, -2, -2, 112, 196);
     x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
     x.drawImage(medio, -80, -80, HE_W + 160, HE_H + 160);
     x.save();
@@ -304,7 +318,7 @@ function heFondo(x, cv) {
     x.fillStyle = 'rgba(128,128,128,.88)';
     x.fillRect(0, 0, HE_W, HE_H);
     x.restore();
-    x.fillStyle = 'rgba(8,10,14,.55)';
+    x.fillStyle = 'rgba(8,10,14,.42)';
     x.fillRect(0, 0, HE_W, HE_H);
   } else {
     const g = x.createLinearGradient(0, 0, 0, HE_H);
@@ -317,40 +331,76 @@ function heFondo(x, cv) {
   x.fillStyle = v; x.fillRect(0, 0, HE_W, HE_H);
 }
 
-// Los íconos de "Incluye", dibujados con línea (un emoji sale distinto en
-// cada celular y no combina con el estilo)
+// Los íconos de "Incluye": dibujados con volumen (blanco con degradé y
+// brillo), para que parezcan el cargador o la funda de verdad, como en las
+// historias de las casas de celulares (Alan, 20/11). Un emoji sale distinto
+// en cada celular y no combina con el estilo.
 function heDibujarIcono(x, tipo, cx, cy, s) {
   x.save();
   x.translate(cx, cy);
-  x.strokeStyle = '#fff'; x.fillStyle = '#fff';
-  x.lineWidth = s * 0.07; x.lineCap = 'round'; x.lineJoin = 'round';
-  const rr = (X, Y, W, H, R) => { _heRedondo(x, X, Y, W, H, R); };
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  const blanco = (y0, y1) => { const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c9ced6'); return g; };
+  const vidrio = (y0, y1) => { const g = x.createLinearGradient(-s * 0.3, y0, s * 0.3, y1); g.addColorStop(0, 'rgba(255,255,255,.42)'); g.addColorStop(1, 'rgba(255,255,255,.06)'); return g; };
+  const sombra = () => { x.shadowColor = 'rgba(0,0,0,.45)'; x.shadowBlur = s * 0.12; x.shadowOffsetY = s * 0.04; };
   if (tipo === 'cargador') {
-    rr(-s * 0.3, -s * 0.18, s * 0.6, s * 0.5, s * 0.1); x.stroke();
-    x.beginPath(); x.moveTo(-s * 0.12, -s * 0.18); x.lineTo(-s * 0.12, -s * 0.42); x.moveTo(s * 0.12, -s * 0.18); x.lineTo(s * 0.12, -s * 0.42); x.stroke();
-    x.beginPath(); x.moveTo(0, s * 0.32); x.quadraticCurveTo(0, s * 0.5, s * 0.25, s * 0.48); x.stroke();
+    // el cubito blanco con las patitas, y el cable enrollado al lado
+    x.strokeStyle = '#e9ecf0'; x.lineWidth = s * 0.07;
+    for (let k = 0; k < 3; k++) { x.beginPath(); x.ellipse(s * 0.2, s * 0.14, s * 0.2 - k * s * 0.035, s * 0.22 - k * s * 0.035, 0, 0, Math.PI * 2); x.stroke(); }
+    x.beginPath(); x.moveTo(-s * 0.05, s * 0.2); x.quadraticCurveTo(0, s * 0.42, s * 0.12, s * 0.34); x.stroke();
+    x.fillStyle = '#b8bec7';
+    x.fillRect(-s * 0.3, -s * 0.46, s * 0.05, s * 0.16); x.fillRect(-s * 0.15, -s * 0.46, s * 0.05, s * 0.16);
+    sombra(); x.fillStyle = blanco(-s * 0.3, s * 0.25);
+    _heRedondo(x, -s * 0.4, -s * 0.3, s * 0.4, s * 0.5, s * 0.07); x.fill();
   } else if (tipo === 'cable') {
-    rr(-s * 0.42, -s * 0.36, s * 0.2, s * 0.26, s * 0.05); x.stroke();
-    rr(s * 0.22, s * 0.1, s * 0.2, s * 0.26, s * 0.05); x.stroke();
-    x.beginPath(); x.moveTo(-s * 0.32, -s * 0.1); x.bezierCurveTo(-s * 0.32, s * 0.4, s * 0.32, -s * 0.4, s * 0.32, s * 0.1); x.stroke();
+    x.strokeStyle = '#eef0f3'; x.lineWidth = s * 0.07;
+    for (let k = 0; k < 4; k++) { x.beginPath(); x.ellipse(0, s * 0.02, s * 0.34 - k * s * 0.05, s * 0.3 - k * s * 0.05, 0, 0, Math.PI * 2); x.stroke(); }
+    sombra(); x.fillStyle = blanco(-s * 0.46, -s * 0.2);
+    _heRedondo(x, -s * 0.06, -s * 0.46, s * 0.12, s * 0.22, s * 0.03); x.fill();
   } else if (tipo === 'funda') {
-    rr(-s * 0.25, -s * 0.42, s * 0.5, s * 0.84, s * 0.12); x.stroke();
-    rr(-s * 0.15, -s * 0.32, s * 0.2, s * 0.2, s * 0.05); x.stroke();
+    // la funda transparente, un poco girada, con el hueco de la cámara
+    x.rotate(-0.22);
+    x.fillStyle = vidrio(-s * 0.45, s * 0.45);
+    _heRedondo(x, -s * 0.24, -s * 0.45, s * 0.48, s * 0.9, s * 0.1); x.fill();
+    x.strokeStyle = 'rgba(255,255,255,.95)'; x.lineWidth = s * 0.05;
+    _heRedondo(x, -s * 0.24, -s * 0.45, s * 0.48, s * 0.9, s * 0.1); x.stroke();
+    x.strokeStyle = 'rgba(255,255,255,.55)'; x.lineWidth = s * 0.025;
+    _heRedondo(x, -s * 0.2, -s * 0.41, s * 0.4, s * 0.82, s * 0.08); x.stroke();
+    x.strokeStyle = 'rgba(255,255,255,.9)'; x.lineWidth = s * 0.035;
+    _heRedondo(x, -s * 0.17, -s * 0.38, s * 0.17, s * 0.17, s * 0.04); x.stroke();
   } else if (tipo === 'templado') {
-    rr(-s * 0.25, -s * 0.42, s * 0.5, s * 0.84, s * 0.1); x.stroke();
-    x.globalAlpha = 0.7;
-    x.beginPath(); x.moveTo(-s * 0.1, -s * 0.22); x.lineTo(s * 0.1, -s * 0.36); x.moveTo(-s * 0.12, -s * 0.06); x.lineTo(s * 0.14, -s * 0.24); x.stroke();
+    // el vidrio: lámina con brillo en diagonal
+    x.rotate(-0.22);
+    x.fillStyle = vidrio(-s * 0.45, s * 0.45);
+    _heRedondo(x, -s * 0.24, -s * 0.45, s * 0.48, s * 0.9, s * 0.08); x.fill();
+    x.strokeStyle = 'rgba(255,255,255,.9)'; x.lineWidth = s * 0.035;
+    _heRedondo(x, -s * 0.24, -s * 0.45, s * 0.48, s * 0.9, s * 0.08); x.stroke();
+    x.save(); _heRedondo(x, -s * 0.24, -s * 0.45, s * 0.48, s * 0.9, s * 0.08); x.clip();
+    x.fillStyle = 'rgba(255,255,255,.45)';
+    x.beginPath(); x.moveTo(-s * 0.3, -s * 0.05); x.lineTo(s * 0.3, -s * 0.38); x.lineTo(s * 0.3, -s * 0.24); x.lineTo(-s * 0.3, s * 0.09); x.closePath(); x.fill();
+    x.restore();
+    x.fillStyle = 'rgba(255,255,255,.8)';
+    _heRedondo(x, -s * 0.06, -s * 0.41, s * 0.12, s * 0.03, s * 0.015); x.fill();
   } else if (tipo === 'caja') {
-    x.beginPath();
-    x.moveTo(0, -s * 0.4); x.lineTo(s * 0.38, -s * 0.2); x.lineTo(s * 0.38, s * 0.24); x.lineTo(0, s * 0.44); x.lineTo(-s * 0.38, s * 0.24); x.lineTo(-s * 0.38, -s * 0.2); x.closePath();
-    x.moveTo(-s * 0.38, -s * 0.2); x.lineTo(0, 0); x.lineTo(s * 0.38, -s * 0.2); x.moveTo(0, 0); x.lineTo(0, s * 0.44);
-    x.stroke();
+    sombra();
+    x.fillStyle = blanco(-s * 0.42, s * 0.42);
+    _heRedondo(x, -s * 0.26, -s * 0.42, s * 0.52, s * 0.84, s * 0.06); x.fill();
+    x.shadowColor = 'transparent';
+    x.strokeStyle = 'rgba(0,0,0,.15)'; x.lineWidth = s * 0.02;
+    x.beginPath(); x.moveTo(-s * 0.26, -s * 0.3); x.lineTo(s * 0.26, -s * 0.3); x.stroke();
   } else if (tipo === 'auriculares') {
-    x.beginPath(); x.arc(0, s * 0.05, s * 0.34, Math.PI, 0); x.stroke();
-    rr(-s * 0.42, s * 0.02, s * 0.16, s * 0.3, s * 0.06); x.fill();
-    rr(s * 0.26, s * 0.02, s * 0.16, s * 0.3, s * 0.06); x.fill();
+    sombra(); x.fillStyle = blanco(-s * 0.1, s * 0.4);
+    _heRedondo(x, -s * 0.3, -s * 0.06, s * 0.6, s * 0.44, s * 0.18); x.fill();
+    x.shadowColor = 'transparent';
+    x.strokeStyle = 'rgba(0,0,0,.18)'; x.lineWidth = s * 0.02;
+    x.beginPath(); x.moveTo(-s * 0.3, s * 0.08); x.lineTo(s * 0.3, s * 0.08); x.stroke();
+    x.fillStyle = blanco(-s * 0.46, -s * 0.1);
+    x.beginPath(); x.ellipse(-s * 0.14, -s * 0.28, s * 0.1, s * 0.14, -0.3, 0, Math.PI * 2); x.fill();
+    x.beginPath(); x.ellipse(s * 0.14, -s * 0.28, s * 0.1, s * 0.14, 0.3, 0, Math.PI * 2); x.fill();
   } else {
-    x.beginPath(); x.arc(0, 0, s * 0.36, 0, Math.PI * 2); x.stroke();
+    sombra(); x.fillStyle = blanco(-s * 0.36, s * 0.36);
+    x.beginPath(); x.arc(0, 0, s * 0.36, 0, Math.PI * 2); x.fill();
+    x.shadowColor = 'transparent';
+    x.strokeStyle = '#16a34a'; x.lineWidth = s * 0.08;
     x.beginPath(); x.moveTo(-s * 0.16, 0); x.lineTo(-s * 0.03, s * 0.13); x.lineTo(s * 0.18, -s * 0.12); x.stroke();
   }
   x.restore();
@@ -373,20 +423,20 @@ function _heBateria(x, cx, cy, s, pct) {
 // calcula aparte del dibujo para poder probarlo.
 function heLayout(d, altoModelo) {
   const L = {};
-  L.pie = HE_H - 70;
-  L.precio = { top: L.pie - 50 - 150, alto: 150 };            // aunque no haya precio: el lugar queda
-  let abajo = L.precio.top - 34;
+  L.pie = HE_H - 64;
+  L.precio = { top: L.pie - 44 - 146, alto: 146 };            // aunque no haya precio: el lugar queda
+  let abajo = L.precio.top - 28;
   if (d.incluye && d.incluye.length) {
-    L.incluye = { top: abajo - 170, alto: 170, titulo: abajo - 170 - 22 };
-    abajo = L.incluye.titulo - 50;
+    L.incluye = { top: abajo - 172, alto: 172, titulo: abajo - 172 - 18 };
+    abajo = L.incluye.titulo - 46;
   }
-  if (d.bateria) { L.bateria = { top: abajo - 92, alto: 92 }; abajo = L.bateria.top - 26; }
-  L.marca = 178; L.linea = 206; L.sub = 252;
-  L.modeloTop = 300;
+  if (d.bateria) { L.bateria = { top: abajo - 92, alto: 92 }; abajo = L.bateria.top - 18; }
+  L.marca = 168; L.linea = 194; L.sub = 238;
+  L.modeloTop = 278;
   L.modeloBase = L.modeloTop + altoModelo;
-  let arriba = L.modeloBase + 26;
-  if (d.capacidad) { L.capacidad = { top: arriba, alto: 82 }; arriba += 82 + 20; }
-  L.equipos = { top: arriba + 10, bottom: abajo - 10 };
+  let arriba = L.modeloBase + 22;
+  if (d.capacidad) { L.capacidad = { top: arriba, alto: 80 }; arriba += 80 + 12; }
+  L.equipos = { top: arriba + 6, bottom: abajo - 6 };
   return L;
 }
 
@@ -440,11 +490,11 @@ function heDibujar(d, piezas) {
     x.font = _heF(800, 48);
     const w = x.measureText(d.capacidad).width + 90, t = L.capacidad.top;
     x.fillStyle = 'rgba(12,14,20,.78)';
-    _heRedondo(x, (HE_W - w) / 2, t, w, L.capacidad.alto, 41); x.fill();
+    _heRedondo(x, (HE_W - w) / 2, t, w, L.capacidad.alto, 40); x.fill();
     x.strokeStyle = '#fff'; x.lineWidth = 6;
-    _heRedondo(x, (HE_W - w) / 2, t, w, L.capacidad.alto, 41); x.stroke();
+    _heRedondo(x, (HE_W - w) / 2, t, w, L.capacidad.alto, 40); x.stroke();
     x.fillStyle = '#fff';
-    x.fillText(d.capacidad, HE_W / 2, t + 57);
+    x.fillText(d.capacidad, HE_W / 2, t + 56);
   }
 
   // 4. Los teléfonos, grandes, sin cortarse en los bordes
@@ -487,7 +537,7 @@ function heDibujar(d, piezas) {
     for (let i = 0; i < n; i++) {
       const cx = X + col * i + col / 2;
       if (i) { x.strokeStyle = 'rgba(255,255,255,.4)'; x.lineWidth = 2; x.beginPath(); x.moveTo(X + col * i, t + 26); x.lineTo(X + col * i, t + h - 26); x.stroke(); }
-      heDibujarIcono(x, heIcono(it[i]), cx, t + 66, 76);
+      heDibujarIcono(x, heIcono(it[i]), cx, t + 70, 92);
       x.fillStyle = '#fff';
       _heEntra(x, it[i], 700, 30, 20, col - 20);
       x.fillText(it[i], cx, t + h - 26);
@@ -503,9 +553,17 @@ function heDibujar(d, piezas) {
     x.save();
     x.shadowColor = 'rgba(0,0,0,.5)'; x.shadowBlur = 30; x.shadowOffsetY = 10;
     const g = x.createLinearGradient(0, t, 0, t + h);
-    g.addColorStop(0, '#ff4545'); g.addColorStop(1, '#b30d18');
+    g.addColorStop(0, '#d42a2a'); g.addColorStop(0.55, '#a51212'); g.addColorStop(1, '#6a0808');
     x.fillStyle = g;
     _heRedondo(x, X, t, w, h, h / 2); x.fill();
+    x.restore();
+    // el brillo de arriba (como una pastilla de vidrio)
+    x.save();
+    _heRedondo(x, X, t, w, h, h / 2); x.clip();
+    const br = x.createLinearGradient(0, t, 0, t + h * 0.5);
+    br.addColorStop(0, 'rgba(255,255,255,.32)'); br.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = br;
+    _heRedondo(x, X + h * 0.25, t + 6, w - h * 0.5, h * 0.46, h * 0.23); x.fill();
     x.restore();
     x.strokeStyle = '#fff'; x.lineWidth = 6;
     _heRedondo(x, X, t, w, h, h / 2); x.stroke();
@@ -530,9 +588,10 @@ function heDibujar(d, piezas) {
 function heDibujarEquipos(x, piezas, top, bottom) {
   const lista = [piezas.espalda, piezas.frente].filter(Boolean);   // la espalda atrás
   if (!lista.length) return;
-  const H = bottom - top, W = 1000;
+  const H = bottom - top, W = 1040;
   const dos = lista.length === 2;
-  const ang = dos ? [7, -7] : [-4];
+  const ang = dos ? [4, -4] : [-3];
+  const GAP = 26;                    // un poquito de aire entre los dos
   const caja = (c, a, alto) => {
     const k = alto / c.height, w = c.width * k, r = Math.abs(a) * Math.PI / 180;
     return { w: w * Math.cos(r) + alto * Math.sin(r), h: w * Math.sin(r) + alto * Math.cos(r), k };
@@ -541,11 +600,11 @@ function heDibujarEquipos(x, piezas, top, bottom) {
   let alto = H;
   for (; alto > 120; alto -= 8) {
     const cs = lista.map((c, i) => caja(c, ang[i], alto));
-    const anchoTot = dos ? cs[0].w + cs[1].w - Math.min(cs[0].w, cs[1].w) * 0.18 : cs[0].w;
+    const anchoTot = dos ? cs[0].w + cs[1].w + GAP : cs[0].w;
     if (Math.max(...cs.map(c => c.h)) <= H && anchoTot <= W) break;
   }
   const cs = lista.map((c, i) => caja(c, ang[i], alto));
-  const anchoTot = dos ? cs[0].w + cs[1].w - Math.min(cs[0].w, cs[1].w) * 0.18 : cs[0].w;
+  const anchoTot = dos ? cs[0].w + cs[1].w + GAP : cs[0].w;
   let px = (HE_W - anchoTot) / 2;
   const cy = top + H / 2;
   // Espalda a la derecha (atrás), frente a la izquierda (adelante)
