@@ -365,6 +365,7 @@ function unlockOwnerMode() {
   clearTimeout(_ownerLockTimer);
   _ownerLockTimer = setTimeout(lockOwnerMode, 15 * 60 * 1000);
   toast('🔓 Modo dueño activo', 'success');
+  if (typeof tpRepintar === 'function' && typeof tpMostrador === 'function' && tpMostrador()) tpRepintar();
 }
 
 // El modo dueño se bloquea a los 15 minutos SIN USO, no a los 15 minutos de
@@ -388,9 +389,12 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
 }
 
 function lockOwnerMode() {
+  const estaba = OWNER_MODE;
   OWNER_MODE = false;
   document.body.classList.remove('owner-mode');
   clearTimeout(_ownerLockTimer);
+  // aplicarRol llama a esto: solo se repinta si de verdad se estaba en modo dueño
+  if (estaba && typeof tpRepintar === 'function' && typeof tpMostrador === 'function' && tpMostrador()) setTimeout(tpRepintar, 0);
   document.querySelectorAll('.owner-lock-btn').forEach(b => {
     const iconEl = b.querySelector('.lock-icon');
     if (iconEl) iconEl.textContent = '🔒'; else b.textContent = '🔒';

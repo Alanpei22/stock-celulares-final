@@ -419,6 +419,8 @@ function openArqueoModal(cajaChicaPreset = 0) {
 
   const hintEl  = document.getElementById('arqueo-cajachica-hint');
   const rapidEl = document.getElementById('arqueo-confirm-rapido');
+  // 🙈 Ciego: no se dice cuánto se dejó de caja chica: hay que contarlo
+  if (typeof cajaCiega === 'function' && cajaCiega()) cajaChicaPreset = 0;
   if (cajaChicaPreset > 0) {
     if (hintEl) {
       // MED-13: mostrar fecha real en vez de hardcodear "ayer"
@@ -1052,13 +1054,18 @@ function toggleCajaMenu() {
   const no = p => (typeof tpPuede === 'function') ? !tpPuede(p) : emp;
   openSheet('Caja', [
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
-    { icon: '🔒', label: 'Modo dueño', hide: emp, onClick: openCajaOwnerPin },
+    { icon: '🔒', label: 'Modo dueño', hide: emp && !(typeof tpCuentaDueno === 'function' && tpCuentaDueno()), onClick: openCajaOwnerPin },
     { divider: true, hide: emp },
     sheetGrupo(toggleCajaMenu, 'Arqueo y chequeos', '🧾', 'Arqueo y chequeos', 'Contar la caja, cambio de cajero y los chequeos', [
       { icon: '🧾', label: 'Arqueo de caja', hide: no('cierre'), onClick: reopenArqueo },
       { icon: '🔄', label: 'Cierre de turno', sub: 'Cambio de cajero', hide: no('cierre'), onClick: openCierreParcialModal },
       { icon: '⏰', label: 'Chequeo de caja', sub: 'Horarios obligatorios', hide: !isOwner, onClick: openChequeoConfig },
       { icon: '🧾', label: 'Chequeos de hoy', sub: 'Contado vs esperado', hide: !isOwner, onClick: openChequeosHoy },
+      // 🙈 Modo mostrador: en ESTA compu la cuenta del dueño no muestra la
+      // plata sin el PIN (roles.js). Prenderlo y apagarlo es del dueño.
+      { icon: '🙈', label: 'Modo mostrador (esta compu)',
+        sub: (typeof tpMostrador === 'function' && tpMostrador()) ? '✅ Prendido: sin PIN no se ve la plata' : 'Que en esta compu no se vea la plata sin tu PIN',
+        hide: !(typeof tpEsDueno === 'function' && tpEsDueno()), onClick: cajaMostradorToggle },
     ]),
     { icon: '🔐', label: CIERRE ? 'Cierre registrado' : 'Cerrar caja del día', sub: CIERRE ? `Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}` : null, hide: no('cierre'), onClick: openCierreModal },
     sheetGrupo(toggleCajaMenu, 'Informes', '📊', 'Informes', 'Reporte del día, búsquedas y estadísticas', [
@@ -1099,6 +1106,21 @@ function toggleCajaMenu() {
   ]);
 }
 function closeCajaMenu() { closeSheet(); }
+
+function cajaMostradorToggle() {
+  closeCajaMenu();
+  if (typeof tpMostrador !== 'function') return;
+  if (tpMostrador()) {
+    if (!confirm('¿Apagar el modo mostrador en esta compu?\n\nSe va a volver a ver la plata del día sin PIN.')) return;
+    tpMostradorPoner(false);
+    toast('Modo mostrador apagado en esta compu', 'info');
+    return;
+  }
+  if (!confirm('🙈 Modo mostrador en ESTA compu\n\n• No se ve el total del día, el efectivo, el neto ni los reportes.\n• El arqueo y el cierre se hacen a ciegas (sin ver lo esperado).\n• Para ver todo: 🔒 Modo dueño con tu PIN (se bloquea solo).\n\nTu celular no cambia. ¿Prenderlo?')) return;
+  if (typeof _cajaIsOwner !== 'undefined' && _cajaIsOwner && typeof lockCajaOwner === 'function') lockCajaOwner();
+  tpMostradorPoner(true);
+  toast('🙈 Modo mostrador prendido: sin tu PIN no se ve la plata', 'success');
+}
 
 // 💳 Cuánto se queda Getnet. Se carga una vez (y cuando cambie la comisión)
 // y vale para todos los dispositivos. Solo el dueño (modo dueño).
@@ -4831,19 +4853,26 @@ function updateCierreTotal() {
     if (subEl) subEl.textContent = '$' + sub.toLocaleString('es-AR');
   });
   const dif = contado - esperado;
-  document.getElementById('cierre-esperado-val').textContent = fmt(esperado);
+  // 🙈 Ciego: se cuenta sin ver cuánto tendría que haber
+  const ciega = typeof cajaCiega === 'function' && cajaCiega();
+  // (los dólares "en caja" y su diferencia, igual: se cuentan sin saber cuántos hay)
+  ['cierre-esperado-val', 'cierre-dif-val', 'cierre-usd-dif-val'].forEach(id => {
+    const row = document.getElementById(id)?.closest('.cierre-resumen-row');
+    if (row) row.style.display = ciega ? 'none' : '';
+  });
+  document.getElementById('cierre-esperado-val').textContent = ciega ? '' : fmt(esperado);
   document.getElementById('cierre-contado-val').textContent  = fmt(contado);
   // Dólares en caja (aparte del efectivo en pesos)
   const usdCaja = _usdEnCaja();
   const usdRow = document.getElementById('cierre-usd-row');
   if (usdRow) {
-    usdRow.style.display = usdCaja !== 0 ? '' : 'none';
+    usdRow.style.display = usdCaja !== 0 && !ciega ? '' : 'none';
     const usdValEl = document.getElementById('cierre-usd-val');
     if (usdValEl) usdValEl.textContent = 'u$ ' + Math.round(usdCaja).toLocaleString('es-AR');
   }
   const difEl = document.getElementById('cierre-dif-val');
   if (difEl) {
-    difEl.textContent = (dif >= 0 ? '+' : '') + '$' + dif.toLocaleString('es-AR');
+    difEl.textContent = ciega ? '' : (dif >= 0 ? '+' : '') + '$' + dif.toLocaleString('es-AR');
     difEl.className = 'cierre-dif-val ' + (Math.abs(dif) <= 500 ? 'dif-ok' : 'dif-warn');
   }
 }
@@ -4860,6 +4889,12 @@ async function saveCierre() {
   });
   const diferencia = contado - esperado;
 
+  const ciega = typeof cajaCiega === 'function' && cajaCiega();
+  // 🙈 Ciego: no se avisa la diferencia (sería decirle cuánto había). Solo
+  // se confirma lo que contó.
+  if (ciega) {
+    if (!confirm(`🔐 Cerrar la caja con $${contado.toLocaleString('es-AR')} contados en efectivo?\n\nRevisá el conteo antes de confirmar.`)) return;
+  } else
   // BUG-FIX: confirmación si hay diferencia grande
   if (Math.abs(diferencia) > 500) {
     const signo = diferencia > 0 ? 'sobra' : 'falta';
@@ -4878,7 +4913,7 @@ async function saveCierre() {
     const ok = confirm(
       `⚠️ Ya hay un cierre registrado para hoy:\n` +
       `   Contado: $${(CIERRE.contado || 0).toLocaleString('es-AR')}\n` +
-      `   Diferencia: $${(CIERRE.diferencia || 0).toLocaleString('es-AR')}\n\n` +
+      (ciega ? '' : `   Diferencia: $${(CIERRE.diferencia || 0).toLocaleString('es-AR')}\n`) + `\n` +
       `¿Sobrescribir con el nuevo cierre?`
     );
     if (!ok) return;
@@ -4914,7 +4949,8 @@ async function saveCierre() {
     const difStr = diferencia === 0
       ? 'sin diferencia ✅'
       : (diferencia > 0 ? '+' : '') + '$' + diferencia.toLocaleString('es-AR');
-    toast('🔐 Cierre guardado — ' + difStr, Math.abs(diferencia) <= 500 ? 'success' : 'info');
+    if (ciega) toast('🔐 Cierre guardado. La diferencia la ve el dueño.', 'success');
+    else toast('🔐 Cierre guardado — ' + difStr, Math.abs(diferencia) <= 500 ? 'success' : 'info');
     // 📨 Aviso Telegram: cierre de caja con desglose completo del día
     if (typeof tgNotify === 'function') {
       const ingMovs = MOVIMIENTOS.filter(m => m.tipo === 'ingreso');
@@ -5009,6 +5045,9 @@ function openCierreParcialModal() {
     const rows = [];
     rows.push(`<div class="parcial-desde">⏱ Período desde <strong>${esc(desdeHora)}</strong> · ${stats.count} movimiento${stats.count !== 1 ? 's' : ''}</div>`);
     rows.push('<div class="parcial-grid">');
+    const ciega = typeof cajaCiega === 'function' && cajaCiega();
+    if (ciega) rows.push(`<span class="pg-lbl" style="grid-column:1/-1">🙈 Contá el efectivo de la caja y anotalo abajo. Lo que tendría que haber lo ve el dueño.</span>`);
+    else {
     if (stats.totalIng > 0) {
       rows.push(`<span class="pg-lbl">Ingresos</span><span class="pg-val pg-ing">+${fmt(stats.totalIng)}</span>`);
       if (stats.efec > 0 && stats.digital > 0) {
@@ -5020,6 +5059,7 @@ function openCierreParcialModal() {
       rows.push(`<span class="pg-lbl">Egresos</span><span class="pg-val pg-eg">−${fmt(stats.totalEg)}</span>`);
     rows.push(`<span class="pg-lbl">Neto turno</span><span class="pg-val" style="color:${stats.neto>=0?'#10b981':'#ef4444'}">${stats.neto>=0?'+':''}${fmt(stats.neto)}</span>`);
     rows.push(`<span class="pg-lbl">💵 Ef. esperado caja</span><span class="pg-val">${fmt(esperado)}</span>`);
+    }
     rows.push('</div>');
     info.innerHTML = rows.join('');
   }

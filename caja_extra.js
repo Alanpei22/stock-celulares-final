@@ -138,6 +138,8 @@ async function submitCajaOwnerPin() {
       _cajaOwnerRenovar();
       closeCajaOwnerPin();
       toast('Modo dueño activado', 'success');
+      // 🙈 En modo mostrador: ahora sí se ve la plata
+      if (typeof tpRepintar === 'function') tpRepintar();
     } else {
       document.getElementById('caja-owner-error').textContent = 'PIN incorrecto';
       _cajaOwnerBuf = '';
@@ -175,6 +177,8 @@ function lockCajaOwner() {
   document.body.classList.remove('owner-mode');
   const _ob2 = document.getElementById('caja-owner-btn'); if (_ob2) _ob2.textContent = '🔒';
   clearTimeout(_cajaOwnerTimer);
+  // 🙈 En modo mostrador: se vuelve a esconder la plata
+  if (typeof tpRepintar === 'function') tpRepintar();
 }
 
 // ══════════════════════════════════════════

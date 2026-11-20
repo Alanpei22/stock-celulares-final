@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-mostrador-ciego.js': '🙈 Modo mostrador (la cuenta del dueño en la compu del local no muestra la plata sin PIN) y arqueo ciego (el que cuenta no ve lo esperado ni la diferencia)',
   'test-historia-equipo.js': '✨ Historia de WhatsApp de un equipo: la IA ubica los teléfonos, la app ajusta el borde, recorta, tapa el IMEI y arma la historia sin que nada se pise',
   'test-resenas.js': '⭐ QR de reseñas en Google: solo links de Google, el cartel sale con el QR del link guardado, y el link lo cambia solo el dueño',
   'test-importar-historial.js': '📥 Importar la caja vieja de las planillas de Drive (archivo .json): valida, muestra el resumen por mes, no duplica y se puede borrar',

@@ -63,6 +63,44 @@ const TP_PERMISOS = [
 ];
 const TP_PERMISOS_DEF = TP_PERMISOS.filter(p => p.def).map(p => p.k);
 
+// ── 🙈 Modo mostrador (Alan, 20/11) ──────────────────────────
+// "Necesito ocultar todo del usuario principal": en la compu del local
+// queda abierta la cuenta del dueño y los chicos veían la plata del día. Con
+// el modo mostrador prendido EN ESA COMPU (se guarda en el navegador, no en
+// la cuenta), la cuenta del dueño trabaja como un empleado: cobra, carga,
+// abre y cierra la caja (a ciegas), pero no ve totales, neto, reportes ni
+// ganancias. Con el PIN de dueño se ve todo hasta que se bloquea solo. En el
+// celular del dueño no cambia nada.
+// ⚠️ Es la pantalla: la cuenta sigue pudiendo leer todo en Firebase. Lo que
+//    protege de verdad es que cada empleado entre con SU cuenta.
+const TP_PERMISOS_MOSTRADOR = ['caja', 'gastos', 'cierre', 'stock', 'reparaciones', 'inventario'];
+function tpMostrador() {
+  try { return localStorage.getItem('tp-mostrador') === '1'; } catch { return false; }
+}
+function tpMostradorPoner(si) {
+  try { if (si) localStorage.setItem('tp-mostrador', '1'); else localStorage.removeItem('tp-mostrador'); } catch {}
+  tpRepintar();
+}
+// ¿Está puesto el PIN de dueño (en la caja o en la página principal)?
+function _tpDesbloqueado() {
+  try { if (typeof _cajaIsOwner !== 'undefined' && _cajaIsOwner) return true; } catch {}
+  try { if (typeof OWNER_MODE !== 'undefined' && OWNER_MODE) return true; } catch {}
+  return false;
+}
+// La cuenta ES la del dueño (aunque ahora esté en modo mostrador)
+function tpCuentaDueno() {
+  let u = null;
+  try { u = (typeof currentUser === 'function') ? currentUser() : null; } catch {}
+  return !!(u && TP_USUARIOS[u.uid] && TP_USUARIOS[u.uid].rol === 'dueno');
+}
+// Al poner o sacar el PIN: la pantalla se vuelve a pintar con lo que corresponde
+function tpRepintar() {
+  try { aplicarRol(); } catch {}
+  ['renderStats', 'renderMovimientos', 'renderEquiposDia'].forEach(f => {
+    try { if (typeof globalThis[f] === 'function') globalThis[f](); } catch {}
+  });
+}
+
 // Empleados creados desde la app (👥 Empleados): el nombre viene en la marca
 // de la cuenta (custom claim). Se lee una vez y queda guardado por UID para
 // que la próxima vez esté al instante.
@@ -96,6 +134,7 @@ function tpPermisos() {
   const u = tpUsuario();
   if (!u) return [];
   if (u.rol === 'dueno') return TP_PERMISOS.map(p => p.k);
+  if (u.mostrador) return TP_PERMISOS_MOSTRADOR.slice();
   let guardado = null;
   try { guardado = localStorage.getItem('tpPerms_' + u.uid); } catch {}
   let lista = null;
@@ -123,6 +162,8 @@ function tpUsuario() {
   try { u = (typeof currentUser === 'function') ? currentUser() : null; } catch {}
   if (!u) return null;
   const ficha = TP_USUARIOS[u.uid];
+  // 🙈 La cuenta del dueño en la compu del mostrador, sin el PIN puesto
+  if (ficha && ficha.rol === 'dueno' && tpMostrador() && !_tpDesbloqueado()) return { uid: u.uid, nombre: ficha.nombre, rol: 'empleado', mostrador: true };
   if (ficha) return { uid: u.uid, nombre: ficha.nombre, rol: ficha.rol };
   const nombre = _tpNombreGuardado(u.uid) || u.displayName || (u.email || 'Usuario').split('@')[0];
   return { uid: u.uid, nombre, rol: 'empleado', desconocido: !_tpNombreGuardado(u.uid) && !u.displayName };
@@ -154,6 +195,16 @@ function aplicarRol() {
     // Una clase por permiso: `.req-totales` se ve solo con `body.p-totales`
     const tiene = tpPermisos();
     TP_PERMISOS.forEach(p => document.body.classList.toggle('p-' + p.k, tiene.indexOf(p.k) >= 0));
+    // En modo mostrador el candado del modo dueño tiene que seguir a la vista
+    // (está marcado "solo dueño" y se escondería): es la forma de ver la plata
+    const mos = tpMostrador() && tpCuentaDueno();
+    document.body.classList.toggle('tp-mostrador', mos);
+    if (mos && !document.getElementById('tp-mostrador-css')) {
+      const st = document.createElement('style');
+      st.id = 'tp-mostrador-css';
+      st.textContent = 'body.rol-empleado.tp-mostrador .owner-lock-btn.solo-dueno, body.rol-empleado.tp-mostrador #caja-owner-btn { display: flex !important; }';
+      document.head.appendChild(st);
+    }
   } catch {}
   // Un empleado no entra a modo dueño aunque adivine el PIN: la cuenta no lo tiene.
   if (emp) {
@@ -164,10 +215,18 @@ function aplicarRol() {
   return emp;
 }
 
+// 🙈 Arqueo ciego (Alan, 20/11): el que cuenta la plata no ve cuánto
+// "tendría que haber" ni la diferencia (si la ve, no cuenta: copia). La ve
+// el que tiene permiso de ver la plata: el dueño (en el mostrador, con PIN).
+function cajaCiega() { return !tpPuede('totales'); }
+
 // Cortafuegos para las acciones que son del dueño. Devuelve true si hay que
 // frenar. Se usa arriba de todo en las funciones que abren plata.
 function tpFrenarEmpleado(queEs) {
   if (tpEsDueno()) return false;
+  // En modo mostrador, la cuenta del dueño sí puede pedir el PIN (es la
+  // forma de destapar todo); lo demás "solo del dueño" sigue frenado sin él
+  if (tpCuentaDueno() && /modo dueño/i.test(String(queEs || ''))) return false;
   try { if (typeof toast === 'function') toast((queEs || 'Eso') + ' es solo del dueño', 'error'); } catch {}
   return true;
 }
