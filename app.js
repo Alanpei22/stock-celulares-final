@@ -1810,6 +1810,7 @@ function openDetail(id) {
     <div class="det-acc-grid">
       ${!p.vendido ? tile('🟢', 'WhatsApp', `shareWhatsApp('${p.id}')`) : ''}
       ${!p.vendido ? tile('📲', 'Estado', `eeEstadoDe('${p.id}')`) : ''}
+      ${!p.vendido ? tile('✨', 'Historia', `heAbrir('${p.id}')`) : ''}
       ${!p.vendido ? tile('🏷️', 'Etiqueta', `etiquetaDe('${p.id}')`) : ''}
       ${!p.vendido && !p.reservado ? tile('✏️', 'Editar', `closeDetail();openForm('${p.id}')`) : ''}
       ${p.reservado ? tile('📄', 'Comprobante reserva', `printReservaDe('${p.id}')`) : ''}

@@ -301,6 +301,48 @@ Reglas:
     }
   }
 
+  // ── ubicarEquipos: dónde está cada teléfono en las fotos ──
+  // Para la historia de WhatsApp de un equipo (historia-equipo.js, Alan
+  // 20/11): la app recorta los teléfonos de las fotos (sin la mano ni el
+  // mostrador) y tapa los datos que no se muestran (IMEI, serie, EID, MAC).
+  // Recortar "a mano" en el celu no se puede sin un programa pesado: la IA
+  // dice dónde están las 4 esquinas de cada teléfono y la app recorta con esa
+  // forma (y después ajusta el borde ella sola).
+  if (action === 'ubicarEquipos') {
+    const imgs = (Array.isArray(data.imagenes) ? data.imagenes : []).slice(0, 4).map(s => String(s || ''));
+    if (!imgs.length || imgs.some(s => !s)) return json({ error: 'Faltan las fotos' }, 400);
+    if (imgs.reduce((t, s) => t + s.length, 0) > 8_000_000) return json({ error: 'Fotos demasiado grandes' }, 413);
+    const prompt =
+`Te paso ${imgs.length} foto${imgs.length === 1 ? '' : 's'} (numeradas desde 0, en orden) de UN celular usado que vende un local. Las fotos son para recortar el teléfono y armar una publicidad.
+Respondé ÚNICAMENTE con este JSON (sin texto antes ni después, sin markdown):
+{"frente":{"foto":0,"esquinas":[[0,0],[0,0],[0,0],[0,0]],"entero":true},"espalda":{"foto":1,"esquinas":[[0,0],[0,0],[0,0],[0,0]],"entero":true},"fondo":0,"sensibles":[{"foto":0,"caja":[0,0,0,0]}]}
+Reglas:
+- Coordenadas en milésimas del ancho y del alto de ESA foto: x de 0 (borde izquierdo) a 1000 (borde derecho), y de 0 (arriba) a 1000 (abajo).
+- frente: la mejor foto donde se ve la PANTALLA del teléfono; espalda: la mejor donde se ve la parte de ATRÁS (cámaras). Si no hay ninguna de ese lado, poné null.
+- esquinas: las 4 esquinas del borde EXTERIOR del cuerpo del teléfono (con la funda si tiene una puesta), en este orden: arriba-izquierda, arriba-derecha, abajo-derecha, abajo-izquierda del teléfono tal como se ve en la foto. Si un dedo tapa una esquina, estimá dónde está. Sé lo más preciso que puedas: con esto se recorta.
+- entero: false si una parte del teléfono queda afuera de la foto.
+- fondo: la foto que mejor sirve de fondo (la más prolija).
+- sensibles: cajas [x0,y0,x1,y1] alrededor de cualquier texto visible con IMEI, número de serie, EID, ICCID o direcciones Wi-Fi / Bluetooth (en la pantalla, en una etiqueta o en la caja), en cualquiera de las fotos. Si no hay, [].`;
+    try {
+      const content = imgs.map(s => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: s } }));
+      content.push({ type: 'text', text: prompt });
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'claude-opus-5-5', max_tokens: 1500, messages: [{ role: 'user', content }] })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error?.message || 'Error de API');
+      if (result.stop_reason === 'refusal') return json({ error: 'No se pudieron ubicar los equipos' }, 422);
+      const texto = (result.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+      const ubicacion = parsearUbicacion(texto, imgs.length);
+      if (!ubicacion) return json({ error: 'No encontré el teléfono en las fotos' }, 422);
+      return json({ ubicacion });
+    } catch (err) {
+      return json({ error: err.message }, 500);
+    }
+  }
+
   // ── oficina: un personaje de 🏢 La oficina "lo piensa" con IA ──
   // El cliente manda quién es (pj), lo que vio (hallazgos), los datos de su
   // parte ya resumidos y, si querés, una pregunta. Vuelve un JSON fijo
@@ -519,6 +561,45 @@ export function parsearTicket(texto) {
 
 // La respuesta del modelo → los datos de la etiqueta, con tipos sanos. Un
 // IMEI que no tiene 15 números no se usa (mejor vacío que uno equivocado).
+// La respuesta de ubicarEquipos, revisada: coordenadas dentro de la foto,
+// 4 esquinas que formen un teléfono de verdad (ni una rayita ni la foto
+// entera), y las fotos que existen. Lo que no cierra se descarta.
+export function parsearUbicacion(texto, nFotos) {
+  const m = String(texto || '').match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  let o;
+  try { o = JSON.parse(m[0]); } catch { return null; }
+  if (!o || typeof o !== 'object') return null;
+  const n = Math.max(1, Math.round(Number(nFotos) || 1));
+  const foto = v => { const i = Math.round(Number(v)); return i >= 0 && i < n ? i : -1; };
+  const num = v => Math.min(1000, Math.max(0, Math.round(Number(v) || 0)));
+  const lado = l => {
+    if (!l || typeof l !== 'object' || !Array.isArray(l.esquinas) || l.esquinas.length !== 4) return null;
+    const f = foto(l.foto);
+    if (f < 0) return null;
+    const e = l.esquinas.map(p => Array.isArray(p) ? [num(p[0]), num(p[1])] : null);
+    if (e.some(p => !p)) return null;
+    // Área del cuadrilátero (fórmula del cordón): un teléfono ocupa algo
+    let a = 0;
+    for (let i = 0; i < 4; i++) { const [x1, y1] = e[i], [x2, y2] = e[(i + 1) % 4]; a += x1 * y2 - x2 * y1; }
+    a = Math.abs(a) / 2;
+    if (a < 15000 || a > 990000) return null;          // menos del 1,5% de la foto, o la foto entera
+    return { foto: f, esquinas: e, entero: l.entero !== false };
+  };
+  const r = { frente: lado(o.frente), espalda: lado(o.espalda), fondo: foto(o.fondo), sensibles: [] };
+  if (r.fondo < 0) r.fondo = r.frente ? r.frente.foto : (r.espalda ? r.espalda.foto : 0);
+  (Array.isArray(o.sensibles) ? o.sensibles : []).slice(0, 20).forEach(s => {
+    const f = foto(s && s.foto);
+    const c = s && Array.isArray(s.caja) && s.caja.length === 4 ? s.caja.map(num) : null;
+    if (f < 0 || !c) return;
+    const [x0, y0, x1, y1] = [Math.min(c[0], c[2]), Math.min(c[1], c[3]), Math.max(c[0], c[2]), Math.max(c[1], c[3])];
+    if (x1 - x0 < 3 || y1 - y0 < 3) return;
+    r.sensibles.push({ foto: f, caja: [x0, y0, x1, y1] });
+  });
+  if (!r.frente && !r.espalda) return null;
+  return r;
+}
+
 export function parsearEtiqueta(texto) {
   const m = String(texto || '').match(/\{[\s\S]*\}/);
   if (!m) return null;
