@@ -99,6 +99,13 @@ ok(/toLocaleUpperCase\('es-AR'\)/.test(he0) && /'SERVICIO TÉCNICO · VENTA'/.te
 ok(/HE_AZUL = '#3b82f6'/.test(he0) && !/HE_ROJO|#e11d2a|#d42a2a/.test(he0), 'la línea y el precio en el azul del logo (ya no en rojo)');
 ok(/const fichaC = /.test(he0), 'el cargador y el cable con su ficha USB-C dibujada');
 
+console.log('\n5d) La garantía (Alan, 20/11: "hay que aclarar también el tema de la garantía")');
+ok(run(`heDatos({ modelo: 'A15', garantiaMeses: 3 })`).garantia === 3 && run(`heDatos({ modelo: 'A15' })`).garantia === 0, 'sale de los meses de garantía que tiene cargados el equipo (sin cargar, no sale)');
+ok(run('heGarantiaTxt(3)') === 'GARANTÍA 3 MESES' && run('heGarantiaTxt(1)') === 'GARANTÍA 1 MES' && run('heGarantiaTxt(0)') === '', '"GARANTÍA 3 MESES" / "GARANTÍA 1 MES"');
+const conGar = lay({ capacidad: '', bateria: 0, garantia: 6, incluye: [], precio: '' }, 100);
+ok(!!conGar.bateria, 'con garantía y sin batería, la fila igual sale (con la garantía sola)');
+ok(/id="he-gar"/.test(he0), 'en la pantalla se puede cambiar o sacar');
+
 console.log('\n6) Enganchado');
 const he = leer('historia-equipo.js');
 ok(/action === 'ubicarEquipos'/.test(api) && /corteSiNoAutorizadoEdge/.test(api), 'la IA está en /api/ai, que pide sesión');

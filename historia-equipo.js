@@ -60,6 +60,9 @@ function heDatos(p) {
     capacidad: cap,
     bateria: bat >= 1 && bat <= 100 && p.estado !== 'Nuevo' ? bat : 0,
     incluye: (Array.isArray(p.incluye) ? p.incluye : []).map(s => String(s).trim()).filter(Boolean).slice(0, 5),
+    // Alan (20/11): "hay que aclarar también el tema de la garantía". Sale de
+    // los meses de garantía que ya tiene cargados el equipo.
+    garantia: Math.max(0, Math.min(36, Math.round(Number(p.garantiaMeses) || 0))),
     precio: precio > 0 && !p.ocultarPrecio ? hePrecioTxt(precio, usd ? 'usd' : 'ars') : '',
     fotos: (Array.isArray(p.fotos) ? p.fotos : []).filter(u => typeof u === 'string' && /^https:\/\//.test(u)),
   };
@@ -70,6 +73,12 @@ function hePrecioTxt(n, moneda) {
   const v = Math.round(Number(n) || 0);
   if (!v) return '';
   return (moneda === 'usd' ? 'U$S ' : '$ ') + v.toLocaleString('es-AR') + '.-';
+}
+
+// "GARANTÍA 3 MESES" / "GARANTÍA 1 MES"
+function heGarantiaTxt(meses) {
+  const m = Math.round(Number(meses) || 0);
+  return m > 0 ? `GARANTÍA ${m} ${m === 1 ? 'MES' : 'MESES'}` : '';
 }
 
 // Qué ícono lleva cada cosa que incluye
@@ -521,6 +530,26 @@ function heDibujarIcono(x, tipo, cx, cy, s) {
   x.restore();
 }
 
+// El escudo de la garantía (con el tilde), en el azul de la marca
+function _heEscudo(x, cx, cy, s) {
+  x.save();
+  x.translate(cx, cy);
+  x.beginPath();
+  x.moveTo(0, -s * 0.5);
+  x.bezierCurveTo(s * 0.18, -s * 0.38, s * 0.32, -s * 0.36, s * 0.42, -s * 0.36);
+  x.bezierCurveTo(s * 0.44, s * 0.08, s * 0.3, s * 0.36, 0, s * 0.5);
+  x.bezierCurveTo(-s * 0.3, s * 0.36, -s * 0.44, s * 0.08, -s * 0.42, -s * 0.36);
+  x.bezierCurveTo(-s * 0.32, -s * 0.36, -s * 0.18, -s * 0.38, 0, -s * 0.5);
+  x.closePath();
+  const g = x.createLinearGradient(0, -s * 0.5, 0, s * 0.5);
+  g.addColorStop(0, '#60a5fa'); g.addColorStop(1, HE_AZUL_OSC);
+  x.fillStyle = g; x.fill();
+  x.strokeStyle = '#fff'; x.lineWidth = s * 0.07; x.stroke();
+  x.strokeStyle = '#fff'; x.lineWidth = s * 0.09; x.lineCap = 'round'; x.lineJoin = 'round';
+  x.beginPath(); x.moveTo(-s * 0.16, 0); x.lineTo(-s * 0.03, s * 0.13); x.lineTo(s * 0.18, -s * 0.12); x.stroke();
+  x.restore();
+}
+
 function _heBateria(x, cx, cy, s, pct) {
   const w = s * 1.5, h = s * 0.8;
   x.save();
@@ -545,7 +574,7 @@ function heLayout(d, altoModelo) {
     L.incluye = { top: abajo - 172, alto: 172, titulo: abajo - 172 - 18 };
     abajo = L.incluye.titulo - 46;
   }
-  if (d.bateria) { L.bateria = { top: abajo - 92, alto: 92 }; abajo = L.bateria.top - 18; }
+  if (d.bateria || d.garantia) { L.bateria = { top: abajo - 92, alto: 92 }; abajo = L.bateria.top - 18; }
   L.marca = 168; L.linea = 194; L.sub = 238;
   L.modeloTop = 278;
   L.modeloBase = L.modeloTop + altoModelo;
@@ -623,25 +652,38 @@ function heDibujar(d, piezas) {
 
   // 4. (Los teléfonos ya están: se dibujaron antes que los textos)
 
-  // 5a. Batería
+  // 5a. Batería y garantía: en la misma fila, lado a lado (o una sola, al medio)
   if (L.bateria) {
     const t = L.bateria.top, h = L.bateria.alto;
-    x.font = _heF(600, 44);
-    const a = 'BATERÍA ', b = `${d.bateria}%`;
-    const wa = x.measureText(a).width;
-    x.font = _heF(900, 46);
-    const wb = x.measureText(b).width;
-    const w = 50 + 76 + 22 + wa + wb + 50;
-    const X = (HE_W - w) / 2;
-    x.fillStyle = HE_MARINO;
-    _heRedondo(x, X, t, w, h, h / 2); x.fill();
-    x.strokeStyle = '#fff'; x.lineWidth = 5;
-    _heRedondo(x, X, t, w, h, h / 2); x.stroke();
-    _heBateria(x, X + 50 + 34, t + h / 2, 48, d.bateria);
-    x.textAlign = 'left'; x.fillStyle = '#fff';
-    x.font = _heF(600, 44); x.fillText(a, X + 50 + 76 + 22, t + 62);
-    x.font = _heF(900, 46); x.fillText(b, X + 50 + 76 + 22 + wa, t + 62);
-    x.textAlign = 'center';
+    const pastillas = [];
+    if (d.bateria) pastillas.push({ ico: 'bateria', a: 'BATERÍA ', b: `${d.bateria}%` });
+    if (d.garantia) pastillas.push({ ico: 'garantia', a: 'GARANTÍA ', b: `${d.garantia} ${d.garantia === 1 ? 'MES' : 'MESES'}` });
+    // Con las dos, la letra se achica hasta que entren en el ancho
+    const medir = tam => pastillas.map(p => {
+      x.font = _heF(600, tam); const wa = x.measureText(p.a).width;
+      x.font = _heF(900, tam + 2); const wb = x.measureText(p.b).width;
+      // la batería es más ancha que el escudo: cada ícono con su lugar
+      const icoW = tam * (p.ico === 'bateria' ? 1.9 : 1.15);
+      return Object.assign({}, p, { tam, wa, wb, icoW, w: 40 + icoW + 18 + wa + wb + 40 });
+    });
+    let tam = 44, ps = medir(tam);
+    const GAP = 22;
+    while (tam > 28 && ps.reduce((a, p) => a + p.w, 0) + GAP * (ps.length - 1) > 1000) { tam -= 2; ps = medir(tam); }
+    let X = (HE_W - (ps.reduce((a, p) => a + p.w, 0) + GAP * (ps.length - 1))) / 2;
+    ps.forEach(p => {
+      x.fillStyle = HE_MARINO;
+      _heRedondo(x, X, t, p.w, h, h / 2); x.fill();
+      x.strokeStyle = '#fff'; x.lineWidth = 5;
+      _heRedondo(x, X, t, p.w, h, h / 2); x.stroke();
+      const icx = X + 40 + p.icoW / 2, base = t + h / 2 + p.tam * 0.36;
+      if (p.ico === 'bateria') _heBateria(x, icx, t + h / 2, p.tam * 1.08, d.bateria);
+      else _heEscudo(x, icx, t + h / 2, p.tam * 1.2);
+      x.textAlign = 'left'; x.fillStyle = '#fff';
+      x.font = _heF(600, p.tam); x.fillText(p.a, X + 40 + p.icoW + 18, base);
+      x.font = _heF(900, p.tam + 2); x.fillText(p.b, X + 40 + p.icoW + 18 + p.wa, base);
+      x.textAlign = 'center';
+      X += p.w + GAP;
+    });
   }
 
   // 5b. Incluye
@@ -815,6 +857,7 @@ function heAbrir(id) {
       <label class="he-l">Capacidad<input id="he-cap" class="he-in" value="${esc(d.capacidad)}" placeholder="128 GB"></label>
       <label class="he-l">Batería %<input id="he-bat" class="he-in" type="number" inputmode="numeric" min="1" max="100" value="${d.bateria || ''}" placeholder="—"></label>
     </div>
+    <label class="he-l">Garantía (meses) <small>(vacío o 0 = no sale)</small><input id="he-gar" class="he-in" type="number" inputmode="numeric" min="0" max="36" value="${d.garantia || ''}" placeholder="—"></label>
     <div class="he-l">Incluye</div>
     <div class="he-chips" id="he-inc">${chips}</div>
     <label class="he-l">Precio <small>(vacío = lugar libre para el widget de precio de WhatsApp)</small><input id="he-precio" class="he-in" value="${esc(d.precio)}" placeholder="U$S 380.-"></label>
@@ -844,6 +887,8 @@ function heLeerPantalla() {
   d.capacidad = v('he-cap');
   const b = Math.round(Number(v('he-bat')) || 0);
   d.bateria = b >= 1 && b <= 100 ? b : 0;
+  const g = Math.round(Number(v('he-gar')) || 0);
+  d.garantia = g >= 1 && g <= 36 ? g : 0;
   d.incluye = [...document.querySelectorAll('#he-inc .he-chip.on')].map(c => c.textContent.trim()).slice(0, 5);
   let pr = v('he-precio');
   // "380" solo → con el formato del local
