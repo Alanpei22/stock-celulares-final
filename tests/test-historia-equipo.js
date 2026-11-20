@@ -87,6 +87,13 @@ ok(resp({ ...bueno, frente: { foto: 0, esquinas: [[1, 2], [3, 4]] } }) === null,
 ok(resp({ ...bueno, sensibles: [{ foto: 9, caja: [1, 1, 50, 50] }, { foto: 1, caja: [800, 900, 100, 50] }] }).sensibles[0].caja.join() === '100,50,800,900', 'las cajas del IMEI se ordenan y las de fotos que no existen se descartan');
 ok(run(`parsearUbicacion('no hay nada', 1)`) === null && run(`parsearUbicacion('{"frente":null,"espalda":null}', 1)`) === null, 'sin ningún teléfono: null (sale con las fotos enteras)');
 
+console.log('\n5b) Con la mano (Alan, 20/11: "queda más real")');
+const he0 = leer('historia-equipo.js');
+ok(/function heConMano\(cv, esquinas\)/.test(he0) && /const cortar = conMano \? heConMano : heRecortar/.test(he0), 'hay dos formas: con la mano (se desvanece hacia el fondo) o solo el teléfono');
+ok(/getItem\('tp-historia-modo'\) === 'recorte' \? 'recorte' : 'mano'/.test(he0), 'por defecto, con la mano (y se acuerda lo que elegiste)');
+ok(/out\._tel = \{ w: ancho, h: alto \}/.test(he0) && /const tel = c\._tel \|\|/.test(he0), 'con la mano se acomoda por el tamaño del TELÉFONO (la mano puede desbordar desvanecida)');
+ok(he0.indexOf('heDibujarEquipos(x, piezas, L.equipos.top') < he0.indexOf("x.fillText('TECHPOINT'"), 'los teléfonos se dibujan antes que los textos (lo desvanecido no tapa nada escrito)');
+
 console.log('\n6) Enganchado');
 const he = leer('historia-equipo.js');
 ok(/action === 'ubicarEquipos'/.test(api) && /corteSiNoAutorizadoEdge/.test(api), 'la IA está en /api/ai, que pide sesión');

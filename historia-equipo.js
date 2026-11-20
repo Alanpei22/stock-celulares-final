@@ -251,6 +251,92 @@ function heRecortar(cv, esquinas) {
   return out;
 }
 
+// CON LA MANO (Alan, 20/11: "no tengo drama si se ve la mano, queda más
+// real"): el teléfono derecho y entero, más un poco de lo que tiene
+// alrededor (la mano que lo sostiene), que se va desvaneciendo hacia el
+// fondo. Así la foto sigue pareciendo una foto, como en las historias de
+// las casas de celulares. El teléfono queda 100% visible; lo de alrededor,
+// cada vez más transparente.
+function heConMano(cv, esquinas) {
+  const q = heEsquinasPx(esquinas, cv.width, cv.height);
+  const m = heMedidas(q);
+  let giro = m.giro, ancho = m.ancho, alto = m.alto;
+  if (ancho > alto) { giro += Math.PI / 2; [ancho, alto] = [alto, ancho]; }
+  // Cuánto de alrededor: lo que dé la foto (si el teléfono está pegado al
+  // borde, menos: afuera de la foto no hay nada y se vería el corte)
+  const dentro = (fw, fh) => {
+    const c = Math.cos(giro), si = Math.sin(giro);
+    return [[-1, -1], [1, -1], [1, 1], [-1, 1]].every(([a, b]) => {
+      const u = a * ancho * fw / 2, v = b * alto * fh / 2;
+      const X = m.cx + u * c - v * si, Y = m.cy + u * si + v * c;
+      return X >= -2 && Y >= -2 && X <= cv.width + 2 && Y <= cv.height + 2;
+    });
+  };
+  let fw = 1.6, fh = 1.18;
+  while ((fw > 1.06 || fh > 1.04) && !dentro(fw, fh)) { fw = Math.max(1.06, fw - 0.05); fh = Math.max(1.04, fh - 0.02); }
+  const W = ancho * fw, H = alto * fh;
+  const out = _heCanvas(W, H);
+  const x = out.getContext('2d');
+  x.save();
+  x.translate(out.width / 2, out.height / 2);
+  x.rotate(-giro);
+  x.translate(-m.cx, -m.cy);
+  x.drawImage(cv, 0, 0);
+  x.restore();
+  // Máscara: entera sobre el teléfono, y se va apagando hacia los bordes
+  const mk = _heCanvas(out.width, out.height);
+  const mx = mk.getContext('2d');
+  const ti = { w: ancho * 1.06, h: alto * 1.03 };
+  // Muchas capas muy suaves: con pocas se nota el contorno de cada una
+  const N = 44;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;                                  // 0 = borde de afuera, 1 = teléfono
+    const w = W + (ti.w - W) * t, h = H + (ti.h - H) * t;
+    // empieza casi invisible y crece de a poco (si arranca fuerte, se ve el contorno)
+    mx.globalAlpha = i === N ? 1 : 0.008 + 0.09 * t * t;
+    mx.fillStyle = '#000';
+    _heRedondo(mx, (out.width - w) / 2, (out.height - h) / 2, w, h, Math.min(w, h) * (0.5 - 0.37 * t));
+    mx.fill();
+  }
+  // Lo de alrededor se va poniendo gris y oscuro como el fondo de la
+  // historia (si no, la parte de la foto que queda con su color y su brillo
+  // se ve como un halo con contorno). El teléfono queda con su color real.
+  // Solo la parte de afuera (la mano cerca del teléfono queda con su color):
+  // una máscara entera hasta el 55% del camino y que se apaga después
+  const mk2 = _heCanvas(out.width, out.height);
+  const m2 = mk2.getContext('2d');
+  const t2 = { w: ti.w + (W - ti.w) * 0.55, h: ti.h + (H - ti.h) * 0.55 };
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const w = W + (t2.w - W) * t, h = H + (t2.h - H) * t;
+    m2.globalAlpha = i === N ? 1 : 0.008 + 0.09 * t * t;
+    m2.fillStyle = '#000';
+    _heRedondo(m2, (out.width - w) / 2, (out.height - h) / 2, w, h, Math.min(w, h) * (0.5 - 0.2 * t));
+    m2.fill();
+  }
+  const inv = _heCanvas(out.width, out.height);
+  const ix = inv.getContext('2d');
+  ix.fillStyle = '#000'; ix.fillRect(0, 0, inv.width, inv.height);
+  ix.globalCompositeOperation = 'destination-out';
+  ix.drawImage(mk2, 0, 0);
+  const tr = _heCanvas(out.width, out.height);
+  const tx = tr.getContext('2d');
+  tx.drawImage(out, 0, 0);
+  tx.globalCompositeOperation = 'saturation';
+  tx.fillStyle = 'rgba(128,128,128,.88)'; tx.fillRect(0, 0, tr.width, tr.height);
+  tx.globalCompositeOperation = 'source-atop';
+  tx.fillStyle = 'rgba(8,10,14,.6)'; tx.fillRect(0, 0, tr.width, tr.height);
+  tx.globalCompositeOperation = 'destination-in';
+  tx.drawImage(inv, 0, 0);
+  x.drawImage(tr, 0, 0);
+  x.globalCompositeOperation = 'destination-in';
+  x.drawImage(mk, 0, 0);
+  // Para acomodarlo: el tamaño del TELÉFONO adentro de la imagen (lo que
+  // tiene que entrar en el espacio; la mano puede desbordar desvanecida)
+  out._tel = { w: ancho, h: alto };
+  return out;
+}
+
 // Sin recorte (la IA no anduvo): la foto entera en una tarjeta redondeada
 function heTarjeta(cv) {
   const out = _heCanvas(cv.width, cv.height);
@@ -463,6 +549,9 @@ function heDibujar(d, piezas) {
   }
   const altoRen = Math.round(tm * 1.02);
   const L = heLayout(d, Math.round(tm * 0.78) + (renglones.length - 1) * altoRen);
+  // Los teléfonos primero: todo lo escrito va encima (con la mano, la parte
+  // que se desvanece puede llegar hasta la capacidad o la batería)
+  heDibujarEquipos(x, piezas, L.equipos.top, L.equipos.bottom);
 
   // 1. TECHPOINT + línea roja + "Servicio técnico · Venta"
   x.textAlign = 'center'; x.fillStyle = '#fff';
@@ -497,8 +586,7 @@ function heDibujar(d, piezas) {
     x.fillText(d.capacidad, HE_W / 2, t + 56);
   }
 
-  // 4. Los teléfonos, grandes, sin cortarse en los bordes
-  heDibujarEquipos(x, piezas, L.equipos.top, L.equipos.bottom);
+  // 4. (Los teléfonos ya están: se dibujaron antes que los textos)
 
   // 5a. Batería
   if (L.bateria) {
@@ -592,8 +680,11 @@ function heDibujarEquipos(x, piezas, top, bottom) {
   const dos = lista.length === 2;
   const ang = dos ? [4, -4] : [-3];
   const GAP = 26;                    // un poquito de aire entre los dos
+  // Lo que tiene que entrar es el TELÉFONO: con la mano, lo de alrededor
+  // (que se desvanece) puede pasarse un poco
   const caja = (c, a, alto) => {
-    const k = alto / c.height, w = c.width * k, r = Math.abs(a) * Math.PI / 180;
+    const tel = c._tel || { w: c.width, h: c.height };
+    const k = alto / tel.h, w = tel.w * k, r = Math.abs(a) * Math.PI / 180;
     return { w: w * Math.cos(r) + alto * Math.sin(r), h: w * Math.sin(r) + alto * Math.cos(r), k };
   };
   // El alto más grande que entra (los dos lado a lado, solapados un poco)
@@ -614,14 +705,16 @@ function heDibujarEquipos(x, piezas, top, bottom) {
     x.save();
     x.translate(cx, cy);
     x.rotate(ang[i] * Math.PI / 180);
-    x.shadowColor = 'rgba(0,0,0,.6)'; x.shadowBlur = 50; x.shadowOffsetY = 24;
+    // La sombra solo en el teléfono recortado (con la mano, la foto ya trae la suya)
+    if (!c._tel) { x.shadowColor = 'rgba(0,0,0,.6)'; x.shadowBlur = 50; x.shadowOffsetY = 24; }
     x.drawImage(c, -c.width * k / 2, -c.height * k / 2, c.width * k, c.height * k);
     x.restore();
   });
 }
 
 // ── Armar todo: fotos → IA → recorte → dibujo ─────────────
-async function heArmar(d, alAvanzar) {
+async function heArmar(d, alAvanzar, modo) {
+  const conMano = modo !== 'recorte';
   const av = t => { if (typeof alAvanzar === 'function') alAvanzar(t); };
   if (typeof _eeFuentes === 'function') await _eeFuentes();
   av('Bajando las fotos…');
@@ -643,8 +736,9 @@ async function heArmar(d, alAvanzar) {
   if (ub) ub.sensibles.forEach(s => copias[s.foto] && heTapar(copias[s.foto], s.caja));
   const piezas = { fondo: copias[ub ? ub.fondo : 0] || copias[0] || null, frente: null, espalda: null, recortado: false };
   if (ub) {
-    if (ub.frente && copias[ub.frente.foto]) piezas.frente = heRecortar(copias[ub.frente.foto], ub.frente.esquinas);
-    if (ub.espalda && copias[ub.espalda.foto]) piezas.espalda = heRecortar(copias[ub.espalda.foto], ub.espalda.esquinas);
+    const cortar = conMano ? heConMano : heRecortar;
+    if (ub.frente && copias[ub.frente.foto]) piezas.frente = cortar(copias[ub.frente.foto], ub.frente.esquinas);
+    if (ub.espalda && copias[ub.espalda.foto]) piezas.espalda = cortar(copias[ub.espalda.foto], ub.espalda.esquinas);
     piezas.recortado = !!(piezas.frente || piezas.espalda);
   }
   if (!piezas.recortado) {
@@ -675,6 +769,11 @@ function heAbrir(id) {
     <div class="he-hd"><b>✨ Historia de WhatsApp</b><button type="button" onclick="heCerrar()">✕</button></div>
     ${d.fotos.length ? `<p class="he-sub">Sale con las ${d.fotos.length === 1 ? 'foto' : d.fotos.length + ' fotos'} del equipo: los teléfonos recortados y el fondo desenfocado.</p>`
       : '<p class="he-sub he-ojo">Este equipo no tiene fotos: sale sin los teléfonos. Subile fotos (una de frente y una de espalda) para que quede mejor.</p>'}
+    <div class="he-l">Los teléfonos</div>
+    <div class="he-seg">
+      <button type="button" id="he-m-mano" class="${heModo() === 'mano' ? 'on' : ''}" onclick="heElegirModo('mano')">🤚 Con la mano (más real)</button>
+      <button type="button" id="he-m-rec" class="${heModo() === 'recorte' ? 'on' : ''}" onclick="heElegirModo('recorte')">✂️ Solo el teléfono</button>
+    </div>
     <label class="he-l">Modelo<input id="he-modelo" class="he-in" value="${esc(d.modelo)}"></label>
     <div class="he-dos">
       <label class="he-l">Capacidad<input id="he-cap" class="he-in" value="${esc(d.capacidad)}" placeholder="128 GB"></label>
@@ -690,6 +789,16 @@ function heAbrir(id) {
 }
 
 function heCerrar() { document.getElementById('he-ov')?.remove(); }
+
+// Con la mano o solo el teléfono: se acuerda en esta compu / este celu
+function heModo() {
+  try { return localStorage.getItem('tp-historia-modo') === 'recorte' ? 'recorte' : 'mano'; } catch { return 'mano'; }
+}
+function heElegirModo(m) {
+  try { localStorage.setItem('tp-historia-modo', m); } catch { /* sin almacenamiento: vale para esta vez */ }
+  document.getElementById('he-m-mano')?.classList.toggle('on', m === 'mano');
+  document.getElementById('he-m-rec')?.classList.toggle('on', m === 'recorte');
+}
 
 // Lo que quedó en la pantalla → datos para el dibujo
 function heLeerPantalla() {
@@ -719,7 +828,7 @@ async function heIr() {
     db.collection('stock').doc(_heEq.id).update({ incluye: d.incluye }).then(() => { _heEq.incluye = d.incluye; }).catch(e => console.warn('[historia] incluye:', e));
   }
   try {
-    const r = await heArmar(d, t => { if (btn) btn.textContent = '⏳ ' + t; });
+    const r = await heArmar(d, t => { if (btn) btn.textContent = '⏳ ' + t; }, heModo());
     if (!r.blob) throw new Error('sin imagen');
     const nombre = 'historia-' + (d.modelo.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '') || 'equipo') + '.jpg';
     _heArch = new File([r.blob], nombre, { type: 'image/jpeg' });
@@ -727,7 +836,7 @@ async function heIr() {
     if (res) res.innerHTML = `
       ${!r.recortado && !r.sinFotos ? '<p class="he-sub he-ojo">No pude recortar los teléfonos (¿sin internet?): salió con las fotos enteras. <b>Ojo:</b> así tampoco se pudo tapar el IMEI o el número de serie si alguna foto los muestra.</p>' : ''}
       <img class="he-prev" src="${url}" alt="Historia">
-      <p class="he-sub">Revisala antes de subirla: que los teléfonos estén bien recortados y no se vea ningún dato (IMEI, serie).</p>
+      <p class="he-sub">Revisala antes de subirla: que se vean bien los teléfonos y ningún dato (IMEI, serie).</p>
       <button type="button" class="he-ok" onclick="heCompartir()">📲 Subir a WhatsApp</button>`;
   } catch (e) {
     console.error('[historia]', e);
@@ -760,6 +869,9 @@ function _heEstilos() {
   .he-l small { font-weight: 500; opacity: .7; }
   .he-in { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 10px; border-radius: 10px; border: 1px solid rgba(128,128,128,.4); background: transparent; color: inherit; font-size: 15px; }
   .he-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .he-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .he-seg button { padding: 10px 6px; border-radius: 12px; border: 2px solid rgba(128,128,128,.3); background: none; color: inherit; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .he-seg button.on { border-color: #25D366; background: rgba(37,211,102,.12); }
   .he-chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .he-chip { padding: 8px 12px; border-radius: 999px; border: 1.5px solid rgba(128,128,128,.4); background: none; color: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
   .he-chip.on { border-color: #25D366; background: rgba(37,211,102,.15); }
