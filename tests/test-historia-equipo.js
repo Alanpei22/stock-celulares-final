@@ -94,6 +94,11 @@ ok(/getItem\('tp-historia-modo'\) === 'recorte' \? 'recorte' : 'mano'/.test(he0)
 ok(/out\._tel = \{ w: ancho, h: alto \}/.test(he0) && /const tel = c\._tel \|\|/.test(he0), 'con la mano se acomoda por el tamaño del TELÉFONO (la mano puede desbordar desvanecida)');
 ok(he0.indexOf('heDibujarEquipos(x, piezas, L.equipos.top') < he0.indexOf("x.fillText('TECHPOINT'"), 'los teléfonos se dibujan antes que los textos (lo desvanecido no tapa nada escrito)');
 
+console.log('\n5c) Mayúsculas y colores de TechPoint (Alan, 20/11)');
+ok(/toLocaleUpperCase\('es-AR'\)/.test(he0) && /'SERVICIO TÉCNICO · VENTA'/.test(he0) && /'INCLUYE:'/.test(he0) && /'BATERÍA '/.test(he0), 'todo lo escrito en la historia va en mayúscula');
+ok(/HE_AZUL = '#3b82f6'/.test(he0) && !/HE_ROJO|#e11d2a|#d42a2a/.test(he0), 'la línea y el precio en el azul del logo (ya no en rojo)');
+ok(/const fichaC = /.test(he0), 'el cargador y el cable con su ficha USB-C dibujada');
+
 console.log('\n6) Enganchado');
 const he = leer('historia-equipo.js');
 ok(/action === 'ubicarEquipos'/.test(api) && /corteSiNoAutorizadoEdge/.test(api), 'la IA está en /api/ai, que pide sesión');

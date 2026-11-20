@@ -25,7 +25,13 @@
 'use strict';
 
 const HE_W = 1080, HE_H = 1920;
-const HE_ROJO = '#e11d2a';
+// Los colores de TechPoint (Alan, 20/11: "que se asemejen al logo"): el
+// azul del logo sobre azul marino, como el ícono de la app y la imagen de la
+// página de equipos. Antes la línea y el precio iban en rojo.
+const HE_AZUL = '#3b82f6';                 // el azul del logo
+const HE_AZUL_OSC = '#1d4ed8';
+const HE_MARINO = 'rgba(11,23,52,.82)';    // el fondo de las pastillas y recuadros
+const HE_CELESTE = '#bfdbfe';
 const HE_PIE = 'Urquiza 4741, Local 22 · Caseros | @techpoint.arg';
 // Lo que puede incluir un equipo, con su ícono dibujado
 const HE_INCLUYE = ['Cargador', 'Cable', 'Funda', 'Templado', 'Caja', 'Auriculares'];
@@ -325,7 +331,7 @@ function heConMano(cv, esquinas) {
   tx.globalCompositeOperation = 'saturation';
   tx.fillStyle = 'rgba(128,128,128,.88)'; tx.fillRect(0, 0, tr.width, tr.height);
   tx.globalCompositeOperation = 'source-atop';
-  tx.fillStyle = 'rgba(8,10,14,.6)'; tx.fillRect(0, 0, tr.width, tr.height);
+  tx.fillStyle = 'rgba(6,16,40,.6)'; tx.fillRect(0, 0, tr.width, tr.height);
   tx.globalCompositeOperation = 'destination-in';
   tx.drawImage(inv, 0, 0);
   x.drawImage(tr, 0, 0);
@@ -404,16 +410,16 @@ function heFondo(x, cv) {
     x.fillStyle = 'rgba(128,128,128,.88)';
     x.fillRect(0, 0, HE_W, HE_H);
     x.restore();
-    x.fillStyle = 'rgba(8,10,14,.42)';
+    x.fillStyle = 'rgba(6,16,40,.5)';     // azul marino, el color de la marca
     x.fillRect(0, 0, HE_W, HE_H);
   } else {
     const g = x.createLinearGradient(0, 0, 0, HE_H);
-    g.addColorStop(0, '#22262e'); g.addColorStop(1, '#0b0d11');
+    g.addColorStop(0, '#16284d'); g.addColorStop(1, '#060d1f');
     x.fillStyle = g; x.fillRect(0, 0, HE_W, HE_H);
   }
   // Viñeta: los bordes más oscuros
   const v = x.createRadialGradient(HE_W / 2, HE_H * 0.45, HE_W * 0.35, HE_W / 2, HE_H * 0.45, HE_H * 0.75);
-  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.6)');
+  v.addColorStop(0, 'rgba(2,6,18,0)'); v.addColorStop(1, 'rgba(2,6,18,.65)');
   x.fillStyle = v; x.fillRect(0, 0, HE_W, HE_H);
 }
 
@@ -428,20 +434,39 @@ function heDibujarIcono(x, tipo, cx, cy, s) {
   const blanco = (y0, y1) => { const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c9ced6'); return g; };
   const vidrio = (y0, y1) => { const g = x.createLinearGradient(-s * 0.3, y0, s * 0.3, y1); g.addColorStop(0, 'rgba(255,255,255,.42)'); g.addColorStop(1, 'rgba(255,255,255,.06)'); return g; };
   const sombra = () => { x.shadowColor = 'rgba(0,0,0,.45)'; x.shadowBlur = s * 0.12; x.shadowOffsetY = s * 0.04; };
+  // Una ficha USB-C (la cabeza del cable), parada, con la punta para `dir`
+  const fichaC = (px, py, dir) => {
+    x.save(); x.translate(px, py); if (dir > 0) x.rotate(Math.PI);
+    x.fillStyle = '#c3c9d2';
+    _heRedondo(x, -s * 0.045, -s * 0.2, s * 0.09, s * 0.08, s * 0.025); x.fill();   // la punta de metal
+    x.fillStyle = blanco(-s * 0.13, s * 0.06);
+    _heRedondo(x, -s * 0.07, -s * 0.13, s * 0.14, s * 0.2, s * 0.04); x.fill();     // el cuerpo
+    x.restore();
+  };
   if (tipo === 'cargador') {
-    // el cubito blanco con las patitas, y el cable enrollado al lado
-    x.strokeStyle = '#e9ecf0'; x.lineWidth = s * 0.07;
-    for (let k = 0; k < 3; k++) { x.beginPath(); x.ellipse(s * 0.2, s * 0.14, s * 0.2 - k * s * 0.035, s * 0.22 - k * s * 0.035, 0, 0, Math.PI * 2); x.stroke(); }
-    x.beginPath(); x.moveTo(-s * 0.05, s * 0.2); x.quadraticCurveTo(0, s * 0.42, s * 0.12, s * 0.34); x.stroke();
+    // Alan (20/11): "el cable usb cámbiale la imagen". El cubito blanco
+    // con las patitas y el cable que sale de abajo y termina en su ficha.
+    x.strokeStyle = '#eef1f5'; x.lineWidth = s * 0.06;
+    x.beginPath(); x.moveTo(-s * 0.13, s * 0.2);
+    x.bezierCurveTo(-s * 0.13, s * 0.5, s * 0.27, s * 0.5, s * 0.27, s * 0.16); x.stroke();
+    fichaC(s * 0.27, s * 0.04, -1);
     x.fillStyle = '#b8bec7';
-    x.fillRect(-s * 0.3, -s * 0.46, s * 0.05, s * 0.16); x.fillRect(-s * 0.15, -s * 0.46, s * 0.05, s * 0.16);
-    sombra(); x.fillStyle = blanco(-s * 0.3, s * 0.25);
-    _heRedondo(x, -s * 0.4, -s * 0.3, s * 0.4, s * 0.5, s * 0.07); x.fill();
+    x.fillRect(-s * 0.27, -s * 0.47, s * 0.05, s * 0.17); x.fillRect(-s * 0.09, -s * 0.47, s * 0.05, s * 0.17);
+    sombra(); x.fillStyle = blanco(-s * 0.3, s * 0.22);
+    _heRedondo(x, -s * 0.35, -s * 0.3, s * 0.44, s * 0.52, s * 0.08); x.fill();
   } else if (tipo === 'cable') {
-    x.strokeStyle = '#eef0f3'; x.lineWidth = s * 0.07;
-    for (let k = 0; k < 4; k++) { x.beginPath(); x.ellipse(0, s * 0.02, s * 0.34 - k * s * 0.05, s * 0.3 - k * s * 0.05, 0, 0, Math.PI * 2); x.stroke(); }
-    sombra(); x.fillStyle = blanco(-s * 0.46, -s * 0.2);
-    _heRedondo(x, -s * 0.06, -s * 0.46, s * 0.12, s * 0.22, s * 0.03); x.fill();
+    // El cable con una vuelta y sus dos fichas USB-C para abajo
+    x.strokeStyle = '#eef1f5'; x.lineWidth = s * 0.06;
+    x.beginPath();
+    x.moveTo(-s * 0.26, s * 0.22);
+    x.bezierCurveTo(-s * 0.26, -s * 0.1, -s * 0.3, -s * 0.45, 0, -s * 0.42);
+    x.bezierCurveTo(s * 0.3, -s * 0.4, s * 0.3, -s * 0.05, 0, -s * 0.05);
+    x.bezierCurveTo(-s * 0.18, -s * 0.05, -s * 0.12, -s * 0.3, s * 0.06, -s * 0.28);
+    x.bezierCurveTo(s * 0.3, -s * 0.25, s * 0.26, 0, s * 0.26, s * 0.22);
+    x.stroke();
+    sombra();
+    fichaC(-s * 0.26, s * 0.32, 1);
+    fichaC(s * 0.26, s * 0.32, 1);
   } else if (tipo === 'funda') {
     // la funda transparente, un poco girada, con el hueco de la cámara
     x.rotate(-0.22);
@@ -473,6 +498,10 @@ function heDibujarIcono(x, tipo, cx, cy, s) {
     x.shadowColor = 'transparent';
     x.strokeStyle = 'rgba(0,0,0,.15)'; x.lineWidth = s * 0.02;
     x.beginPath(); x.moveTo(-s * 0.26, -s * 0.3); x.lineTo(s * 0.26, -s * 0.3); x.stroke();
+    // la silueta del celular en la tapa (así se entiende que es la caja del equipo)
+    x.strokeStyle = 'rgba(60,70,90,.45)'; x.lineWidth = s * 0.025;
+    _heRedondo(x, -s * 0.11, -s * 0.2, s * 0.22, s * 0.46, s * 0.05); x.stroke();
+    x.beginPath(); x.arc(-s * 0.04, -s * 0.13, s * 0.025, 0, Math.PI * 2); x.stroke();
   } else if (tipo === 'auriculares') {
     sombra(); x.fillStyle = blanco(-s * 0.1, s * 0.4);
     _heRedondo(x, -s * 0.3, -s * 0.06, s * 0.6, s * 0.44, s * 0.18); x.fill();
@@ -533,6 +562,11 @@ function heDibujar(d, piezas) {
   const x = cv.getContext('2d');
   x.textBaseline = 'alphabetic';
   heFondo(x, piezas.fondo);
+  // Todo lo escrito en mayúscula (Alan, 20/11: "que la letra esté en
+  // mayúscula siempre"). Se pasa acá y no en los datos: la pantalla y lo que
+  // se guarda en el equipo quedan como se cargaron.
+  const M = t => String(t || '').toLocaleUpperCase('es-AR');
+  d = Object.assign({}, d, { modelo: M(d.modelo), capacidad: M(d.capacidad), incluye: (d.incluye || []).map(M), precio: M(d.precio) });
 
   // El modelo: grande, en uno o dos renglones
   const ANCHO = 960;
@@ -561,11 +595,12 @@ function heDibujar(d, piezas) {
   x.fillText('TECHPOINT', HE_W / 2 + 3, L.marca);
   if ('letterSpacing' in x) x.letterSpacing = '0px';
   _heSinSombra(x);
-  x.fillStyle = HE_ROJO; x.fillRect(HE_W / 2 - 170, L.linea, 340, 5);
+  x.fillStyle = HE_AZUL; x.fillRect(HE_W / 2 - 170, L.linea, 340, 6);
   _heSombraTexto(x);
   x.fillStyle = 'rgba(255,255,255,.92)';
   x.font = _heF(600, 34);
-  x.fillText('Servicio técnico · Venta', HE_W / 2, L.sub);
+  x.fillStyle = HE_CELESTE;
+  x.fillText('SERVICIO TÉCNICO · VENTA', HE_W / 2, L.sub);
 
   // 2. Modelo
   x.fillStyle = '#fff';
@@ -578,7 +613,7 @@ function heDibujar(d, piezas) {
   if (L.capacidad) {
     x.font = _heF(800, 48);
     const w = x.measureText(d.capacidad).width + 90, t = L.capacidad.top;
-    x.fillStyle = 'rgba(12,14,20,.78)';
+    x.fillStyle = HE_MARINO;
     _heRedondo(x, (HE_W - w) / 2, t, w, L.capacidad.alto, 40); x.fill();
     x.strokeStyle = '#fff'; x.lineWidth = 6;
     _heRedondo(x, (HE_W - w) / 2, t, w, L.capacidad.alto, 40); x.stroke();
@@ -592,13 +627,13 @@ function heDibujar(d, piezas) {
   if (L.bateria) {
     const t = L.bateria.top, h = L.bateria.alto;
     x.font = _heF(600, 44);
-    const a = 'Batería ', b = `${d.bateria}%`;
+    const a = 'BATERÍA ', b = `${d.bateria}%`;
     const wa = x.measureText(a).width;
     x.font = _heF(900, 46);
     const wb = x.measureText(b).width;
     const w = 50 + 76 + 22 + wa + wb + 50;
     const X = (HE_W - w) / 2;
-    x.fillStyle = 'rgba(12,14,20,.72)';
+    x.fillStyle = HE_MARINO;
     _heRedondo(x, X, t, w, h, h / 2); x.fill();
     x.strokeStyle = '#fff'; x.lineWidth = 5;
     _heRedondo(x, X, t, w, h, h / 2); x.stroke();
@@ -615,9 +650,9 @@ function heDibujar(d, piezas) {
     const W = Math.min(960, 150 + n * 170), X = (HE_W - W) / 2, t = L.incluye.top, h = L.incluye.alto;
     _heSombraTexto(x);
     x.fillStyle = '#fff'; x.font = _heF(800, 40);
-    x.fillText('Incluye:', HE_W / 2, L.incluye.titulo);
+    x.fillText('INCLUYE:', HE_W / 2, L.incluye.titulo);
     _heSinSombra(x);
-    x.fillStyle = 'rgba(12,14,20,.62)';
+    x.fillStyle = HE_MARINO;
     _heRedondo(x, X, t, W, h, 34); x.fill();
     x.strokeStyle = '#fff'; x.lineWidth = 5;
     _heRedondo(x, X, t, W, h, 34); x.stroke();
@@ -641,7 +676,7 @@ function heDibujar(d, piezas) {
     x.save();
     x.shadowColor = 'rgba(0,0,0,.5)'; x.shadowBlur = 30; x.shadowOffsetY = 10;
     const g = x.createLinearGradient(0, t, 0, t + h);
-    g.addColorStop(0, '#d42a2a'); g.addColorStop(0.55, '#a51212'); g.addColorStop(1, '#6a0808');
+    g.addColorStop(0, '#4f8ff7'); g.addColorStop(0.55, HE_AZUL_OSC); g.addColorStop(1, '#0f2a7a');
     x.fillStyle = g;
     _heRedondo(x, X, t, w, h, h / 2); x.fill();
     x.restore();
@@ -665,8 +700,9 @@ function heDibujar(d, piezas) {
   // 6. Pie
   _heSombraTexto(x);
   x.fillStyle = 'rgba(255,255,255,.9)';
-  _heEntra(x, HE_PIE, 600, 30, 22, 980);
-  x.fillText(HE_PIE, HE_W / 2, L.pie);
+  const pie = HE_PIE.toLocaleUpperCase('es-AR');
+  _heEntra(x, pie, 600, 30, 22, 980);
+  x.fillText(pie, HE_W / 2, L.pie);
   _heSinSombra(x);
   return cv;
 }
