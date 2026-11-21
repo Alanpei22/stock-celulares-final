@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Equipos en venta · TechPoint Caseros</title>
 <meta name="description" content="Celulares nuevos y usados con garantía en TechPoint, Urquiza 4741, Caseros. Mirá fotos, precios y consultanos por WhatsApp.">
-<meta name="theme-color" content="#0f2b52">
+<meta name="theme-color" content="#0b0d12">
 <link rel="canonical" href="https://stock-celulares-final.vercel.app/equipos">
 <!-- Vista previa al compartir el link (WhatsApp, Instagram, Facebook) -->
 <meta property="og:type" content="website">
@@ -22,48 +22,160 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,600..800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="equipos.css">
 </head>
 <body>
-<header class="cab">
-  <h1>TechPoint <span>Servicio técnico · Equipos</span></h1>
-  <p class="cab-dato">📍 Urquiza 4741, Local 22, Caseros</p>
-  <p class="cab-dato">🕘 Lunes a sábado · <span class="mono">9:30 a 19:30</span></p>
-  <a class="btn-wa" id="cab-wa" target="_blank" rel="noopener">💬 Consultar por WhatsApp</a>
+<!-- Alan (21/11): "mirá esta página, ¿podemos modificar a este estilo la
+     nuestra?" (una tienda de iPhone de Navarro). Del estilo se tomó la forma:
+     franja negra arriba con el menú flotante y el título grande en dos tonos,
+     secciones blancas con tarjetas gris clarito muy redondeadas, botones tipo
+     pastilla y el pie negro. Los colores son los de TechPoint (el azul del
+     logo) y no hay logos de marcas ni fotos de otros. -->
+
+<nav class="nav" aria-label="Menú">
+  <a class="nav-marca" href="#arriba">
+    <img src="icon.svg" alt="" width="32" height="32">
+    <span><b>TechPoint</b><small>Servicio técnico · Caseros</small></span>
+  </a>
+  <div class="nav-links">
+    <a href="#catalogo">Equipos</a>
+    <a href="#canje">Plan canje</a>
+    <a href="#garantia">Garantía</a>
+    <a href="#pagos">Medios de pago</a>
+  </div>
+  <a class="nav-wa" id="cab-wa" target="_blank" rel="noopener"><span class="ico-wa" aria-hidden="true"></span>Hablanos</a>
+</nav>
+
+<header class="hero" id="arriba">
+  <div class="hero-in">
+    <div class="hero-txt">
+      <p class="pastilla-dato"><i></i>Caseros · Buenos Aires · Tomamos tu usado</p>
+      <h1>Tu próximo celu.<br><span>Con garantía.</span><br>En Caseros.</h1>
+      <p class="hero-sub">Nuevos y usados, revisados por nuestros técnicos y con garantía escrita. Vení a verlo y probalo en el local.</p>
+      <div class="hero-btns">
+        <a class="btn btn-blanco" href="#catalogo">Ver equipos y precios <span aria-hidden="true">→</span></a>
+        <a class="btn btn-vidrio" data-wa="Hola TechPoint! Quería hacer una consulta." target="_blank" rel="noopener"><span class="ico-wa" aria-hidden="true"></span>Consultar por WhatsApp</a>
+      </div>
+    </div>
+    <!-- Un celular dibujado (sin fotos de marcas), con lo que el cliente pregunta siempre -->
+    <div class="hero-visual" aria-hidden="true">
+      <div class="brillo"></div>
+      <div class="cel"><div class="cel-isla"></div><div class="cel-pantalla"><b>TechPoint</b><span>Equipos con garantía</span></div></div>
+      <span class="rotulo r1">Batería revisada</span>
+      <span class="rotulo r2">Garantía escrita</span>
+      <span class="rotulo r3">Probalo en el local</span>
+    </div>
+  </div>
 </header>
 
-<section class="filtros" aria-label="Filtros">
-  <div class="seg" role="tablist" id="f-cond">
-    <button type="button" data-c="" class="on">Todos</button>
-    <button type="button" data-c="nuevo">Nuevos</button>
-    <button type="button" data-c="usado">Usados</button>
+<section class="sec sec-blanca">
+  <div class="dos-col">
+    <div class="intro">
+      <h2 class="titulo-2">Todo el stock.<br><span class="azul">En un solo lugar.</span></h2>
+      <p>Precios actualizados todos los días. Equipos nuevos y usados seleccionados, con la batería y el estado a la vista.</p>
+      <a class="btn btn-negro" href="#catalogo">Ver el catálogo <span aria-hidden="true">→</span></a>
+    </div>
+    <div class="tarjeta-local">
+      <span class="local-ico" aria-hidden="true">📍</span>
+      <h3>Nuestro local</h3>
+      <p>Urquiza 4741, Local 22, Caseros.<br>Lunes a sábado · <span class="mono">9:30 a 19:30</span></p>
+      <a class="fila-link" href="https://www.google.com/maps/search/?api=1&query=Urquiza+4741+Caseros" target="_blank" rel="noopener">Cómo llegar en Google Maps <span aria-hidden="true">→</span></a>
+    </div>
   </div>
-  <div class="chips" id="f-marcas"></div>
-  <div class="fila-orden">
-    <input class="buscar" id="f-buscar" type="search" placeholder="🔍 Buscá modelo, color o capacidad" autocomplete="off" enterkeyhint="search">
-    <select class="orden" id="f-orden" aria-label="Ordenar">
-      <option value="">Recomendados</option>
-      <option value="barato">Más barato primero</option>
-      <option value="caro">Más caro primero</option>
-    </select>
-  </div>
-  <p class="actualizado" id="actualizado"></p>
 </section>
 
-<main class="grilla" id="grilla" aria-live="polite">
-  <div class="ficha esqueleto"></div><div class="ficha esqueleto"></div>
-</main>
+<section class="sec sec-gris" id="catalogo">
+  <div class="cat-cab">
+    <h2 class="titulo-2">Equipos disponibles.<br><span class="gris">Elegí el tuyo.</span></h2>
+    <p class="actualizado" id="actualizado"></p>
+  </div>
+
+  <div class="filtros" aria-label="Filtros">
+    <div class="seg" role="tablist" id="f-cond">
+      <button type="button" data-c="" class="on">Todos</button>
+      <button type="button" data-c="nuevo">Nuevos</button>
+      <button type="button" data-c="usado">Usados</button>
+    </div>
+    <div class="chips" id="f-marcas"></div>
+    <div class="fila-orden">
+      <input class="buscar" id="f-buscar" type="search" placeholder="Buscá modelo, color o capacidad" autocomplete="off" enterkeyhint="search" aria-label="Buscar">
+      <select class="orden" id="f-orden" aria-label="Ordenar">
+        <option value="">Recomendados</option>
+        <option value="barato">Más barato primero</option>
+        <option value="caro">Más caro primero</option>
+      </select>
+    </div>
+  </div>
+
+  <main class="grilla" id="grilla" aria-live="polite">
+    <div class="ficha esqueleto"></div><div class="ficha esqueleto"></div><div class="ficha esqueleto"></div>
+  </main>
+</section>
+
+<section class="sec sec-gris sec-sin-arriba" id="garantia">
+  <div class="banda-azul">
+    <div class="banda-txt">
+      <h2>Comprá con confianza.</h2>
+      <p>Somos servicio técnico: los equipos los revisamos nosotros antes de venderlos. Cada uno muestra su batería y su estado, y te llevás la garantía por escrito.</p>
+    </div>
+    <div class="numeros">
+      <div><b>Garantía</b><span>por escrito en cada equipo</span></div>
+      <div><b>Técnicos</b><span>propios, en el mismo local</span></div>
+      <div><b>Tu usado</b><span>vale como parte de pago</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec sec-blanca" id="canje">
+  <div class="dos-col">
+    <div class="intro">
+      <h2 class="titulo-2">Plan canje.<br><span class="azul">Tu usado vale.</span></h2>
+      <p>Traé tu celular y lo tomamos como parte de pago. Lo revisamos en el momento y te decimos cuánto vale.</p>
+      <a class="btn btn-negro" data-wa="Hola TechPoint! Quiero cotizar mi celular para el plan canje." target="_blank" rel="noopener"><span class="ico-wa" aria-hidden="true"></span>Cotizar mi usado</a>
+    </div>
+    <ol class="pasos">
+      <li><b>Escribinos</b><span>Contanos qué modelo tenés y qué querés llevar.</span></li>
+      <li><b>Lo revisamos</b><span>En el local, con vos, en unos minutos.</span></li>
+      <li><b>Pagás la diferencia</b><span>Y te llevás el nuevo con garantía.</span></li>
+    </ol>
+  </div>
+</section>
+
+<section class="sec sec-gris" id="pagos">
+  <h2 class="titulo-2 centro">Medios de pago.<br><span class="gris">Como te quede mejor.</span></h2>
+  <div class="pagos">
+    <div><b>Efectivo</b><span>Pesos o dólares</span></div>
+    <div><b>Transferencia</b><span>O Mercado Pago</span></div>
+    <div><b>Débito</b><span>Con tarjeta</span></div>
+    <div><b>Crédito en cuotas</b><span>Consultá los planes</span></div>
+  </div>
+</section>
 
 <footer class="pie">
-  <p class="pie-lbl">Contacto</p>
-  <p>WhatsApp <b class="mono sel">11 7239-2511</b></p>
-  <p>Urquiza 4741, Local 22, Caseros · Lunes a sábado de 9:30 a 19:30</p>
-  <p class="pie-lbl">Formas de pago</p>
-  <p>Efectivo · Transferencia · Débito · Crédito en cuotas · Mercado Pago</p>
-  <p><b>Tomamos tu usado como parte de pago.</b></p>
+  <div class="pie-in">
+    <div class="pie-marca">
+      <a class="nav-marca" href="#arriba"><img src="icon.svg" alt="" width="32" height="32"><span><b>TechPoint</b><small>Caseros · Buenos Aires</small></span></a>
+      <p>Venta de celulares nuevos y usados, y servicio técnico. Tomamos tu usado como parte de pago.</p>
+    </div>
+    <div class="pie-col">
+      <p class="pie-lbl">Tienda</p>
+      <a href="#catalogo">Equipos</a>
+      <a href="#canje">Plan canje</a>
+      <a href="#pagos">Medios de pago</a>
+    </div>
+    <div class="pie-col">
+      <p class="pie-lbl">Contacto</p>
+      <p>WhatsApp <b class="mono sel">11 7239-2511</b></p>
+      <p>Urquiza 4741, Local 22, Caseros</p>
+      <p>Lunes a sábado de 9:30 a 19:30</p>
+      <a class="btn btn-azul" data-wa="Hola TechPoint! Quería hacer una consulta." target="_blank" rel="noopener"><span class="ico-wa" aria-hidden="true"></span>Escribinos</a>
+    </div>
+  </div>
   <p class="pie-acceso"><a href="index.html">Acceso del local</a></p>
 </footer>
+
+<a class="wa-flotante oculto" id="wa-flotante" data-wa="Hola TechPoint! Quería hacer una consulta." target="_blank" rel="noopener" aria-label="Escribinos por WhatsApp"><span class="ico-wa" aria-hidden="true"></span></a>
 
 <div class="visor hidden" id="visor" role="dialog" aria-label="Foto ampliada">
   <div class="visor-pista" id="visor-pista"></div>

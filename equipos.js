@@ -80,8 +80,8 @@
       ? `<div class="bat mono">🔋 ${e.bateria}% <div class="barra"><i class="${e.bateria < 75 ? 'baja' : e.bateria < 85 ? 'media' : ''}" style="width:${e.bateria}%"></i></div></div>` : '';
     const gar = e.garantiaMeses ? `<span class="garantia mono">Garantía<br>${e.garantiaMeses} ${e.garantiaMeses === 1 ? 'mes' : 'meses'}</span>` : '';
     const boton = e.estado === 'sinstock'
-      ? `<a class="btn-wa btn-parecido" href="${esc(waLink(mensajeParecido(e)))}" target="_blank" rel="noopener">🔁 Pedir uno parecido</a>`
-      : `<a class="btn-wa" href="${esc(waLink(mensajeInteres(e)))}" target="_blank" rel="noopener">💬 Me interesa</a>`;
+      ? `<a class="btn-wa btn-parecido" href="${esc(waLink(mensajeParecido(e)))}" target="_blank" rel="noopener">Pedir uno parecido</a>`
+      : `<a class="btn-wa" href="${esc(waLink(mensajeInteres(e)))}" target="_blank" rel="noopener">Me interesa</a>`;
     return `<article class="ficha ${e.estado}" data-id="${esc(e.id)}">
       <div class="fotos">
         <div class="pista">${pista}</div>
@@ -96,7 +96,7 @@
         ${e.detalles ? `<p class="det">${esc(e.detalles)}</p>` : ''}
         <div class="precio-fila">${precioHtml(e)}${gar}</div>
         ${boton}
-        <button type="button" class="compartir" data-share="${esc(e.id)}" aria-label="Compartir este equipo">🔗 Compartir</button>
+        <button type="button" class="compartir" data-share="${esc(e.id)}" aria-label="Compartir este equipo">Compartir este equipo</button>
       </div>
     </article>`;
   }
@@ -136,7 +136,7 @@
     if (!S.equipos.length) {
       g.innerHTML = `<div class="vacio"><b>Estamos cargando equipos nuevos</b>
         Escribinos y te contamos qué tenemos hoy.
-        <a class="btn-wa" href="${esc(waLink('Hola TechPoint! ¿Qué equipos tienen disponibles?'))}" target="_blank" rel="noopener">💬 Consultar por WhatsApp</a></div>`;
+        <a class="btn-wa" href="${esc(waLink('Hola TechPoint! ¿Qué equipos tienen disponibles?'))}" target="_blank" rel="noopener">Consultar por WhatsApp</a></div>`;
       return;
     }
     const lista = filtrados();
@@ -145,7 +145,7 @@
       S.uno = '';
       g.innerHTML = `<div class="vacio"><b>Ese equipo ya no está</b>
         Se vendió o lo sacamos de la página.
-        <a class="btn-wa" href="${esc(waLink('Hola TechPoint! Vi un equipo en la página que ya no está. ¿Tienen algo parecido?'))}" target="_blank" rel="noopener">💬 Preguntar por uno parecido</a>
+        <a class="btn-wa" href="${esc(waLink('Hola TechPoint! Vi un equipo en la página que ya no está. ¿Tienen algo parecido?'))}" target="_blank" rel="noopener">Preguntar por uno parecido</a>
         <br><button type="button" class="limpiar" id="limpiar">Ver todos los equipos</button></div>`;
       $('limpiar').onclick = () => { pintar(); pintarFiltros(); };
       return;
@@ -153,7 +153,7 @@
     if (!lista.length) {
       g.innerHTML = `<div class="vacio"><b>No encontramos ese equipo</b>
         Capaz lo tenemos y todavía no está en la página.
-        <a class="btn-wa" href="${esc(waLink(`Hola TechPoint! ¿Tienen ${S.q ? S.q : 'algún equipo'}${S.marca ? ' ' + S.marca : ''}?`))}" target="_blank" rel="noopener">💬 Preguntar por WhatsApp</a>
+        <a class="btn-wa" href="${esc(waLink(`Hola TechPoint! ¿Tienen ${S.q ? S.q : 'algún equipo'}${S.marca ? ' ' + S.marca : ''}?`))}" target="_blank" rel="noopener">Preguntar por WhatsApp</a>
         <br><button type="button" class="limpiar" id="limpiar">Ver todos</button></div>`;
       $('limpiar').onclick = () => { S.cond = ''; S.marca = ''; S.q = ''; $('f-buscar').value = ''; pintarFiltros(); pintar(); };
       return;
@@ -213,6 +213,14 @@
 
   function enganchar() {
     $('cab-wa').href = waLink('Hola TechPoint! Quería hacer una consulta.');
+    // Los otros botones de WhatsApp de la página (arriba, plan canje, pie y el
+    // flotante) traen su mensaje en data-wa
+    document.querySelectorAll('[data-wa]').forEach(a => { a.href = waLink(a.getAttribute('data-wa')); });
+    const flot = $('wa-flotante');
+    if (flot && flot.classList && typeof window.addEventListener === 'function') {
+      const ver = () => flot.classList.toggle('oculto', (window.scrollY || 0) < 420);
+      window.addEventListener('scroll', ver, { passive: true }); ver();
+    }
     $('f-cond').onclick = ev => {
       const b = ev.target.closest('button'); if (!b) return;
       S.cond = b.dataset.c; pintarFiltros(); pintar();
@@ -258,7 +266,7 @@
       console.error('equipos:', e);
       $('grilla').innerHTML = `<div class="vacio"><b>No pudimos cargar los equipos</b>
         Probá de nuevo en un ratito, o escribinos directo.
-        <a class="btn-wa" href="${esc(waLink('Hola TechPoint! ¿Qué equipos tienen disponibles?'))}" target="_blank" rel="noopener">💬 Consultar por WhatsApp</a></div>`;
+        <a class="btn-wa" href="${esc(waLink('Hola TechPoint! ¿Qué equipos tienen disponibles?'))}" target="_blank" rel="noopener">Consultar por WhatsApp</a></div>`;
     }
   }
 
