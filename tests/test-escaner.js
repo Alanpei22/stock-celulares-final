@@ -60,7 +60,12 @@ const ctx = {
   console, Date, Math, JSON, Promise, String, Number,
   setInterval: (f, ms) => { TICK = f; return 7; },
   clearInterval: () => { TICK = null; },
-  setTimeout: f => { f(); return 0; },
+  // El loop de detección ya no es un setInterval (se encimaban las vueltas y
+  // el celu se trababa): cada vuelta programa la siguiente con un setTimeout
+  // de 150–7999 ms. Ese se guarda en TICK para correrlo a mano; los demás
+  // (el aviso de los 8 s, el pitido) corren en el momento, como antes.
+  setTimeout: (f, ms) => { if (ms >= 100 && ms < 8000) { TICK = f; return 7; } f(); return 0; },
+  clearTimeout: id => { if (id === 7) TICK = null; },
   document: {
     hidden: false,
     getElementById: id => els[id] || null,

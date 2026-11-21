@@ -208,23 +208,44 @@ function _escLectorZxing() {
     } catch { /* sigue con la franja entera */ }
     return leer(lienzo);
   };
+  // Antes cada vuelta probaba las 3 franjas (hasta 4 lecturas cada una) y
+  // después el cuadro entero dos veces: hasta 14 lecturas seguidas sin soltar
+  // la pantalla, y en un celu eso la trababa. Ahora cada vuelta tiene un tope
+  // de tiempo, las franjas se van turnando y el cuadro entero (el más caro)
+  // va una vuelta de cada tres. En unas pocas vueltas se prueba todo igual.
+  const TOPE_MS = 90;
+  let _vuelta = 0;
+  // (local: las pruebas cargan solo esta función)
+  const _escAhora = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   return {
     async detect(video) {
-      // Primero las franjas del medio (así lee la etiqueta de los equipos)
+      const t0 = _escAhora();
+      const n = _vuelta++;
       // (typeof: las pruebas cargan solo esta función, sin las de recortes)
-      if (video.videoWidth && typeof escRecortes === 'function' && typeof document !== 'undefined' && document.createElement
-          && Z.HTMLCanvasElementLuminanceSource && Z.HybridBinarizer) {
-        for (const rec of escRecortes(video.videoWidth, video.videoHeight)) {
-          const t = deFranja(video, rec);
+      const puedeFranjas = !!(video.videoWidth && typeof escRecortes === 'function' && typeof document !== 'undefined' && document.createElement
+          && Z.HTMLCanvasElementLuminanceSource && Z.HybridBinarizer);
+      // Una vuelta de cada tres es SOLO para el cuadro entero: si va después de
+      // las franjas, en un celu lento el tope se gasta antes y nunca llega (y
+      // los EAN de las cajas dejaban de leerse)
+      const tocaEntero = !puedeFranjas || n % 3 === 2;
+      // Las franjas del medio (así lee la etiqueta de los equipos)
+      if (puedeFranjas && !tocaEntero) {
+        const recs = escRecortes(video.videoWidth, video.videoHeight);
+        for (let i = 0; i < recs.length; i++) {
+          const t = deFranja(video, recs[(n + i) % recs.length]);
           if (t) return [{ rawValue: t }];
+          if (_escAhora() - t0 > TOPE_MS) return [];     // se sigue en la próxima vuelta
         }
       }
-      // Después el cuadro entero, como siempre (así lee los EAN de las cajas)
-      for (let i = 0; i < 2; i++) {
-        try {
-          const txt = texto(reader.decode(video));
-          if (txt) return [{ rawValue: txt }];
-        } catch { /* cuadro sin código: no es un error */ }
+      // El cuadro entero (así lee los EAN de las cajas). Dos intentos: esta
+      // versión de ZXing falla uno sí y uno no sobre la misma imagen.
+      if (tocaEntero) {
+        for (let i = 0; i < 2; i++) {
+          try {
+            const txt = texto(reader.decode(video));
+            if (txt) return [{ rawValue: txt }];
+          } catch { /* cuadro sin código: no es un error */ }
+        }
       }
       return [];
     },
@@ -324,10 +345,25 @@ async function abrirEscaner(cb, opts = {}) {
     // el recuadro (probado: más chicas, no se leen)
     if (_escStream && !_escUltimo.cod) _escEstado('No lo estoy leyendo. Que el código llene casi todo el ancho del recuadro, derecho, con luz y sin reflejo.');
   }, 8000);
-  // El de respaldo tarda más por cuadro: se le da aire para no trabar la pantalla.
-  _escTimer = setInterval(() => _escBuscar(_escLector, video), nativo ? 220 : 350);
+  // Alan (21/11): "la app en el celu se frezzea". Antes era un setInterval:
+  // cada 220/350 ms arrancaba una búsqueda AUNQUE la anterior no hubiera
+  // terminado, y en el iPhone (sin lector propio) una búsqueda podía tardar
+  // más que eso → se encimaban y la pantalla no respondía ni al ✕. Ahora la
+  // próxima vuelta se programa recién cuando termina la anterior, con un
+  // respiro proporcional a lo que tardó (la pantalla siempre llega a pintar).
+  const pausa = nativo ? 150 : 250;
+  const vuelta = async () => {
+    if (!_escStream) return;
+    const t0 = _escAhora();
+    try { await _escBuscar(_escLector, video); } catch (e) { /* un cuadro fallado no corta el loop */ }
+    if (!_escStream) return;
+    _escTimer = setTimeout(vuelta, Math.max(pausa, (_escAhora() - t0) * 1.5));
+  };
+  _escTimer = setTimeout(vuelta, pausa);
   return true;
 }
+
+function _escAhora() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
 
 async function _escBuscar(detector, video) {
   if (!_escStream) return;
@@ -468,7 +504,7 @@ async function escanerLuz() {
 // Cerrar SIEMPRE apaga la cámara: si el stream queda abierto, el celu se
 // calienta y la luz de la cámara queda prendida.
 function cerrarEscaner() {
-  if (_escTimer) { clearInterval(_escTimer); _escTimer = null; }
+  if (_escTimer) { clearTimeout(_escTimer); _escTimer = null; }
   if (_escAyudaTimer) { clearTimeout(_escAyudaTimer); _escAyudaTimer = null; }
   if (_escStream) {
     try { _escStream.getTracks().forEach(t => t.stop()); } catch {}

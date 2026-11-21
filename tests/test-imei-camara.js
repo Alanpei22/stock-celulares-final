@@ -30,7 +30,11 @@ const creados = [];
 const ctx = {
   console, Date, Math, JSON, Promise, String, Number,
   setInterval: f => { TICK = f; return 1; }, clearInterval: () => { TICK = null; },
-  setTimeout: f => { f(); return 0; }, clearTimeout,
+  // El loop de detección ahora es un setTimeout que se vuelve a programar al
+  // terminar cada vuelta (con setInterval se encimaban y el celu se trababa):
+  // ese (150–7999 ms) va a TICK; los demás corren en el momento.
+  setTimeout: (f, ms) => { if (ms >= 100 && ms < 8000) { TICK = f; return 1; } f(); return 0; },
+  clearTimeout: id => { if (id === 1) TICK = null; },
   document: {
     hidden: false,
     getElementById: id => els[id] || null,
