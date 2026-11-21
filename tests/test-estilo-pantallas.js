@@ -67,10 +67,19 @@ PAGINAS.forEach(p => {
 ok(definidas.size > 40, `${definidas.size} variables definidas en las hojas de estilo`, definidas.size);
 
 const inventadas = [];
+// Un script también puede usar las variables que define la página que lo
+// carga (fichar.js usa las de fichar.html). Antes se miraban solo las hojas
+// .css, y fichar.js pasaba de casualidad porque equipos.css definía --line.
+const dePaginas = js => {
+  const set = new Set();
+  PAGINAS.forEach(p => { if (new RegExp('src="' + js.replace('.', '\\.') + '"').test(leer(p))) propias[p].forEach(v => set.add(v)); });
+  return set;
+};
 HOJAS.concat(SCRIPTS).forEach(f => {
   const s = leer(f);
   const re = /var\(\s*(--[\w-]+)/g;
-  let m; while ((m = re.exec(s))) if (!definidas.has(m[1])) inventadas.push(f + ' → ' + m[1]);
+  const locales = f.endsWith('.js') ? dePaginas(f) : new Set();
+  let m; while ((m = re.exec(s))) if (!definidas.has(m[1]) && !locales.has(m[1])) inventadas.push(f + ' → ' + m[1]);
 });
 PAGINAS.forEach(p => {
   const s = leer(p);
