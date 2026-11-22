@@ -798,6 +798,9 @@ function toggleDashMenu() {
     { icon: '🌙', label: 'Modo oscuro/claro', onClick: toggleDarkMode },
     { icon: '🔒', label: 'Modo dueño', hide: _soloDueno(), onClick: toggleOwnerLock },
     { icon: '🔔', label: 'Notificaciones', sub: 'Push + avisos in-app', onClick: () => (typeof openNotifConfig === 'function') && openNotifConfig() },
+    // 📲 Íconos en la pantalla del celu para Caja, Nueva reparación y Escanear venta (atajo.js)
+    { icon: '📲', label: 'Accesos directos en el celu', sub: 'Íconos para Caja, Nueva reparación y Escanear venta',
+      onClick: () => { location.href = 'atajos.html'; } },
     { icon: '📅', label: 'Estado del día', sub: 'El de "ya estamos abiertos", para WhatsApp e Instagram', hide: _soloDueno(),
       onClick: () => (typeof estAbrir === 'function') && estAbrir() },
     // Cuentas y horas del personal, juntos: el menú no pasa de diez renglones

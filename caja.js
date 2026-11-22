@@ -242,6 +242,14 @@ function _handleUrlAction() {
       } else if (action === 'reporte') {
         if (typeof openReporteModal === 'function') openReporteModal();
         else if (retry < 10) setTimeout(() => tryAct(retry + 1), 300);
+      } else if (action === 'escanear') {
+        // 📲 Acceso directo "Escanear venta" (atajo-escanear.html): la venta
+        // abierta y la cámara prendida, listo para leer el código.
+        if (typeof openMovFormType === 'function' && typeof movEscanear === 'function') {
+          openMovFormType('ingreso');
+          setTimeout(() => movEscanear(), 350);
+        }
+        else if (retry < 10) setTimeout(() => tryAct(retry + 1), 300);
       } else if (action === 'venta' || action === 'egreso') {
         // Accesos rápidos del dashboard
         if (typeof openMovFormType === 'function') {

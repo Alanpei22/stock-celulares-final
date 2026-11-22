@@ -1,0 +1,23 @@
+{
+  "id": "/atajo-escanear.html",
+  "name": "Escanear venta · TechPoint",
+  "short_name": "Escanear",
+  "start_url": "/atajo-escanear.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "atajo-escanear-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "atajo-escanear-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

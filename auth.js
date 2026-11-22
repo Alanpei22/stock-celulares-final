@@ -67,12 +67,22 @@ async function sendPasswordReset(email) {
   await _a().sendPasswordResetEmail(String(email).trim().toLowerCase());
 }
 
+// La dirección con la que se abrió la página, ANTES de que app.js / caja.js
+// le saquen el ?action= (lo borran de la barra apenas arrancan). Sirve para
+// que un acceso directo (atajo-*.html) que cae en el login vuelva a donde iba:
+// en iPhone cada ícono tiene su propia sesión y la primera vez pide entrar.
+const _TP_URL_INICIAL = (typeof location !== 'undefined')
+  ? ((location.pathname.split('/').pop() || 'index.html') + location.search) : '';
+
 // ── Guard: redirige a login si no está autenticado ───────
 // Uso al arrancar cada página:
 //   requireAuth().then(u => { if (u) showApp(); });
 async function requireAuth(loginUrl = 'login.html') {
   const user = await waitForAuth();
   if (!user) {
+    if (loginUrl === 'login.html' && /[?&]action=/.test(_TP_URL_INICIAL)) {
+      loginUrl = 'login.html?next=' + encodeURIComponent(_TP_URL_INICIAL);
+    }
     location.replace(loginUrl);
     return null;
   }

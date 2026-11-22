@@ -79,6 +79,9 @@ HOJAS.concat(SCRIPTS).forEach(f => {
   const s = leer(f);
   const re = /var\(\s*(--[\w-]+)/g;
   const locales = f.endsWith('.js') ? dePaginas(f) : new Set();
+  // Y las que el script define él mismo en el CSS que inyecta (atajo.js trae
+  // sus colores en su propio :root, porque sus páginas no cargan style.css)
+  if (f.endsWith('.js')) (s.match(/(--[\w-]+)\s*:/g) || []).forEach(v => locales.add(v.replace(':', '').trim()));
   let m; while ((m = re.exec(s))) if (!definidas.has(m[1]) && !locales.has(m[1])) inventadas.push(f + ' → ' + m[1]);
 });
 PAGINAS.forEach(p => {
