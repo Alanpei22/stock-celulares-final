@@ -1830,6 +1830,8 @@ function openRepairForm(id) {
   if (typeof listenRepuestos === 'function') listenRepuestos();
   // 💲 Y la lista de precios de reparación (una vez, del caché si está fresco)
   if (typeof iaCargarPrecios === 'function') iaCargarPrecios();
+  // 📥 Fotos de cómo ingresa: vacías si es nueva, las guardadas si se edita
+  if (typeof fiReset === 'function') fiReset(id ? (REPAIRS.find(x => x.id === id) || null) : null);
   setTimeout(() => { if (typeof _repuModeloPintar === 'function') _repuModeloPintar(); }, 0);
   editingRepairId = id || null;
   const COMMON_ARREGLOS = [
@@ -2155,6 +2157,10 @@ async function saveRepair() {
   if (!marca)   { toast('Ingresá la marca', 'error'); return; }
   if (!modelo)  { toast('Ingresá el modelo', 'error'); return; }
   if (!arreglos.length) { toast('Agregá al menos una reparación', 'error'); return; }
+  // 📥 El cliente ve en su QR cómo ingresó el equipo: si faltan, se avisa
+  // (no se traba: hay ingresos apurados o sin cámara a mano)
+  if (!editingRepairId && typeof fiFaltanFotos === 'function' && fiFaltanFotos()
+      && !confirm('No le sacaste las fotos de cómo ingresa (adelante y atrás).\nEl cliente no las va a ver en su QR. ¿Guardar igual?')) return;
   // Un IMEI mal cargado se arrastra a la boleta, a la garantía y al día que
   // haya que consultarlo en la blacklist
   if (typeof imeiConfirmar === 'function' && !imeiConfirmar(imei, 'IMEI')) return;
@@ -2221,6 +2227,8 @@ async function saveRepair() {
       if (typeof upsertSeguimientoPublico === 'function') {
         upsertSeguimientoPublico({ ...updateData, id: editingRepairId });
       }
+      // 📥 Fotos de ingreso nuevas o cambiadas (en segundo plano)
+      if (typeof fiSubirIngreso === 'function') fiSubirIngreso({ ...existing, ...updateData, id: editingRepairId });
       // CRM: mantener ficha del cliente al día
       if (tlf && typeof upsertCliente === 'function') {
         upsertCliente({ tlf, nombre, dni });
@@ -2306,6 +2314,8 @@ async function saveRepair() {
       if (sena > 0) _senaAlIngresoACaja(newDoc);
       // 🧠 Los precios pasados quedan como sugerencia para la próxima (ingreso-ayudas.js)
       if (typeof iaMemorizar === 'function') iaMemorizar(newDoc);
+      // 📥 Fotos de cómo ingresa: se suben en segundo plano y van al QR del cliente
+      if (typeof fiSubirIngreso === 'function') fiSubirIngreso(newDoc);
       toast(provisorio
         ? `Reparación N°${nOrden} guardada en el celu — se sube cuando Firebase vuelva (el N° puede cambiar)`
         : 'Reparación N°' + nOrden + ' registrada', 'success');

@@ -122,6 +122,47 @@ const espera = () => new Promise(r => setTimeout(r, 10));
   ok(/lqFotosHtml\(r\)/.test(leer('repairs.js')), 'la ficha muestra las fotos');
   ok(/match \/reparaciones\/\{repairId\}\/\{filename\}/.test(leer('storage.rules')), 'storage.rules tiene la carpeta reparaciones/ (hay que publicarla)');
 
+  console.log('\n8) 📥 Fotos de cómo ingresa (formulario de reparación)');
+  els['rep-fotos-ingreso'] = nuevoEl();
+  ctx.fiReset(null);
+  let fi = els['rep-fotos-ingreso'].innerHTML;
+  ok((fi.match(/capture="environment" onchange="fiFoto/g) || []).length === 2 && /Cómo ingresa/.test(fi) && /QR/.test(fi), 'dos recuadros (adelante y atrás) que dicen que el cliente las ve en su QR');
+  ok(ctx.fiFaltanFotos() === true, 'sin fotos: faltan');
+  ok(ctx.fiSubirIngreso({ id: 'r9', nOrden: 9 }) === null, 'sin fotos nuevas no sube nada');
+  ctx.fiFoto('adelante', { files: [{ name: 'in-a.jpg' }] }); ctx.fiFoto('atras', { files: [{ name: 'in-b.jpg' }] });
+  ok(ctx.fiFaltanFotos() === false && /blob:in-a\.jpg/.test(els['rep-fotos-ingreso'].innerHTML), 'con las dos: se ven y ya no faltan');
+  SUBIDAS.length = 0; UPDATES.length = 0;
+  const PUBLICADOS = [];
+  ctx.upsertSeguimientoPublico = r => PUBLICADOS.push(JSON.parse(JSON.stringify(r)));
+  ctx.REPAIRS.push({ id: 'r9', nOrden: 9, estado: 'reparando' });
+  const fIng = await ctx.fiSubirIngreso({ id: 'r9', nOrden: 9 });
+  ok(SUBIDAS.length === 2 && SUBIDAS.every(s => /^reparaciones\/r9\/ingreso-(adelante|atras)_/.test(s)), 'al guardar, sube las dos a reparaciones/r9/', SUBIDAS);
+  ok(UPDATES[0] && UPDATES[0].id === 'r9' && /ingreso-adelante/.test(UPDATES[0].d.fotosIngreso.adelante) && /ingreso-atras/.test(UPDATES[0].d.fotosIngreso.atras), 'anota fotosIngreso en la reparación', UPDATES[0]);
+  ok(PUBLICADOS.length === 1 && PUBLICADOS[0].fotosIngreso && PUBLICADOS[0].fotosIngreso.adelante, 'y actualiza el seguimiento del cliente con las fotos');
+  ctx.fiReset({ fotosIngreso: { adelante: 'https://f/x.webp', atras: 'https://f/y.webp' } });
+  ok(ctx.fiFaltanFotos() === false && /https:\/\/f\/x\.webp/.test(els['rep-fotos-ingreso'].innerHTML), 'al editar, muestra las que ya tenía');
+  const fh2 = ctx.lqFotosHtml({ fotosIngreso: { adelante: 'https://f/i.webp' }, fotosListo: { atras: 'https://f/o.webp' } });
+  ok(/Cómo ingresó/.test(fh2) && /Cómo quedó/.test(fh2), 'la ficha muestra las de ingreso y las de salida');
+
+  console.log('\n9) Las ve el cliente en su QR');
+  const seg = leer('seguimiento.js');
+  const sctx = { console, String, JSON, Array, Set, Date, window: {}, SEG_MENSAJES: undefined };
+  vm.createContext(sctx);
+  vm.runInContext(seg, sctx, { filename: 'seguimiento.js' });
+  const pub = sctx._segDocPublico({ nOrden: 7, marca: 'Samsung', modelo: 'A54', foto: 'data:image/jpeg;base64,AAAA',
+    fotosIngreso: { adelante: 'https://s/a.webp', atras: 'https://s/b.webp', fecha: '2026-11-18', por: 'Nacho' },
+    fotosListo: { adelante: 'https://s/c.webp', atras: 'data:image/png;base64,XX' } }, 'listo');
+  ok(pub.fotosIngreso.adelante === 'https://s/a.webp' && pub.fotosIngreso.atras === 'https://s/b.webp', 'el documento público lleva las fotos de ingreso', pub.fotosIngreso);
+  ok(pub.fotosSalida.adelante === 'https://s/c.webp' && pub.fotosSalida.atras === '', 'y las de salida (solo links https: nada de base64)', pub.fotosSalida);
+  ok(!('por' in pub.fotosIngreso) && !JSON.stringify(pub).includes('base64'), 'sin quién la sacó ni la foto vieja del ingreso');
+  ok(sctx._segDocPublico({ nOrden: 8 }, 'reparacion').fotosIngreso === null, 'sin fotos, nada');
+  const est = leer('estado.html');
+  ok(/fotosBloque\(d\.fotosIngreso, '📥 Cómo ingresó'\)/.test(est) && /paso >= 3 \? fotosBloque\(d\.fotosSalida, '✅ Cómo sale'\)/.test(est), 'estado.html: "Cómo ingresó" siempre y "Cómo sale" recién cuando está listo');
+  ok(/function fotoUrl\(u\) \{ return \(typeof u === 'string' && \/\^https:/.test(est) && /id="visor"/.test(est), 'solo muestra links https y se pueden agrandar');
+  const rp = leer('repairs.js');
+  ok(/fiFaltanFotos\(\)[\s\S]{0,120}confirm\(/.test(rp) && /fiSubirIngreso\(newDoc\)/.test(rp) && /fiSubirIngreso\(\{ \.\.\.existing/.test(rp) && /fiReset\(/.test(rp), 'repairs.js: pregunta si faltan, sube al crear y al editar, limpia al abrir');
+  ok(/id="rep-fotos-ingreso"/.test(leer('index.html')), 'el formulario tiene el lugar para las fotos');
+
   console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
   process.exit(fails ? 1 : 0);
 })();

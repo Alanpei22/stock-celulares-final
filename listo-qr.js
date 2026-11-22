@@ -23,6 +23,13 @@
 //  Para qué las fotos: queda cómo se entregó el equipo (pantalla sana, tapa
 //  sin rayones). Si el cliente vuelve con un reclamo, está la foto. Se ven en
 //  la ficha, en "📷 Cómo quedó".
+//
+//  📥 FOTOS DE CÓMO INGRESA (más abajo, fi*). Alan (22/11): "necesito que el
+//  cliente vea en su QR, además del estado del equipo, fotos de cómo ingresa y
+//  cómo sale". En el ingreso (paso 1) hay dos recuadros, adelante y atrás. Se
+//  suben DESPUÉS de guardar, en segundo plano (el mostrador no espera), se
+//  anotan en `fotosIngreso` y se publican en el seguimiento del cliente
+//  (seguimiento.js), junto con las de salida (`fotosListo`).
 'use strict';
 
 const LQ_LADOS = [['adelante', 'Adelante', 'La pantalla, prendida si se puede'], ['atras', 'Atrás', 'La tapa y las cámaras']];
@@ -197,15 +204,84 @@ async function _lqMarcarListo(id) {
 
 // En la ficha: las dos fotos de cómo quedó
 function lqFotosHtml(r) {
-  const f = r && r.fotosListo;
+  return _lqFotosBloque(r && r.fotosIngreso, '📥 Cómo ingresó') + _lqFotosBloque(r && r.fotosListo, '📷 Cómo quedó');
+}
+function _lqFotosBloque(f, titulo) {
   if (!f || !(f.adelante || f.atras)) return '';
   const cuando = (typeof tpFechaCorta === 'function' && f.fecha) ? tpFechaCorta(f.fecha) : String(f.fecha || '').slice(0, 10);
   const img = (u, nom) => u ? `<a class="lq-mini" href="${esc(u)}" target="_blank" rel="noopener"><img src="${esc(u)}" alt="${nom}" loading="lazy"><span>${nom}</span></a>` : '';
   _lqEstilos();
   return `<div class="det-row det-row--full tp-bloque">
-    <span class="det-label">📷 Cómo quedó${cuando ? ' · ' + esc(cuando) : ''}${f.por ? ' · ' + esc(f.por) : ''}</span>
+    <span class="det-label">${titulo}${cuando ? ' · ' + esc(cuando) : ''}${f.por ? ' · ' + esc(f.por) : ''}</span>
     <div class="lq-minis">${img(f.adelante, 'Adelante')}${img(f.atras, 'Atrás')}</div>
   </div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+//  📥 Fotos de cómo ingresa (formulario de reparación, paso 1)
+// ══════════════════════════════════════════════════════════
+let _fi = { files: {}, urls: {}, previas: {} };   // previas = las ya guardadas (al editar)
+
+function fiReset(r) {
+  Object.values(_fi.urls).forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
+  const p = (r && r.fotosIngreso) || {};
+  _fi = { files: {}, urls: {}, previas: { adelante: p.adelante || '', atras: p.atras || '' } };
+  fiPintar();
+}
+function fiFoto(lado, input) {
+  const f = input && input.files && input.files[0];
+  if (!f) return;
+  if (_fi.urls[lado]) { try { URL.revokeObjectURL(_fi.urls[lado]); } catch {} }
+  _fi.files[lado] = f;
+  try { _fi.urls[lado] = URL.createObjectURL(f); } catch { _fi.urls[lado] = ''; }
+  fiPintar();
+}
+// ¿Falta alguna? (cuenta las nuevas y las que ya estaban guardadas)
+function fiFaltanFotos() {
+  return LQ_LADOS.some(([k]) => !_fi.files[k] && !_fi.previas[k]);
+}
+function fiPintar() {
+  const box = (typeof document !== 'undefined') && document.getElementById('rep-fotos-ingreso');
+  if (!box) return;
+  _lqEstilos();
+  box.innerHTML = `<label class="fl">📷 Cómo ingresa <span class="fl-hint">el cliente las ve en su QR</span></label>
+    <div class="lq-fotos lq-fotos--chicas">${LQ_LADOS.map(([k, nom]) => {
+      const src = _fi.urls[k] || _fi.previas[k];
+      return `<label class="lq-foto${src ? ' ok' : ''}">
+        <input type="file" accept="image/*" capture="environment" onchange="fiFoto('${k}', this)">
+        ${src ? `<img src="${esc(src)}" alt="">` : `<span class="lq-cam" aria-hidden="true">📷</span>`}
+        <b>${src ? '✓ ' : ''}${nom}</b>
+      </label>`;
+    }).join('')}</div>`;
+}
+
+// Al guardar (repairs.js saveRepair): sube las nuevas en segundo plano, las
+// anota en la reparación y actualiza el seguimiento del cliente. Las fotos se
+// toman en el momento: el formulario se limpia enseguida y no importa.
+function fiSubirIngreso(r) {
+  if (!r || !r.id) return null;
+  const files = Object.assign({}, _fi.files);
+  const lados = LQ_LADOS.map(([k]) => k).filter(k => files[k]);
+  if (!lados.length) return null;
+  return (async () => {
+    try {
+      const urls = await Promise.all(lados.map(k => lqSubirFoto(r.id, 'ingreso-' + k, files[k])));
+      const previo = (r.fotosIngreso && typeof r.fotosIngreso === 'object') ? r.fotosIngreso : {};
+      const fotosIngreso = Object.assign({}, previo, { fecha: new Date().toISOString(), por: _lqQuien() });
+      lados.forEach((k, i) => { fotosIngreso[k] = urls[i]; });
+      await db.collection('repairs').doc(r.id).update({ fotosIngreso });
+      const enMem = (typeof REPAIRS !== 'undefined' ? REPAIRS : []).find(x => x.id === r.id);
+      const obj = enMem || r;
+      Object.assign(obj, { fotosIngreso });
+      if (typeof _repPatchLocal === 'function') _repPatchLocal(r.id, { fotosIngreso });
+      if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(obj);
+      return fotosIngreso;
+    } catch (e) {
+      console.error('fotos de ingreso:', e);
+      if (typeof toast === 'function') toast(`⚠️ No se subieron las fotos de ingreso de la N°${r.nOrden || ''}. Abrila y sacalas de nuevo.`, 'error');
+      return null;
+    }
+  })();
 }
 
 function _lqEstilos() {
@@ -240,6 +316,9 @@ function _lqEstilos() {
   .lq-minis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
   .lq-mini { position: relative; display: block; border-radius: 12px; overflow: hidden; background: var(--bg2, rgba(128,128,128,.08)); }
   .lq-mini img { display: block; width: 100%; height: 150px; object-fit: cover; }
+  .lq-fotos--chicas .lq-foto { min-height: 120px; }
+  .lq-fotos--chicas .lq-foto img { height: 84px; }
+  .lq-fotos--chicas .lq-cam { font-size: 32px; }
   .lq-mini span { position: absolute; left: 6px; bottom: 6px; background: rgba(0,0,0,.6); color: #fff; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }`;
   document.head.appendChild(st);
 }

@@ -13,7 +13,10 @@
     con un fetch común. Carga en menos de 20 KB, que es lo que corresponde para
     alguien mirando esto con datos móviles en la calle.
 
-    Solo muestra datos no sensibles (modelo, paso, fechas, últimos 4 del IMEI).
+    Solo muestra datos no sensibles (modelo, paso, fechas, últimos 4 del IMEI),
+    y las fotos de cómo ingresó y cómo sale el equipo (Alan, 22/11: "que el
+    cliente vea en su QR, además del estado, fotos de cómo ingresa y cómo
+    sale"). Las de salida se muestran recién cuando está Listo.
     Sin el token del QR no se llega a ninguna orden: las reglas de Firestore
     permiten leer un documento por su id, pero no listar la colección.
   -->
@@ -101,6 +104,17 @@
     }
     .wa:active { background: #1eb356; }
 
+    .fotos-g { margin-bottom: 14px; }
+    .fotos-t { font-size: .8rem; font-weight: 700; margin-bottom: 7px; }
+    .fotos-t span { color: var(--tenue); font-weight: 500; }
+    .fotos-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .foto { position: relative; display: block; width: 100%; padding: 0; border: 0; border-radius: 13px; overflow: hidden; background: var(--fondo); cursor: zoom-in; }
+    .foto img { display: block; width: 100%; height: 150px; object-fit: cover; }
+    .foto span { position: absolute; left: 6px; bottom: 6px; background: rgba(0,0,0,.6); color: #fff; font-size: .68rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+    .visor { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.92); display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .visor[hidden] { display: none; }
+    .visor img { max-width: 100%; max-height: 100%; border-radius: 10px; }
+    .visor b { position: absolute; top: 14px; right: 18px; color: #fff; font-size: 1.6rem; line-height: 1; }
     .pie { padding: 18px 22px 24px; border-top: 1px solid var(--linea); text-align: center; }
     .pie-l { font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--tenue); margin-bottom: 5px; }
     .pie-v { font-size: .87rem; line-height: 1.6; color: var(--suave); }
@@ -118,6 +132,7 @@
       <div class="cargando">Cargando…</div>
     </div>
     <div class="pie" id="pie"></div>
+    <div class="visor" id="visor" hidden onclick="this.hidden=true"><img id="visor-img" alt=""><b aria-hidden="true">✕</b></div>
   </div>
 
   <script>
@@ -172,6 +187,26 @@
     for (var k in f) if (Object.prototype.hasOwnProperty.call(f, k)) out[k] = valor(f[k]);
     return out;
   }
+
+  // 📷 Fotos del equipo: solo links https (son de Firebase Storage)
+  function fotoUrl(u) { return (typeof u === 'string' && /^https:\/\//.test(u)) ? u : ''; }
+  function fotosBloque(f, titulo) {
+    if (!f || typeof f !== 'object') return '';
+    var a = fotoUrl(f.adelante), b = fotoUrl(f.atras);
+    if (!a && !b) return '';
+    var una = function (u, nom) {
+      return u ? '<button type="button" class="foto" onclick="verFoto(this)" data-src="' + esc(u) + '">' +
+                 '<img src="' + esc(u) + '" alt="' + nom + '" loading="lazy"><span>' + nom + '</span></button>' : '<div></div>';
+    };
+    return '<div class="fotos-g"><div class="fotos-t">' + titulo +
+           (f.fecha ? ' <span>· ' + esc(fechaLarga(f.fecha)) + '</span>' : '') + '</div>' +
+           '<div class="fotos-2">' + una(a, 'Adelante') + una(b, 'Atrás') + '</div></div>';
+  }
+  if (typeof window !== 'undefined') window.verFoto = function (el) {
+    var v = document.getElementById('visor');
+    document.getElementById('visor-img').src = el.getAttribute('data-src');
+    v.hidden = false;
+  };
 
   function noEncontrada() {
     // A propósito no distingue "no existe" de "el código no coincide":
@@ -249,6 +284,11 @@
             '<div class="tl-f">' + esc(fechaHora(hist[h].fecha)) + '</div></div>';
     }
 
+    // Las de salida, recién cuando está listo o entregado (si se reabrió la
+    // orden, las de una salida anterior no corresponden)
+    var fotos = fotosBloque(d.fotosIngreso, '📥 Cómo ingresó') +
+                (!corte && paso >= 3 ? fotosBloque(d.fotosSalida, '✅ Cómo sale') : '');
+
     document.getElementById('body').innerHTML =
       '<div class="equipo">' +
         (d.nOrden ? '<div class="equipo-orden">Orden N°' + esc(d.nOrden) + '</div>' : '') +
@@ -265,6 +305,7 @@
         '<div class="fecha"><div class="fecha-l">' + (d.fechaEntrega ? 'Entregado' : 'Entrega estimada') + '</div>' +
         '<div class="fecha-v">' + esc(fechaLarga(d.fechaEntrega || d.fechaEstimada)) + '</div></div>' +
       '</div>' +
+      (fotos ? '<div class="linea-t"><div class="linea-t-h">Fotos de tu equipo</div>' + fotos + '</div>' : '') +
       (tl ? '<div class="linea-t"><div class="linea-t-h">Seguimiento</div><div class="tl">' + tl + '</div></div>' : '') +
       (d.bizTel ? '<a class="wa" id="wa" href="#">Escribinos por WhatsApp</a>' : '');
 

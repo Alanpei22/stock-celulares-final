@@ -69,6 +69,12 @@ function _segPasoDe(fase) {
 }
 
 // ── Publicación ────────────────────────────────────────────
+function _segFotos(f) {
+  if (!f || typeof f !== 'object') return null;
+  const ok = u => (typeof u === 'string' && /^https:\/\//.test(u)) ? u : '';
+  const out = { adelante: ok(f.adelante), atras: ok(f.atras), fecha: String(f.fecha || '') };
+  return (out.adelante || out.atras) ? out : null;
+}
 function _segDocPublico(r, fase) {
   const biz = (typeof window !== 'undefined' && window._DAKI_NAME) || 'TechPoint';
   const bd = (typeof BIZ_DATA !== 'undefined' && BIZ_DATA) || {};
@@ -99,6 +105,10 @@ function _segDocPublico(r, fase) {
     fechaEstimada: r.fechaEstimada || null,
     fechaEntrega: r.fechaEntrega || null,
     historial: hist,
+    // 📷 Fotos de cómo ingresó y cómo sale (listo-qr.js). Solo links https de
+    // Storage: la foto vieja del ingreso (base64, campo `foto`) no va.
+    fotosIngreso: _segFotos(r.fotosIngreso),
+    fotosSalida: _segFotos(r.fotosListo),
     // Datos del local, para que la página no tenga nada escrito a fuego
     bizDir: bd.dir || '',
     bizTel: bd.tel || '',
