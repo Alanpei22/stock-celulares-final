@@ -525,6 +525,9 @@ function initRepairs() {
   // El aviso de stock de repuestos depende del modelo, que se carga en el paso 1.
   ['rep-fi-marca', 'rep-fi-modelo'].forEach(id => {
     document.getElementById(id).addEventListener('change', () => _sugerirRepuestos());
+    // 🔩 Los repuestos de ese modelo, mientras se escribe
+    document.getElementById(id).addEventListener('input', () => _repuModeloProgramar());
+    document.getElementById(id).addEventListener('change', () => _repuModeloPintar());
   });
 
   document.getElementById('rep-detail-close').addEventListener('click', closeRepairDetail);
@@ -1699,6 +1702,90 @@ function _sugerirRepuestos() {
   ).join('');
 }
 
+// ── 🔩 Repuestos del modelo, en el ingreso ─────────────────
+// Alan (22/11): "cuando entra un equipo, cuando ponemos el modelo, estaría
+// bueno que nos diga qué repuestos hay". Apenas se escriben marca y modelo
+// (paso 1) aparece la lista de repuestos de ESE modelo con su stock y su
+// precio de venta: se le puede dar precio y demora al cliente en el momento.
+// (El aviso de arriba, _sugerirRepuestos, sigue en el paso 2 por reparación.)
+const _RM_VARIANTES = ['pro', 'max', 'plus', 'mini', 'ultra', 'lite', 'fe', 'neo', 'prime', 'power', 'play'];
+function _rmNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim(); }
+// "Apple" y "iPhone" son la misma marca para los repuestos
+function _rmMarca(s) { const m = _rmNorm(s); return m === 'apple' ? 'iphone' : m; }
+
+// Los repuestos que son de este modelo. Palabras enteras ("A54" no trae el
+// "A5"), y si el repuesto es de una variante que no se escribió ("13 Pro"
+// cuando se puso "13"), no entra. Primero los que hay en stock.
+function repuestosDelModelo(marca, modelo, lista) {
+  const mq = _rmMarca(marca);
+  let toks = _rmNorm(modelo).split(' ').filter(Boolean);
+  if (mq) toks = toks.filter(t => t !== mq && !(mq === 'iphone' && t === 'apple'));
+  if (!toks.length || !Array.isArray(lista)) return [];
+  const out = lista.filter(r => {
+    if (!r) return false;
+    const mr = _rmMarca(r.marca);
+    if (mq && mr && mr !== mq) return false;
+    const set = new Set(_rmNorm([r.modelo, r.nombre].join(' ')).split(' '));
+    if (!toks.every(t => set.has(t))) return false;
+    // Variante de más ("pro", "max"…) que no se escribió: es otro modelo
+    return !_RM_VARIANTES.some(v => set.has(v) && !toks.includes(v));
+  });
+  return out.sort((a, b) => (((Number(b.cantidad) || 0) > 0) - ((Number(a.cantidad) || 0) > 0))
+    || String(a.tipo || a.nombre || '').localeCompare(String(b.tipo || b.nombre || '')));
+}
+
+let _rmT = null;
+function _repuModeloPintar() {
+  const box = document.getElementById('rep-repu-modelo');
+  if (!box) return;
+  const marca  = (document.getElementById('rep-fi-marca')  || {}).value || '';
+  const modelo = (document.getElementById('rep-fi-modelo') || {}).value || '';
+  if (!modelo.trim()) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  _rmEstilos();
+  const titulo = esc([marca.trim(), modelo.trim()].filter(Boolean).join(' '));
+  const cab = `<div class="rm-cab">🔩 Repuestos para ${titulo}</div>`;
+  box.classList.remove('hidden');
+  if (typeof REPUESTOS === 'undefined' || !REPUESTOS.length) {
+    box.innerHTML = cab + '<div class="rm-nada">Cargando los repuestos…</div>';
+    return;
+  }
+  const lista = repuestosDelModelo(marca, modelo, REPUESTOS);
+  if (!lista.length) {
+    box.innerHTML = cab + '<div class="rm-nada">No hay repuestos cargados para este modelo.</div>';
+    return;
+  }
+  const MAX = 8;
+  box.innerHTML = cab + lista.slice(0, MAX).map(r => {
+    const cant = Number(r.cantidad) || 0;
+    const venta = Number(r.precioVenta) || 0;
+    return `<div class="rm-fila">
+      <span class="rm-nom">${esc(r.tipo || '')}${r.tipo && r.nombre ? ' · ' : ''}<span>${esc(r.nombre || '')}</span></span>
+      ${venta ? `<span class="rm-precio">$${venta.toLocaleString('es-AR')}</span>` : ''}
+      <span class="rm-stock ${cant > 0 ? 'ok' : 'no'}">${cant > 0 ? cant + ' en stock' : 'sin stock · pedir'}</span>
+    </div>`;
+  }).join('') + (lista.length > MAX ? `<div class="rm-nada">y ${lista.length - MAX} más en 🔩 Repuestos</div>` : '');
+}
+function _repuModeloProgramar() { clearTimeout(_rmT); _rmT = setTimeout(_repuModeloPintar, 250); }
+
+function _rmEstilos() {
+  if (document.getElementById('rm-css')) return;
+  const st = document.createElement('style');
+  st.id = 'rm-css';
+  st.textContent = `
+  #rep-repu-modelo { border: 1px solid var(--border, rgba(128,128,128,.3)); border-radius: 12px; padding: 10px 12px; background: var(--bg2, rgba(128,128,128,.06)); display: grid; gap: 6px; }
+  #rep-repu-modelo.hidden { display: none; }
+  .rm-cab { font-weight: 700; font-size: 13.5px; }
+  .rm-fila { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .rm-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .rm-nom span { font-weight: 400; color: var(--t2, #888); }
+  .rm-precio { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .rm-stock { flex: none; font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 99px; }
+  .rm-stock.ok { background: rgba(16,185,129,.15); color: #10b981; }
+  .rm-stock.no { background: rgba(239,68,68,.13); color: #ef4444; }
+  .rm-nada { font-size: 12.5px; color: var(--t2, #888); }`;
+  document.head.appendChild(st);
+}
+
 function _repwizNext() {
   if (_repwizIdx < 0) return;
   if (!_repwizValidarPaso()) return;
@@ -1718,6 +1805,11 @@ function _repwizBack() {
 
 function openRepairForm(id) {
   _repFormTocado = false;
+  // 🔩 Para mostrar los repuestos del modelo hacen falta en memoria. CUPO: es
+  // la misma escucha de la sección Repuestos (una lectura de la colección por
+  // sesión, después solo los cambios); si ya se abrió, no lee nada de nuevo.
+  if (typeof listenRepuestos === 'function') listenRepuestos();
+  setTimeout(() => { if (typeof _repuModeloPintar === 'function') _repuModeloPintar(); }, 0);
   if (typeof tpFrenar === 'function' && tpFrenar('reparaciones', id ? 'editar reparaciones' : 'tomar reparaciones')) return;
   editingRepairId = id || null;
   const COMMON_ARREGLOS = [

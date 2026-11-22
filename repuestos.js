@@ -179,6 +179,8 @@ function listenRepuestos() {
     REPUESTOS.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
     _lowStockDismissed = false; // reaparece en cada cambio de inventario
     renderRepuestos();
+    // 🔩 El recuadro "Repuestos para [modelo]" del ingreso de reparaciones
+    if (typeof _repuModeloPintar === 'function') _repuModeloPintar();
     // Si el cuadro "¿Qué repuesto usaste?" está abierto esperándolos, se llena
     const uso = document.getElementById('rep-uso-modal');
     if (uso && !uso.classList.contains('hidden') && typeof renderRepUsoList === 'function') renderRepUsoList();

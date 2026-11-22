@@ -1070,6 +1070,8 @@
           <label class="fl">Modelo *</label>
           <input id="rep-fi-modelo" class="fi" type="text" placeholder="A54, iPhone 13..." autocomplete="off">
         </div>
+        <!-- 🔩 Repuestos que hay de este modelo (repairs.js _repuModeloPintar) -->
+        <div id="rep-repu-modelo" class="fg fg--full hidden" aria-live="polite"></div>
         <div class="fg fg--full">
           <label class="fl">IMEI <small style="color:var(--t2);font-weight:400">— opcional, el cliente ve solo los últimos 4</small></label>
           <input id="rep-fi-imei" class="fi" type="text" placeholder="356938035643809" inputmode="numeric" autocomplete="off" maxlength="20">
