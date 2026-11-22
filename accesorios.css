@@ -1,0 +1,46 @@
+/* Página de accesorios (/accesorios). La base es equipos.css (mismo estilo
+   que /equipos); acá va lo propio: el "¿Qué celu tenés?" de arriba y las
+   tarjetas, más chicas que las de los celulares (de a dos en el celu). */
+
+/* ── "¿Qué celu tenés?" en la franja negra ── */
+.acc-hero-buscar { margin-top: 28px; max-width: 520px; }
+.acc-hero-buscar label { display: block; font-weight: 700; font-size: 15px; margin-bottom: 10px; color: #fff; }
+.acc-hero-buscar div { display: flex; gap: 10px; flex-wrap: wrap; }
+.acc-hero-buscar input { flex: 1 1 220px; min-width: 0; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08); color: #fff;
+  border-radius: 999px; padding: 14px 20px; font: inherit; font-size: 16px; }
+.acc-hero-buscar input::placeholder { color: rgba(255,255,255,.45); }
+.acc-hero-buscar input:focus { outline: 2px solid var(--azul); outline-offset: 0; background: rgba(255,255,255,.12); }
+.acc-hero-buscar .btn { flex: none; }
+
+/* ── Grilla: de a 2 en el celu, de a 3 o 4 en la compu ── */
+.acc-grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 700px) { .acc-grilla { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+@media (min-width: 1000px) { .acc-grilla { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.acc-esq { min-height: 300px; }
+
+.acc-sub { grid-column: 1 / -1; margin: 14px 0 0; font-size: 15px; font-weight: 700; color: var(--tx); }
+.acc-sub:first-child { margin-top: 0; }
+.acc-sub small { display: block; font-weight: 400; color: var(--mut); font-size: 13.5px; }
+
+.acc-ficha { background: var(--blanco); border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.acc-foto { position: relative; display: block; width: 100%; aspect-ratio: 1; border: 0; padding: 0; background: var(--gris-2); cursor: zoom-in; overflow: hidden; }
+.acc-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.acc-foto .acc-n { position: absolute; right: 8px; bottom: 8px; background: rgba(0,0,0,.6); color: #fff; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 99px; }
+.acc-sin-foto { width: 100%; aspect-ratio: 1; display: grid; place-items: center; font-size: 46px; background: linear-gradient(150deg, var(--azul-claro), var(--gris-2)); }
+.acc-cuerpo { padding: 12px 12px 14px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.acc-cat { font-size: 11.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--mut); }
+.acc-nom { margin: 0; font-size: 15px; line-height: 1.25; font-weight: 700; letter-spacing: -.01em; }
+.acc-para { font-size: 12.5px; color: var(--mut); line-height: 1.35; }
+.acc-para b { color: var(--azul-osc); font-weight: 600; }
+.acc-precio-fila { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 8px; }
+.acc-precio { font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+.acc-precio.consultar { font-size: 14px; color: var(--mut); font-weight: 600; }
+.acc-disp { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: #e7f8ee; color: #167a3e; }
+.acc-disp.ultimas { background: #fff4e0; color: #a35a00; }
+.acc-quiero { display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 10px; padding: 11px 10px; border-radius: 999px;
+  background: var(--tx); color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; }
+.acc-quiero::before { content: ""; width: 16px; height: 16px; background: var(--wa);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z'/%3E%3C/svg%3E") center/contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z'/%3E%3C/svg%3E") center/contain no-repeat; }
+.acc-quiero:active { transform: scale(.98); }
+@media (max-width: 420px) { .acc-cuerpo { padding: 10px 10px 12px; } .acc-nom { font-size: 14px; } .acc-precio { font-size: 17px; } }

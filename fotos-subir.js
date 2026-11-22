@@ -75,6 +75,27 @@ function _fotoPut(ref, blob, meta, alAvanzar) {
   });
 }
 
+// Sube UNA foto (achicada) a la primera carpeta que Storage deje escribir y
+// devuelve su link. Sirve para carpetas nuevas cuya regla todavía no se
+// publicó en Firebase: esa queda cerrada y se usa la siguiente (por ejemplo
+// stock-photos/, que ya está permitida), así la carga no se traba.
+async function fotoSubirUna(carpetas, nombreBase, file, op = {}) {
+  const storage = op.storage || firebase.storage();
+  const { blob, ext, tipo } = await fotoAchicar(file);
+  const nombre = `${nombreBase}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.${ext}`;
+  let ultimo = null;
+  for (const c of carpetas) {
+    try {
+      const snap = await _fotoPut(storage.ref(`${c}/${nombre}`), blob, { contentType: tipo, cacheControl: FOTO_CACHE });
+      return await snap.ref.getDownloadURL();
+    } catch (e) {
+      ultimo = e;
+      if (!/unauthori[sz]ed|permission|forbidden/i.test(String((e && (e.code || e.message)) || e))) throw e;
+    }
+  }
+  throw ultimo || new Error('Sin carpeta para la foto');
+}
+
 // Sube `files` al equipo `stockId`.
 //   op.storage, op.db       → firebase.storage() / firebase.firestore()
 //   op.alProgreso({ hechas, total, pct })

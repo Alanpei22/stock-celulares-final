@@ -293,7 +293,7 @@ function renderInventario() {
       <div class="inv-item-main" onclick="${click}">
         ${_invSelModo ? `<span class="inv-sel-chk" style="font-size:20px;margin-right:8px">${sel ? '☑️' : '⬜'}</span>` : ''}
         <div class="inv-item-info">
-          <span class="inv-item-nombre">${esc(p.nombre)}</span>
+          <span class="inv-item-nombre">${esc(p.nombre)}${p.publicar ? ' <span class="inv-web-chip" title="Se muestra en la página de accesorios">🌐</span>' : ''}${Array.isArray(p.fotos) && p.fotos.length ? ' <span class="inv-web-chip" title="Tiene fotos">📷</span>' : ''}</span>
           <span class="inv-item-sub">${esc(p.categoria || '')}${p.codigo ? ' · <code>' + esc(p.codigo) + '</code>' : ''}</span>
         </div>
         <div class="inv-item-right">
@@ -309,6 +309,90 @@ function renderInventario() {
 const _fmtNum = fmtNum;
 
 // ── Formulario producto ─────────────────────────────────────
+// ── 🌐 Página de accesorios: fotos del artículo ────────────
+// Alan (22/11): página de accesorios con precio, "hay / últimas unidades",
+// fotos sacadas por ellos, y sin publicar hasta que se tilde desde la app.
+// Las fotos nuevas se suben DESPUÉS de guardar, en segundo plano (cargando
+// una tanda no se espera a cada subida), a accesorios/{id}/, y se suman al
+// artículo. Si la regla de Storage todavía no se publicó, van a
+// stock-photos/acc-{id}/ (fotoSubirUna).
+const INV_FOTOS_MAX = 6;
+let _invFotos = { guardadas: [], nuevas: [] };   // nuevas: [{ file, url }]
+
+function _invFotosReset(guardadas) {
+  _invFotos.nuevas.forEach(n => { try { URL.revokeObjectURL(n.url); } catch {} });
+  _invFotos = { guardadas: (Array.isArray(guardadas) ? guardadas : []).filter(u => typeof u === 'string'), nuevas: [] };
+  _invPintarFotos();
+}
+function _invPintarFotos() {
+  const box = document.getElementById('inv-fotos');
+  if (!box) return;
+  _invWebEstilos();
+  const todas = _invFotos.guardadas.map((u, i) => ({ src: u, q: `'g',${i}` }))
+    .concat(_invFotos.nuevas.map((n, i) => ({ src: n.url, q: `'n',${i}`, nueva: true })));
+  box.innerHTML = todas.map(f => `<span class="inv-foto${f.nueva ? ' nueva' : ''}"><img src="${esc(f.src)}" alt="">
+      <button type="button" onclick="invFotoQuitar(${f.q})" aria-label="Sacar foto">✕</button></span>`).join('')
+    + (todas.length < INV_FOTOS_MAX ? `<label class="inv-foto-mas">📷<small>Foto</small>
+        <input type="file" accept="image/*" multiple onchange="invFotoAgregar(this)"></label>` : '');
+}
+// Estilos del bloque (desde acá: el CSS se sirve del caché y tarda en llegar)
+function _invWebEstilos() {
+  if (document.getElementById('inv-web-css')) return;
+  const st = document.createElement('style');
+  st.id = 'inv-web-css';
+  st.textContent = `
+  .inv-web { display: grid; gap: 8px; border-top: 1px solid var(--border, rgba(128,128,128,.25)); padding-top: 12px; }
+  .inv-fotos { display: flex; flex-wrap: wrap; gap: 8px; }
+  .inv-foto { position: relative; width: 72px; height: 72px; border-radius: 12px; overflow: hidden; background: var(--bg2, #eee); }
+  .inv-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .inv-foto.nueva { outline: 2px dashed var(--accent, #3b82f6); outline-offset: -2px; }
+  .inv-foto button { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; line-height: 22px; padding: 0; cursor: pointer; }
+  .inv-foto-mas { position: relative; width: 72px; height: 72px; border-radius: 12px; border: 2px dashed var(--border, rgba(128,128,128,.4)); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; color: var(--t2, #666); }
+  .inv-foto-mas small { font-size: 11px; }
+  .inv-foto-mas input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .inv-web-chip { font-size: 12px; }`;
+  document.head.appendChild(st);
+}
+
+function invFotoAgregar(input) {
+  const files = Array.from((input && input.files) || []);
+  const lugar = INV_FOTOS_MAX - _invFotos.guardadas.length - _invFotos.nuevas.length;
+  files.slice(0, Math.max(0, lugar)).forEach(f => {
+    let url = '';
+    try { url = URL.createObjectURL(f); } catch {}
+    _invFotos.nuevas.push({ file: f, url });
+  });
+  if (input) input.value = '';
+  _invPintarFotos();
+}
+function invFotoQuitar(tipo, i) {
+  if (tipo === 'g') _invFotos.guardadas.splice(i, 1);
+  else { const n = _invFotos.nuevas.splice(i, 1)[0]; if (n) { try { URL.revokeObjectURL(n.url); } catch {} } }
+  _invPintarFotos();
+}
+// Sube las nuevas y las suma al artículo (arrayUnion: si en otra compu se
+// sumó otra foto mientras tanto, no se pisa)
+function invSubirFotos(id, nuevas, nombre) {
+  if (!id || !nuevas || !nuevas.length || typeof fotoSubirUna !== 'function') return null;
+  return (async () => {
+    const urls = [];
+    for (const n of nuevas) {
+      try { urls.push(await fotoSubirUna([`accesorios/${id}`, `stock-photos/acc-${id}`], 'foto', n.file)); }
+      catch (e) { console.error('foto de accesorio:', e); }
+    }
+    if (urls.length) {
+      try {
+        await db.collection('productos').doc(id).update({ fotos: firebase.firestore.FieldValue.arrayUnion(...urls) });
+      } catch (e) { console.error('anotar fotos:', e); urls.length = 0; }
+    }
+    if (typeof toast === 'function') {
+      if (urls.length === nuevas.length) toast(`📷 ${urls.length === 1 ? 'Foto subida' : urls.length + ' fotos subidas'} · ${nombre || ''}`, 'success');
+      else toast(`⚠️ No se subieron ${nuevas.length - urls.length} foto(s) de ${nombre || 'un artículo'}. Probá de nuevo.`, 'error');
+    }
+    return urls;
+  })();
+}
+
 function openProductoForm(id, precodigo) {
   if (typeof tpFrenar === 'function' && tpFrenar('inventario', 'cargar o editar productos')) return;
   _invEditingId = id || null;
@@ -348,6 +432,10 @@ function openProductoForm(id, precodigo) {
     document.getElementById('inv-fi-stock').value = p.stock ?? 0;
     document.getElementById('inv-fi-stockmin').value = p.stockMin ?? 0;
     document.getElementById('inv-fi-activo').checked = p.activo !== false;
+    // 🌐 Página de accesorios
+    const pub = document.getElementById('inv-fi-publicar'); if (pub) pub.checked = p.publicar === true;
+    const cmp = document.getElementById('inv-fi-compat'); if (cmp) cmp.value = p.compat || '';
+    _invFotosReset(p.fotos);
     if (delBtn) delBtn.style.display = _invIsOwner() ? '' : 'none';
   } else {
     title.textContent = '➕ Nuevo producto';
@@ -381,6 +469,10 @@ function _clearProductoForm() {
   document.getElementById('inv-fi-stock').value = 0;
   document.getElementById('inv-fi-stockmin').value = 0;
   document.getElementById('inv-fi-activo').checked = true;
+  // 🌐 Arranca sin publicar y sin fotos
+  const pub = document.getElementById('inv-fi-publicar'); if (pub) pub.checked = false;
+  const cmp = document.getElementById('inv-fi-compat'); if (cmp) cmp.value = '';
+  _invFotosReset([]);
 }
 
 async function saveProducto(opts) {
@@ -407,6 +499,10 @@ async function saveProducto(opts) {
   const stock  = parseInt(document.getElementById('inv-fi-stock').value)    || 0;
   const stmin  = parseInt(document.getElementById('inv-fi-stockmin').value) || 0;
   const activo = document.getElementById('inv-fi-activo').checked;
+  // 🌐 Página de accesorios
+  const publicar = !!(document.getElementById('inv-fi-publicar') || {}).checked;
+  const compat = String((document.getElementById('inv-fi-compat') || {}).value || '').trim().slice(0, 200);
+  const fotosNuevas = _invFotos.nuevas.slice();   // se suben después de guardar (el form se limpia)
 
   if (!nom) { toast('Ingresá el nombre del producto', 'error'); return; }
 
@@ -456,6 +552,7 @@ async function saveProducto(opts) {
       codigo, nombre: nom, categoria: cat,
       precioVenta: pv, precioCostoUSD: costoUSD,
       stock, stockMin: stmin, activo,
+      publicar, compat, fotos: _invFotos.guardadas.slice(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     if (costoARS > 0) data.precioCosto = costoARS;
@@ -471,12 +568,14 @@ async function saveProducto(opts) {
       const viejo = PRODUCTOS.find(x => x.id === _invEditingId);
       if (viejo) if (typeof movStockDiff === 'function') movStockDiff({ tipo: 'accesorio', id: _invEditingId, nombre: nom, codigo }, viejo.stock, stock);
       await db.collection('productos').doc(_invEditingId).update(data);
+      invSubirFotos(_invEditingId, fotosNuevas, nom);
       toast('✅ Producto actualizado', 'success');
     } else {
       data.fechaAlta = firebase.firestore.FieldValue.serverTimestamp();
       const ref = await db.collection('productos').add(data);
       if (ref && typeof movStock === 'function') movStock({ tipo: 'accesorio', id: ref.id, nombre: nom, codigo, cant: stock, antes: 0, despues: stock, motivo: 'alta' });
       alGuardar({ ...data, id: ref && ref.id });
+      if (ref) invSubirFotos(ref.id, fotosNuevas, nom);
       toast('✅ Producto guardado' + (!cod && codigo ? ' · ' + codigo : ''), 'success');
     }
     // Cargando una tanda, cerrar el formulario y volver a tocar "escanear" en
@@ -674,8 +773,11 @@ function _invSiguiente(cat) {
   const t = document.getElementById('inv-form-title');
   if (t) t.textContent = '➕ Nuevo producto';
   const stminAntes = document.getElementById('inv-fi-stockmin')?.value;
+  // 🌐 "Para qué celu" también se repite en la tanda (fundas del mismo modelo)
+  const compatAntes = document.getElementById('inv-fi-compat')?.value;
   _clearProductoForm();
   if (cat) document.getElementById('inv-fi-cat').value = cat;
+  if (compatAntes) document.getElementById('inv-fi-compat').value = compatAntes;
   // La cantidad SÍ se borra (cada artículo tiene la suya) pero el mínimo suele
   // repetirse en toda la tanda: volver a escribirlo 150 veces no tiene sentido.
   if (stminAntes) document.getElementById('inv-fi-stockmin').value = stminAntes;

@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-accesorios.js': '🛍️ /accesorios: solo publicados, precio y "hay / últimas unidades" (nada de costo ni stock exacto), búsqueda por modelo y fotos desde el inventario',
   'test-equipos-video.js': '🎬 /equipos: el video del local arriba (4:5, comprimido, mudo y en loop), arranca solo al verse y respeta el ahorro de datos',
   'test-listo-qr.js': '✅ Equipo listo leyendo el QR de la etiqueta: pide foto adelante y atrás, las sube y recién ahí pasa a Listo (sin fotos solo el dueño)',
   'test-atajos.js': '📲 Accesos directos en el celu: Caja, Nueva reparación y Escanear venta (íconos de iPhone y atajos de Android), y el login vuelve al atajo',

@@ -885,6 +885,18 @@
             Producto activo
           </label>
         </div>
+        <!-- 🌐 Página de accesorios (/accesorios): fotos, para qué celu y si se
+             muestra. Arranca SIN publicar (Alan, 22/11). Lo maneja el inventario. -->
+        <div class="fg fg--full inv-web">
+          <label class="fl">🌐 Página de accesorios</label>
+          <label class="inv-activo-lbl">
+            <input id="inv-fi-publicar" type="checkbox">
+            Mostrar en la página (con precio y "hay / últimas unidades")
+          </label>
+          <input id="inv-fi-compat" class="fi" type="text" maxlength="200" autocomplete="off"
+                 placeholder="Para qué celu: iPhone 13, iPhone 14 (vacío = sirve para todos)">
+          <div id="inv-fotos" class="inv-fotos"></div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1153,6 +1165,8 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!-- Storage: fotos de los accesorios para la página /accesorios (las sube el inventario) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="utils.js"></script>
 <script src="firebase-config.js"></script>
 <script src="auth.js"></script>
@@ -1187,6 +1201,7 @@
 <script src="pistola.js"></script>
 <script src="carteles.js"></script>
 <script src="carteles-acc.js"></script>
+<script src="fotos-subir.js"></script>
 <script src="inventario.js"></script>
 <script src="movstock.js"></script>
 <script src="finanzas-report.js"></script>

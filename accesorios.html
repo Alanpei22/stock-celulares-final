@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Accesorios para tu celu · TechPoint Caseros</title>
+<meta name="description" content="Fundas, vidrios templados, cargadores, cables y auriculares en TechPoint, Urquiza 4741, Caseros. Buscá por tu modelo, mirá precio y reservalo por WhatsApp.">
+<meta name="theme-color" content="#0b0d12">
+<link rel="canonical" href="https://stock-celulares-final.vercel.app/accesorios">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TechPoint · Servicio técnico">
+<meta property="og:title" content="Accesorios para tu celu · TechPoint Caseros">
+<meta property="og:description" content="Fundas, vidrios, cargadores y más. Buscá por tu modelo y reservalo por WhatsApp.">
+<meta property="og:url" content="https://stock-celulares-final.vercel.app/accesorios">
+<meta property="og:image" content="https://stock-celulares-final.vercel.app/accesorios-video.jpg">
+<meta property="og:locale" content="es_AR">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<!-- Mismo estilo que /equipos (equipos.css) + lo propio de esta página -->
+<link rel="stylesheet" href="equipos.css">
+<link rel="stylesheet" href="accesorios.css">
+</head>
+<body>
+<!-- Alan (22/11): página de venta de accesorios. Decisiones: precio sí, stock
+     solo "hay / últimas unidades", cada artículo se publica desde la app
+     (inventario → "Mostrar en la página"), por ahora sin envíos (retiro en el
+     local) y fotos propias. Los datos salen de /api/accesorios. -->
+
+<nav class="nav" aria-label="Menú">
+  <a class="nav-marca" href="#arriba">
+    <img src="icon.svg" alt="" width="32" height="32">
+    <span><b>TechPoint</b><small>Accesorios · Caseros</small></span>
+  </a>
+  <div class="nav-links">
+    <a href="#catalogo">Accesorios</a>
+    <a href="#comprar">Cómo comprar</a>
+    <a href="equipos">Celulares</a>
+  </div>
+  <a class="nav-wa" id="cab-wa" target="_blank" rel="noopener"><span class="ico-wa" aria-hidden="true"></span>Hablanos</a>
+</nav>
+
+<header class="hero" id="arriba">
+  <div class="hero-in">
+    <div class="hero-txt">
+      <p class="pastilla-dato"><i></i>Caseros · Retiro en el local</p>
+      <h1>Todo para<br><span>tu celu.</span></h1>
+      <p class="hero-sub">Fundas, vidrios templados, cargadores, cables y auriculares. Decinos qué celu tenés y te mostramos lo que le va.</p>
+      <form class="acc-hero-buscar" id="h-form" role="search">
+        <label for="h-buscar">¿Qué celu tenés?</label>
+        <div>
+          <input id="h-buscar" type="search" placeholder="Ej: A54, iPhone 13, Moto G54" autocomplete="off" enterkeyhint="search">
+          <button type="submit" class="btn btn-blanco">Ver accesorios <span aria-hidden="true">→</span></button>
+        </div>
+      </form>
+    </div>
+    <div class="hero-visual">
+      <div class="brillo" aria-hidden="true"></div>
+      <div class="hero-video">
+        <video id="hero-video" muted loop playsinline preload="metadata" poster="accesorios-video.jpg" width="720" height="900"
+          aria-label="Video de TechPoint: fundas, vidrios templados, cargadores y cables">
+          <source src="accesorios-video.mp4" type="video/mp4">
+        </video>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="sec sec-gris" id="catalogo">
+  <div class="cat-cab">
+    <h2 class="titulo-2" id="cat-titulo">Accesorios.<br><span class="gris">Elegí el tuyo.</span></h2>
+    <p class="actualizado" id="actualizado"></p>
+  </div>
+
+  <div class="filtros" aria-label="Filtros">
+    <div class="fila-orden">
+      <input class="buscar" id="f-buscar" type="search" placeholder="Tu celu o lo que buscás: A54, funda, cargador…" autocomplete="off" enterkeyhint="search" aria-label="Buscar">
+    </div>
+    <div class="chips" id="f-cats"></div>
+  </div>
+
+  <main class="grilla acc-grilla" id="grilla" aria-live="polite">
+    <div class="ficha esqueleto acc-esq"></div><div class="ficha esqueleto acc-esq"></div><div class="ficha esqueleto acc-esq"></div>
+  </main>
+</section>
+
+<section class="sec sec-blanca" id="comprar">
+  <div class="dos-col">
+    <div class="intro">
+      <h2 class="titulo-2">Cómo comprar.<br><span class="azul">Fácil y rápido.</span></h2>
+      <p>Elegí lo que te gusta, escribinos y te lo separamos. Lo retirás en el local y lo pagás ahí. Por ahora no hacemos envíos.</p>
+      <a class="btn btn-negro" data-wa="Hola TechPoint! Quería consultar por un accesorio." target="_blank" rel="noopener"><span class="ico-wa" aria-hidden="true"></span>Escribinos</a>
+    </div>
+    <ol class="pasos">
+      <li><b>Elegí</b><span>Buscá por tu modelo y tocá "Lo quiero".</span></li>
+      <li><b>Te lo reservamos</b><span>Te contestamos por WhatsApp y lo separamos.</span></li>
+      <li><b>Pasá a buscarlo</b><span>Urquiza 4741, Local 22, Caseros. Si querés, te lo colocamos ahí mismo.</span></li>
+    </ol>
+  </div>
+</section>
+
+<section class="sec sec-gris" id="pagos">
+  <h2 class="titulo-2 centro">Medios de pago.<br><span class="gris">Como te quede mejor.</span></h2>
+  <div class="pagos">
+    <div><b>Efectivo</b><span>En el local</span></div>
+    <div><b>Transferencia</b><span>O Mercado Pago</span></div>
+    <div><b>Débito</b><span>Con tarjeta</span></div>
+    <div><b>Crédito</b><span>Consultá los planes</span></div>
+  </div>
+</section>
+
+<footer class="pie">
+  <div class="pie-in">
+    <div class="pie-marca">
+      <a class="nav-marca" href="#arriba"><img src="icon.svg" alt="" width="32" height="32"><span><b>TechPoint</b><small>Caseros · Buenos Aires</small></span></a>
+      <p>Accesorios, venta de celulares y servicio técnico.</p>
+    </div>
+    <div class="pie-col">
+      <p class="pie-lbl">Tienda</p>
+      <a href="#catalogo">Accesorios</a>
+      <a href="equipos">Celulares nuevos y usados</a>
+      <a href="#comprar">Cómo comprar</a>
+    </div>
+    <div class="pie-col">
+      <p class="pie-lbl">Contacto</p>
+      <p>WhatsApp <b class="mono sel">11 7239-2511</b></p>
+      <p>Urquiza 4741, Local 22, Caseros</p>
+      <a class="btn btn-azul" data-wa="Hola TechPoint! Quería consultar por un accesorio." target="_blank" rel="noopener"><span class="ico-wa" aria-hidden="true"></span>Escribinos</a>
+    </div>
+  </div>
+  <p class="pie-acceso"><a href="index.html">Acceso del local</a></p>
+</footer>
+
+<a class="wa-flotante oculto" id="wa-flotante" data-wa="Hola TechPoint! Quería consultar por un accesorio." target="_blank" rel="noopener" aria-label="Escribinos por WhatsApp"><span class="ico-wa" aria-hidden="true"></span></a>
+
+<div class="visor hidden" id="visor" role="dialog" aria-label="Fotos del accesorio">
+  <div class="visor-pista" id="visor-pista"></div>
+  <button type="button" class="visor-x" id="visor-x" aria-label="Cerrar">✕</button>
+</div>
+
+<script src="accesorios.js"></script>
+</body>
+</html>

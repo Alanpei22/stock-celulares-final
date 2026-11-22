@@ -37,6 +37,17 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
 
+    // Fotos de los accesorios para la página /accesorios (inventario.js).
+    // Lectura abierta: la página es pública. Mientras esta regla no se
+    // publique, la app las guarda en stock-photos/acc-{id}/.
+    match /accesorios/{productoId}/{filename} {
+      allow read: if true;
+      allow delete: if esDelNegocio();
+      allow create, update: if esDelNegocio()
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
     // Fotos de cómo quedó cada reparación al pasarla a Listo (adelante y
     // atrás, listo-qr.js). Mientras esta regla no se publique en Firebase, la
     // app las guarda en stock-photos/rep-{id}/ (que ya está permitida).

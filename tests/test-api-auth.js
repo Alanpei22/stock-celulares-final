@@ -58,6 +58,7 @@ ok(endpoints.length >= 7, 'se encontraron los endpoints de /api', endpoints);
 // devolver datos armados por lista blanca. Sumar uno acá es una decisión.
 const PUBLICOS = {
   'equipos.js': 'catálogo /equipos: lista blanca de campos del stock, solo GET',
+  'accesorios.js': 'catálogo /accesorios: lista blanca de campos del inventario (sin costo ni stock exacto), solo GET',
 };
 Object.keys(PUBLICOS).forEach(f => {
   const src = sinComentarios(leer(path.join('api', f)));
@@ -183,8 +184,8 @@ const run = code => vm.runInContext(code, ctx);
 
   const delCliente = fs.readdirSync(raiz('.'))
     .filter(f => f.endsWith('.js') && !f.startsWith('sw.'))
-    // la página pública /equipos no tiene sesión: lee el endpoint público
-    .filter(f => f !== 'equipos.js');
+    // las páginas públicas /equipos y /accesorios no tienen sesión: leen su endpoint público
+    .filter(f => f !== 'equipos.js' && f !== 'accesorios.js');
   delCliente.forEach(f => {
     const src = leer(f);
     const pelado = /fetch\(\s*['"`]\/api\//.test(src);

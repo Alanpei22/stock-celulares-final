@@ -3,6 +3,10 @@
     {
       "source": "/equipos",
       "destination": "/equipos.html"
+    },
+    {
+      "source": "/accesorios",
+      "destination": "/accesorios.html"
     }
   ],
   "functions": {
