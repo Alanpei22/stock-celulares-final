@@ -397,7 +397,9 @@ function renderRepuestos() {
   }
   emptyEl.style.display = 'none';
 
-  listEl.innerHTML = filtered.map(r => {
+  // Por tandas (utils.js): con cientos de repuestos el iPhone tardaba en
+  // mostrar la sección. Sin utils.js (las pruebas), se dibuja entera.
+  const _pintarRepu = r => {
     const isLow  = r.stockMin != null && r.stockMin > 0 && (r.cantidad || 0) <= r.stockMin;
     const lowCls = isLow ? ' rep2-card--lowstock' : '';
     // Costo USD canónico, precioVenta en pesos
@@ -443,7 +445,9 @@ function renderRepuestos() {
           </div>
         </div>
       </div>`;
-  }).join('');
+  };
+  if (typeof listaPorTandas === 'function') listaPorTandas(listEl, filtered, _pintarRepu);
+  else listEl.innerHTML = filtered.map(_pintarRepu).join('');
 }
 
 // ── Cambio rápido de cantidad ──────────────

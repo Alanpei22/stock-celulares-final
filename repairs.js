@@ -761,7 +761,8 @@ function renderRepairs() {
   }
   emptyEl.style.display = 'none';
 
-  listEl.innerHTML = filtered.map(r => {
+  // Por tandas (utils.js), como repuestos: sin utils.js se dibuja entera
+  const _pintarRep = r => {
     const st   = REPAIR_STATES[r.estado] || { label: r.estado || '—', cls: '' };
     const fecha = r.fechaIngreso
       ? new Date(r.fechaIngreso).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: 'short' })
@@ -858,7 +859,9 @@ function renderRepairs() {
         ${notaHTML}
         ${acciones}
       </div>`;
-  }).join('') + _repAlcancePie(false);
+  };
+  if (typeof listaPorTandas === 'function') listaPorTandas(listEl, filtered, _pintarRep, _repAlcancePie(false));
+  else listEl.innerHTML = filtered.map(_pintarRep).join('') + _repAlcancePie(false);
 }
 
 // Renglón al pie de la lista: qué se está mirando y cómo ver el resto.

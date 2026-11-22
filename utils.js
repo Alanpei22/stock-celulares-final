@@ -944,3 +944,60 @@ function tpCodigosIguales(a, b) {
 function tpEsSuCodigo(item, cod) {
   return !!item && (tpCodigosIguales(item.codigo, cod) || tpCodigosIguales(item.codigoCorto, cod));
 }
+
+
+// ══════════════════════════════════════════
+//  LISTAS LARGAS: se dibujan por tandas
+// ══════════════════════════════════════════
+// Alan (22/11, en iPhone): "está tardando mucho pasar de reparaciones a
+// repuestos". Las listas (equipos, reparaciones, repuestos) se dibujaban
+// ENTERAS de una: cientos de tarjetas que el iPhone tenía que acomodar cada
+// vez que se mostraba la sección. Ahora arrancan con 50 y las siguientes se
+// agregan solas al bajar (o con el botón). El buscador y los filtros siguen
+// buscando en TODO: lo que se reparte es solo el dibujo.
+const TP_TANDA = 50;
+function listaPorTandas(listEl, items, pintar, pie) {
+  pie = pie || '';
+  if (listEl._tandas && listEl._tandas.obs) { try { listEl._tandas.obs.disconnect(); } catch {} }
+  listEl._tandas = null;
+  const n = items.length;
+  const primera = items.slice(0, TP_TANDA).map(pintar).join('');
+  if (n <= TP_TANDA) { listEl.innerHTML = primera + pie; return; }
+  _tpListasEstilos();
+  const st = { items, pintar, hecho: TP_TANDA, obs: null };
+  listEl._tandas = st;
+  listEl.innerHTML = primera + `<button type="button" class="tp-mas" data-tp-mas>${_tpMasTxt(n - TP_TANDA)}</button>` + pie;
+  if (typeof listEl.querySelector !== 'function') return;
+  const btn = listEl.querySelector('[data-tp-mas]');
+  if (!btn) return;
+  const seguir = () => {
+    if (listEl._tandas !== st) return;            // la lista se volvió a dibujar
+    const hasta = Math.min(n, st.hecho + TP_TANDA);
+    btn.insertAdjacentHTML('beforebegin', items.slice(st.hecho, hasta).map(pintar).join(''));
+    st.hecho = hasta;
+    if (hasta >= n) { if (st.obs) st.obs.disconnect(); btn.remove(); return; }
+    btn.textContent = _tpMasTxt(n - hasta);
+  };
+  btn.onclick = seguir;
+  // Se agregan solas cuando el botón se acerca a la pantalla (scroll infinito)
+  if (typeof IntersectionObserver === 'function') {
+    st.obs = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) seguir(); }, { rootMargin: '900px 0px' });
+    st.obs.observe(btn);
+  }
+}
+function _tpMasTxt(quedan) { return `Mostrar ${Math.min(TP_TANDA, quedan)} más · quedan ${quedan}`; }
+
+// Además, que el navegador no pinte las tarjetas que están fuera de la
+// pantalla (content-visibility; los iPhone viejos lo ignoran sin problema).
+function _tpListasEstilos() {
+  if (typeof document === 'undefined' || !document.createElement || document.getElementById('tp-listas-css')) return;
+  const st = document.createElement('style');
+  st.id = 'tp-listas-css';
+  st.textContent = `
+  #list > .card, #rep-list > .card, #rep2-list > .card { content-visibility: auto; contain-intrinsic-size: auto 170px; }
+  .tp-mas { grid-column: 1 / -1; display: block; width: 100%; margin: 6px 0 14px; padding: 13px; border-radius: 12px;
+    border: 1px dashed var(--border, rgba(128,128,128,.35)); background: transparent; color: var(--accent, #C8965A);
+    font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; }`;
+  (document.head || document.body).appendChild(st);
+}
+if (typeof document !== 'undefined' && document.readyState !== undefined) { try { _tpListasEstilos(); } catch {} }

@@ -1456,7 +1456,8 @@ function render() {
 
   const today = new Date();
   const badgeCls = { Nuevo: 'bg-new', Usado: 'bg-used', Reacondicionado: 'bg-refurb' };
-  listEl.innerHTML = filtered.map(p => {
+  // Por tandas (utils.js), como reparaciones y repuestos
+  const _pintarEq = p => {
     const specs = [p.almacenamiento, p.ram ? p.ram + ' RAM' : ''].filter(Boolean).join(' · ');
     const usdVal = p.precioUSD || ((!p.vendido && p.precio && dolarBlue) ? Math.round(p.precio / dolarBlue) : null);
     const isUSD = p.moneda === 'usd' && p.precioUSD;
@@ -1526,7 +1527,9 @@ function render() {
           </div>
         </div>
       </div>`;
-  }).join('');
+  };
+  if (typeof listaPorTandas === 'function') listaPorTandas(listEl, filtered, _pintarEq);
+  else listEl.innerHTML = filtered.map(_pintarEq).join('');
 }
 
 function esc(s) {
