@@ -96,5 +96,47 @@ ok(/IA_PRECIOS_TTL[\s\S]{0,900}\.get\(\)/.test(ayudas) && !/onSnapshot/.test(ayu
 ok(/preciosCacheTs/.test(leer('precios.js')), 'la caja marca la hora del caché, así el index no la vuelve a leer');
 ok(!/[\u0300-\u036f]/.test(ayudas), 'los acentos van como \\u0300 (no literales)');
 
+console.log('\n6) 🧠 Memoria de precios: "los que pasamos ya" y los futuros');
+ok(ctx.iaClaveModelo('Samsung', 'Galaxy A54 5G') === 'samsung_a54' && ctx.iaClaveModelo('samsung', 'A54') === 'samsung_a54', '"Galaxy A54 5G" y "A54" son el mismo modelo', ctx.iaClaveModelo('Samsung', 'Galaxy A54 5G'));
+ok(ctx.iaClaveModelo('Apple', 'iPhone 13') === ctx.iaClaveModelo('iPhone', '13') && ctx.iaClaveModelo('iPhone', '13') !== ctx.iaClaveModelo('iPhone', '13 Pro'), 'iPhone 13 = Apple 13, pero no 13 Pro');
+ok(ctx.iaClaveModelo('Samsung', '') === '', 'sin modelo, no hay clave');
+const HIST = [
+  { marca: 'Samsung', modelo: 'A54', fechaIngreso: '2026-03-01T10:00', arreglos: [{ texto: 'Batería', precio: 30000 }, { texto: 'Revisión', precio: 5000 }] },
+  { marca: 'Samsung', modelo: 'Galaxy A54', fechaIngreso: '2026-09-01T10:00', arreglos: [{ texto: 'Cambio de batería', precio: 42000 }] },
+  { marca: 'Samsung', modelo: 'A54', fechaIngreso: '2026-06-01T10:00', arreglo: 'Ficha de carga', monto: 22000 },
+  { marca: 'Motorola', modelo: 'G54', fechaIngreso: '2026-08-01', arreglos: [{ texto: 'Módulo', precio: 0 }] },
+];
+const apr = ctx.iaAprenderDeReparaciones(HIST);
+const a54 = apr.get('samsung_a54');
+ok(apr.size === 1 && a54, 'un doc por modelo (el Moto sin precio no se guarda)', [...apr.keys()]);
+ok(a54.tipos.bateria.precio === 42000 && a54.tipos.bateria.fecha === '2026-09-01', 'batería: se queda con la MÁS NUEVA ($42.000 de septiembre, no la de marzo)', a54.tipos.bateria);
+ok(a54.tipos.pin.precio === 22000, 'las viejas con arreglo + monto también se aprenden');
+ok(!a54.tipos.revision && Object.keys(a54.tipos).length === 2, 'lo que no es un arreglo conocido ("Revisión") no se guarda', Object.keys(a54.tipos));
+const MEM = { bateria: { precio: 52000, fecha: '2026-11-18' }, flex: { precio: 15000, fecha: '2026-05-01' }, pin: { precio: 20000, fecha: '2026-10-01' } };
+const PM = ctx.iaPreciosModelo('Samsung', 'A54', { lista: [], reps: REPS, repuestos: [], memoria: MEM });
+const pm = k => PM.find(f => f.clave === k) || {};
+ok(pm('bateria').precio === 52000 && pm('bateria').origen === 'ultimo', 'la memoria (18/11) le gana a lo cobrado antes (02/11)', pm('bateria'));
+ok(pm('pin').precio === 28000, 'y si en el celu hay algo más nuevo que la memoria, gana eso', pm('pin'));
+ok(pm('flex').precio === 15000, 'arreglos que solo están en la memoria también aparecen');
+ok(ctx.iaPreciosModelo('Samsung', 'A54', { lista: LISTA, memoria: MEM }).find(f => f.clave === 'bateria').precio === 48000, 'la lista de precios sigue mandando sobre la memoria');
+
+// Guardar: con un Firebase de mentira
+const escritos = [];
+ctx.db = { collection: c => ({ doc: id => ({ set: (data, op) => { escritos.push({ c, id, data, op }); return Promise.resolve(); } }) }) };
+ctx.localStorage = { _s: {}, getItem(k) { return this._s[k] ?? null; }, setItem(k, v) { this._s[k] = String(v); }, removeItem(k) { delete this._s[k]; } };
+const hoy = new Date().toISOString();
+ctx.iaMemorizar({ marca: 'Samsung', modelo: 'A54', fechaIngreso: hoy, arreglos: [{ texto: 'Pin de carga', precio: 30000 }] });
+ok(escritos.length === 1 && escritos[0].c === 'precios_memoria' && escritos[0].id === 'samsung_a54' && escritos[0].op.merge === true, 'al guardar una reparación, se anota en precios_memoria (sin pisar los otros arreglos)', escritos);
+ok(escritos[0].data.tipos.pin.precio === 30000, 'con el precio que se pasó');
+ok(ctx.iaMemoria('Samsung', 'Galaxy A54').pin.precio === 30000, 'y se ve enseguida, sin volver a leer');
+ctx.iaMemorizar({ marca: 'Samsung', modelo: 'A54', fechaIngreso: '2025-01-10T10:00', arreglos: [{ texto: 'Pin de carga', precio: 9000 }] });
+ok(escritos.length === 1, 'editar una reparación vieja no pisa el precio de hoy');
+
+console.log('\n7) Enganches de la memoria');
+ok((repairs.match(/iaMemorizar\((updateData|newDoc)\)/g) || []).length === 2, 'saveRepair memoriza al crear y al editar');
+ok(/function _addArreglo[\s\S]{0,600}iaPrecioSugerido\(t\)/.test(repairs), 'elegir un arreglo en el paso 2 trae el precio sugerido');
+ok(/tpEsDueno\(\)/.test(ayudas) && /_estado/.test(ayudas), 'el botón de "sacar los precios" es del dueño y se hace una sola vez');
+ok(/i \+= 400/.test(ayudas) && /IA_APRENDER_MESES = 12/.test(ayudas), 'se escribe en tandas de 400, últimos 12 meses');
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

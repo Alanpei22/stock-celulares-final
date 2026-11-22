@@ -25,6 +25,21 @@
 //         (mismo criterio que precios-historial.js).
 //     Al lado dice si hay el repuesto o hay que pedirlo, y tocándolo se suma
 //     a "Reparaciones a hacer" con ese precio.
+//
+//  3) MEMORIA DE PRECIOS. Alan (22/11): "¿podés sacar precios de los que
+//     pasamos ya? Y memorizar también como sugerencia para los precios
+//     futuros". Las reparaciones en memoria son solo las de 30 días, así que
+//     cada precio que se pasa queda guardado en `precios_memoria` (un doc por
+//     modelo: "samsung_a54" → { tipos: { bateria: {precio, fecha}, … } }):
+//       · al guardar una reparación se anota el precio de cada arreglo
+//         (una escritura por reparación);
+//       · al escribir el modelo se lee SOLO el doc de ese modelo (una lectura,
+//         y queda en caché 12 h);
+//       · "los que pasamos ya": botón del dueño que recorre las reparaciones de
+//         los últimos 12 meses UNA vez y carga todo (una lectura por reparación,
+//         una sola vez).
+//     Y al elegir un arreglo en el paso 2, el precio se completa solo con el
+//     sugerido (se puede cambiar).
 'use strict';
 
 const IA_MARCAS_BASE = ['Samsung', 'iPhone', 'Motorola', 'Xiaomi', 'LG', 'TCL', 'Huawei'];
@@ -280,6 +295,14 @@ function iaPreciosModelo(marca, modelo, datos) {
       if (fecha >= f._tsU) { f._tsU = fecha; f.ultimo = precio; f.fecha = fecha; }
     });
   });
+  // 2b) La memoria de precios (todas las reparaciones, no solo 30 días):
+  // gana la más nueva entre la memoria y lo que hay en memoria del celu
+  Object.entries(d.memoria || {}).forEach(([clave, v]) => {
+    const precio = Number(v && v.precio) || 0;
+    if (!(precio > 0) || !_iaTipo(clave)) return;
+    const f = fila(clave), fecha = String(v.fecha || '').slice(0, 10);
+    if (fecha >= f._tsU) { f._tsU = fecha; f.ultimo = precio; f.fecha = fecha; }
+  });
   filas.forEach(f => {
     if (f.origen !== 'lista' && f.ultimo > 0) { f.precio = f.ultimo; f.origen = 'ultimo'; }
   });
@@ -342,20 +365,24 @@ function _iaFechaCorta(iso) {
 const _iaPlata = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-AR');
 
 // El pedazo de HTML que va adentro del recuadro del modelo
-function iaPreciosHtml(marca, modelo) {
-  _iaEstilos();
-  const filas = iaPreciosModelo(marca, modelo, {
+function _iaDatos(marca, modelo) {
+  return {
     lista: iaListaPrecios(),
     reps: (typeof REPAIRS !== 'undefined') ? REPAIRS : [],
     repuestos: (typeof REPUESTOS !== 'undefined') ? REPUESTOS : [],
-  });
+    memoria: iaMemoria(marca, modelo),
+  };
+}
+function iaPreciosHtml(marca, modelo) {
+  _iaEstilos();
+  const filas = iaPreciosModelo(marca, modelo, _iaDatos(marca, modelo));
   if (!filas.length) return '';
   const enOrden = new Set(((typeof _repArreglos !== 'undefined') ? _repArreglos : []).map(a => iaTipoDe(a.texto)).filter(Boolean));
   const algunoDeLista = filas.some(f => f.origen === 'lista');
   return `<div class="ia-sec">💲 Precios de reparación</div>` + filas.map(f => {
     const ya = enOrden.has(f.clave);
     const de = f.origen === 'lista' ? 'de la lista'
-      : f.origen === 'ultimo' ? `último cobrado${f.fecha ? ' el ' + _iaFechaCorta(f.fecha) : ''}` : 'sin precio cargado';
+      : f.origen === 'ultimo' ? `último precio${f.fecha ? ' el ' + _iaFechaCorta(f.fecha) : ''}` : 'sin precio cargado';
     const rep = f.repuesto === 'hay' ? `<span class="rm-stock ok">hay repuesto</span>`
       : f.repuesto === 'pedir' ? `<span class="rm-stock no">pedir repuesto</span>` : '';
     return `<button type="button" class="ia-pr${ya ? ' ya' : ''}" onclick="iaSumarArreglo('${f.clave}', ${Math.round(f.precio) || 0})">
@@ -364,7 +391,19 @@ function iaPreciosHtml(marca, modelo) {
       ${rep}
       <span class="ia-pr-precio${f.precio ? '' : ' no'}">${f.precio ? _iaPlata(f.precio) : '—'}</span>
     </button>`;
-  }).join('') + `<div class="rm-nada">Tocá un arreglo para sumarlo a la orden.${algunoDeLista ? '' : ' Los precios fijos se cargan en Caja → 💲 Precios de reparación.'}</div>`;
+  }).join('') + `<div class="rm-nada">Tocá un arreglo para sumarlo a la orden.${algunoDeLista ? '' : ' Los precios fijos se cargan en Caja → 💲 Precios de reparación.'}</div>`
+    + _iaBotonAprender();
+}
+
+// Precio sugerido para un arreglo escrito o elegido en el paso 2
+// ("Batería" → el de la lista o el último que se pasó en este modelo)
+function iaPrecioSugerido(texto) {
+  const clave = iaTipoDe(texto);
+  if (!clave || typeof document === 'undefined') return 0;
+  const marca  = (document.getElementById('rep-fi-marca')  || {}).value || '';
+  const modelo = (document.getElementById('rep-fi-modelo') || {}).value || '';
+  const f = iaPreciosModelo(marca, modelo, _iaDatos(marca, modelo)).find(x => x.clave === clave);
+  return f ? Math.round(f.precio) || 0 : 0;
 }
 
 // Toque en un renglón → a "Reparaciones a hacer", con el precio sugerido
@@ -381,6 +420,170 @@ function iaSumarArreglo(clave, precio) {
   if (typeof _renderArreglosTotal === 'function') _renderArreglosTotal();
   if (typeof _repuModeloPintar === 'function') _repuModeloPintar();
   if (typeof toast === 'function') toast(`Sumado a la orden: ${t[1]}${precio ? ' ' + _iaPlata(precio) : ''}`, 'success');
+}
+
+// ══════════════════════════════════════════════════════════
+//  🧠 Memoria de precios (colección precios_memoria)
+// ══════════════════════════════════════════════════════════
+const IA_MEM_COL = 'precios_memoria';
+const IA_MEM_TTL = 12 * 3600 * 1000;
+const IA_MEM_DIAS = 7;   // solo se memorizan reparaciones de la última semana (ver iaMemorizar)
+// Palabras que no cambian el equipo: "Galaxy A54 5G" es el A54
+const IA_RELLENO = new Set(['galaxy', 'moto', '5g', '4g', 'lte']);
+
+// "Samsung" + "Galaxy A54 5G" → "samsung_a54". La misma clave para cómo lo
+// escriba cada uno; sin modelo, ''.
+function iaClaveModelo(marca, modelo) {
+  const mq = _iaMarcaClave(marca);
+  const toks = _iaNorm(modelo).split(' ')
+    .filter(t => t && t !== mq && t !== 'apple' && !(mq === 'iphone' && t === 'iphone') && !IA_RELLENO.has(t));
+  if (!toks.length) return '';
+  return ((mq || 'x').replace(/ /g, '-') + '_' + toks.join('-')).slice(0, 120);
+}
+
+// Lo que se anota de UNA reparación: { clave, tipos: { bateria: {precio, fecha, texto} } }
+function iaMemoDeReparacion(r) {
+  if (!r) return null;
+  const clave = iaClaveModelo(r.marca, r.modelo);
+  if (!clave) return null;
+  const fecha = String(r.fechaIngreso || r.fecha || '').slice(0, 10);
+  const arr = (Array.isArray(r.arreglos) && r.arreglos.length) ? r.arreglos
+    : (r.arreglo ? [{ texto: r.arreglo, precio: r.monto }] : []);
+  const tipos = {};
+  arr.forEach(a => {
+    const precio = Math.round(Number(a && a.precio) || 0);
+    const t = precio > 0 ? iaTipoDe(a.texto) : null;
+    if (t && !tipos[t]) tipos[t] = { precio, fecha, texto: String(a.texto || '').trim().slice(0, 60) };
+  });
+  return Object.keys(tipos).length ? { clave, marca: String(r.marca || '').trim(), modelo: String(r.modelo || '').trim(), tipos } : null;
+}
+
+// Muchas reparaciones → un doc por modelo, con el precio MÁS NUEVO de cada arreglo
+function iaAprenderDeReparaciones(reps) {
+  const out = new Map();
+  (reps || []).forEach(r => {
+    const m = iaMemoDeReparacion(r);
+    if (!m) return;
+    const g = out.get(m.clave) || { marca: m.marca, modelo: m.modelo, tipos: {} };
+    Object.entries(m.tipos).forEach(([t, v]) => {
+      if (!g.tipos[t] || v.fecha >= g.tipos[t].fecha) g.tipos[t] = v;
+    });
+    out.set(m.clave, g);
+  });
+  return out;
+}
+
+const _iaMem = new Map();   // clave → tipos (o null mientras se pide)
+let _iaMemT = null;
+function _iaMemCache() {
+  try { return JSON.parse(localStorage.getItem('tpPreciosMem') || '{}') || {}; } catch { return {}; }
+}
+function _iaMemGuardar(clave, tipos) {
+  _iaMem.set(clave, tipos);
+  try {
+    const c = _iaMemCache();
+    c[clave] = { t: Date.now(), tipos };
+    const ks = Object.keys(c);
+    if (ks.length > 300) ks.sort((a, b) => c[a].t - c[b].t).slice(0, ks.length - 300).forEach(k => delete c[k]);
+    localStorage.setItem('tpPreciosMem', JSON.stringify(c));
+  } catch {}
+}
+
+// Lo que haya YA de este modelo. Si no está (o el caché es viejo), lo pide
+// después de 700 ms sin escribir: mientras se tipea "A5", "A54" no se lee
+// cada letra. Al llegar, repinta el recuadro.
+function iaMemoria(marca, modelo) {
+  const clave = iaClaveModelo(marca, modelo);
+  if (!clave) return null;
+  if (_iaMem.has(clave)) return _iaMem.get(clave);
+  const c = _iaMemCache()[clave];
+  if (c && Date.now() - c.t < IA_MEM_TTL) { _iaMem.set(clave, c.tipos); return c.tipos; }
+  clearTimeout(_iaMemT);
+  _iaMemT = setTimeout(() => _iaMemPedir(clave), 700);
+  return c ? c.tipos : null;
+}
+function _iaMemPedir(clave) {
+  if (_iaMem.has(clave) || typeof db === 'undefined' || !db) return;
+  _iaMem.set(clave, null);   // que no se pida dos veces
+  db.collection(IA_MEM_COL).doc(clave).get().then(doc => {
+    if (typeof cupoContar === 'function') cupoContar('precios_memoria', 1);
+    _iaMemGuardar(clave, doc.exists ? (doc.data().tipos || {}) : {});
+    if (typeof _repuModeloPintar === 'function') _repuModeloPintar();
+  }).catch(err => { _iaMem.delete(clave); console.warn('memoria de precios:', err); });
+}
+
+// Al guardar una reparación (repairs.js saveRepair). Solo si es de la última
+// semana: si se edita una de hace meses, su precio viejo no pisa el de hoy.
+function iaMemorizar(r) {
+  const m = iaMemoDeReparacion(r);
+  if (!m || typeof db === 'undefined' || !db) return;
+  const desde = new Date(Date.now() - IA_MEM_DIAS * 86400000).toISOString().slice(0, 10);
+  if (Object.values(m.tipos)[0].fecha < desde) return;
+  db.collection(IA_MEM_COL).doc(m.clave)
+    .set({ marca: m.marca, modelo: m.modelo, tipos: m.tipos, actualizado: new Date().toISOString() }, { merge: true })
+    .catch(err => console.warn('memoria de precios:', err));
+  // Que se vea ya, sin volver a leer
+  const antes = _iaMem.get(m.clave) || (_iaMemCache()[m.clave] || {}).tipos || {};
+  _iaMemGuardar(m.clave, Object.assign({}, antes, m.tipos));
+}
+
+// ── "Los que pasamos ya": una vez, desde el recuadro (solo el dueño) ──
+const IA_APRENDER_MESES = 12;
+let _iaAprendido = null;   // null = no se sabe todavía
+function _iaYaAprendido() {
+  if (_iaAprendido !== null) return _iaAprendido;
+  try { if (localStorage.getItem('tpPreciosMemAprendido')) return (_iaAprendido = true); } catch {}
+  _iaAprendido = false;
+  // Una lectura por sesión para saber si ya se hizo desde otra compu
+  if (typeof db !== 'undefined' && db) {
+    db.collection(IA_MEM_COL).doc('_estado').get().then(doc => {
+      if (!doc.exists) return;
+      _iaAprendido = true;
+      try { localStorage.setItem('tpPreciosMemAprendido', '1'); } catch {}
+      if (typeof _repuModeloPintar === 'function') _repuModeloPintar();
+    }).catch(() => {});
+  }
+  return false;
+}
+function _iaBotonAprender() {
+  const dueno = (typeof tpEsDueno === 'function') ? tpEsDueno() : false;
+  if (!dueno || _iaYaAprendido()) return '';
+  return `<button type="button" class="ia-aprender" onclick="iaAprenderHistorial(this)">🧠 Sacar los precios de las reparaciones de los últimos ${IA_APRENDER_MESES} meses</button>`;
+}
+
+async function iaAprenderHistorial(btn) {
+  if (typeof db === 'undefined' || !db) return;
+  if (btn) { btn.disabled = true; btn.textContent = '🧠 Leyendo las reparaciones…'; }
+  try {
+    const desde = new Date(Date.now() - IA_APRENDER_MESES * 30.5 * 86400000).toISOString();
+    const snap = await db.collection('repairs').where('fechaIngreso', '>=', desde).get();
+    if (typeof cupoContar === 'function') cupoContar('repairs', snap.size);
+    const modelos = iaAprenderDeReparaciones(snap.docs.map(d => d.data()));
+    const claves = [...modelos.keys()];
+    let precios = 0;
+    for (let i = 0; i < claves.length; i += 400) {
+      const lote = db.batch();
+      claves.slice(i, i + 400).forEach(k => {
+        const g = modelos.get(k);
+        precios += Object.keys(g.tipos).length;
+        lote.set(db.collection(IA_MEM_COL).doc(k), { ...g, actualizado: new Date().toISOString() }, { merge: true });
+      });
+      await lote.commit();
+    }
+    await db.collection(IA_MEM_COL).doc('_estado').set({
+      aprendido: new Date().toISOString(), meses: IA_APRENDER_MESES, reparaciones: snap.size, modelos: claves.length,
+    });
+    _iaAprendido = true;
+    try { localStorage.setItem('tpPreciosMemAprendido', '1'); localStorage.removeItem('tpPreciosMem'); } catch {}
+    _iaMem.clear();
+    modelos.forEach((g, k) => _iaMemGuardar(k, g.tipos));
+    if (typeof toast === 'function') toast(`🧠 Listo: ${precios} precios de ${claves.length} modelos (de ${snap.size} reparaciones)`, 'success');
+    if (typeof _repuModeloPintar === 'function') _repuModeloPintar();
+  } catch (err) {
+    console.error('aprender precios:', err);
+    if (typeof toast === 'function') toast('No se pudieron leer las reparaciones. Probá de nuevo.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '🧠 Reintentar: sacar los precios de las reparaciones'; }
+  }
 }
 
 function _iaEstilos() {
@@ -402,7 +605,9 @@ function _iaEstilos() {
   .ia-pr-nom { flex: 1; min-width: 0; font-weight: 600; }
   .ia-pr-nom small { display: block; font-weight: 400; font-size: 11.5px; color: var(--t2, #888); }
   .ia-pr-precio { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
-  .ia-pr-precio.no { color: var(--t2, #888); font-weight: 500; }`;
+  .ia-pr-precio.no { color: var(--t2, #888); font-weight: 500; }
+  .ia-aprender { width: 100%; font: inherit; font-size: 13px; font-weight: 700; padding: 10px 12px; border-radius: 10px; border: 1px dashed var(--accent, #3b82f6); background: none; color: var(--accent, #3b82f6); cursor: pointer; }
+  .ia-aprender:disabled { opacity: .6; cursor: default; }`;
   document.head.appendChild(st);
 }
 

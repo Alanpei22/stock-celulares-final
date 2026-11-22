@@ -1239,8 +1239,12 @@ function _addArreglo(texto) {
     toast('Esa reparación ya está en la lista', 'error');
     return;
   }
-  _repArreglos.push({ texto: t, precio: 0, hecho: false });
+  // 💲 Con el precio sugerido de este modelo (lista o el último que se pasó);
+  // se puede cambiar. Antes arrancaba en $0 y había que acordarse el precio.
+  const sug = (typeof iaPrecioSugerido === 'function') ? iaPrecioSugerido(t) : 0;
+  _repArreglos.push({ texto: t, precio: sug, hecho: false });
   _renderArreglos();
+  if (sug) { _syncMontoDesdeArreglos(); _renderArreglosTotal(); }
 }
 
 function _removeArreglo(i) {
@@ -1711,6 +1715,7 @@ function _sugerirRepuestos() {
 // precio de venta: se le puede dar precio y demora al cliente en el momento.
 // (El aviso de arriba, _sugerirRepuestos, sigue en el paso 2 por reparación.)
 const _RM_VARIANTES = ['pro', 'max', 'plus', 'mini', 'ultra', 'lite', 'fe', 'neo', 'prime', 'power', 'play'];
+const _RM_RELLENO = ['galaxy', 'moto', '5g', '4g', 'lte'];
 function _rmNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim(); }
 // "Apple" y "iPhone" son la misma marca para los repuestos
 function _rmMarca(s) { const m = _rmNorm(s); return m === 'apple' ? 'iphone' : m; }
@@ -1722,6 +1727,9 @@ function repuestosDelModelo(marca, modelo, lista) {
   const mq = _rmMarca(marca);
   let toks = _rmNorm(modelo).split(' ').filter(Boolean);
   if (mq) toks = toks.filter(t => t !== mq && !(mq === 'iphone' && t === 'apple'));
+  // "Galaxy A54 5G" es el A54: esas palabras no cuentan (si no, el repuesto
+  // cargado como "A54" no aparecía al escribir "Galaxy A54")
+  toks = toks.filter(t => !_RM_RELLENO.includes(t));
   if (!toks.length || !Array.isArray(lista)) return [];
   const out = lista.filter(r => {
     if (!r) return false;
@@ -2192,6 +2200,8 @@ async function saveRepair() {
       }
       await db.collection('repairs').doc(editingRepairId).set(_stripUndefined(updateData));
       _repPatchLocal(editingRepairId, _stripUndefined(updateData));
+      // 🧠 Los precios pasados quedan como sugerencia para la próxima (ingreso-ayudas.js)
+      if (typeof iaMemorizar === 'function') iaMemorizar(updateData);
       // Si al editar se SUBE la seña, la diferencia es plata que entró ahora:
       // a la caja. Si se baja, no se toca la caja (eso se corrige allá).
       const senaAntes = Number(existing.sena) || 0;
@@ -2294,6 +2304,8 @@ async function saveRepair() {
       // descuenta lo ya pagado y si se borra el movimiento se revierte).
       // Antes quedaba anotada solo en la reparación y la caja no cerraba.
       if (sena > 0) _senaAlIngresoACaja(newDoc);
+      // 🧠 Los precios pasados quedan como sugerencia para la próxima (ingreso-ayudas.js)
+      if (typeof iaMemorizar === 'function') iaMemorizar(newDoc);
       toast(provisorio
         ? `Reparación N°${nOrden} guardada en el celu — se sube cuando Firebase vuelva (el N° puede cambiar)`
         : 'Reparación N°' + nOrden + ' registrada', 'success');

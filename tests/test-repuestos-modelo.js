@@ -31,6 +31,7 @@ ok(!R('Samsung', 'A54').includes('a5mod'), '"A54" no trae el del "A5" (palabras 
 ok(!R('Samsung', 'A5').includes('a54mod') && R('Samsung', 'A5').includes('a5mod'), 'y "A5" no trae los del "A54"');
 ok(!R('Samsung', 'A54').includes('motoa54'), 'de otra marca, no (aunque se llame igual)');
 ok(R('', 'A54').includes('motoa54'), 'sin marca escrita, trae de todas');
+ok(R('Samsung', 'Galaxy A54 5G').sort().join() === 'a54bat,a54mod,a54pin', '"Galaxy A54 5G" trae los del A54 ("Galaxy" y "5G" no cuentan)', R('Samsung', 'Galaxy A54 5G'));
 
 console.log('\n2) Variantes: "13" no es "13 Pro"');
 ok(R('iPhone', 'iPhone 13').sort().join() === 'i13bat,i13mod', 'iPhone 13: el módulo y la batería, sin el del 13 Pro', R('iPhone', 'iPhone 13'));
