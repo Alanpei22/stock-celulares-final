@@ -276,7 +276,10 @@ function iaPreciosModelo(marca, modelo, datos) {
     const clave = iaTipoDe(x._p.tipo) || iaTipoDe(x._p.nota);
     if (!clave) return;
     const f = fila(clave), ts = _iaMs(x._p.updatedAt);
-    if (f.origen !== 'lista' || ts > f._ts) { f.precio = Number(x._p.precio); f.origen = 'lista'; f._ts = ts; }
+    if (f.origen !== 'lista' || ts > f._ts) {
+      f.precio = Number(x._p.precio); f.origen = 'lista'; f._ts = ts;
+      f.listaId = x._p.id || ''; f.listaEquipo = String(x._p.equipo || '');
+    }
   });
 
   // 2) Lo último que se cobró en ese modelo (cada arreglo con SU precio)
@@ -379,20 +382,148 @@ function iaPreciosHtml(marca, modelo) {
   if (!filas.length) return '';
   const enOrden = new Set(((typeof _repArreglos !== 'undefined') ? _repArreglos : []).map(a => iaTipoDe(a.texto)).filter(Boolean));
   const algunoDeLista = filas.some(f => f.origen === 'lista');
+  const puedeEditar = _iaPuedeEditar();
+  // Si se cambió de modelo con un precio a medio editar, esa edición se descarta
+  const editando = (puedeEditar && _iaEdit && _iaEdit.modelo === iaClaveModelo(marca, modelo)) ? _iaEdit.clave : null;
   return `<div class="ia-sec">💲 Precios de reparación</div>` + filas.map(f => {
     const ya = enOrden.has(f.clave);
     const de = f.origen === 'lista' ? 'de la lista'
       : f.origen === 'ultimo' ? `último precio${f.fecha ? ' el ' + _iaFechaCorta(f.fecha) : ''}` : 'sin precio cargado';
     const rep = f.repuesto === 'hay' ? `<span class="rm-stock ok">hay repuesto</span>`
       : f.repuesto === 'pedir' ? `<span class="rm-stock no">pedir repuesto</span>` : '';
-    return `<button type="button" class="ia-pr${ya ? ' ya' : ''}" onclick="iaSumarArreglo('${f.clave}', ${Math.round(f.precio) || 0})">
+    if (editando === f.clave) return _iaFilaEditando(f, marca, modelo);
+    return `<div class="ia-pr-fila"><button type="button" class="ia-pr${ya ? ' ya' : ''}" onclick="iaSumarArreglo('${f.clave}', ${Math.round(f.precio) || 0})">
       <span class="ia-pr-ico" aria-hidden="true">${f.icono}</span>
-      <span class="ia-pr-nom">${esc(f.rotulo)}<small>${ya ? '✓ ya está en la orden' : de}</small></span>
-      ${rep}
+      <span class="ia-pr-nom">${esc(f.rotulo)}<small>${ya ? '✓ ya está en la orden' : de}${rep ? ' ' + rep : ''}</small></span>
       <span class="ia-pr-precio${f.precio ? '' : ' no'}">${f.precio ? _iaPlata(f.precio) : '—'}</span>
-    </button>`;
-  }).join('') + `<div class="rm-nada">Tocá un arreglo para sumarlo a la orden.${algunoDeLista ? '' : ' Los precios fijos se cargan en Caja → 💲 Precios de reparación.'}</div>`
+    </button>${puedeEditar ? `<button type="button" class="ia-pr-lapiz" onclick="iaEditarPrecio('${f.clave}')" aria-label="Cambiar el precio de ${esc(f.rotulo)}" title="Cambiar el precio">✏️</button>` : ''}</div>`;
+  }).join('') + `<div class="rm-nada">Tocá un arreglo para sumarlo a la orden.${puedeEditar ? ' Con ✏️ cambiás el precio.' : (algunoDeLista ? '' : ' Los precios fijos se cargan en Caja → 💲 Precios de reparación.')}</div>`
     + _iaBotonAprender();
+}
+
+// ── ✏️ Cambiar un precio desde el recuadro ─────────────────
+// Alan (22/11): "dame la opción de modificar los precios". El precio que se
+// pone queda en la LISTA DE PRECIOS (precios_reparaciones, la misma de Caja →
+// 💲 Precios de reparación), que es la que manda: desde ahí lo ven todos, en
+// el recuadro y al elegir el arreglo en el paso 2.
+//   · Si el precio ya salía de la lista, se cambia ESE renglón (si el renglón
+//     es "A54 / A34", cambia para los dos y se avisa).
+//   · Si salía del último precio o no había, se crea el renglón
+//     "Marca Modelo".
+// Solo el dueño (y no en modo mostrador): los precios los decide él.
+// Esconder el lápiz no protege la base; la lista ya se podía tocar desde la
+// caja, igual que antes.
+const IA_TIPO_LISTA = {   // clave → el tipo como lo nombra la lista de precios (PRECIO_TIPOS)
+  modulo: 'Pantalla / Módulo', bateria: 'Batería', pin: 'Pin de carga', flex: 'Flex', camara: 'Cámara',
+  parlante: 'Parlante / Auricular', mic: 'Micrófono', tapa: 'Tapa / Carcasa', botones: 'Botones',
+  soft: 'Software / Liberación', placa: 'Placa',
+};
+let _iaEdit = null;   // { clave, modelo (iaClaveModelo), valor }
+
+function _iaPuedeEditar() { return (typeof tpEsDueno === 'function') ? tpEsDueno() : false; }
+function _iaCampos() {
+  const v = id => ((typeof document !== 'undefined' && document.getElementById(id)) || {}).value || '';
+  return { marca: v('rep-fi-marca').trim(), modelo: v('rep-fi-modelo').trim() };
+}
+function _iaFilaDe(clave) {
+  const { marca, modelo } = _iaCampos();
+  return iaPreciosModelo(marca, modelo, _iaDatos(marca, modelo)).find(x => x.clave === clave) || null;
+}
+
+function _iaFilaEditando(f, marca, modelo) {
+  const equipo = f.listaId ? f.listaEquipo : [marca.trim(), modelo.trim()].filter(Boolean).join(' ');
+  const nota = f.listaId
+    ? (iaClaveModelo('', f.listaEquipo) !== iaClaveModelo('', [marca, modelo].join(' ')) ? `cambia el de la lista: "${esc(equipo)}"` : 'cambia el de la lista')
+    : `queda en la lista para ${esc(equipo)}`;
+  return `<div class="ia-pr ia-pr--edit">
+    <span class="ia-pr-ico" aria-hidden="true">${f.icono}</span>
+    <span class="ia-pr-nom">${esc(f.rotulo)}<small>${nota}</small></span>
+    <span class="ia-edit-ctl">
+      <span class="ia-edit-pesos">$</span><input id="ia-edit-in" class="ia-edit-in" type="text" inputmode="numeric" autocomplete="off"
+        value="${esc(_iaEdit.valor)}" oninput="iaEditTipeo(this.value)"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();iaEditGuardar()}else if(event.key==='Escape'){iaEditCancelar()}">
+      <button type="button" class="ia-edit-ok" onclick="iaEditGuardar()">Guardar</button>
+      <button type="button" class="ia-edit-x" onclick="iaEditCancelar()" aria-label="Cancelar">✕</button>
+    </span>
+    ${f.listaId ? `<button type="button" class="ia-edit-quitar" onclick="iaEditQuitar()">Sacarlo de la lista (vuelve al último precio)</button>` : ''}
+  </div>`;
+}
+
+function iaEditarPrecio(clave) {
+  if (!_iaPuedeEditar() || !_iaTipo(clave)) return;
+  const { marca, modelo } = _iaCampos();
+  const f = _iaFilaDe(clave);
+  _iaEdit = { clave, modelo: iaClaveModelo(marca, modelo), valor: f && f.precio ? String(Math.round(f.precio)) : '' };
+  if (typeof _repuModeloPintar === 'function') _repuModeloPintar();
+  const inp = document.getElementById('ia-edit-in');
+  if (inp) { inp.focus(); try { inp.select(); } catch {} }
+}
+function iaEditTipeo(v) { if (_iaEdit) _iaEdit.valor = String(v || ''); }
+function iaEditCancelar() {
+  _iaEdit = null;
+  if (typeof _repuModeloPintar === 'function') _repuModeloPintar();
+}
+// "$ 45.000", "45000", "45k" → 45000
+function iaLeerPrecio(txt) {
+  const s = String(txt || '').toLowerCase().replace(/\s/g, '');
+  const k = /k$/.test(s);
+  const n = Number(s.replace(/k$/, '').replace(/[$.]/g, '').replace(',', '.')) || 0;
+  return Math.round(k ? n * 1000 : n);
+}
+
+// La lista que hay que tocar en memoria: la de la caja (PRECIOS) si está
+// abierta, si no la del index (_iaPrecios); y el caché de esta compu.
+function _iaListaLocal() {
+  if (typeof PRECIOS !== 'undefined' && Array.isArray(PRECIOS) && PRECIOS.length) return PRECIOS;
+  if (!_iaPrecios) _iaPrecios = iaListaPrecios().slice();
+  return _iaPrecios;
+}
+function _iaListaCache() {
+  try { localStorage.setItem('preciosCache', JSON.stringify(_iaListaLocal())); } catch {}
+}
+
+function iaEditGuardar() {
+  if (!_iaEdit || !_iaPuedeEditar()) return;
+  const precio = iaLeerPrecio(_iaEdit.valor);
+  if (!(precio > 0)) { if (typeof toast === 'function') toast('Poné un precio mayor a $0', 'error'); return; }
+  const { marca, modelo } = _iaCampos();
+  const clave = _iaEdit.clave, f = _iaFilaDe(clave), t = _iaTipo(clave);
+  if (!f || !t || typeof db === 'undefined' || !db) return;
+  const equipo = f.listaId ? f.listaEquipo : [marca, modelo].filter(Boolean).join(' ');
+  const data = { tipo: IA_TIPO_LISTA[clave], equipo, precio, updatedAt: new Date().toISOString() };
+  const col = db.collection('precios_reparaciones');
+  // El id se saca antes de subir: así se ve al instante aunque no haya señal
+  // (Firestore lo sube cuando vuelve), sin esperar la respuesta.
+  const ref = f.listaId ? col.doc(f.listaId) : col.doc();
+  const lista = _iaListaLocal();
+  const i = lista.findIndex(p => p && p.id === ref.id);
+  if (i >= 0) lista[i] = Object.assign({}, lista[i], data); else lista.push(Object.assign({ id: ref.id }, data));
+  _iaListaCache();
+  ref.set(data, { merge: true }).catch(err => {
+    console.error('guardar precio:', err);
+    if (typeof toast === 'function') toast('No se pudo guardar el precio en la base. Probá de nuevo.', 'error');
+  });
+  _iaEdit = null;
+  if (typeof _repuModeloPintar === 'function') _repuModeloPintar();
+  if (typeof toast === 'function') toast(`💲 ${t[1]} ${_iaPlata(precio)} para ${equipo} · queda en la lista de precios`, 'success');
+}
+
+function iaEditQuitar() {
+  if (!_iaEdit || !_iaPuedeEditar()) return;
+  const f = _iaFilaDe(_iaEdit.clave);
+  if (!f || !f.listaId || typeof db === 'undefined' || !db) return;
+  if (typeof confirm === 'function' && !confirm(`¿Sacar "${f.rotulo} · ${f.listaEquipo}" de la lista de precios?`)) return;
+  const lista = _iaListaLocal();
+  const i = lista.findIndex(p => p && p.id === f.listaId);
+  if (i >= 0) lista.splice(i, 1);
+  _iaListaCache();
+  db.collection('precios_reparaciones').doc(f.listaId).delete().catch(err => {
+    console.error('sacar precio:', err);
+    if (typeof toast === 'function') toast('No se pudo sacar de la lista. Probá de nuevo.', 'error');
+  });
+  _iaEdit = null;
+  if (typeof _repuModeloPintar === 'function') _repuModeloPintar();
+  if (typeof toast === 'function') toast('Sacado de la lista de precios', 'success');
 }
 
 // Precio sugerido para un arreglo escrito o elegido en el paso 2
@@ -606,6 +737,19 @@ function _iaEstilos() {
   .ia-pr-nom small { display: block; font-weight: 400; font-size: 11.5px; color: var(--t2, #888); }
   .ia-pr-precio { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
   .ia-pr-precio.no { color: var(--t2, #888); font-weight: 500; }
+  .ia-pr-nom .rm-stock { display: inline-block; font-size: 10.5px; padding: 1px 7px; margin-left: 2px; vertical-align: 1px; }
+  .ia-pr-fila { display: flex; gap: 6px; align-items: stretch; }
+  .ia-pr-fila .ia-pr { flex: 1; min-width: 0; }
+  .ia-pr-lapiz { flex: none; width: 40px; border-radius: 10px; border: 1px solid var(--border, rgba(128,128,128,.25)); background: var(--card, #fff); font-size: 16px; cursor: pointer; }
+  .ia-pr--edit { flex-wrap: wrap; cursor: default; border-color: var(--accent, #3b82f6); }
+  .ia-pr--edit:active { transform: none; }
+  .ia-pr--edit .ia-pr-nom { flex: 1 1 60%; }
+  .ia-edit-ctl { display: flex; align-items: center; gap: 6px; flex: 1 1 100%; }
+  .ia-edit-pesos { font-weight: 700; color: var(--t2, #888); }
+  .ia-edit-in { flex: 1; min-width: 0; width: 0; font: inherit; font-size: 16px; font-weight: 700; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--accent, #3b82f6); background: var(--input, #fff); color: var(--text, inherit); }
+  .ia-edit-ok { flex: none; font: inherit; font-weight: 700; padding: 9px 14px; border-radius: 8px; border: 0; background: var(--accent, #3b82f6); color: #fff; cursor: pointer; }
+  .ia-edit-x { flex: none; font: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border, rgba(128,128,128,.3)); background: none; color: var(--text, inherit); cursor: pointer; }
+  .ia-edit-quitar { flex: 1 1 100%; text-align: left; background: none; border: 0; padding: 2px 2px 0; font: inherit; font-size: 12px; color: var(--red, #ef4444); cursor: pointer; }
   .ia-aprender { width: 100%; font: inherit; font-size: 13px; font-weight: 700; padding: 10px 12px; border-radius: 10px; border: 1px dashed var(--accent, #3b82f6); background: none; color: var(--accent, #3b82f6); cursor: pointer; }
   .ia-aprender:disabled { opacity: .6; cursor: default; }`;
   document.head.appendChild(st);

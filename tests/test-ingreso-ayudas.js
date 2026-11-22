@@ -138,5 +138,47 @@ ok(/function _addArreglo[\s\S]{0,600}iaPrecioSugerido\(t\)/.test(repairs), 'eleg
 ok(/tpEsDueno\(\)/.test(ayudas) && /_estado/.test(ayudas), 'el botón de "sacar los precios" es del dueño y se hace una sola vez');
 ok(/i \+= 400/.test(ayudas) && /IA_APRENDER_MESES = 12/.test(ayudas), 'se escribe en tandas de 400, últimos 12 meses');
 
+console.log('\n8) ✏️ Cambiar precios desde el recuadro');
+const CAMPOS = { 'rep-fi-marca': { value: 'Samsung' }, 'rep-fi-modelo': { value: 'Galaxy A54' } };
+ctx.document = { getElementById: id => CAMPOS[id] || (id === 'ia-css' ? {} : null) };
+const OPS = []; let nId = 0;
+const refDe = (c, id) => ({ id, get: () => Promise.resolve({ exists: true, data: () => ({}) }), set: (data, op) => { OPS.push({ op: 'set', c, id, data, merge: !!(op && op.merge) }); return Promise.resolve(); },
+                                 delete: () => { OPS.push({ op: 'delete', c, id }); return Promise.resolve(); } });
+ctx.db = { collection: c => ({ doc: id => refDe(c, id || ('nuevo' + (++nId))) }) };
+ctx.confirm = () => true;
+ctx.setTimeout = () => 0; ctx.clearTimeout = () => {};   // el pedido de la memoria de otro modelo no hace falta acá
+let dueno = false;
+ctx.tpEsDueno = () => dueno;
+ok(!/ia-pr-lapiz/.test(ctx.iaPreciosHtml('Samsung', 'Galaxy A54')), 'el empleado (o el modo mostrador) no ve el lápiz');
+ctx.iaEditarPrecio('pin');
+ok(ctx.iaPreciosHtml('Samsung', 'Galaxy A54').indexOf('ia-edit-in') < 0, 'y no puede abrir la edición');
+dueno = true;
+ok(/iaEditarPrecio\('pin'\)/.test(ctx.iaPreciosHtml('Samsung', 'Galaxy A54')), 'el dueño ve ✏️ en cada precio');
+ctx.iaEditarPrecio('pin');
+ok(/id="ia-edit-in"[\s\S]*value="30000"/.test(ctx.iaPreciosHtml('Samsung', 'Galaxy A54')), 'al tocar ✏️ aparece el campo con el precio de ahora', ctx.iaPreciosHtml('Samsung', 'Galaxy A54').slice(0, 300));
+ctx.iaEditTipeo('$ 33.000');
+ctx.iaEditGuardar();
+const g1 = OPS[OPS.length - 1];
+ok(g1 && g1.c === 'precios_reparaciones' && g1.data.tipo === 'Pin de carga' && g1.data.equipo === 'Samsung Galaxy A54' && g1.data.precio === 33000,
+  'se guarda en la LISTA DE PRECIOS ("Pin de carga · Samsung Galaxy A54 · $33.000")', g1);
+ok(ctx.iaPrecioSugerido('Ficha de carga') === 33000, 'y ya es el precio sugerido (le gana al último precio)');
+ok(/de la lista/.test(ctx.iaPreciosHtml('Samsung', 'A54')) && ctx.iaPreciosHtml('Samsung', 'A54').indexOf('ia-edit-in') < 0, 'la edición se cierra y el renglón dice "de la lista"');
+ctx.iaEditarPrecio('pin'); ctx.iaEditTipeo('35k'); ctx.iaEditGuardar();
+const g2 = OPS[OPS.length - 1];
+ok(g2.id === g1.id && g2.merge, 'cambiarlo otra vez pisa ESE renglón de la lista, no crea otro', [g1.id, g2.id]);
+ok(ctx.iaPrecioSugerido('pin') === 35000, '"35k" se entiende como $35.000');
+ctx.iaEditarPrecio('bateria'); ctx.iaEditTipeo('0'); const antes = OPS.length; ctx.iaEditGuardar();
+ok(OPS.length === antes && /mayor a \$0/.test(toasts[toasts.length - 1][0]), 'precio en $0 no se guarda');
+ctx.iaEditCancelar();
+ok(ctx.iaPreciosHtml('Samsung', 'A54').indexOf('ia-edit-in') < 0, 'Cancelar no guarda nada');
+ctx.iaEditarPrecio('pin');
+CAMPOS['rep-fi-modelo'].value = 'A34';
+ok(ctx.iaPreciosHtml('Samsung', 'A34').indexOf('ia-edit-in') < 0, 'si se cambia de modelo, la edición a medias se descarta');
+CAMPOS['rep-fi-modelo'].value = 'A54';
+ctx.iaEditarPrecio('pin'); ctx.iaEditQuitar();
+ok(OPS[OPS.length - 1].op === 'delete' && OPS[OPS.length - 1].id === g1.id, '"Sacarlo de la lista" borra ese renglón');
+ok(ctx.iaPrecioSugerido('pin') === 30000, 'y vuelve al último precio');
+ok(ctx.iaLeerPrecio('45.000') === 45000 && ctx.iaLeerPrecio('$45000') === 45000 && ctx.iaLeerPrecio('45k') === 45000, 'entiende "45.000", "$45000" y "45k"');
+
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

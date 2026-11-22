@@ -1789,7 +1789,7 @@ function _rmEstilos() {
   const st = document.createElement('style');
   st.id = 'rm-css';
   st.textContent = `
-  #rep-repu-modelo { border: 1px solid var(--border, rgba(128,128,128,.3)); border-radius: 12px; padding: 10px 12px; background: var(--bg2, rgba(128,128,128,.06)); display: grid; gap: 6px; }
+  #rep-repu-modelo { border: 1px solid var(--border, rgba(128,128,128,.3)); border-radius: 12px; padding: 10px 12px; background: var(--bg2, rgba(128,128,128,.06)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
   #rep-repu-modelo.hidden { display: none; }
   .rm-cab { font-weight: 700; font-size: 13.5px; }
   .rm-fila { display: flex; align-items: center; gap: 8px; font-size: 13px; }
