@@ -68,30 +68,20 @@ a { color: inherit; }
 .hero-sub { margin: 20px 0 0; max-width: 46ch; font-size: 17px; color: rgba(255,255,255,.66); }
 .hero-btns { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
 
-/* El celular dibujado, con la luz azul detrás */
-.hero-visual { position: relative; height: 470px; display: flex; align-items: center; justify-content: center; }
+/* El video del local, con la luz azul detrás (antes era un celular dibujado) */
+.hero-visual { position: relative; display: flex; align-items: center; justify-content: center; min-height: 470px; }
+.hero-video { position: relative; width: min(100%, 380px); aspect-ratio: 4 / 5; border-radius: 28px; overflow: hidden; background: #14161c;
+  box-shadow: 0 40px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.12); }
+.hero-video video { display: block; width: 100%; height: 100%; object-fit: cover; }
 .brillo { position: absolute; width: 340px; height: 340px; border-radius: 50%; background: radial-gradient(circle, rgba(47,107,255,.55), transparent 65%); filter: blur(20px); }
-.cel { position: relative; width: 210px; height: 430px; border-radius: 44px; transform: rotate(-12deg);
-  background: linear-gradient(145deg, #3a3f4b, #14161c 45%, #2b2f38); padding: 10px;
-  box-shadow: 0 40px 80px rgba(0,0,0,.6), inset 0 0 0 1.5px rgba(255,255,255,.12); }
-.cel-pantalla { height: 100%; border-radius: 35px; background: linear-gradient(160deg, #1b3a8f, #0d1530 55%, #2f6bff); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
-.cel-pantalla b { font-size: 22px; letter-spacing: -.02em; }
-.cel-pantalla span { font-size: 11px; color: rgba(255,255,255,.7); }
-.cel-isla { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 70px; height: 20px; border-radius: 20px; background: #000; z-index: 1; }
-.rotulo { position: absolute; font: 500 10.5px "JetBrains Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.55); display: flex; align-items: center; gap: 8px; }
-.rotulo::before { content: ""; width: 34px; height: 1px; background: rgba(255,255,255,.3); }
-.r1 { top: 70px; right: 0; } .r2 { top: 210px; left: 0; flex-direction: row-reverse; } .r2::before { order: 0; } .r3 { bottom: 70px; right: 10px; }
+/* En el celu: primero el título y los botones, abajo el video (si iba
+   arriba, empujaba el título fuera de la pantalla) */
 @media (max-width: 860px) {
   .hero-in { grid-template-columns: 1fr; }
-  .hero-visual { height: 300px; order: -1; margin-bottom: -10px; }
-  .cel { width: 140px; height: 286px; border-radius: 32px; padding: 7px; }
-  .cel-pantalla { border-radius: 26px; } .cel-pantalla b { font-size: 16px; }
-  .cel-isla { width: 48px; height: 14px; top: 15px; }
-  .brillo { width: 240px; height: 240px; }
-  .r1 { top: 40px; right: 4%; } .r2 { top: 140px; left: 2%; } .r3 { bottom: 30px; right: 6%; }
+  .hero-visual { min-height: 0; margin-top: 18px; }
+  .hero-video { width: min(100%, 420px); border-radius: 24px; }
+  .brillo { width: 260px; height: 260px; }
 }
-/* En el celu los rótulos se cruzaban con el celular dibujado */
-@media (max-width: 600px) { .rotulo { display: none; } .hero-visual { height: 250px; } }
 
 /* ── Secciones ── */
 .sec { padding: 84px max(20px, env(safe-area-inset-right, 0px)) 84px max(20px, env(safe-area-inset-left, 0px)); }

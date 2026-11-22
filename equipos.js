@@ -211,7 +211,25 @@
     if (!desdeAtras && history.state && history.state.visor) history.back();
   }
 
+  // El video de arriba: arranca solo (mudo) cuando se ve y se frena cuando no,
+  // así no gasta batería ni datos con la página scrolleada. Con "reducir
+  // movimiento" o "ahorro de datos" no arranca solo: queda la portada con los
+  // controles para darle play.
+  function heroVideo(v) {
+    let quieto = false;
+    try { quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches || !!(navigator.connection && navigator.connection.saveData); } catch (e) {}
+    if (quieto) { v.controls = true; return 'quieto'; }
+    v.muted = true;
+    const play = () => { const p = v.play(); if (p && p.catch) p.catch(() => { v.controls = true; }); };
+    if (typeof IntersectionObserver === 'function') {
+      new IntersectionObserver(es => es.forEach(e => (e.isIntersecting ? play() : v.pause())), { threshold: 0.25 }).observe(v);
+    } else play();
+    return 'anda';
+  }
+
   function enganchar() {
+    const vid = $('hero-video');
+    if (vid && typeof vid.play === 'function') heroVideo(vid);
     $('cab-wa').href = waLink('Hola TechPoint! Quería hacer una consulta.');
     // Los otros botones de WhatsApp de la página (arriba, plan canje, pie y el
     // flotante) traen su mensaje en data-wa

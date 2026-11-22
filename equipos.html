@@ -58,13 +58,18 @@
         <a class="btn btn-vidrio" data-wa="Hola TechPoint! Quería hacer una consulta." target="_blank" rel="noopener"><span class="ico-wa" aria-hidden="true"></span>Consultar por WhatsApp</a>
       </div>
     </div>
-    <!-- Un celular dibujado (sin fotos de marcas), con lo que el cliente pregunta siempre -->
-    <div class="hero-visual" aria-hidden="true">
-      <div class="brillo"></div>
-      <div class="cel"><div class="cel-isla"></div><div class="cel-pantalla"><b>TechPoint</b><span>Equipos con garantía</span></div></div>
-      <span class="rotulo r1">Batería revisada</span>
-      <span class="rotulo r2">Garantía escrita</span>
-      <span class="rotulo r3">Probalo en el local</span>
+    <!-- Alan (22/11): el video del local (versión 4:5 de Instagram; la 9:16 del
+         reel quedaba demasiado alta acá). Comprimido de 26 MB a 4 MB, sin
+         audio (no tiene), mudo y en loop para que arranque solo en el celu.
+         Reemplaza al celular dibujado. -->
+    <div class="hero-visual">
+      <div class="brillo" aria-hidden="true"></div>
+      <div class="hero-video">
+        <video id="hero-video" muted loop playsinline preload="metadata" poster="equipos-video.jpg" width="720" height="900"
+          aria-label="Video de TechPoint: servicio técnico, accesorios y cómo llegar al local">
+          <source src="equipos-video.mp4" type="video/mp4">
+        </video>
+      </div>
     </div>
   </div>
 </header>
