@@ -53,7 +53,9 @@ function initPrecios() {
         return t !== 0 ? t : (a.equipo || '').localeCompare(b.equipo || '');
       });
       // Actualizar cache (best-effort)
-      try { localStorage.setItem('preciosCache', JSON.stringify(PRECIOS)); } catch {}
+      // preciosCacheTs: el ingreso de reparaciones (ingreso-ayudas.js) usa este
+      // caché y no vuelve a leer la colección mientras tenga menos de 6 horas
+      try { localStorage.setItem('preciosCache', JSON.stringify(PRECIOS)); localStorage.setItem('preciosCacheTs', String(Date.now())); } catch {}
       if (!document.getElementById('precios-modal')?.classList.contains('hidden')) {
         renderPreciosList();
       }

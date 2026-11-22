@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-ingreso-ayudas.js': '✍️ Ingreso: "sa" sugiere Samsung y los modelos de esa marca; precios de reparación del modelo (lista de precios > último cobrado) con aviso de repuesto, y tocándolos se suman a la orden',
   'test-repuestos-modelo.js': '🔩 Al ingresar una reparación, apenas se escribe el modelo muestra los repuestos de ese modelo (stock y precio), sin mezclar parecidos (A54/A5, 13/13 Pro)',
   'test-mostrador-ciego.js': '🙈 Modo mostrador (la cuenta del dueño en la compu del local no muestra la plata sin PIN) y arqueo ciego (el que cuenta no ve lo esperado ni la diferencia)',
   'test-historia-equipo.js': '✨ Historia de WhatsApp de un equipo: la IA ubica los teléfonos, la app ajusta el borde, recorta, tapa el IMEI y arma la historia sin que nada se pise',

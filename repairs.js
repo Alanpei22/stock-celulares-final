@@ -1298,6 +1298,8 @@ function _renderArreglos() {
     </div>`).join('');
   _renderArreglosTotal();
   _sugerirRepuestos();
+  // 💲 Que el recuadro del modelo marque bien cuáles ya están en la orden
+  if (typeof _repuModeloPintar === 'function') _repuModeloPintar();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1738,24 +1740,31 @@ let _rmT = null;
 function _repuModeloPintar() {
   const box = document.getElementById('rep-repu-modelo');
   if (!box) return;
+  // Solo se redibuja si cambió lo que muestra. Antes, al tocar un precio, el
+  // campo modelo perdía el foco, el navegador avisaba "change", el recuadro se
+  // rehacía debajo del dedo y el toque se perdía.
+  const poner = h => { if (box._rmHtml !== h) { box._rmHtml = h; box.innerHTML = h; } };
   const marca  = (document.getElementById('rep-fi-marca')  || {}).value || '';
   const modelo = (document.getElementById('rep-fi-modelo') || {}).value || '';
-  if (!modelo.trim()) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  if (!modelo.trim()) { box.classList.add('hidden'); poner(''); return; }
   _rmEstilos();
   const titulo = esc([marca.trim(), modelo.trim()].filter(Boolean).join(' '));
-  const cab = `<div class="rm-cab">🔩 Repuestos para ${titulo}</div>`;
+  // 💲 Arriba, los precios de reparación de este modelo (ingreso-ayudas.js):
+  // módulo, batería, pin de carga… con el precio de la lista o el último cobrado.
+  const precios = (typeof iaPreciosHtml === 'function') ? iaPreciosHtml(marca, modelo) : '';
+  const cab = `<div class="rm-cab">📱 ${titulo}</div>` + precios + `<div class="ia-sec">🔩 Repuestos</div>`;
   box.classList.remove('hidden');
   if (typeof REPUESTOS === 'undefined' || !REPUESTOS.length) {
-    box.innerHTML = cab + '<div class="rm-nada">Cargando los repuestos…</div>';
+    poner(cab + '<div class="rm-nada">Cargando los repuestos…</div>');
     return;
   }
   const lista = repuestosDelModelo(marca, modelo, REPUESTOS);
   if (!lista.length) {
-    box.innerHTML = cab + '<div class="rm-nada">No hay repuestos cargados para este modelo.</div>';
+    poner(cab + '<div class="rm-nada">No hay repuestos cargados para este modelo.</div>');
     return;
   }
   const MAX = 8;
-  box.innerHTML = cab + lista.slice(0, MAX).map(r => {
+  poner(cab + lista.slice(0, MAX).map(r => {
     const cant = Number(r.cantidad) || 0;
     const venta = Number(r.precioVenta) || 0;
     return `<div class="rm-fila">
@@ -1763,7 +1772,7 @@ function _repuModeloPintar() {
       ${venta ? `<span class="rm-precio">$${venta.toLocaleString('es-AR')}</span>` : ''}
       <span class="rm-stock ${cant > 0 ? 'ok' : 'no'}">${cant > 0 ? cant + ' en stock' : 'sin stock · pedir'}</span>
     </div>`;
-  }).join('') + (lista.length > MAX ? `<div class="rm-nada">y ${lista.length - MAX} más en 🔩 Repuestos</div>` : '');
+  }).join('') + (lista.length > MAX ? `<div class="rm-nada">y ${lista.length - MAX} más en 🔩 Repuestos</div>` : ''));
 }
 function _repuModeloProgramar() { clearTimeout(_rmT); _rmT = setTimeout(_repuModeloPintar, 250); }
 
@@ -1805,12 +1814,15 @@ function _repwizBack() {
 
 function openRepairForm(id) {
   _repFormTocado = false;
+  if (typeof tpFrenar === 'function' && tpFrenar('reparaciones', id ? 'editar reparaciones' : 'tomar reparaciones')) return;
+  // (Después del permiso: sin permiso no se lee nada.)
   // 🔩 Para mostrar los repuestos del modelo hacen falta en memoria. CUPO: es
   // la misma escucha de la sección Repuestos (una lectura de la colección por
   // sesión, después solo los cambios); si ya se abrió, no lee nada de nuevo.
   if (typeof listenRepuestos === 'function') listenRepuestos();
+  // 💲 Y la lista de precios de reparación (una vez, del caché si está fresco)
+  if (typeof iaCargarPrecios === 'function') iaCargarPrecios();
   setTimeout(() => { if (typeof _repuModeloPintar === 'function') _repuModeloPintar(); }, 0);
-  if (typeof tpFrenar === 'function' && tpFrenar('reparaciones', id ? 'editar reparaciones' : 'tomar reparaciones')) return;
   editingRepairId = id || null;
   const COMMON_ARREGLOS = [
     'Módulo / Pantalla','Ficha de carga','Batería','Módulo + Templado',

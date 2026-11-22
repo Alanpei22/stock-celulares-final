@@ -46,7 +46,7 @@ ok(ctx.repuestosDelModelo('samsung', 'a54', LISTA).length === 3, 'no importan ma
 console.log('\n4) Enganchado al ingreso');
 ok(/id="rep-repu-modelo"/.test(leer('index.html')), 'el recuadro está debajo de marca y modelo');
 ok(/addEventListener\('input', \(\) => _repuModeloProgramar\(\)\)/.test(src), 'se actualiza mientras se escribe');
-ok(/function openRepairForm\(id\) \{[\s\S]{0,400}listenRepuestos\(\)/.test(src), 'al abrir el ingreso se cargan los repuestos (aunque no se haya entrado a Repuestos)');
+ok(/function openRepairForm\(id\) \{[\s\S]{0,900}listenRepuestos\(\)/.test(src), 'al abrir el ingreso se cargan los repuestos (aunque no se haya entrado a Repuestos)');
 ok(/_repuModeloPintar\(\)/.test(leer('repuestos.js')), 'cuando cambian los repuestos, el recuadro se actualiza');
 ok(/sin stock · pedir/.test(src) && /rm-precio/.test(src), 'muestra el stock (o "sin stock · pedir") y el precio de venta');
 
