@@ -26,7 +26,10 @@ ok(/_handleUrlAction/.test(pr.slice(pr.indexOf('Lleva un QR'), pr.indexOf('const
 
 console.log('\n2) Escanearlo abre la ficha');
 const app = leer('app.js');
-const fn = (app.match(/function abrirRepairPorOrden\(nOrden\) \{[\s\S]*?\n\}/) || [''])[0];
+// _repAbrirQr: lo que se hace al encontrarla (con listo-qr.js cargado, "Equipo
+// listo" si está en el taller; acá no está cargado, así que abre la ficha)
+const fn = (app.match(/function _repAbrirQr\(id\) \{[\s\S]*?\n\}/) || [''])[0] + '\n'
+         + (app.match(/function abrirRepairPorOrden\(nOrden\) \{[\s\S]*?\n\}/) || [''])[0];
 const ABIERTAS = [], SECC = [], TOASTS = [], SS = {};
 let CONSULTAS = 0, ENBASE = null;
 const ax = {

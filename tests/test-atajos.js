@@ -9,7 +9,7 @@ let fails = 0;
 const ok = (c, l, x) => { console.log((c ? '  OK  ' : '  FAIL') + ' · ' + l + (c ? '' : '  → ' + JSON.stringify(x))); if (!c) fails++; };
 const leer = f => fs.readFileSync(DIR + f, 'utf8');
 
-const ATAJOS = { caja: 'caja.html', reparacion: 'index.html?action=nueva-reparacion', escanear: 'caja.html?action=escanear' };
+const ATAJOS = { caja: 'caja.html', reparacion: 'index.html?action=nueva-reparacion', escanear: 'caja.html?action=escanear', listo: 'index.html?action=escanear-reparacion' };
 
 console.log('\n1) Una página, un manifest y un ícono por atajo');
 Object.entries(ATAJOS).forEach(([k, dest]) => {
@@ -27,7 +27,7 @@ Object.entries(ATAJOS).forEach(([k, dest]) => {
 console.log('\n2) Android: los atajos del ícono (mantener apretado)');
 const man = JSON.parse(leer('manifest.json'));
 const urls = (man.shortcuts || []).map(s => s.url);
-ok(urls.includes('/caja.html') && urls.includes('/index.html?action=nueva-reparacion') && urls.includes('/caja.html?action=escanear'), 'Caja, Nueva reparación y Escanear venta', urls);
+ok(urls.includes('/caja.html') && urls.includes('/index.html?action=nueva-reparacion') && urls.includes('/caja.html?action=escanear') && urls.includes('/index.html?action=escanear-reparacion'), 'Caja, Nueva reparación, Escanear venta y Equipo listo', urls);
 ok(man.start_url === '/index.html' && man.icons.length >= 3, 'el resto del manifest sigue igual');
 
 console.log('\n3) Abierto desde el ícono va directo; en el navegador, explica');
@@ -65,7 +65,7 @@ ok(/usuario y la contraseña/.test(w.main.innerHTML), 'avisa que la primera vez 
 w = ventana({ app: false });
 w.main = { innerHTML: '' };
 ctx.atajosPintarTodos(w);
-ok(['atajo-caja.html', 'atajo-reparacion.html', 'atajo-escanear.html'].every(h => w.main.innerHTML.includes(h)), 'la página de todos los accesos lista los tres');
+ok(['atajo-caja.html', 'atajo-reparacion.html', 'atajo-escanear.html', 'atajo-listo.html'].every(h => w.main.innerHTML.includes(h)), 'la página de todos los accesos lista los cuatro');
 
 console.log('\n4) La caja entiende "escanear" y el login no pierde a dónde iba');
 const caja = leer('caja.js');

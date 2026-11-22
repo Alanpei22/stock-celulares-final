@@ -26,6 +26,7 @@
 const ATAJOS = [
   { id: 'caja',       corto: 'Caja',       nombre: 'Caja',             sub: 'La caja del día, para cobrar y ver movimientos', icono: 'atajo-caja-180.png' },
   { id: 'reparacion', corto: 'Reparación', nombre: 'Nueva reparación', sub: 'Abre directo la toma de un equipo',              icono: 'atajo-reparacion-180.png' },
+  { id: 'listo',      corto: 'Equipo listo', nombre: 'Equipo listo (QR)', sub: 'Leés la etiqueta del equipo, le sacás foto adelante y atrás, y queda Listo', icono: 'atajo-listo-180.png' },
   { id: 'escanear',   corto: 'Escanear',   nombre: 'Escanear venta',   sub: 'La venta abierta con la cámara lista para leer el código', icono: 'atajo-escanear-180.png' },
 ];
 
@@ -61,7 +62,7 @@ function _atPasos(iphone, nombre) {
         <li>Elegí <b>"Agregar a la pantalla principal"</b> (o "Instalar").</li>
         <li>Confirmá con <b>Agregar</b>.</li>
       </ol>
-      <p class="at-nota">En Android también podés mantener apretado el ícono de TechPoint: ahí ya salen Caja, Nueva reparación y Escanear venta.</p>`;
+      <p class="at-nota">En Android también podés mantener apretado el ícono de TechPoint: ahí ya salen Caja, Nueva reparación, Equipo listo y Escanear venta.</p>`;
 }
 
 function _atAdentro(url) {

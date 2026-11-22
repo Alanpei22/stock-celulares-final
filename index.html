@@ -190,7 +190,10 @@
       </div>
       <div class="search-wrap">
         <span class="search-icon">🔍</span>
-        <input id="rep-search" type="search" placeholder="Cliente, modelo, N° orden..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <input id="rep-search" type="search" placeholder="Cliente, modelo, N° orden..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding-right:56px">
+        <!-- 📷 Leer el QR de la etiqueta del equipo → pasarlo a Listo con fotos (listo-qr.js) -->
+        <button type="button" onclick="repEscanearListo()" title="Escanear la etiqueta del equipo"
+          style="position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;font-size:22px;cursor:pointer;padding:6px 8px">📷</button>
       </div>
       <div class="filters">
         <select class="pill pill--alcance" id="rep-alcance" title="Qué equipos cuenta la lista (se guarda en este dispositivo)">
@@ -2444,6 +2447,8 @@
 <script defer src="app.js"></script>
 <script defer src="costos-lista.js"></script>
 <script defer src="fotos-subir.js"></script>
+<!-- Equipo listo leyendo el QR, con foto de adelante y atrás -->
+<script defer src="listo-qr.js"></script>
 <script defer src="stock-extras.js"></script>
 <script defer src="catalogo-stock.js"></script>
 <script defer src="usuarios.js"></script>

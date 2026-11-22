@@ -2494,6 +2494,7 @@ function openRepairDetail(id) {
 
   document.getElementById('rep-det-body').innerHTML = `
     ${faseBloque}
+    ${typeof lqFotosHtml === 'function' ? lqFotosHtml(r) : ''}
     ${r.falla ? `<div class="det-row det-row--full">
       <span class="det-label">Falla declarada</span>
       <span class="det-val">${esc(r.falla)}</span>

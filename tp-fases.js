@@ -725,11 +725,19 @@ function _tpSyncFase(r, nuevoEstado, ahoraISO, faseDestino) {
 }
 
 // Entrada única para mover una reparación de fase.
-async function tpCambiarFase(id, nuevaFase) {
+async function tpCambiarFase(id, nuevaFase, opts = {}) {
   const r = (typeof REPAIRS !== 'undefined' ? REPAIRS : []).find(x => x.id === id);
   if (!r || !TP_FASES[nuevaFase]) return;
   const actual = tpFaseDe(r);
   if (actual === nuevaFase) return;
+  // ✅ Alan (22/11): cada equipo pasa a Listo con foto de adelante y de atrás.
+  // Antes de mover nada, se piden las fotos (listo-qr.js); de ahí vuelve acá
+  // con conFotos. Solo si el equipo está en el taller (lqPuedeListo).
+  if (nuevaFase === 'listo' && !opts.conFotos && typeof lqAbrir === 'function'
+      && typeof lqPuedeListo === 'function' && lqPuedeListo(r)) {
+    lqAbrir(id);
+    return;
+  }
 
   // Fases que cierran sin arreglar: pedir el motivo ANTES de mover nada.
   // Si cancela el cartel no se mueve (sirve de red por si tocó el botón sin querer).

@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-listo-qr.js': '✅ Equipo listo leyendo el QR de la etiqueta: pide foto adelante y atrás, las sube y recién ahí pasa a Listo (sin fotos solo el dueño)',
   'test-atajos.js': '📲 Accesos directos en el celu: Caja, Nueva reparación y Escanear venta (íconos de iPhone y atajos de Android), y el login vuelve al atajo',
   'test-ingreso-ayudas.js': '✍️ Ingreso: "sa" sugiere Samsung y los modelos de esa marca; precios de reparación del modelo (lista de precios > último cobrado) con aviso de repuesto, y tocándolos se suman a la orden',
   'test-repuestos-modelo.js': '🔩 Al ingresar una reparación, apenas se escribe el modelo muestra los repuestos de ese modelo (stock y precio), sin mezclar parecidos (A54/A5, 13/13 Pro)',

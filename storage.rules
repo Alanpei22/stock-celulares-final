@@ -37,6 +37,17 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/.*');
     }
 
+    // Fotos de cómo quedó cada reparación al pasarla a Listo (adelante y
+    // atrás, listo-qr.js). Mientras esta regla no se publique en Firebase, la
+    // app las guarda en stock-photos/rep-{id}/ (que ya está permitida).
+    match /reparaciones/{repairId}/{filename} {
+      allow read: if esDelNegocio();
+      allow delete: if esDelNegocio();
+      allow create, update: if esDelNegocio()
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
     // Cualquier otra ruta: bloqueada por defecto.
     match /{allPaths=**} {
       allow read, write: if false;

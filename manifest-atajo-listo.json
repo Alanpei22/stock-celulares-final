@@ -1,0 +1,23 @@
+{
+  "id": "/atajo-listo.html",
+  "name": "Equipo listo · TechPoint",
+  "short_name": "Equipo listo",
+  "start_url": "/atajo-listo.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "atajo-listo-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "atajo-listo-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

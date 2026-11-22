@@ -799,7 +799,7 @@ function toggleDashMenu() {
     { icon: '🔒', label: 'Modo dueño', hide: _soloDueno(), onClick: toggleOwnerLock },
     { icon: '🔔', label: 'Notificaciones', sub: 'Push + avisos in-app', onClick: () => (typeof openNotifConfig === 'function') && openNotifConfig() },
     // 📲 Íconos en la pantalla del celu para Caja, Nueva reparación y Escanear venta (atajo.js)
-    { icon: '📲', label: 'Accesos directos en el celu', sub: 'Íconos para Caja, Nueva reparación y Escanear venta',
+    { icon: '📲', label: 'Accesos directos en el celu', sub: 'Íconos para Caja, Nueva reparación, Equipo listo y Escanear venta',
       onClick: () => { location.href = 'atajos.html'; } },
     { icon: '📅', label: 'Estado del día', sub: 'El de "ya estamos abiertos", para WhatsApp e Instagram', hide: _soloDueno(),
       onClick: () => (typeof estAbrir === 'function') && estAbrir() },
@@ -2989,6 +2989,12 @@ function initPWA() {
 // Abre la ficha de la reparación con ese N° de orden (el QR de la etiqueta).
 // Primero la busca entre las que ya están cargadas; si es vieja (más de 30
 // días) la pide a la base: una sola lectura.
+// ✅ Lo que pasa al encontrar la reparación de un QR: si está en el taller,
+// "Equipo listo" con las fotos (listo-qr.js); si no, la ficha como siempre.
+function _repAbrirQr(id) {
+  if (typeof lqAbrir === 'function') return lqAbrir(id);
+  if (typeof openRepairDetail === 'function') openRepairDetail(id);
+}
 function abrirRepairPorOrden(nOrden) {
   const listo = () => { try { sessionStorage.removeItem('tpRepQr'); } catch {} };
   const enMemoria = () => (typeof REPAIRS !== 'undefined' ? REPAIRS : []).find(r => Number(r.nOrden) === nOrden);
@@ -3003,7 +3009,7 @@ function abrirRepairPorOrden(nOrden) {
       if (typeof switchSection === 'function') switchSection('repairs');   // ahí se cargan
     }
     const r = enMemoria();
-    if (r && typeof openRepairDetail === 'function') { listo(); openRepairDetail(r.id); return; }
+    if (r && typeof openRepairDetail === 'function') { listo(); _repAbrirQr(r.id); return; }
     // Ya llegaron las de los últimos 30 días y no está: es más vieja
     if (!pedida && retry >= 6 && typeof db !== 'undefined' && db) {
       pedida = true;
@@ -3013,7 +3019,7 @@ function abrirRepairPorOrden(nOrden) {
         const d = snap.docs[0], rep = { id: d.id, ...d.data() };
         if (!enMemoria() && typeof _repHistorial !== 'undefined') { _repHistorial.push(rep); if (typeof _repPintar === 'function') _repPintar(); }
         listo();
-        if (typeof openRepairDetail === 'function') openRepairDetail(rep.id);
+        if (typeof openRepairDetail === 'function') _repAbrirQr(rep.id);
       }).catch(e => { console.error('QR reparación:', e); toast('No se pudo abrir la reparación', 'error'); });
       return;
     }
@@ -3095,6 +3101,13 @@ function _handleUrlAction() {
       if (action === 'nueva-reparacion') {
         if (typeof openRepairForm === 'function' && document.getElementById('app') && !document.getElementById('app').classList.contains('app-hidden')) {
           openRepairForm();
+        } else if (retry < 15) setTimeout(() => tryAct(retry + 1), 400);
+      } else if (action === 'escanear-reparacion') {
+        // 📲 Acceso directo "Escanear reparación": la cámara para leer la
+        // etiqueta del equipo y pasarlo a Listo con las fotos (listo-qr.js)
+        if (typeof repEscanearListo === 'function' && document.getElementById('app') && !document.getElementById('app').classList.contains('app-hidden')) {
+          if (typeof switchSection === 'function') switchSection('repairs');
+          repEscanearListo();
         } else if (retry < 15) setTimeout(() => tryAct(retry + 1), 400);
       }
     };

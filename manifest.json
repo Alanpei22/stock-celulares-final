@@ -67,6 +67,18 @@
           "type": "image/png"
         }
       ]
+    },
+    {
+      "name": "Equipo listo (escanear QR)",
+      "short_name": "Equipo listo",
+      "url": "/index.html?action=escanear-reparacion",
+      "icons": [
+        {
+          "src": "atajo-listo-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }
