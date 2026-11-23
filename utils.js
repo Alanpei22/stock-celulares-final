@@ -5,6 +5,33 @@
 'use strict';
 
 // ── Sanitización HTML ──────────────────────────────────────
+// ── Marcas: una sola forma de escribir cada una ─────────────
+// Alan (23/11): "iPhone está escrito de varias maneras y las toma como
+// diferentes marcas". En el stock había "iPhone", "Iphone", "IPHONE", "Apple"
+// y en el filtro de marcas (y en la página de equipos) salía cada una por
+// separado. marcaCanon() las lleva a UNA: se usa al guardar, al armar los
+// filtros y en la página pública (api/equipos.js tiene la misma lista).
+const MARCAS_CANON = [
+  [/^(apple|iphone|i ?phone|iphon|ipone|aple)$/, 'iPhone'],
+  [/^(samsung|samsumg|sansung|samnsung|samgsung|samsun|galaxy)$/, 'Samsung'],
+  [/^(motorola|moto|motorol|motorolla)$/, 'Motorola'],
+  [/^(xiaomi|xiomi|xiaomy|redmi|poco|mi)$/, 'Xiaomi'],
+  [/^(huawei|huawey|huawuei|hauwei)$/, 'Huawei'],
+  [/^lg$/, 'LG'], [/^tcl$/, 'TCL'], [/^zte$/, 'ZTE'], [/^oppo$/, 'OPPO'],
+  [/^(google|pixel)$/, 'Google'], [/^realme$/, 'Realme'], [/^nokia$/, 'Nokia'],
+  [/^alcatel$/, 'Alcatel'], [/^infinix$/, 'Infinix'], [/^tecno$/, 'Tecno'],
+  [/^honor$/, 'Honor'], [/^vivo$/, 'Vivo'], [/^nubia$/, 'Nubia'], [/^sony$/, 'Sony'],
+];
+function marcaCanon(m) {
+  const crudo = String(m == null ? '' : m).trim().replace(/\s+/g, ' ');
+  if (!crudo) return '';
+  const k = crudo.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, '').trim();
+  for (const [re, nombre] of MARCAS_CANON) if (re.test(k)) return nombre;
+  // Una que no está en la lista: primera letra en mayúscula ("blu" → "Blu"),
+  // sin tocar las que ya vienen con mayúsculas propias ("BLU" queda "BLU")
+  return crudo === crudo.toLowerCase() ? crudo.charAt(0).toUpperCase() + crudo.slice(1) : crudo;
+}
+
 // Escapa los 5 caracteres especiales de HTML.
 // Usar SIEMPRE que se inserte contenido de usuario en innerHTML.
 function esc(s) {

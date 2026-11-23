@@ -2114,7 +2114,7 @@ function _stripUndefined(obj) {
 
 async function saveRepair() {
   if (typeof tpFrenar === 'function' && tpFrenar('reparaciones', 'tomar o editar reparaciones')) return;
-  const marca    = document.getElementById('rep-fi-marca').value.trim();
+  const marca    = (typeof marcaCanon === 'function') ? marcaCanon(document.getElementById('rep-fi-marca').value) : document.getElementById('rep-fi-marca').value.trim();
   const modelo   = document.getElementById('rep-fi-modelo').value.trim();
   // Si quedó texto escrito en "Otro" sin haberle dado Enter, se toma igual:
   // en el mostrador es fácil escribirlo y pasar de largo.

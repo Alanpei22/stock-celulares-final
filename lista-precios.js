@@ -60,7 +60,7 @@ function lpFiltrar(lista, f) {
 }
 
 // Apple primero (es lo que más se busca), después las marcas grandes y el resto
-const LP_MARCAS = ['apple', 'samsung', 'motorola', 'xiaomi'];
+const LP_MARCAS = ['apple', 'iphone', 'samsung', 'motorola', 'xiaomi'];
 function _lpMarcaOrden(m) { const i = LP_MARCAS.indexOf(_eeNorm(m)); return i < 0 ? 99 : i; }
 function _lpCapGB(c) {
   const m = String(c || '').match(/(\d+)\s*(GB|TB)/i);

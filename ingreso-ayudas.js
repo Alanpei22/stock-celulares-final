@@ -90,7 +90,8 @@ function iaMarcas(fuentes, extras) {
     const m = String(f.marca || '').trim().replace(/\s+/g, ' ');
     if (m && m.length <= 30) pares.push([_iaMarcaClave(m), m, 1]);
   });
-  return _iaContar(pares).map(x => x.clave === 'iphone' ? 'iPhone' : x.forma);
+  const canon = m => (typeof marcaCanon === 'function' ? marcaCanon(m) : m);
+  return [...new Set(_iaContar(pares).map(x => x.clave === 'iphone' ? 'iPhone' : canon(x.forma)))];
 }
 
 // Modelos de esa marca. "iPhone 13" y "13" (marca iPhone) son el mismo: la

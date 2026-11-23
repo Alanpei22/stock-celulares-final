@@ -31,7 +31,7 @@ function eeDesdeStock(p) {
   const cap = String(p.almacenamiento || '').trim().replace(/^(\d+)\s*(gb|tb)$/i, (m, n, u) => `${n} ${u.toUpperCase()}`);
   return {
     id: p.id,
-    marca: String(p.marca || '').trim(),
+    marca: (typeof marcaCanon === 'function') ? marcaCanon(p.marca) : String(p.marca || '').trim(),
     modelo: String(p.modelo || '').trim(),
     capacidad: cap,
     color: String(p.color || '').trim(),

@@ -677,7 +677,10 @@ function toggleHdrMenu() {
     { divider: true },
     { icon: '☑️', label: 'Seleccionar varios', sub: 'Editar varios equipos a la vez', onClick: enterBatchMode },
     // Página y estados juntos: el menú no pasa de diez renglones (tests/test-menus.js)
-    sheetGrupo(toggleHdrMenu, 'Página de equipos', '🌐', 'Página de equipos', 'La página, el link y los estados de WhatsApp', [
+    sheetGrupo(toggleHdrMenu, 'Página de equipos', '🌐', 'Página de equipos', 'Publicar o sacar equipos, el link y los estados', [
+      // Alan (23/11): todos los equipos con un interruptor (catalogo-stock.js)
+      { icon: '🔀', label: 'Publicar o sacar equipos', sub: 'Todos los equipos en venta, con un interruptor cada uno',
+        onClick: () => (typeof catPanelAbrir === 'function') && catPanelAbrir() },
       { icon: '🌐', label: 'Ver la página', sub: 'Y copiar el link para Instagram / WhatsApp',
         onClick: () => (typeof catAbrirPagina === 'function') && catAbrirPagina() },
       { icon: '📲', label: 'Estados de WhatsApp', sub: 'Una imagen por equipo publicado, lista para "Mi estado"',
@@ -712,6 +715,9 @@ function toggleHdrMenu() {
         onClick: () => (typeof abrirCostosLista === 'function') && abrirCostosLista('equipo') },
       { icon: '📜', label: 'Movimientos de stock', sub: 'Qué entró y salió: equipos, repuestos y accesorios',
         onClick: () => (typeof abrirMovStock === 'function') && abrirMovStock('equipo') },
+      // Alan (23/11): "iPhone está escrito de varias maneras" (catalogo-stock.js)
+      { icon: '🔤', label: 'Unificar marcas', sub: '"Iphone", "IPHONE" y "Apple" pasan a ser iPhone',
+        onClick: () => (typeof stockUnificarMarcas === 'function') && stockUnificarMarcas() },
       { icon: '💾', label: 'Exportar stock', hide: _soloDueno(), onClick: () => document.getElementById('export-btn')?.click() },
       { icon: '🛟', label: 'Descargar backup', hide: _soloDueno(), onClick: downloadBackup },
     ]),
@@ -1312,7 +1318,7 @@ function _stockFiltrado() {
   const fUbi    = _pendingUbiFilter;
 
   return STOCK.filter(p => {
-    if (fMarca && p.marca !== fMarca) return false;
+    if (fMarca && _mc(p.marca) !== fMarca) return false;   // "Iphone" y "iPhone" son la misma
     if (fEstado && p.estado !== fEstado) return false;
     if (fVend === '0' && p.vendido) return false;
     if (fVend === '1' && !p.vendido) return false;
@@ -1373,6 +1379,8 @@ async function stockEscanearCam() {
   }, { titulo: 'Escaneá la etiqueta o el IMEI del celular' });
 }
 
+const _mc = m => (typeof marcaCanon === 'function' ? marcaCanon(m) : String(m || '').trim());
+
 function render() {
   const q = (document.getElementById('search').value || '').trim().toLowerCase();
   const fMarca = document.getElementById('f-marca').value;
@@ -1385,7 +1393,8 @@ function render() {
   const words = q ? q.split(/\s+/).filter(Boolean) : [];
 
   // Populate marca filter
-  const marcas = [...new Set(STOCK.map(p => p.marca))].sort();
+  // Una opción por marca, aunque esté escrita de varias maneras (marcaCanon)
+  const marcas = [...new Set(STOCK.map(p => _mc(p.marca)).filter(Boolean))].sort();
   const selM = document.getElementById('f-marca');
   const prevM = selM.value;
   while (selM.options.length > 1) selM.remove(1);
@@ -1648,7 +1657,8 @@ async function savePhone() {
     window._precioUSD = null;
   }
 
-  const marca     = document.getElementById('fi-marca').value.trim();
+  // Se guarda con la forma única de la marca ("iphone" → "iPhone")
+  const marca     = _mc(document.getElementById('fi-marca').value.trim());
   const modelo    = document.getElementById('fi-modelo').value.trim();
   const estado    = document.getElementById('fi-estado').value;
   const precio    = parseInt(document.getElementById('fi-precio').value) || 0;

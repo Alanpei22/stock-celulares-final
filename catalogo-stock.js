@@ -316,3 +316,234 @@ async function batchPublicar(publicar) {
     toast('No se pudo actualizar la página', 'error');
   }
 }
+
+// ══════════════════════════════════════════════════════════════
+//  🌐 PANEL: PUBLICAR O SACAR EQUIPOS DE LA PÁGINA
+// ══════════════════════════════════════════════════════════════
+// Alan (23/11): "me hacés algo para los equipos en venta, con respecto a
+// publicarlos o sacarlos de la página". Antes había que abrir cada equipo
+// (o entrar a "Seleccionar varios"). Acá están todos los que están a la
+// venta, cada uno con un interruptor: se toca y listo. Dice qué le falta a
+// cada uno para verse bien (fotos, precio, batería) y deja publicar de una
+// todos los que ya tienen fotos.
+let _cpFiltro = 'todos', _cpQ = '';
+
+function catPanelEquipos(stock) {
+  return (stock || []).filter(p => p && !p.vendido && !p.eliminado && !p.bloqueado);
+}
+// Lo que le falta a un equipo YA cargado para que la ficha se vea bien
+function catFaltaDe(p) {
+  const f = [];
+  if (!(Array.isArray(p.fotos) && p.fotos.length)) f.push('fotos');
+  const usd = p.moneda === 'usd' && Number(p.precioUSD) > 0;
+  if (!p.ocultarPrecio && !(Number(usd ? p.precioUSD : p.precio) > 0)) f.push('precio');
+  if (p.estado && p.estado !== 'Nuevo' && !(Number(p.bateria) > 0)) f.push('batería');
+  return f;
+}
+function _cpNombre(p) {
+  const m = (typeof marcaCanon === 'function') ? marcaCanon(p.marca) : (p.marca || '');
+  const repite = m && String(p.modelo || '').toLowerCase().startsWith(m.toLowerCase());
+  return [repite ? '' : m, p.modelo, p.almacenamiento].filter(Boolean).join(' ') || 'Equipo';
+}
+function _cpPrecio(p) {
+  if (p.ocultarPrecio) return 'Consultar precio';
+  if (p.moneda === 'usd' && Number(p.precioUSD) > 0) return 'U$S ' + Number(p.precioUSD).toLocaleString('es-AR');
+  return Number(p.precio) > 0 ? '$ ' + Number(p.precio).toLocaleString('es-AR') : 'Sin precio';
+}
+
+function catPanelAbrir() {
+  if (typeof tpFrenar === 'function' && tpFrenar('stock', 'publicar equipos')) return;
+  _cpEstilos();
+  let m = document.getElementById('cp-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'cp-modal';
+    m.className = 'cp-fondo';
+    m.setAttribute('role', 'dialog');
+    m.setAttribute('aria-label', 'Equipos en la página');
+    m.addEventListener('click', e => { if (e.target === m) catPanelCerrar(); });
+    document.body.appendChild(m);
+  }
+  _cpQ = '';
+  m.innerHTML = `<div class="cp-hoja">
+    <div class="cp-cab">
+      <div><b>🌐 Equipos en la página</b><small id="cp-resumen"></small></div>
+      <button type="button" class="cp-x" onclick="catPanelCerrar()" aria-label="Cerrar">✕</button>
+    </div>
+    <input id="cp-buscar" class="fi" type="search" placeholder="Buscar: iPhone 13, A54…" autocomplete="off" oninput="_cpQ=this.value;catPanelPintar()">
+    <div class="cp-tabs" id="cp-tabs"></div>
+    <div class="cp-lista" id="cp-lista"></div>
+    <div class="cp-pie" id="cp-pie"></div>
+  </div>`;
+  m.classList.remove('hidden');
+  catPanelPintar();
+}
+function catPanelCerrar() {
+  const m = document.getElementById('cp-modal');
+  if (m) m.classList.add('hidden');
+}
+function catPanelFiltro(f) { _cpFiltro = f; catPanelPintar(); }
+
+function catPanelPintar() {
+  const todos = catPanelEquipos(typeof STOCK !== 'undefined' ? STOCK : []);
+  const en = todos.filter(p => p.publicar), fuera = todos.filter(p => !p.publicar);
+  const res = document.getElementById('cp-resumen');
+  if (res) res.textContent = `${en.length} en la página · ${fuera.length} sin publicar`;
+  const tabs = document.getElementById('cp-tabs');
+  if (tabs) tabs.innerHTML = [['todos', `Todos (${todos.length})`], ['en', `En la página (${en.length})`], ['fuera', `Sin publicar (${fuera.length})`]]
+    .map(([k, t]) => `<button type="button" class="${_cpFiltro === k ? 'on' : ''}" onclick="catPanelFiltro('${k}')">${t}</button>`).join('');
+  let lista = _cpFiltro === 'en' ? en : (_cpFiltro === 'fuera' ? fuera : todos);
+  const q = String(_cpQ || '').toLowerCase().trim();
+  if (q) lista = lista.filter(p => q.split(/\s+/).every(w => (_cpNombre(p) + ' ' + (p.color || '')).toLowerCase().includes(w)));
+  // Publicados arriba; de los que no, primero los que ya están listos (con fotos)
+  lista = lista.slice().sort((a, b) => (!!b.publicar - !!a.publicar) || (catFaltaDe(a).length - catFaltaDe(b).length));
+  const box = document.getElementById('cp-lista');
+  if (box) box.innerHTML = lista.length ? lista.map(p => {
+    const falta = catFaltaDe(p);
+    const foto = Array.isArray(p.fotos) && p.fotos[0];
+    return `<div class="cp-fila${p.publicar ? ' on' : ''}">
+      <button type="button" class="cp-info" onclick="catPanelCerrar();openForm('${esc(p.id)}')" title="Abrir el equipo">
+        ${foto ? `<img src="${esc(foto)}" alt="" loading="lazy">` : '<span class="cp-sinfoto">📱</span>'}
+        <span class="cp-txt"><b>${esc(_cpNombre(p))}</b>
+          <small>${esc(_cpPrecio(p))}${p.estado ? ' · ' + esc(p.estado) : ''}${p.reservado ? ' · 🔒 reservado' : ''}</small>
+          ${falta.length ? `<small class="cp-falta">Falta: ${falta.join(', ')}</small>` : '<small class="cp-ok">✓ Ficha completa</small>'}
+        </span>
+      </button>
+      <label class="cp-sw" title="${p.publicar ? 'Sacar de la página' : 'Publicar en la página'}">
+        <input type="checkbox" ${p.publicar ? 'checked' : ''} onchange="catPanelSwitch('${esc(p.id)}', this.checked, this)">
+        <span aria-hidden="true"></span>
+      </label>
+    </div>`;
+  }).join('') : `<p class="cp-vacio">${q ? 'No hay equipos con esa búsqueda.' : (_cpFiltro === 'en' ? 'No hay equipos en la página todavía.' : 'No hay equipos acá.')}</p>`;
+  const listos = fuera.filter(p => (p.fotos || []).length);
+  const pie = document.getElementById('cp-pie');
+  if (pie) pie.innerHTML = (listos.length ? `<button type="button" class="cp-btn" onclick="catPanelPublicarListos()">🌐 ${listos.length === 1 ? 'Publicar el que ya tiene fotos' : `Publicar los ${listos.length} que ya tienen fotos`}</button>` : '')
+    + `<button type="button" class="cp-btn sec" onclick="catAbrirPagina()">🔗 Ver la página</button>`;
+}
+
+async function catPanelSwitch(id, on, input) {
+  if (typeof tpFrenar === 'function' && tpFrenar('stock', 'publicar equipos')) { if (input) input.checked = !on; return; }
+  const p = (typeof STOCK !== 'undefined' ? STOCK : []).find(x => x.id === id);
+  if (!p) return;
+  const antes = !!p.publicar;
+  p.publicar = !!on;
+  catPanelPintar();
+  try {
+    await db.collection('stock').doc(id).update({ publicar: !!on });
+    const falta = on ? catFaltaDe(p) : [];
+    toast(on ? `🌐 ${_cpNombre(p)} ya está en la página${falta.length ? ' · le falta: ' + falta.join(', ') : ''}` : `🚫 ${_cpNombre(p)} salió de la página`, on && falta.length ? 'info' : 'success');
+    if (typeof render === 'function') render();
+  } catch (e) {
+    console.error('publicar:', e);
+    p.publicar = antes;
+    catPanelPintar();
+    toast('No se pudo cambiar. Revisá la conexión.', 'error');
+  }
+}
+
+async function catPanelPublicarListos() {
+  if (typeof tpFrenar === 'function' && tpFrenar('stock', 'publicar equipos')) return;
+  const listos = catPanelEquipos(typeof STOCK !== 'undefined' ? STOCK : []).filter(p => !p.publicar && (p.fotos || []).length);
+  if (!listos.length) return;
+  if (!confirm(`¿Publicar ${listos.length} equipo${listos.length === 1 ? '' : 's'} en la página?`)) return;
+  try {
+    for (let i = 0; i < listos.length; i += 450) {
+      const b = db.batch();
+      listos.slice(i, i + 450).forEach(p => b.update(db.collection('stock').doc(p.id), { publicar: true }));
+      await b.commit();
+    }
+    listos.forEach(p => { p.publicar = true; });
+    toast(`🌐 ${listos.length} equipo${listos.length === 1 ? '' : 's'} publicado${listos.length === 1 ? '' : 's'}`, 'success');
+    catPanelPintar();
+    if (typeof render === 'function') render();
+  } catch (e) {
+    console.error('publicar listos:', e);
+    toast('No se pudo publicar. Revisá la conexión.', 'error');
+  }
+}
+
+function _cpEstilos() {
+  if (document.getElementById('cp-css')) return;
+  const st = document.createElement('style');
+  st.id = 'cp-css';
+  st.textContent = `
+  .cp-fondo { position: fixed; inset: 0; z-index: 1200; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; }
+  .cp-fondo.hidden { display: none; }
+  .cp-hoja { width: 100%; max-width: 640px; height: 92vh; display: flex; flex-direction: column; gap: 10px; background: var(--card, #fff); color: var(--text, #111);
+    border-radius: 20px 20px 0 0; padding: 16px 16px max(14px, env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgba(0,0,0,.3); }
+  @media (min-width: 700px) { .cp-fondo { align-items: center; } .cp-hoja { border-radius: 20px; height: 86vh; } }
+  .cp-cab { display: flex; gap: 10px; align-items: flex-start; }
+  .cp-cab > div { flex: 1; min-width: 0; }
+  .cp-cab b { display: block; font-size: 19px; }
+  .cp-cab small { color: var(--t2, #666); font-size: 13.5px; }
+  .cp-x { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--bg2, rgba(128,128,128,.12)); color: inherit; font-size: 16px; cursor: pointer; }
+  .cp-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: none; }
+  .cp-tabs button { flex: none; border: 1px solid var(--border, rgba(128,128,128,.3)); background: none; color: inherit; border-radius: 99px; padding: 7px 13px; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .cp-tabs button.on { background: var(--text, #111); color: var(--card, #fff); border-color: var(--text, #111); }
+  .cp-lista { flex: 1; overflow-y: auto; display: grid; align-content: start; gap: 8px; margin: 0 -4px; padding: 0 4px; }
+  .cp-fila { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 14px; border: 1px solid var(--border, rgba(128,128,128,.2)); background: var(--bg2, rgba(128,128,128,.04)); }
+  .cp-fila.on { border-color: var(--grn, #10b981); }
+  .cp-info { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: none; color: inherit; text-align: left; padding: 0; font: inherit; cursor: pointer; }
+  .cp-info img, .cp-sinfoto { flex: none; width: 54px; height: 54px; border-radius: 10px; object-fit: cover; }
+  .cp-sinfoto { display: grid; place-items: center; font-size: 24px; background: var(--border, rgba(128,128,128,.15)); }
+  .cp-txt { min-width: 0; display: flex; flex-direction: column; }
+  .cp-txt b { font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cp-txt small { font-size: 12.5px; color: var(--t2, #666); }
+  .cp-txt small.cp-falta { color: var(--warn, #b45309); font-weight: 600; }
+  .cp-txt small.cp-ok { color: var(--grn, #10b981); font-weight: 600; }
+  .cp-sw { position: relative; flex: none; width: 52px; height: 30px; cursor: pointer; }
+  .cp-sw input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .cp-sw span { position: absolute; inset: 0; border-radius: 99px; background: var(--border, rgba(128,128,128,.4)); transition: background .15s; pointer-events: none; }
+  .cp-sw span::after { content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s; }
+  .cp-sw input:checked + span { background: var(--grn, #10b981); }
+  .cp-sw input:checked + span::after { transform: translateX(22px); }
+  .cp-sw input:focus-visible + span { outline: 2px solid var(--accent, #3b82f6); outline-offset: 2px; }
+  .cp-vacio { text-align: center; color: var(--t2, #666); padding: 30px 10px; }
+  .cp-pie { display: flex; gap: 8px; flex-wrap: wrap; flex: none; }
+  .cp-btn { flex: 1 1 200px; border: 0; border-radius: 12px; padding: 12px; font: inherit; font-weight: 700; background: var(--grn, #10b981); color: #fff; cursor: pointer; }
+  .cp-btn.sec { background: var(--bg2, rgba(128,128,128,.12)); color: inherit; flex: 0 1 auto; }`;
+  document.head.appendChild(st);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  🔤 UNIFICAR MARCAS (los equipos ya cargados)
+// ══════════════════════════════════════════════════════════════
+// marcaCanon (utils.js) ya junta las variantes al mostrar y al guardar. Esto
+// corrige de una vez cómo quedaron escritas en los equipos viejos, así en
+// todos lados (reportes, búsquedas, exportar) dice lo mismo.
+function stockMarcasACorregir(stock) {
+  const cambios = {};
+  (stock || []).forEach(p => {
+    const de = String((p && p.marca) || '');
+    if (!de.trim() || typeof marcaCanon !== 'function') return;
+    const a = marcaCanon(de);
+    if (a === de) return;
+    const k = de + '→' + a;
+    (cambios[k] = cambios[k] || { de, a, ids: [] }).ids.push(p.id);
+  });
+  return Object.values(cambios).sort((x, y) => y.ids.length - x.ids.length);
+}
+
+async function stockUnificarMarcas() {
+  if (typeof tpFrenar === 'function' && tpFrenar('stock', 'corregir marcas')) return;
+  const cambios = stockMarcasACorregir(typeof STOCK !== 'undefined' ? STOCK : []);
+  if (!cambios.length) { toast('✅ Las marcas ya están todas bien escritas', 'success'); return; }
+  const total = cambios.reduce((n, c) => n + c.ids.length, 0);
+  const detalle = cambios.slice(0, 15).map(c => `"${c.de}" (${c.ids.length}) → ${c.a}`).join('\n') + (cambios.length > 15 ? `\n… y ${cambios.length - 15} más` : '');
+  if (!confirm(`Corregir la marca de ${total} equipo${total === 1 ? '' : 's'}:\n\n${detalle}\n\n¿Dale?`)) return;
+  try {
+    const ops = [];
+    cambios.forEach(c => c.ids.forEach(id => ops.push([id, c.a])));
+    for (let i = 0; i < ops.length; i += 450) {
+      const b = db.batch();
+      ops.slice(i, i + 450).forEach(([id, a]) => b.update(db.collection('stock').doc(id), { marca: a }));
+      await b.commit();
+    }
+    ops.forEach(([id, a]) => { const p = STOCK.find(x => x.id === id); if (p) p.marca = a; });
+    toast(`🔤 Listo: ${total} equipo${total === 1 ? '' : 's'} con la marca corregida`, 'success');
+    if (typeof render === 'function') render();
+  } catch (e) {
+    console.error('unificar marcas:', e);
+    toast('No se pudieron corregir. Revisá la conexión.', 'error');
+  }
+}
