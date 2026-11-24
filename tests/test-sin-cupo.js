@@ -54,7 +54,13 @@ ctx.__DB = {
         ESCRITURAS.push([n, id, d]);
       },
       update: async () => {},
-      get: async () => { if (CUPO_AGOTADO) throw err('resource-exhausted'); return { exists: false, data: () => ({}) }; },
+      // Está "en la base" lo que ya se escribió, y la 'viejo' (cargada de antes).
+      // El reintento le pregunta esto al servidor antes de reescribir nada.
+      get: async () => {
+        if (CUPO_AGOTADO) throw err('resource-exhausted');
+        const esta = n === 'repairs' && (id === 'viejo' || ESCRITURAS.some(e => e[0] === 'repairs' && e[1] === id));
+        return { exists: esta, data: () => ({}) };
+      },
     }),
     where: () => ({ limit: () => ({ get: async () => { if (CUPO_AGOTADO) throw err('resource-exhausted'); return { empty: true }; } }) }),
     add: async () => ({ id: 'x' }),
@@ -139,7 +145,7 @@ console.log('\n4) Lo que ya está en la base no se sube dos veces');
 run(`_pendGuardar({ id: 'viejo', nOrden: 7123 })`);
 ESCRITURAS.length = 0;
 await get('_pendReintentar()');
-ok(ESCRITURAS.length === 0, 'la reparación que ya figura en la lista no se reescribe', ESCRITURAS);
+ok(ESCRITURAS.length === 0, 'la reparación que ya está en la base no se reescribe (se le pregunta al servidor, no a la lista)', ESCRITURAS);
 ok(get('_pendLeer()').length === 0, 'y sale de la cola igual');
 
 console.log('\n5) Si la escritura se cuelga, el mostrador sigue');

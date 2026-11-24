@@ -43,7 +43,7 @@ await new Promise(r => setTimeout(r, 5));
 ok(TOASTS.some(t => /NO se pudo anotar/.test(t[1])), 'si falla, avisa fuerte para cargarla a mano');
 
 console.log('\n2) Enganchado al guardar');
-const nuevo = src.slice(src.indexOf('_guardarRepairSinBloquear(newDoc);'), src.indexOf('_guardarRepairSinBloquear(newDoc);') + 500);
+const nuevo = src.slice(src.indexOf('_guardarRepairSinBloquear(newDoc'), src.indexOf('_guardarRepairSinBloquear(newDoc') + 500);
 ok(/if \(sena > 0\) _senaAlIngresoACaja\(newDoc\)/.test(nuevo), 'al ingresar una reparación con seña');
 const edit = src.slice(src.indexOf("await db.collection('repairs').doc(editingRepairId).set"), src.indexOf("await db.collection('repairs').doc(editingRepairId).set") + 800);
 ok(/sena > senaAntes/.test(edit) && /sena: sena - senaAntes/.test(edit), 'al editar, si sube la seña entra solo la diferencia');

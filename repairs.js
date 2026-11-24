@@ -251,12 +251,37 @@ function _pendLeer() {
   try { return JSON.parse(localStorage.getItem(_PEND_KEY) || '[]'); } catch { return []; }
 }
 
-function _pendGuardar(doc) {
+// En la cola, además del doc, van tres datos que NO se suben a Firestore:
+// __tg (el aviso de Telegram, que sale recién cuando la base confirma),
+// __t (cuándo se tomó) y __err (por qué falló el último intento).
+function _pendGuardar(doc, tg) {
   try {
     const lista = _pendLeer().filter(d => d.id !== doc.id);
-    lista.push(doc);
+    lista.push(Object.assign({}, doc, { __tg: tg || '', __t: Date.now() }));
     localStorage.setItem(_PEND_KEY, JSON.stringify(lista));
   } catch { /* si no entra (fotos), queda la cola de Firestore */ }
+}
+function _pendSinMarcas(doc) {
+  const { __tg, __t, __err, ...limpio } = doc || {};
+  return limpio;
+}
+function _pendError(id, e) {
+  try {
+    const lista = _pendLeer();
+    const d = lista.find(x => x.id === id);
+    if (!d) return;
+    d.__err = _pendMotivo(e);
+    localStorage.setItem(_PEND_KEY, JSON.stringify(lista));
+  } catch {}
+}
+// El error de Firebase, en criollo
+function _pendMotivo(e) {
+  const c = String((e && (e.code || e.message)) || e || '');
+  if (/permission/i.test(c)) return 'la base no le dio permiso a esta cuenta';
+  if (/exceed|too large|maximum|invalid-argument/i.test(c)) return 'la orden es demasiado pesada (¿foto muy grande?)';
+  if (/unavailable|offline|network|deadline/i.test(c)) return 'sin conexión con la base';
+  if (/quota|resource-exhausted/i.test(c)) return 'se terminó el cupo gratis de Firebase por hoy';
+  return c.slice(0, 80) || 'error desconocido';
 }
 
 function _pendBorrar(id) {
@@ -269,29 +294,85 @@ function _pendBorrar(id) {
 
 // Escribe la reparación SIN hacer esperar al mostrador: si tarda o falla, la
 // copia local queda y se reintenta al abrir la app.
-function _guardarRepairSinBloquear(doc) {
-  _pendGuardar(doc);
-  db.collection('repairs').doc(doc.id).set(_stripUndefined(doc))
-    .then(() => _pendBorrar(doc.id))
-    .catch(e => console.error('ingreso pendiente de subir:', e));
+// Alan (24/11): "no me aparece la orden 8679, figura en Telegram ingresada
+// pero en la app no". El aviso de Telegram salía al tocar Guardar, ANTES de
+// que la base confirmara; si la orden no llegaba (señal que se corta, la app
+// que se cierra, un rechazo), Telegram decía "ingresado" y la orden quedaba
+// escondida en la cola de ESE celu sin que nadie lo supiera. Ahora:
+//   · Telegram sale cuando la base confirma (`tg`);
+//   · si falla, avisa fuerte en el celu y por Telegram ("NO se guardó");
+//   · mientras haya órdenes sin subir, ese celu muestra un cartel con
+//     "Reintentar" (_pendAviso).
+function _guardarRepairSinBloquear(doc, tg) {
+  _pendGuardar(doc, tg);
+  db.collection('repairs').doc(doc.id).set(_stripUndefined(_pendSinMarcas(doc)))
+    .then(() => {
+      _pendBorrar(doc.id);
+      if (tg && typeof tgNotify === 'function') tgNotify(tg);
+      _pendAviso();
+    })
+    .catch(e => {
+      console.error('ingreso pendiente de subir:', e);
+      const motivo = _pendMotivo(e);
+      _pendError(doc.id, e);
+      _pendAviso();
+      if (typeof toast === 'function') toast(`⚠️ La orden N°${doc.nOrden} NO se guardó en la base (${motivo}). Quedó en este aparato: no lo cierres y tocá "Reintentar".`, 'error');
+      if (typeof tgNotify === 'function') tgNotify(`⚠️ <b>La orden #${doc.nOrden} NO se guardó en la base</b>\n${esc(doc.marca || '')} ${esc(doc.modelo || '')}${doc.nombre ? ' · 👤 ' + esc(doc.nombre) : ''}\nMotivo: ${esc(motivo)}. Quedó en el aparato que la tomó.`);
+    });
+  // Sin señal la promesa no termina nunca: si a los 20 s no subió, que se vea
+  setTimeout(_pendAviso, 20000);
+}
+
+// ── Cartel "órdenes sin subir" (solo en el aparato que las tiene) ──
+function _pendAviso() {
+  if (typeof document === 'undefined') return;
+  const lista = _pendLeer().filter(d => d && (d.__err || !d.__t || Date.now() - d.__t > 15000));
+  let b = document.getElementById('rep-subir-barra');
+  if (!lista.length) { if (b) b.remove(); return; }
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'rep-subir-barra';
+    b.setAttribute('role', 'alert');
+    b.style.cssText = 'position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:1500;'
+      + 'background:#b91c1c;color:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.35);'
+      + 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;max-width:640px;margin:0 auto';
+    document.body.appendChild(b);
+  }
+  const nros = lista.map(d => 'N°' + (d.nOrden || '?')).join(', ');
+  const err = lista.map(d => d.__err).filter(Boolean)[0];
+  b.innerHTML = `<span style="flex:1;min-width:200px"><b>⚠️ ${lista.length === 1 ? 'Una orden no se subió' : lista.length + ' órdenes no se subieron'} a la base: ${esc(nros)}</b><br>
+      <small style="opacity:.9">${err ? 'Motivo: ' + esc(err) + '. ' : 'Puede ser la señal. '}Están guardadas en este aparato: no borres los datos de la app.</small></span>
+    <button type="button" onclick="_pendReintentar(true)" style="border:0;border-radius:10px;padding:10px 14px;background:#fff;color:#b91c1c;font:inherit;font-weight:800;cursor:pointer">Reintentar</button>`;
 }
 
 // Al abrir la app: subir lo que haya quedado colgado de una sesión anterior.
-async function _pendReintentar() {
+async function _pendReintentar(aMano) {
   const lista = _pendLeer();
-  if (!lista.length) return;
+  if (!lista.length) { if (aMano) toast('No hay órdenes pendientes de subir', 'info'); _pendAviso(); return; }
   let subidas = 0;
   for (const doc of lista) {
-    if (REPAIRS.some(r => r.id === doc.id)) { _pendBorrar(doc.id); continue; }
     try {
-      await db.collection('repairs').doc(doc.id).set(_stripUndefined(doc));
+      // ¿Ya está en la base? Se le pregunta AL SERVIDOR: la lista de la app
+      // puede venir del caché de este mismo aparato, que incluye la orden que
+      // nunca subió (antes se la daba por subida con eso y se perdía). Si ya
+      // está, no se la vuelve a escribir: la pisaría con los datos del ingreso
+      // aunque después le hayan cambiado el estado.
+      const ya = await db.collection('repairs').doc(doc.id).get({ source: 'server' });
+      if (ya.exists) { _pendBorrar(doc.id); continue; }
+      await db.collection('repairs').doc(doc.id).set(_stripUndefined(_pendSinMarcas(doc)));
       _pendBorrar(doc.id);
       subidas++;
+      // El aviso de Telegram que no salió en su momento
+      if (doc.__tg && typeof tgNotify === 'function') tgNotify(doc.__tg + '\n⏱️ <i>(se subió más tarde)</i>');
     } catch (e) {
       console.error('reintento de ingreso:', e);
+      _pendError(doc.id, e);
+      _pendAviso();
+      if (aMano) toast(`⚠️ Sigue sin poder subir la N°${doc.nOrden}: ${_pendMotivo(e)}`, 'error');
       return;   // sigue sin poder: se reintenta la próxima vez
     }
   }
+  _pendAviso();
   if (subidas) toast(`✅ ${subidas} ingreso${subidas > 1 ? 's' : ''} que había${subidas > 1 ? 'n' : ''} quedado pendiente${subidas > 1 ? 's' : ''} se subi${subidas > 1 ? 'eron' : 'ó'}`, 'success');
 }
 
@@ -576,6 +657,11 @@ function initRepairs() {
   _hydrateRepairsFromCache(); // pinta la lista al instante desde el cache local
   listenRepairs();
   _pendReintentar();          // ingresos que quedaron sin subir
+  // Y apenas vuelve la señal, sin esperar a que se reabra la app
+  if (typeof window !== 'undefined' && !window._pendOnline) {
+    window._pendOnline = true;
+    window.addEventListener('online', () => _pendReintentar());
+  }
 
   // Cerrar modales con ESC (repairs) — LOW-12: store reference to allow removal
   if (_repEscHandler) document.removeEventListener('keydown', _repEscHandler);
@@ -2304,9 +2390,15 @@ async function saveRepair() {
       if (foto) newDoc.foto = foto;
       // Tag con device para que el cross-device listener no nos notifique a nosotros mismos
       if (typeof getDeviceId === 'function') newDoc._sourceDevice = getDeviceId();
+      // 📨 Aviso Telegram: equipo ingresado. Sale cuando la base CONFIRMA que
+      // la guardó (antes salía al tocar Guardar, aunque no llegara).
+      const tgIngreso = `🔧 <b>Equipo ingresado #${nOrden}</b>\n`
+        + `${esc(marca)} ${esc(modelo)} — ${esc(arreglo)}\n`
+        + `💵 ${typeof tgMonto === 'function' ? tgMonto(monto) : '$' + monto}${sena > 0 ? ` (seña ${typeof tgMonto === 'function' ? tgMonto(sena) : '$' + sena})` : ''}`
+        + `${nombre ? `\n👤 ${esc(nombre)}` : ''} · 🕐 ${typeof tgHora === 'function' ? tgHora() : ''}`;
       // Sin await: el mostrador no espera a Firebase. Si no se puede subir
       // ahora, queda en cola (la de Firestore y la nuestra) y sube sola.
-      _guardarRepairSinBloquear(newDoc);
+      _guardarRepairSinBloquear(newDoc, tgIngreso);
       // La seña es plata que entra HOY: va a la caja como cualquier seña
       // cobrada desde ahí (vinculada a la reparación, así el cobro final
       // descuenta lo ya pagado y si se borra el movimiento se revierte).
@@ -2326,14 +2418,8 @@ async function saveRepair() {
         tecnico,
         extra: { nOrden, marca, modelo, arreglo, monto, nombre }
       });
-      // (No se abre WhatsApp al ingresar: el aviso ya llega por Telegram)
-      // 📨 Aviso Telegram: equipo ingresado
-      if (typeof tgNotify === 'function') {
-        tgNotify(`🔧 <b>Equipo ingresado #${nOrden}</b>\n`
-          + `${esc(marca)} ${esc(modelo)} — ${esc(arreglo)}\n`
-          + `💵 ${tgMonto(monto)}${sena > 0 ? ` (seña ${tgMonto(sena)})` : ''}`
-          + `${nombre ? `\n👤 ${esc(nombre)}` : ''} · 🕐 ${tgHora()}`);
-      }
+      // (No se abre WhatsApp al ingresar: el aviso llega por Telegram cuando
+      // la base confirma; ver _guardarRepairSinBloquear)
       // Aviso a todos los dispositivos del local (llega con la app cerrada)
       if (typeof pushEquipos === 'function') {
         pushEquipos({
