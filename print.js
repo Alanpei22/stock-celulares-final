@@ -755,9 +755,26 @@ function _puedeImprimirAca(tipo) {
   return !_esCelular();
 }
 
+// Una orden recién tomada sale UNA vez: si la impresión automática del mismo
+// ingreso se vuelve a pedir enseguida (Alan, 24/11: "se imprime etiqueta y
+// hoja por duplicado"), la segunda no sale. Para reimprimir están los
+// botones de la barra y de la ficha, que no pasan por acá.
+const _INGRESO_YA_MS = 2 * 60 * 1000;
+const _ingresoImpreso = {};
+function _ingresoYaImpreso(rep, tipo) {
+  const k = (rep && (rep.id || rep.nOrden)) + ':' + tipo, ahora = Date.now();
+  if (_ingresoImpreso[k] && ahora - _ingresoImpreso[k] < _INGRESO_YA_MS) {
+    console.warn('impresión de ingreso repetida, no sale de nuevo:', k);
+    return true;
+  }
+  _ingresoImpreso[k] = ahora;
+  return false;
+}
+
 // Devuelven qué quedó SIN imprimir, para que quien llama lo anote.
 async function imprimirIngresoReparacion(rep) {
   if (!rep) return {};
+  if (_ingresoYaImpreso(rep, 'ingreso')) return {};
   if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);
   const pend = {};
   const hoja = _puedeImprimirAca('hoja') ? _buildA5(rep) : (pend.hoja = true, null);
@@ -782,6 +799,7 @@ async function imprimirIngresoReparacion(rep) {
 // la base y Chrome bloquea una ventana nueva.
 async function imprimirEtiquetaIngreso(rep) {
   if (!rep) return {};
+  if (_ingresoYaImpreso(rep, 'etiqueta-gremio')) return {};
   if (!_puedeImprimirAca('etiqueta')) return { etiqueta: true };
   const etq = _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep');
   if (!(await _imprimirDirecto('etiqueta', etq))) await _imprimirEnIframe(etq);

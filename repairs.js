@@ -2198,8 +2198,18 @@ function _stripUndefined(obj) {
   return obj;
 }
 
+// Alan (24/11): "cuando tomo un equipo se me imprime etiqueta y hoja A5 por
+// duplicado". Si el guardado se dispara dos veces seguidas (doble toque, el
+// Enter del último paso más el botón), cada uno guardaba e imprimía. Ahora
+// mientras uno está guardando, el otro no hace nada.
+let _repGuardando = false;
 async function saveRepair() {
   if (typeof tpFrenar === 'function' && tpFrenar('reparaciones', 'tomar o editar reparaciones')) return;
+  if (_repGuardando) { console.warn('saveRepair: ya se estaba guardando, se ignora el segundo toque'); return; }
+  _repGuardando = true;
+  try { return await _saveRepairAhora(); } finally { _repGuardando = false; }
+}
+async function _saveRepairAhora() {
   const marca    = (typeof marcaCanon === 'function') ? marcaCanon(document.getElementById('rep-fi-marca').value) : document.getElementById('rep-fi-marca').value.trim();
   const modelo   = document.getElementById('rep-fi-modelo').value.trim();
   // Si quedó texto escrito en "Otro" sin haberle dado Enter, se toma igual:

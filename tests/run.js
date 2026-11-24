@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-ingreso-una-vez.js': '🖨️ Un ingreso imprime una etiqueta y una hoja: el segundo toque de Guardar no vuelve a guardar y la impresión automática de la misma orden no sale dos veces',
   'test-orden-perdida.js': '⚠️ Una orden que no llega a la base no queda escondida: Telegram avisa recién cuando se guardó (o que NO se guardó), cartel con Reintentar y no se pierde por el caché',
   'test-marcas.js': '🔤 Una sola forma por marca (Iphone/IPHONE/Apple → iPhone) en filtros, guardado y página; 🔀 panel para publicar o sacar equipos con un interruptor',
   'test-accesorios.js': '🛍️ /accesorios: solo publicados, precio y "hay / últimas unidades" (nada de costo ni stock exacto), búsqueda por modelo y fotos desde el inventario',
