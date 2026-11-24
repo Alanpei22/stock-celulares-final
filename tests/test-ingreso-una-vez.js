@@ -1,7 +1,8 @@
 // 🖨️ Un ingreso imprime UNA etiqueta y UNA hoja. Alan (24/11): "cuando tomo
 // un equipo de reparación se me imprime etiqueta y hoja A5 por duplicado".
-// Se prueba que un segundo guardado mientras corre el primero no hace nada, y
-// que la impresión automática de la misma orden no sale dos veces seguidas.
+// Se prueba que un segundo guardado mientras corre el primero no hace nada,
+// que la impresión automática de la misma orden no sale dos veces seguidas, y
+// la causa real: dos ventanas de la compu de la caja tomando el mismo pedido.
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const DIR = path.join(__dirname, '..') + '/';
 let fails = 0;
@@ -40,6 +41,38 @@ const leer = f => fs.readFileSync(DIR + f, 'utf8');
   await p.imprimirEtiquetaIngreso({ id: 'z', nOrden: 8702 }); await p.imprimirEtiquetaIngreso({ id: 'z', nOrden: 8702 });
   ok(SALIDAS.filter(s => s === 'etq-8702').length === 1, 'lo mismo con la etiqueta de gremio');
   ok(/function reimprimirBoleta[\s\S]{0,200}printRepair\('A5'\)/.test(rep), 'reimprimir a mano (la barra, la ficha) no pasa por esta traba');
+
+  console.log('\n3) Dos ventanas de la compu de la caja: el pedido del celu sale una vez');
+  // La causa real (24/11): la compu que imprime lo de los celus tenía la app
+  // abierta en dos ventanas; las dos tomaban el mismo pedido. Firestore repite
+  // la transacción de la que perdió, y esa repetición imprimía igual.
+  const qz = leer('qz-print.js');
+  const ini = qz.indexOf('async function qzServidorImprimir');
+  const fin = qz.indexOf('\n}\n', ini) + 3;
+  const IMPRESOS = [];
+  const pedido = { estado: 'pendiente', tipo: 'etiqueta', creado: Date.now(), pag: {}, pngs: ['png'], altos: [30] };
+  let version = 0;
+  const tick = () => new Promise(r => setTimeout(r, 1));
+  const q = { console, Date, Number, String, Error, Object, Promise, QZ_REMOTA_VENCE_MIN: 30,
+    qzImpresoras: () => ({ etiqueta: 'XPrinter' }),
+    _qzMandarPngs: async () => { IMPRESOS.push(1); },
+    db: { runTransaction: async fn => {
+      // Como Firestore: si otro guardó entre que leí y que guardo, repite la función
+      for (let intento = 0; intento < 5; intento++) {
+        const v0 = version; let cambio = null;
+        await fn({ get: async () => { const copia = { ...pedido }; await tick(); return { exists: true, data: () => copia }; },
+                   update: (r, d) => { cambio = d; } });
+        if (version !== v0) continue;
+        if (cambio) { Object.assign(pedido, cambio); version++; }
+        return;
+      }
+    } } };
+  vm.createContext(q);
+  vm.runInContext(qz.slice(ini, fin), q, { filename: 'qz-print.js' });
+  const ref = { delete: async () => {}, update: async () => {} };
+  await Promise.all([q.qzServidorImprimir(ref), q.qzServidorImprimir(ref)]);
+  ok(IMPRESOS.length === 1, 'las dos ventanas lo intentan a la vez y sale UNA sola etiqueta', IMPRESOS.length);
+  ok(/runTransaction\(async t => \{\s*job = null;/.test(qz), 'cada intento de la transacción arranca de cero');
 
   console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
   process.exit(fails ? 1 : 0);

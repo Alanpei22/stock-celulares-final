@@ -511,9 +511,19 @@ function qzServidorIniciar() {
   }, e => { console.error('cola de impresión:', e); _qzServUnsub = null; });
 }
 async function qzServidorImprimir(ref) {
-  // Se lo "toma" en una transacción: si hubiera dos compus de caja, no sale dos veces
+  // Se lo "toma" en una transacción: si hubiera dos compus de caja (o la app
+  // abierta en dos ventanas de la misma compu), no sale dos veces.
+  //
+  // Alan (24/11): "cuando tomo un equipo desde los celus se imprime etiqueta y
+  // hoja por duplicado, con el mismo número". Firestore REPITE la función de la
+  // transacción cuando otra ventana tomó el pedido al mismo tiempo. `job` se
+  // llenaba en el primer intento y, en la repetición (que ya ve el pedido
+  // tomado y sale antes), quedaba lleno con lo viejo: las DOS ventanas lo
+  // imprimían. Ahora cada intento arranca de cero, y lo que vale es lo que
+  // decidió el intento que se guardó.
   let job = null;
   await db.runTransaction(async t => {
+    job = null;
     const d = await t.get(ref);
     if (!d.exists || d.data().estado !== 'pendiente') return;
     job = d.data();
