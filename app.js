@@ -733,8 +733,13 @@ function toggleRepMenu() {
     { icon: '🔒', label: 'Modo dueño', hide: _soloDueno(), onClick: toggleOwnerLock },
     { divider: true },
     { icon: '🔬', label: 'Diagnóstico de placa', sub: 'Mediciones, pasos y base de conocimiento', onClick: () => location.href = 'placas.html' },
-    { icon: '👥', label: 'Personal técnico', onClick: () => (typeof openPersonalModal === 'function') && openPersonalModal() },
     { icon: '📊', label: 'Estadísticas', hide: !_puede('reporte'), onClick: () => document.getElementById('rep-stats-btn')?.click() },
+    // 📲 Alan (24/11): los accesos directos estaban solo en el menú de Inicio,
+    // que los empleados no ven (entran directo a Equipos / Reparaciones). Acá
+    // los ven todos. Para no pasar de diez renglones (tests/test-menus.js),
+    // "Personal técnico", que se usa poco, pasó adentro de Mantenimiento.
+    { icon: '📲', label: 'Accesos directos en el celu', sub: 'Íconos para Caja, Nueva reparación, Equipo listo y Escanear venta',
+      onClick: () => { location.href = 'atajos.html'; } },
     { icon: '📋', label: 'Actividad reciente', onClick: () => (typeof openActivityFeed === 'function') && openActivityFeed() },
     // Alan (10/11): cargar fácil los costos de las reparaciones, las de antes
     // y las que vengan (costos-lista.js). Solo el dueño, como el resto de los costos.
@@ -746,7 +751,8 @@ function toggleRepMenu() {
         sub: (typeof waAppActiva === 'function' && waAppActiva()) ? '✅ Activado en esta PC · tocá para volver a wa.me' : 'Sin la página intermedia (necesita WhatsApp instalado)',
         onClick: () => (typeof toggleWaApp === 'function') && toggleWaApp() },
     ]),
-    sheetGrupo(toggleRepMenu, 'Mantenimiento', '⚙️', 'Mantenimiento', 'Cruce con la caja, contador de órdenes, fichas', [
+    sheetGrupo(toggleRepMenu, 'Mantenimiento', '⚙️', 'Mantenimiento', 'Personal técnico, cruce con la caja, contador, fichas', [
+      { icon: '👥', label: 'Personal técnico', onClick: () => (typeof openPersonalModal === 'function') && openPersonalModal() },
       { icon: '🔀', label: 'Cruzar con la caja', sub: 'Cobradas que no figuran entregadas',
         onClick: () => (typeof cruceAbrir === 'function') && cruceAbrir() },
       { icon: '🔢', label: 'Próximo N° de orden', sub: 'Corregir el contador de órdenes', hide: _soloDueno(),

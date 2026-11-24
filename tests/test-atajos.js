@@ -85,6 +85,10 @@ vm.runInContext('requireAuth()', actx).then(() => {
   vm.runInContext(m[0], lctx);
   ok(vm.runInContext('destino()', lctx) === 'index.html?action=nueva-reparacion', 'y el login lo devuelve a la toma de reparación');
   ok(/'atajos\.html'/.test(leer('app.js')), 'en la app: Inicio → ⋯ → "Accesos directos en el celu"');
+  // Alan (24/11): también para los empleados, que no ven el menú de Inicio
+  const repMenu = leer('app.js').slice(leer('app.js').indexOf("openSheet('Reparaciones', ["), leer('app.js').indexOf('function closeRepMenu'));
+  ok(/label: 'Accesos directos en el celu'[\s\S]{0,200}atajos\.html/.test(repMenu) && !/label: 'Accesos directos en el celu', sub: [^\n]*hide:/.test(repMenu),
+     'y en Reparaciones → ⋯, sin esconderlo a los empleados');
 
   console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
   process.exit(fails ? 1 : 0);
