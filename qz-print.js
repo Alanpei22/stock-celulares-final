@@ -495,7 +495,39 @@ function _qzSeguirPedido(ref) {
 // ── La compu de la CAJA: imprime lo que llega ──
 let _qzServUnsub = null;
 let _qzServCola = Promise.resolve();
+// ── Una sola ventana por compu atiende la cola ──
+// Alan (25/11): "se siguen imprimiendo dos veces si tengo dos ventanas de la
+// app abiertas". Cada ventana de la compu de la caja escuchaba la cola y
+// competía por cada pedido; la transacción de qzServidorImprimir tenía que
+// decidir quién lo imprimía, y si una de las ventanas tenía la versión vieja
+// (abierta desde antes del arreglo) imprimía igual. Ahora las ventanas de la
+// misma compu se ponen de acuerdo con un "candado" del navegador: atiende la
+// primera, las otras esperan sin escuchar, y si esa se cierra, toma la posta
+// la siguiente (con lo que haya quedado pendiente).
+let _qzServEsperando = false;   // esta ventana está en la fila del candado
+let _qzServSoltar = null;       // esta ventana tiene el candado: soltarlo
+const QZ_SERV_CANDADO = 'tp-cola-impresion';
+function _qzHayCandados() {
+  return typeof navigator !== 'undefined' && !!(navigator.locks && navigator.locks.request);
+}
 function qzServidorIniciar() {
+  if (_qzServUnsub || _qzServEsperando || !qzEsServidor() || typeof db === 'undefined' || !db) return;
+  // Sin candados (navegador viejo) o si esta ventana ya lo tiene: a escuchar
+  if (!_qzHayCandados() || _qzServSoltar) { _qzServEscuchar(); return; }
+  _qzServEsperando = true;
+  navigator.locks.request(QZ_SERV_CANDADO, () => new Promise(soltar => {
+    _qzServEsperando = false;
+    _qzServSoltar = soltar;
+    // Mientras esperaba, pudo apagarse "esta compu imprime lo de los demás"
+    if (!qzEsServidor()) { _qzServSoltar = null; soltar(); return; }
+    _qzServEscuchar();
+  })).catch(e => {
+    console.error('candado de la cola de impresión:', e);
+    _qzServEsperando = false;
+    _qzServEscuchar();
+  });
+}
+function _qzServEscuchar() {
   if (_qzServUnsub || !qzEsServidor() || typeof db === 'undefined' || !db) return;
   // Cada vez que la caja abre la app vuelve a avisar qué imprime y en qué
   // sentido van las etiquetas. Antes solo se avisaba al pasar por la
@@ -510,7 +542,18 @@ function qzServidorIniciar() {
     });
   }, e => { console.error('cola de impresión:', e); _qzServUnsub = null; });
 }
+// Los pedidos que esta compu ya tomó (las ventanas comparten localStorage):
+// segunda red por si dos ventanas llegaran a escuchar a la vez.
+const _QZ_HECHOS_KEY = 'qzColaHechos';
+function _qzHechos() {
+  try { const l = JSON.parse(localStorage.getItem(_QZ_HECHOS_KEY) || '[]'); return Array.isArray(l) ? l : []; } catch { return []; }
+}
+function _qzMarcarHecho(id) {
+  if (!id) return;
+  try { localStorage.setItem(_QZ_HECHOS_KEY, JSON.stringify(_qzHechos().filter(x => x !== id).concat([id]).slice(-200))); } catch {}
+}
 async function qzServidorImprimir(ref) {
+  if (ref && ref.id && _qzHechos().includes(ref.id)) return;   // ya lo tomó otra ventana de esta compu
   // Se lo "toma" en una transacción: si hubiera dos compus de caja (o la app
   // abierta en dos ventanas de la misma compu), no sale dos veces.
   //
@@ -532,6 +575,11 @@ async function qzServidorImprimir(ref) {
     if (viejo) job = null;
   });
   if (!job) return;
+  // Lo tomó esta ventana: que ninguna otra de esta compu lo vuelva a imprimir
+  if (ref && ref.id) {
+    if (_qzHechos().includes(ref.id)) return;
+    _qzMarcarHecho(ref.id);
+  }
   const impresora = qzImpresoras()[job.tipo];
   try {
     if (!impresora) throw new Error('esta compu no tiene impresora para ' + job.tipo);
@@ -573,7 +621,10 @@ async function qzServidorConfigurar(activar) {
     return;
   }
   if (activar) qzServidorIniciar();
-  else if (_qzServUnsub) { _qzServUnsub(); _qzServUnsub = null; }
+  else {
+    if (_qzServUnsub) { _qzServUnsub(); _qzServUnsub = null; }
+    if (_qzServSoltar) { const soltarCandado = _qzServSoltar; _qzServSoltar = null; soltarCandado(); }
+  }
   if (typeof toast === 'function') toast(activar ? `🖨️ Listo: ${nombre} imprime lo que manden los otros equipos` : '🖨️ Esta compu ya no imprime lo de los demás', 'success');
 }
 

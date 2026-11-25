@@ -74,6 +74,62 @@ const leer = f => fs.readFileSync(DIR + f, 'utf8');
   ok(IMPRESOS.length === 1, 'las dos ventanas lo intentan a la vez y sale UNA sola etiqueta', IMPRESOS.length);
   ok(/runTransaction\(async t => \{\s*job = null;/.test(qz), 'cada intento de la transacción arranca de cero');
 
+  console.log('\n4) Alan (25/11): "se siguen imprimiendo dos veces si tengo dos ventanas" (las etiquetas)');
+  // La etiqueta del celu va por la cola a la compu (la hoja queda en la barra
+  // para imprimir a mano): por eso se repetía la etiqueta. Ahora atiende la
+  // cola UNA sola ventana por compu.
+  const candados = {};   // como navigator.locks: el primero lo tiene, el resto espera
+  const locks = { request: (nombre, fn) => new Promise((ok2, mal) => {
+    const c = candados[nombre] = candados[nombre] || { tomado: false, fila: [] };
+    const correr = () => { c.tomado = true; Promise.resolve(fn()).then(v => { c.tomado = false; ok2(v); const sig = c.fila.shift(); if (sig) sig(); }, mal); };
+    if (c.tomado) c.fila.push(correr); else correr();
+  }) };
+  const LS = { qzServidor: '1' };
+  const ventana = nombre => {
+    const w = { nombre, escuchas: 0, IMPR: [] };
+    const cx = { console, Date, Number, String, Error, Object, Promise, JSON, Array, Math, setTimeout, clearTimeout,
+      navigator: { locks },
+      localStorage: { getItem: k => (k in LS ? LS[k] : null), setItem: (k, v) => { LS[k] = String(v); }, removeItem: k => { delete LS[k]; } },
+      toast: () => {},
+      db: { collection: () => ({ where: () => ({ onSnapshot: () => { w.escuchas++; return () => { w.escuchas--; }; } }),
+                                 doc: () => ({ set: async () => {} }) }) } };
+    vm.createContext(cx);
+    vm.runInContext(qz, cx, { filename: 'qz-print.js' });
+    w.cx = cx;
+    return w;
+  };
+  const A = ventana('A'), B = ventana('B');
+  ok(vm.runInContext('qzEsServidor()', A.cx) === true, '(las dos ventanas son "la compu que imprime")');
+  vm.runInContext('qzServidorIniciar()', A.cx);
+  vm.runInContext('qzServidorIniciar()', B.cx);
+  await tick(); await tick();
+  ok(A.escuchas === 1 && B.escuchas === 0, 'con dos ventanas abiertas, solo UNA escucha la cola', [A.escuchas, B.escuchas]);
+  vm.runInContext('qzServidorIniciar()', B.cx);
+  await tick();
+  ok(B.escuchas === 0, 'la otra queda esperando (aunque se vuelva a pedir)');
+  // Se apaga en la primera (o se cierra): toma la posta la segunda
+  vm.runInContext('localStorage.setItem("qzServidor","0"); qzServidorConfigurar(false)', A.cx);
+  LS.qzServidor = '1';
+  await tick(); await tick(); await tick();
+  ok(A.escuchas === 0 && B.escuchas === 1, 'si la primera deja de atender, la segunda toma la posta', [A.escuchas, B.escuchas]);
+
+  // Segunda red: el mismo pedido, ya tomado por otra ventana de esta compu, no sale
+  const IMP2 = [];
+  const LS2 = {};
+  const q2 = { console, Date, Number, String, Error, Object, Promise, JSON, Array, QZ_REMOTA_VENCE_MIN: 30,
+    localStorage: { getItem: k => (k in LS2 ? LS2[k] : null), setItem: (k, v) => { LS2[k] = String(v); } },
+    qzImpresoras: () => ({ etiqueta: 'XPrinter' }),
+    _qzMandarPngs: async () => { IMP2.push(1); },
+    // Una base que (mal) deja tomar el pedido a las dos
+    db: { runTransaction: async fn => fn({ get: async () => ({ exists: true, data: () => ({ estado: 'pendiente', tipo: 'etiqueta', creado: Date.now() }) }), update() {} }) } };
+  vm.createContext(q2);
+  const ini2 = qz.indexOf("const _QZ_HECHOS_KEY"), fin2 = qz.indexOf('\n}\n', qz.indexOf('async function qzServidorImprimir')) + 3;
+  vm.runInContext(qz.slice(ini2, fin2), q2, { filename: 'qz-print.js' });
+  const ref2 = { id: 'job1', delete: async () => {}, update: async () => {} };
+  await q2.qzServidorImprimir(ref2);
+  await q2.qzServidorImprimir(ref2);
+  ok(IMP2.length === 1, 'aunque la base dejara pasar a las dos, el pedido ya tomado en esta compu no sale otra vez', IMP2.length);
+
   console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
   process.exit(fails ? 1 : 0);
 })();
