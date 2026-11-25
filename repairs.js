@@ -3119,6 +3119,18 @@ function _saldoACobrar(r) {
   return Math.max(0, (Number(r?.monto) || 0) - (Number(r?.sena) || 0));
 }
 
+// Entró sin precio: el cartel de cobro lo pide (y queda en la orden). Antes
+// cobraba $0: la marcaba cobrada sin entrar nada a la caja.
+function _cobroSinPrecio(r) { return !!r && !(Number(r.monto) > 0); }
+function _cobroPrecioEscrito() {
+  return Math.max(0, Math.round(parseFloat(document.getElementById('cobro-precio')?.value) || 0));
+}
+// Lo que se cobra ahora de la reparación: el saldo, o (sin precio) lo
+// escrito menos la seña
+function _cobroSaldo(r) {
+  return _cobroSinPrecio(r) ? Math.max(0, _cobroPrecioEscrito() - (Number(r.sena) || 0)) : _saldoACobrar(r);
+}
+
 function openCobroModal(r) {
   if (typeof tarjetaCargar === 'function') tarjetaCargar();   // 💳 comisión de Getnet al día (1 lectura por sesión)
   // Siempre la versión más nueva: la seña o el cobro pueden haber entrado
@@ -3133,10 +3145,20 @@ function openCobroModal(r) {
   // hubiera seña, y se registraba el total: la seña entraba dos veces a la caja.
   document.getElementById('cobro-monto-label').textContent = '$ ' + _saldoACobrar(r).toLocaleString('es-AR');
   document.getElementById('cobro-desc-label').textContent  = `N°${r.nOrden || '?'} — ${r.marca} ${r.modelo}`;
+  const precioBox = document.getElementById('cobro-precio-box');
+  if (precioBox) {
+    precioBox.style.display = _cobroSinPrecio(r) ? '' : 'none';
+    const inp = document.getElementById('cobro-precio');
+    if (inp) inp.value = '';
+    if (_cobroSinPrecio(r)) setTimeout(() => inp?.focus(), 150);
+  }
   // Mostrar seña si existe
   const senaEl = document.getElementById('cobro-sena-info');
   if (senaEl) {
-    if (sena > 0) {
+    if (sena > 0 && _cobroSinPrecio(r)) {
+      senaEl.innerHTML = `Seña ya cobrada: <b>$${sena.toLocaleString('es-AR')}</b> &nbsp;·&nbsp; se cobra el precio menos la seña`;
+      senaEl.style.display = '';
+    } else if (sena > 0) {
       const saldo = monto - sena;
       senaEl.innerHTML = `Total $${monto.toLocaleString('es-AR')} &nbsp;·&nbsp; Seña ya cobrada: <b>$${sena.toLocaleString('es-AR')}</b> &nbsp;·&nbsp; Se cobra el saldo: <b>$${Math.max(0, saldo).toLocaleString('es-AR')}</b>`;
       senaEl.style.display = '';
@@ -3159,7 +3181,7 @@ function openCobroModal(r) {
 // Lo que se cobra ahora = el saldo de la reparación + lo que se lleve. El
 // número grande del cartel tiene que decir lo que el cliente va a pagar.
 function _cobroTotal() {
-  const saldo = _cobroRepair ? _saldoACobrar(_cobroRepair) : 0;
+  const saldo = _cobroRepair ? _cobroSaldo(_cobroRepair) : 0;
   return saldo + ((typeof vaTotal === 'function') ? vaTotal() : 0);
 }
 
@@ -3193,6 +3215,15 @@ async function confirmarCobro() {
   if (arts.length && typeof vaSinPrecio === 'function' && vaSinPrecio()) {
     toast('Hay un artículo sin precio', 'error'); return;
   }
+  // Sin precio en la orden: el de la casilla (se lee antes de cerrar). En 0
+  // solo si de verdad no se cobra (garantía, sin cargo).
+  const sinPrecio = _cobroSinPrecio(r);
+  const precioNuevo = sinPrecio ? _cobroPrecioEscrito() : 0;
+  if (sinPrecio && !(precioNuevo > 0) && !r.cobrado
+      && !confirm('Esta orden no tiene precio.\n\n¿Se entrega SIN COBRAR (garantía, sin cargo)?\n\nSi se cobra, tocá Cancelar y escribí cuánto.')) {
+    document.getElementById('cobro-precio')?.focus();
+    return;
+  }
   closeCobroModal();
   if (r.cobrado) { toast('Ya estaba cobrada: no se registró de nuevo', 'error'); return; }
   try {
@@ -3201,7 +3232,7 @@ async function confirmarCobro() {
     const ahora  = new Date().toISOString();
     // Se cobra el SALDO: la seña ya entró a la caja cuando se cobró. Si además
     // se lleva algo, entra todo junto en el mismo movimiento.
-    const repAmt = _saldoACobrar(r);
+    const repAmt = sinPrecio ? Math.max(0, precioNuevo - (Number(r.sena) || 0)) : _saldoACobrar(r);
     const monto  = repAmt + artTotal;
     // El costo escrito a mano o, si no hay, el del repuesto que se descontó
     const costo  = (typeof repCostoEfectivo === 'function') ? repCostoEfectivo(r) : (Number(r.costo) || 0);
@@ -3258,15 +3289,15 @@ async function confirmarCobro() {
     }
 
     // ── Marcar reparación como cobrada ────────────────────
+    // Si entró sin precio, el que se puso al cobrar queda en la orden: las
+    // estadísticas (recaudado, ganancia) salen de ahí.
     const repRef = db.collection('repairs').doc(r.id);
-    batch.update(repRef, {
-      cobrado: true,
-      metodoCobro: metodo,
-      fechaCobro: ahora
-    });
+    const repUpd = { cobrado: true, metodoCobro: metodo, fechaCobro: ahora };
+    if (sinPrecio && precioNuevo > 0) { repUpd.monto = precioNuevo; repUpd.montoDesdeCobro = true; }
+    batch.update(repRef, repUpd);
 
     await batch.commit();
-    _repPatchLocal(r.id, { cobrado: true, metodoCobro: metodo, fechaCobro: ahora });
+    _repPatchLocal(r.id, repUpd);
 
     // El stock se descuenta después del commit, igual que en la caja: si
     // fallara, el cobro ya quedó registrado y eso es lo que no se puede perder.

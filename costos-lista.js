@@ -16,6 +16,12 @@
 //                  y lo que haga falta). Si ya estaba cobrada, también se
 //                  corrige la ganancia de ese cobro en la caja.
 // Solo el dueño: el costo no lo ven los empleados.
+//
+// Reparaciones sin PRECIO (Alan, 25/11: "a veces cuando entra no se pone el
+// precio, pero sí cuando se cobra"): esas filas traen también un casillero de
+// precio, y el botón "Traer precios de la caja" los completa con lo que se
+// cobró de cada una (seña + cobro). Sin precio, las estadísticas las contaban
+// $0. De entrada se ven solo las que les falta algo.
 
 // Las reparaciones: de la más nueva a la más vieja (no por nombre), sin las
 // que no se hicieron
@@ -34,7 +40,10 @@ const _COSTOS_CFG = {
     costo: r => Math.round((typeof repCostoEfectivo === 'function' ? repCostoEfectivo(r) : Number(r.costo)) || 0),
     // "Sin repuesto" (solo mano de obra) ya tiene su costo: 0
     falta: r => !(Number(r.costo) > 0 || Number(r.costoRepuesto) > 0 || r.sinRepuesto),
+    // Sin precio: entró sin precio y nadie se lo puso (ni al cobrar)
+    faltaPrecio: r => !(Number(r.monto) > 0),
     historial: true,
+    soloFaltanDeEntrada: true,
   },
   equipo: {
     titulo: '📱 Costos de equipos',
@@ -93,7 +102,14 @@ function abrirCostosLista(tipo) {
   if (!lista.length) { toast('No hay nada en la lista que estás viendo', 'error'); return; }
   _costosTipo = tipo;
   const falta = x => (cfg.falta ? cfg.falta(x) : !cfg.costo(x));
+  const faltaPrecio = x => !!(cfg.faltaPrecio && cfg.faltaPrecio(x));
   const faltan = lista.filter(falta).length;
+  const sinPrecio = lista.filter(faltaPrecio).length;
+  // Las cobradas o entregadas sin precio: a esas se les puede buscar lo que
+  // se cobró en la caja
+  const sinPrecioCobradas = lista.filter(x => faltaPrecio(x) && (x.cobrado || x.estado === 'entregado')).length;
+  // De entrada solo las que les falta algo (si no falta nada, se ven todas)
+  const soloDeEntrada = !!cfg.soloFaltanDeEntrada && (faltan + sinPrecio) > 0;
 
   document.getElementById('costos-lista-modal')?.remove();
   const m = document.createElement('div');
@@ -102,7 +118,7 @@ function abrirCostosLista(tipo) {
   m.innerHTML = `
   <div class="modal-card form-card">
     <div class="modal-header">
-      <h3>${cfg.titulo} <small style="font-weight:500;color:var(--t3)">${lista.length} · ${faltan} sin costo</small></h3>
+      <h3>${cfg.titulo} <small style="font-weight:500;color:var(--t3)">${lista.length} · ${faltan} sin costo${cfg.faltaPrecio ? ` · ${sinPrecio} sin precio` : ''}</small></h3>
       <button class="modal-close" onclick="cerrarCostosLista()">✕</button>
     </div>
     <div style="padding:8px 16px 0;font-size:12px;color:var(--t3)">
@@ -112,8 +128,11 @@ function abrirCostosLista(tipo) {
              ? `<button type="button" class="btn-secondary" style="min-height:0;padding:4px 10px;font-size:12px;margin-left:6px" onclick="_costosTraerTodas()">🗂️ Traer también las viejas</button>` : ''}`
         : 'Costo en pesos. Enter pasa al siguiente. Son los de la lista que estabas viendo (con tus filtros).'}
       <label style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;cursor:pointer">
-        <input type="checkbox" id="costos-solo-faltan" onchange="_costosSoloFaltan(this.checked)"> solo sin costo
+        <input type="checkbox" id="costos-solo-faltan" onchange="_costosSoloFaltan(this.checked)"${soloDeEntrada ? ' checked' : ''}> ${cfg.faltaPrecio ? 'solo las que les falta algo' : 'solo sin costo'}
       </label>
+      ${sinPrecioCobradas ? `<button type="button" class="btn-secondary" style="min-height:0;padding:4px 10px;font-size:12px;margin-left:6px"
+              onclick="_costosPreciosCaja()">💰 Traer precios de la caja (${sinPrecioCobradas})</button>
+      <span id="costos-precios-res" style="font-size:12px;margin-left:6px"></span>` : ''}
       <button type="button" class="btn-secondary" style="min-height:0;padding:4px 10px;font-size:12px;margin-left:6px"
               onclick="_costosPegarToggle()">📋 Pegar lista</button>
       <div id="costos-pegar" class="hidden" style="margin-top:8px">
@@ -127,17 +146,22 @@ function abrirCostosLista(tipo) {
     </div>
     <div class="modal-body" style="max-height:62vh;overflow:auto;gap:0">
       ${lista.map(x => {
-        const val = cfg.costo(x), venta = cfg.venta(x);
-        return `<div class="costos-fila" data-falta="${falta(x) ? '1' : '0'}" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+        const val = cfg.costo(x), venta = cfg.venta(x), sinP = faltaPrecio(x);
+        return `<div class="costos-fila" data-falta="${falta(x) || sinP ? '1' : '0'}" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
           <div style="flex:1;min-width:0">
             <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(cfg.nombre(x) || '(sin nombre)')}</div>
             <div style="font-size:12px;color:var(--t3)">${esc(cfg.sub(x))}</div>
-            ${venta ? `<div style="font-size:12px;color:var(--t3)">venta ${_costosPesos(venta)} <span class="costos-gan">${_costosGanancia(venta, val)}</span></div>` : ''}
+            ${venta ? `<div style="font-size:12px;color:var(--t3)">venta ${_costosPesos(venta)} <span class="costos-gan">${_costosGanancia(venta, val)}</span></div>`
+              : sinP ? `<div style="font-size:12px;color:#b45309;font-weight:700">⚠️ sin precio <span class="costos-gan"></span></div>` : ''}
           </div>
+          ${sinP ? `<input class="fi costos-inp costos-precio" data-campo="monto" data-id="${esc(x.id)}" data-antes=""
+                 type="number" min="0" step="1" inputmode="numeric" enterkeyhint="next"
+                 value="" placeholder="precio" title="Precio de la reparación (lo que pagó el cliente)" style="width:88px;text-align:right"
+                 oninput="_costosFila(this)">` : ''}
           <span style="font-size:13px;color:var(--t3)">$</span>
           <input class="fi costos-inp" data-id="${esc(x.id)}" data-nombre="${esc(cfg.nombre(x))}" data-antes="${val || ''}" data-venta="${venta}"
                  type="number" min="0" step="1" inputmode="numeric" enterkeyhint="next"
-                 value="${val || ''}" placeholder="0" style="width:110px;text-align:right"
+                 value="${val || ''}" placeholder="${sinP ? 'costo' : '0'}" style="width:${sinP ? 88 : 110}px;text-align:right"
                  oninput="_costosFila(this)">
         </div>`;
       }).join('')}
@@ -160,7 +184,8 @@ function abrirCostosLista(tipo) {
   // reemplaza. Si no, con Enter el número nuevo se pegaba al final del que ya
   // estaba (450000 + 520000 = 450000520000).
   m.addEventListener('focusin', e => { if (e.target.classList.contains('costos-inp')) e.target.select(); });
-  setTimeout(() => m.querySelector('.costos-inp')?.focus(), 100);
+  if (soloDeEntrada) _costosSoloFaltan(true);
+  setTimeout(() => [...m.querySelectorAll('.costos-inp')].find(i => i.closest('.costos-fila').style.display !== 'none')?.focus(), 100);
 }
 
 // Al escribir: se recalcula la ganancia y se marca lo que cambió
@@ -168,12 +193,47 @@ function _costosFila(el) {
   _costosSeguirDueno();
   const fila = el.closest('.costos-fila');
   const gan = fila && fila.querySelector('.costos-gan');
-  if (gan) gan.innerHTML = _costosGanancia(el.dataset.venta, parseFloat(el.value));
+  // El precio recién escrito pasa a ser la "venta" del costo de esa fila
+  const inpCosto = el.dataset.campo === 'monto' && fila ? fila.querySelector('.costos-inp:not(.costos-precio)') : el;
+  if (el !== inpCosto && inpCosto) inpCosto.dataset.venta = Math.round(parseFloat(el.value) || 0);
+  if (gan && inpCosto) gan.innerHTML = _costosGanancia(inpCosto.dataset.venta, parseFloat(inpCosto.value));
   const cambio = Math.round(parseFloat(el.value) || 0) !== Math.round(parseFloat(el.dataset.antes) || 0);
   el.style.borderColor = cambio ? '#f59e0b' : '';
   const n = _costosContarCambios();
   const btn = document.getElementById('costos-lista-save');
-  if (btn) btn.textContent = n ? `Guardar ${n} costo${n === 1 ? '' : 's'}` : 'Guardar costos';
+  if (btn) btn.textContent = n ? `Guardar ${n} ${_costosTipo === 'reparacion' ? 'cambio' : 'costo'}${n === 1 ? '' : 's'}` : 'Guardar costos';
+}
+
+// 💰 Precios de la caja: para las cobradas sin precio, lo que entró por cada
+// una (repPreciosDesdeCaja en utils.js). Como "Pegar lista": completa los
+// casilleros, y se revisa antes de tocar Guardar.
+async function _costosPreciosCaja() {
+  const m = document.getElementById('costos-lista-modal');
+  const res = document.getElementById('costos-precios-res');
+  if (!m || typeof repPreciosDesdeCaja !== 'function') return;
+  const inputs = [...m.querySelectorAll('.costos-precio')].filter(i => !(parseFloat(i.value) > 0));
+  const reps = inputs.map(i => (typeof REPAIRS !== 'undefined' ? REPAIRS : []).find(r => r.id === i.dataset.id))
+    .filter(r => r && (r.cobrado || r.estado === 'entregado'));
+  if (!reps.length) { if (res) res.textContent = 'No quedan cobradas sin precio'; return; }
+  if (res) { res.style.color = 'var(--t3)'; res.textContent = '⏳ Buscando en la caja…'; }
+  try {
+    const encontrados = await repPreciosDesdeCaja(reps);
+    encontrados.forEach(e => {
+      const inp = inputs.find(i => i.dataset.id === e.id);
+      if (!inp) return;
+      inp.value = e.monto;
+      _costosFila(inp);
+    });
+    const faltan = reps.length - encontrados.length;
+    if (res) {
+      res.style.color = encontrados.length ? '#10b981' : '#b45309';
+      res.textContent = (encontrados.length ? `✅ ${encontrados.length} completado${encontrados.length === 1 ? '' : 's'} — revisá y tocá Guardar` : '⚠️ No encontré cobros vinculados')
+        + (faltan && encontrados.length ? ` · ${faltan} sin cobro vinculado en la caja (escribí el precio a mano)` : '');
+    }
+  } catch (e) {
+    console.error('precios de la caja:', e);
+    if (res) { res.style.color = '#dc2626'; res.textContent = 'No se pudo leer la caja (¿sin señal?)'; }
+  }
 }
 
 // Mientras cargás, el modo dueño no se vence: cada número escrito vuelve a
@@ -260,7 +320,7 @@ function _costosEmparejar(renglones, nombres) {
 function _costosPegarAplicar() {
   const m = document.getElementById('costos-lista-modal');
   if (!m) return;
-  const inputs = [...m.querySelectorAll('.costos-inp')];
+  const inputs = [...m.querySelectorAll('.costos-inp:not(.costos-precio)')];
   const renglones = _costosLeerLista(document.getElementById('costos-pegar-txt').value);
   const res = document.getElementById('costos-pegar-res');
   if (!renglones.length) { res.textContent = 'No encontré renglones con nombre y costo'; res.style.color = '#dc2626'; return; }
@@ -314,6 +374,15 @@ function _costosCambios(tipo, inputs, dolar, del) {
     const antes = Math.round(parseFloat(el.dataset.antes) || 0);
     if (nuevo === antes) return;
     let data;
+    if (el.dataset && el.dataset.campo === 'monto') {
+      // El precio de una reparación que no tenía (nunca se borra uno: en 0 no se guarda)
+      if (!(nuevo > 0)) return;
+      data = { monto: nuevo };
+      const ya = out.find(c => c.id === el.dataset.id);
+      if (ya) { Object.assign(ya.data, data); return; }
+      out.push({ id: el.dataset.id, data });
+      return;
+    }
     if (tipo === 'equipo') {
       // Igual que el formulario: sin costo, el campo no queda en 0, se borra.
       data = { costo: nuevo > 0 ? nuevo : del };
@@ -325,7 +394,8 @@ function _costosCambios(tipo, inputs, dolar, del) {
                : (nuevo > 0 && dolar > 0 ? Math.round((nuevo / dolar) * 100) / 100 : 0) };
       if (nuevo > 0 && dolar > 0) data.dolarCosto = dolar;
     }
-    out.push({ id: el.dataset.id, data });
+    const ya = out.find(c => c.id === el.dataset.id);
+    if (ya) Object.assign(ya.data, data); else out.push({ id: el.dataset.id, data });
   });
   return out;
 }
@@ -339,7 +409,9 @@ async function _costosRepDespues(cambios) {
     if (!r) continue;
     const costoAntes = Number(r.costo) || 0;
     if (typeof _repPatchLocal === 'function') _repPatchLocal(c.id, c.data); else Object.assign(r, c.data);
-    if (r.cobrado && typeof repActualizarCobro === 'function') corregidos += await repActualizarCobro(r, c.data.costo, costoAntes);
+    // Si solo se puso el precio, el cobro de la caja queda como está (la plata
+    // que entró es la que entró)
+    if ('costo' in c.data && r.cobrado && typeof repActualizarCobro === 'function') corregidos += await repActualizarCobro(r, c.data.costo, costoAntes);
   }
   if (corregidos) toast(`📈 Ganancia corregida en ${corregidos} cobro${corregidos === 1 ? '' : 's'} de la caja`, 'success');
 }
@@ -377,7 +449,9 @@ async function guardarCostosLista() {
       await batch.commit();
     }
     m.remove();
-    toast(`✅ ${cambios.length} costo${cambios.length === 1 ? '' : 's'} guardado${cambios.length === 1 ? '' : 's'}`, 'success');
+    const nP = cambios.filter(c => 'monto' in c.data).length, nC = cambios.filter(c => !('monto' in c.data) || Object.keys(c.data).length > 1).length;
+    toast(nP ? `✅ Guardado: ${nC} costo${nC === 1 ? '' : 's'} · ${nP} precio${nP === 1 ? '' : 's'}`
+             : `✅ ${cambios.length} costo${cambios.length === 1 ? '' : 's'} guardado${cambios.length === 1 ? '' : 's'}`, 'success');
     if (_costosTipo === 'reparacion') await _costosRepDespues(cambios);
   } catch (e) {
     console.error('costos:', e);

@@ -743,7 +743,7 @@ function toggleRepMenu() {
     { icon: '📋', label: 'Actividad reciente', onClick: () => (typeof openActivityFeed === 'function') && openActivityFeed() },
     // Alan (10/11): cargar fácil los costos de las reparaciones, las de antes
     // y las que vengan (costos-lista.js). Solo el dueño, como el resto de los costos.
-    { icon: '💵', label: 'Cargar costos', sub: 'De todas las reparaciones, en una lista', hide: _soloDueno(),
+    { icon: '💵', label: 'Cargar costos', sub: 'De todas las reparaciones, en una lista (y los precios que faltan)', hide: _soloDueno(),
       onClick: () => (typeof abrirCostosLista === 'function') && abrirCostosLista('reparacion') },
     sheetGrupo(toggleRepMenu, 'WhatsApp', '💬', 'WhatsApp', 'Avisos pendientes y cómo se abre', [
       { icon: '🟢', label: 'WhatsApp pendientes', onClick: () => (typeof sendPendingWA === 'function') && sendPendingWA() },

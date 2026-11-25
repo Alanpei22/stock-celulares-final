@@ -122,7 +122,7 @@ ok(/^\d{4}-\d{2}-\d{2}$/.test(ctx._todayAR()), '_todayAR devuelve YYYY-MM-DD', c
 console.log('\n4) El cobro de una reparación');
 const repairs = fs.readFileSync(DIR + 'repairs.js', 'utf8');
 const cuerpo = repairs.slice(repairs.indexOf('async function confirmarCobro'),
-                             repairs.indexOf('async function confirmarCobro') + 2000);
+                             repairs.indexOf('async function confirmarCobro') + 3000);   // más largo: ahora también pide el precio si la orden no tenía
 ok(/_todayAR\(\)/.test(cuerpo), 'confirmarCobro sigue usando la fecha argentina');
 ok(/caja_movimientos/.test(cuerpo), 'y sigue escribiendo el movimiento en la caja');
 ok(scriptsDe('index.html').includes('utils.js'),

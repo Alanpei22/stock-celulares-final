@@ -754,6 +754,50 @@ function repCostoEfectivo(r) {
   return Number(r && r.costo) > 0 ? Number(r.costo) : (Number(r && r.costoRepuesto) || 0);
 }
 
+// ── El precio que se puso recién al cobrar ──────────────────
+// Alan (25/11): "a veces cuando entra una reparación no se pone el precio,
+// pero sí cuando se cobra, y no está cruzada esa info". Las estadísticas de
+// reparaciones (recaudado, ganancia, ticket promedio) salen de repairs.monto:
+// una de $40.000 cobrada en la caja figuraba $0. Ahora, si la orden NO tenía
+// precio, el precio es lo cobrado más la seña. Si ya tenía uno y se cobró
+// distinto (un descuento, un redondeo), el de la orden no se toca.
+function repPrecioDesdeCobro(r, cobradoAhora) {
+  if (Number(r && r.monto) > 0) return 0;
+  const total = Math.round((Number(cobradoAhora) || 0) + (Number(r && r.sena) || 0));
+  return total > 0 ? total : 0;
+}
+
+// Para las que ya se cobraron sin precio: cuánto entró por cada orden, según
+// sus movimientos de caja vinculados (seña + cobro, solo la parte de la
+// reparación si se llevó algo más). Si la seña de la orden es mayor que las
+// señas que hay en la caja (una seña vieja cargada a mano), manda la de la orden.
+function repCobradoDeMovs(r, movs) {
+  let senas = 0, cobros = 0;
+  (movs || []).forEach(m => {
+    if (!m || m.tipo !== 'ingreso' || m.repairId !== r.id) return;
+    if (m.esSena) senas += Number(m.monto) || 0;
+    else if (repEsCobro(m)) cobros += Number(m.montoReparacion) > 0 ? Number(m.montoReparacion) : (Number(m.monto) || 0);
+  });
+  if (!(cobros > 0)) return 0;   // sin el cobro no se sabe el precio (la seña sola no alcanza)
+  return Math.round(cobros + Math.max(senas, Number(r.sena) || 0));
+}
+
+// Busca en la caja el precio de las órdenes cobradas sin precio. Lee solo
+// los movimientos de esas órdenes, de a 30 (lo máximo de un "in" de
+// Firestore): no recorre la caja entera. No guarda nada: devuelve
+// [{ id, monto }] para mostrarlo y que se revise antes.
+async function repPreciosDesdeCaja(repairs) {
+  const sin = (repairs || []).filter(r => r && r.id && !(Number(r.monto) > 0));
+  const out = [];
+  for (let i = 0; i < sin.length; i += 30) {
+    const tanda = sin.slice(i, i + 30);
+    const snap = await db.collection('caja_movimientos').where('repairId', 'in', tanda.map(r => r.id)).get();
+    const movs = snap.docs.map(d => d.data());
+    tanda.forEach(r => { const monto = repCobradoDeMovs(r, movs); if (monto > 0) out.push({ id: r.id, monto }); });
+  }
+  return out;
+}
+
 // Lo que hay que cambiarle al cobro. `costoViejo` es el costo con el que se
 // cobró (r.costo de ese momento), para los cobros de antes de esta marca.
 function repGananciaPatch(mov, r, costoNuevo, costoViejo) {

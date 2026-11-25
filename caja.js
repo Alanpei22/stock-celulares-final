@@ -4213,9 +4213,13 @@ async function saveMov() {
       // la ficha). Antes un cobro desde la caja no la guardaba: en el tablero
       // la reparación contaba $0. Si el costo se carga después, se corrige
       // (repActualizarCobro en utils.js).
+      // Entró sin precio y el precio se puso recién acá, al cobrar: se copia
+      // a la orden. Antes quedaba en $0 y las estadísticas de reparaciones la
+      // contaban como si no se hubiera cobrado nada (ver repPrecioDesdeCobro).
+      const precioCobro = (typeof repPrecioDesdeCobro === 'function') ? repPrecioDesdeCobro(repair, repAmt) : 0;
       if (typeof repCostoEfectivo === 'function') {
         const cRep = repCostoEfectivo(repair);
-        const precioOrden = Number(repair.monto) || repAmt;
+        const precioOrden = Number(repair.monto) || precioCobro || repAmt;
         data.costoReparacionARS = cRep;
         data.gananciaARS   = (typeof data.gananciaARS === 'number' ? data.gananciaARS : 0) + (precioOrden - cRep);
         data.costoARSTotal = (Number(data.costoARSTotal) || 0) + cRep;
@@ -4226,6 +4230,7 @@ async function saveMov() {
         metodoCobro: metodoPago,
         fechaCobro: new Date().toISOString(),
       };
+      if (precioCobro > 0) { upd.monto = precioCobro; upd.montoDesdeCobro = true; }
       // ¿El cliente se lleva el equipo? → marcar ENTREGADO.
       // Se pregunta ANTES de escribir nada, con el modal de tp-fases.js: así
       // "volver" de verdad cancela el cobro. Con el confirm() viejo, apretar

@@ -1837,6 +1837,11 @@
         <div class="cobro-monto-lbl">Total a registrar</div>
         <div id="cobro-monto-label" class="cobro-monto-num"></div>
         <div id="cobro-sena-info" class="cobro-sena-info" style="display:none"></div>
+        <!-- Entró sin precio: se pone acá y queda en la orden (repairs.js, _cobroSinPrecio) -->
+        <div id="cobro-precio-box" class="cobro-precio-box" style="display:none">
+          <label class="fl" for="cobro-precio">⚠️ Esta orden no tiene precio. ¿Cuánto sale la reparación?</label>
+          <input id="cobro-precio" class="fi" type="number" min="0" step="1" inputmode="numeric" placeholder="$ precio total" oninput="_cobroPintarTotal()">
+        </div>
       </div>
       <!-- Método de pago -->
       <div class="fg">

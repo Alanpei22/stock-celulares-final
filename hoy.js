@@ -123,6 +123,15 @@ function hoyItems(ctx) {
       texto: `${sinCostoRep} ${_hoyPlural(sinCostoRep, 'reparación entregada este mes no tiene', 'reparaciones entregadas este mes no tienen')} el costo cargado.`,
       acciones: [{ txt: '💵 Cargar costos', fn: 'costosRep' }],
     });
+    // Y las entregadas sin PRECIO (Alan, 25/11): en las estadísticas cuentan
+    // $0. La misma lista las trae, con "Traer precios de la caja".
+    const sinPrecioRep = reps.filter(r => r && r.estado === 'entregado' && !(Number(r.monto) > 0)
+      && (() => { const d = _hoyDias(r.fechaEntrega || r.fechaListo || r.fechaIngreso, ahora); return d !== null && d <= 30; })()).length;
+    if (sinPrecioRep) out.push({
+      clave: 'sinpreciorep:' + hoy + ':' + sinPrecioRep, nivel: 'aviso', ico: '🏷️',
+      texto: `${sinPrecioRep} ${_hoyPlural(sinPrecioRep, 'reparación entregada este mes no tiene', 'reparaciones entregadas este mes no tienen')} precio: en las estadísticas cuentan $0.`,
+      acciones: [{ txt: '💰 Poner precios', fn: 'costosRep' }],
+    });
   }
 
   // 4c) Cruce caja ↔ reparaciones (cruce-caja.js): cobradas que no figuran
