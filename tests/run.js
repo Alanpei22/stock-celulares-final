@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-control-equipos.js': '✅ Control de stock de equipos: checklist con filtros, escáner, faltantes y resumen',
   'test-precio-cobro.js': '🏷️ El precio que se pone al cobrar queda en la orden, y la lista de costos también completa precios (a mano o trayéndolos de la caja)',
   'test-ingreso-una-vez.js': '🖨️ Un ingreso imprime una etiqueta y una hoja: el segundo toque de Guardar no vuelve a guardar y la impresión automática de la misma orden no sale dos veces',
   'test-orden-perdida.js': '⚠️ Una orden que no llega a la base no queda escondida: Telegram avisa recién cuando se guardó (o que NO se guardó), cartel con Reintentar y no se pierde por el caché',

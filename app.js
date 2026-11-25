@@ -712,8 +712,12 @@ function toggleHdrMenu() {
     ]),
     { icon: '📊', label: 'Estadísticas', hide: !_puede('reporte'), onClick: () => document.getElementById('stats-btn')?.click() },
     { icon: '⚙️', label: 'Configuración', hide: _soloDueno(), onClick: () => document.getElementById('settings-btn')?.click() },
-    sheetGrupo(toggleHdrMenu, 'Datos', '💾', 'Costos, exportar y backup', 'Cargar costos, movimientos, exportar, backup', [
+    sheetGrupo(toggleHdrMenu, 'Datos', '💾', 'Control, costos y backup', 'Control de stock, cargar costos, movimientos, exportar, backup', [
       // El menú ya está en diez renglones (tests/test-menus.js): va adentro.
+      // Alan (25/11): checklist para controlar el stock (control-equipos.js).
+      // También está el cuadrito "✅ Control" en la barra de arriba del stock.
+      { icon: '✅', label: 'Control de stock', sub: 'Checklist de los equipos, con filtros y escáner',
+        onClick: () => (typeof ceAbrir === 'function') && ceAbrir() },
       { icon: '💵', label: 'Cargar costos', sub: 'Todos los equipos en una lista (modo dueño)', hide: _soloDueno(),
         onClick: () => (typeof abrirCostosLista === 'function') && abrirCostosLista('equipo') },
       { icon: '📜', label: 'Movimientos de stock', sub: 'Qué entró y salió: equipos, repuestos y accesorios',
