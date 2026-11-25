@@ -28,6 +28,14 @@ let _ceFiltro = { q: '', marca: '', estado: '', ubic: '', ver: '' };
 let _ceUltimo = null;     // id del último marcado (se resalta)
 
 function _ceDoc() { return db.collection(CE_COL).doc(CE_ACTUAL); }
+// El error de Firebase, en criollo (antes todo decía "¿sin señal?")
+function _ceMotivo(e) {
+  const c = String((e && (e.code || e.message)) || '');
+  if (/permission/i.test(c)) return 'tu usuario no tiene permiso en la base';
+  if (/unavailable|offline|network/i.test(c)) return 'sin señal';
+  if (/quota|resource-exhausted/i.test(c)) return 'se terminó el cupo gratis de Firebase por hoy';
+  return c.slice(0, 60) || 'error desconocido';
+}
 function _ceStock() { return (typeof STOCK !== 'undefined' && Array.isArray(STOCK)) ? STOCK : []; }
 function _ceMarca(m) { return (typeof marcaCanon === 'function') ? marcaCanon(m) : String(m || '').trim(); }
 function _ceQuien() {
@@ -118,7 +126,10 @@ function ceMarcar(id, r) {
   const ya = ceEstadoDe(id, _ceCtl);
   const valor = ya === r ? null : { r, t: Date.now(), por: _ceQuien() };
   _ceUltimo = valor ? id : null;
-  _ceGuardarMarca(id, valor).catch(e => { console.error('control de stock:', e); toast('No se pudo guardar la marca (¿sin señal?). Queda en este aparato y sube sola.', 'error'); });
+  _ceGuardarMarca(id, valor).catch(e => {
+    console.error('control de stock:', e);
+    toast(`No se pudo guardar la marca: ${_ceMotivo(e)}.`, 'error');
+  });
   cePintar();
 }
 
@@ -334,11 +345,14 @@ async function ceTerminar() {
   try {
     const batch = db.batch();
     batch.set(db.collection(CE_COL).doc('equipos-' + fin.replace(/[:.]/g, '-')), hist);
-    batch.delete(_ceDoc());
+    // Se vacía en vez de borrarse: borrar en la base pide el permiso de
+    // "borrar", que los empleados no tienen, y entonces no podían terminar el
+    // control (Alan, 25/11: "no me deja hacerlo, habilitalo a todos").
+    batch.set(_ceDoc(), { tipo: 'equipos', marcas: {}, extras: [], ultimoCierre: fin });
     await batch.commit();
   } catch (e) {
     console.error('control de stock:', e);
-    toast('No se pudo guardar el cierre del control (¿sin señal?). Probá de nuevo.', 'error');
+    toast(`No se pudo guardar el cierre del control: ${_ceMotivo(e)}. Probá de nuevo.`, 'error');
     return;
   }
   ceCerrar();

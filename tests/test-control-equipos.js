@@ -90,7 +90,14 @@ ctx.confirm = () => true;
 ESCRITO.length = 0;
 (async () => {
   await ctx.ceTerminar();
-  ok(ESCRITO.some(e => e[0] === 'batch-set' && e[1].resumen.ok === 2 && e[1].faltan[0].id === 'c') && ESCRITO.some(e => e[0] === 'batch-del'), 'queda en el historial y el control actual arranca de cero', ESCRITO);
+  ok(ESCRITO.some(e => e[0] === 'batch-set' && e[1].resumen && e[1].resumen.ok === 2 && e[1].faltan[0].id === 'c'), 'queda en el historial', ESCRITO);
+  // Alan (25/11): "no me deja hacerlo, habilitalo a todos los usuarios". Borrar
+  // en la base pide el permiso "borrar" (los empleados no lo tienen): se vacía.
+  ok(!ESCRITO.some(e => e[0] === 'batch-del') && ESCRITO.some(e => e[0] === 'batch-set' && e[1].marcas && !Object.keys(e[1].marcas).length && e[1].ultimoCierre),
+     'el control actual arranca de cero SIN borrar nada (así puede terminarlo cualquier usuario)', ESCRITO);
+  const reglas = leer('firestore.rules');
+  ok(!/controles_stock/.test(reglas.slice(reglas.indexOf('function sensible'), reglas.indexOf('function sensible') + 900)), 'controles_stock no es una colección "sensible": la escriben todos los usuarios');
+  ok(!/tpFrenar|tpPuede|_soloDueno/.test(leer('control-equipos.js')), 'y la pantalla no pide ningún permiso');
 
   console.log('\n5) Dónde está');
   const html = leer('index.html'), app = leer('app.js');
