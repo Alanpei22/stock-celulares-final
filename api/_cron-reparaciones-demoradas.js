@@ -1,3 +1,6 @@
+// Tarea "reparaciones-demoradas" de api/cron.js (POST /api/cron?tarea=reparaciones-demoradas; la dirección vieja
+// /api/cron-reparaciones-demoradas sigue andando por vercel.json). No es una función propia por
+// el límite de 12 funciones del plan gratis de Vercel: ver api/cron.js.
 // Vercel Function — invocada por GitHub Actions diariamente a las 10:00 AR
 // Busca reparaciones en estado 'listo' con fechaListo > N días.
 // Manda 1 push agregado por dispositivo (no spam de N pushes).

@@ -13,7 +13,7 @@ let fails = 0;
 const ok = (c, l, x) => { console.log((c ? '  OK  ' : '  FAIL') + ' · ' + l + (c ? '' : '  → ' + JSON.stringify(x))); if (!c) fails++; };
 
 // ── Se carga el archivo de verdad, sin la parte de Firebase ──
-const src = fs.readFileSync(DIR + 'api/cron-resumen-telegram.js', 'utf8');
+const src = fs.readFileSync(DIR + 'api/_cron-resumen-telegram.js', 'utf8');
 const trozo = src.slice(src.indexOf('export function hoyAR'), src.indexOf('export default'))
                  .replace(/export /g, '');
 const ctx = { console, Date, Math, Number, String, Array, Object, JSON };
@@ -122,7 +122,7 @@ ok(/&lt;b&gt;Raro/.test(conHtml) && /Ana &amp; Co/.test(conHtml),
 console.log('\n10) Cuándo y cómo se dispara');
 const wf = fs.readFileSync(DIR + '.github/workflows/resumen-telegram.yml', 'utf8');
 ok(/cron:\s*'15 22 \* \* \*'/.test(wf), '22:15 UTC, que son las 19:15 de acá', wf.match(/cron:.*/));
-ok(/api\/cron-resumen-telegram/.test(wf), 'y llama al endpoint');
+ok(/api\/cron\?tarea=resumen-telegram/.test(wf), 'y llama al endpoint (api/cron.js, la tarea resumen-telegram)');
 ok(/workflow_dispatch/.test(wf), 'se puede disparar a mano para probarlo sin esperar al horario');
 
 console.log('\n11) El endpoint');

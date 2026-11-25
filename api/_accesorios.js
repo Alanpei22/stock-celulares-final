@@ -1,5 +1,13 @@
-// Vercel Function — GET /api/accesorios
+// GET /api/accesorios — la atiende api/equipos.js (?tipo=accesorios)
 // La lista PÚBLICA de accesorios, para la página /accesorios (sin login).
+//
+// ⚠️ Por qué no es una función propia: el plan gratis de Vercel acepta hasta
+// 12 funciones por deploy. Esta era la 13 y desde el 22/11 Vercel rechazaba
+// TODOS los deploys: no se publicaba ningún cambio (Alan, 25/11: "no me
+// aparece lo del control", y los arreglos de impresión y de órdenes perdidas
+// nunca habían llegado). El guion bajo hace que Vercel no la cuente como
+// función; vercel.json manda /api/accesorios a /api/equipos?tipo=accesorios.
+// tests/test-vercel-funciones.js vigila que no se pase de 12.
 //
 // Sale del inventario de la caja (colección `productos`): lo que se vende en
 // la caja baja el stock solo. Aparecen únicamente los marcados con "Mostrar en
@@ -25,7 +33,7 @@ function getAdmin() {
   return admin;
 }
 
-export default async function handler(req, res) {
+export async function handlerAccesorios(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const db = getAdmin().firestore();

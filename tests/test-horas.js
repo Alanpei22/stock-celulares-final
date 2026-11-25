@@ -102,7 +102,7 @@ ok(/where\('uid', '==', user\.uid\)/.test(fj), 'y lee solo las propias (lo que l
 ok(/\/api\/telegram-notify/.test(fj), 'cada fichada le llega por Telegram al dueño');
 
 console.log('\n7) Lo que queda sin salida, por Telegram a las 20:00');
-const cron = leer('api/cron-cierre-pendiente.js');
+const cron = leer('api/_cron-cierre-pendiente.js');
 const m = await modulo(cron.replace(/^import .*$/m, 'const admin = {};'));
 const q = m.sinSalida([F('nacho', 'entrada', D, '09:00'), F('mati', 'entrada', D, '10:00'), F('mati', 'salida', D, '18:00')]
   .map(f => Object.assign({}, f, { ts: ts(f.ts) })));

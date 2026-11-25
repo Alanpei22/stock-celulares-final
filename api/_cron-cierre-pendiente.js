@@ -1,3 +1,6 @@
+// Tarea "cierre-pendiente" de api/cron.js (POST /api/cron?tarea=cierre-pendiente; la dirección vieja
+// /api/cron-cierre-pendiente sigue andando por vercel.json). No es una función propia por
+// el límite de 12 funciones del plan gratis de Vercel: ver api/cron.js.
 // Vercel Function — invocada por GitHub Actions a las 19:30 AR (22:30 UTC)
 // Si no hay caja_cierres/{hoy}, manda push a todos los dispositivos suscritos
 // que tengan push.cierrePendiente=true.

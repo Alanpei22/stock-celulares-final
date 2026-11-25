@@ -1,3 +1,6 @@
+// Tarea "resumen-diario" de api/cron.js (POST /api/cron?tarea=resumen-diario; la dirección vieja
+// /api/cron-resumen-diario sigue andando por vercel.json). No es una función propia por
+// el límite de 12 funciones del plan gratis de Vercel: ver api/cron.js.
 // Vercel Function — invocada por GitHub Actions a las 21:00 AR (00:00 UTC)
 // Calcula el resumen del día desde caja_movimientos + repairs y lo manda
 // por push a todos los dispositivos suscritos.

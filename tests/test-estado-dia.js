@@ -87,7 +87,7 @@ console.log('\n6) A quién le toca salir, y cuándo');
 //
 // Vive adentro de cron-cierre-pendiente.js y no en un archivo propio: sumar
 // una función más en /api volteó el deploy entero de Vercel (hay un tope).
-const api = leer('api/cron-cierre-pendiente.js');
+const api = leer('api/_cron-cierre-pendiente.js');
 const apiCtx = { console, Date, Number, Math };
 apiCtx.globalThis = apiCtx;
 vm.createContext(apiCtx);

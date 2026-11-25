@@ -144,7 +144,7 @@ console.log('\n6) El tablero lo lee igual que cualquier venta');
 const app = leer('app.js');
 ok(/const gan\s*=\s*m\s*=>\s*\(Number\(m\.gananciaARS\) \|\| 0\)/.test(app),
    'el tablero sigue leyendo el mismo campo', (app.match(/const gan .*/) || [])[0]);
-ok(/ganancia \+= Number\(m\.gananciaARS\) \|\| 0/.test(leer('api/cron-resumen-diario.js')),
+ok(/ganancia \+= Number\(m\.gananciaARS\) \|\| 0/.test(leer('api/_cron-resumen-diario.js')),
    'y el resumen diario de Telegram también');
 
 console.log('\n7) Venta de equipo sin el costo cargado');

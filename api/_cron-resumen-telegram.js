@@ -1,3 +1,6 @@
+// Tarea "resumen-telegram" de api/cron.js (POST /api/cron?tarea=resumen-telegram; la dirección vieja
+// /api/cron-resumen-telegram sigue andando por vercel.json). No es una función propia por
+// el límite de 12 funciones del plan gratis de Vercel: ver api/cron.js.
 // Vercel Function — POST /api/cron-resumen-telegram
 // La dispara GitHub Actions a las 19:15 AR (22:15 UTC).
 // Con { oficina: true }, a las 10:30 AR: lo urgente del día (ver abajo).

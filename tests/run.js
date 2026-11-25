@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-vercel-funciones.js': '🚦 Que Vercel acepte el deploy: no más de 12 funciones en /api (con 13 dejó de publicar desde el 22/11)',
   'test-control-equipos.js': '✅ Control de stock de equipos: checklist con filtros, escáner, faltantes y resumen',
   'test-precio-cobro.js': '🏷️ El precio que se pone al cobrar queda en la orden, y la lista de costos también completa precios (a mano o trayéndolos de la caja)',
   'test-ingreso-una-vez.js': '🖨️ Un ingreso imprime una etiqueta y una hoja: el segundo toque de Guardar no vuelve a guardar y la impresión automática de la misma orden no sale dos veces',

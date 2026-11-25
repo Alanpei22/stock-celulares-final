@@ -23,7 +23,7 @@ jobs:
           BASE_URL: ${{ secrets.BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsSL -X POST "$BASE_URL/api/cron-cierre-pendiente" \
+          curl -fsSL -X POST "$BASE_URL/api/cron?tarea=cierre-pendiente" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
             --data '{}'
@@ -37,7 +37,7 @@ jobs:
           BASE_URL: ${{ secrets.BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsSL -X POST "$BASE_URL/api/cron-reparaciones-demoradas" \
+          curl -fsSL -X POST "$BASE_URL/api/cron?tarea=reparaciones-demoradas" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
             --data '{}'
@@ -51,7 +51,7 @@ jobs:
           BASE_URL: ${{ secrets.BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsSL -X POST "$BASE_URL/api/cron-cierre-pendiente" \
+          curl -fsSL -X POST "$BASE_URL/api/cron?tarea=cierre-pendiente" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
             --data '{"fichadas":true}'
@@ -65,7 +65,7 @@ jobs:
           BASE_URL: ${{ secrets.BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsSL -X POST "$BASE_URL/api/cron-cierre-pendiente" \
+          curl -fsSL -X POST "$BASE_URL/api/cron?tarea=cierre-pendiente" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
             --data '{"estado":true}'

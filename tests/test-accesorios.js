@@ -11,7 +11,7 @@ const leer = f => fs.readFileSync(DIR + f, 'utf8');
 
 (async () => {
   console.log('\n1) /api/accesorios: qué sale y qué no');
-  const src = leer('api/accesorios.js').replace("import admin from 'firebase-admin';", 'const admin = {};');
+  const src = leer('api/_accesorios.js').replace("import admin from 'firebase-admin';", 'const admin = {};');
   const api = await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'));
   const doc = { id: 'p1', nombre: 'Funda silicona negra', categoria: 'Funda / Cover', precioVenta: 12500, precioCosto: 4000, precioCostoUSD: 3.5,
     stock: 7, stockMin: 2, codigo: '7790001', publicar: true, compat: 'A54, A34 / A24', fotos: ['https://f/a.webp', 'data:x', 'http://inseguro'] };
@@ -28,7 +28,7 @@ const leer = f => fs.readFileSync(DIR + f, 'utf8');
   ok(api.accesorioPublico({ ...doc, precioVenta: 3 }).precio === 0, 'un precio que no puede ser ($3) no se muestra: queda "Consultá el precio"');
   const ord = api.ordenarAccesorios([{ nombre: 'B', categoria: 'Cable', fotos: [] }, { nombre: 'A', categoria: 'Funda', fotos: ['x'] }]);
   ok(ord[0].nombre === 'A', 'los que tienen foto, primero');
-  ok(/where\('publicar', '==', true\)/.test(leer('api/accesorios.js')) && /s-maxage=60/.test(leer('api/accesorios.js')), 'lee solo los publicados y queda en caché un minuto (no una lectura por visita)');
+  ok(/where\('publicar', '==', true\)/.test(leer('api/_accesorios.js')) && /s-maxage=60/.test(leer('api/_accesorios.js')), 'lee solo los publicados y queda en caché un minuto (no una lectura por visita)');
 
   console.log('\n2) "¿Qué celu tenés?"');
   const ctx = { console, String, Array, Set, Math, JSON, encodeURIComponent, URL, URLSearchParams };

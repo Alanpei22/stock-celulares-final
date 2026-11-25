@@ -27,6 +27,12 @@ function getAdmin() {
 export const DIAS_SIN_STOCK = 30;
 
 export default async function handler(req, res) {
+  // /api/accesorios también sale de acá (ver api/_accesorios.js: el límite de
+  // 12 funciones del plan gratis de Vercel). Se carga solo cuando se pide.
+  if (req.query && req.query.tipo === 'accesorios') {
+    const { handlerAccesorios } = await import('./_accesorios.js');
+    return handlerAccesorios(req, res);
+  }
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   if (req.query && req.query.foto) return mandarFoto(String(req.query.foto), res);
   try {

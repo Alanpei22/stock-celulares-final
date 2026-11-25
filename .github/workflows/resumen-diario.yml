@@ -15,7 +15,7 @@ jobs:
           BASE_URL: ${{ secrets.BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -fsSL -X POST "$BASE_URL/api/cron-resumen-diario" \
+          curl -fsSL -X POST "$BASE_URL/api/cron?tarea=resumen-diario" \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "Content-Type: application/json" \
             --data '{}'

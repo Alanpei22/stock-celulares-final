@@ -206,7 +206,7 @@
   }
 
   function cargar() {
-    fetch('/api/accesorios', { cache: 'no-store' })
+    fetch('/api/equipos?tipo=accesorios', { cache: 'no-store' })
       .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
       .then(j => {
         S.lista = (Array.isArray(j.accesorios) ? j.accesorios : []).map(a => ({

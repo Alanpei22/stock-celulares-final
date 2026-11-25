@@ -37,6 +37,11 @@ usa la app en el mostrador, no un programador.
 - Env vars en Vercel: `FIREBASE_SERVICE_ACCOUNT`, `ANTHROPIC_API_KEY`,
   `QZ_PRIVATE_KEY`, `CRON_SECRET`, Telegram, push. Nunca claves en el repo.
 - Crons: GitHub Actions (`.github/workflows`), no Vercel.
+- **Máximo 12 funciones en `/api`** (plan gratis de Vercel). Con 13 Vercel
+  rechaza el deploy entero y no se publica nada (pasó del 22/11 al 25/11).
+  Un archivo que empieza con `_` no cuenta: las tareas de los crons van en
+  `api/_cron-*.js` detrás de `api/cron.js?tarea=`, y `/api/accesorios` sale de
+  `api/equipos.js`. Lo vigila `tests/test-vercel-funciones.js`.
 
 ## Cosas que no son obvias
 

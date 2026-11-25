@@ -8,7 +8,7 @@ const DIR = path.join(__dirname, '..') + '/';
 let fails = 0;
 const ok = (c, l, x) => { console.log((c ? '  OK  ' : '  FAIL') + ' · ' + l + (c ? '' : '  → ' + JSON.stringify(x))); if (!c) fails++; };
 
-const src = fs.readFileSync(DIR + 'api/cron-resumen-telegram.js', 'utf8');
+const src = fs.readFileSync(DIR + 'api/_cron-resumen-telegram.js', 'utf8');
 const trozo = src.slice(src.indexOf('export function hoyAR'), src.indexOf('export default')).replace(/export /g, '');
 const ctx = { console, Date, Math, Number, String, Array, Object, JSON, Set };
 vm.createContext(ctx);

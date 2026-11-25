@@ -7,6 +7,26 @@
     {
       "source": "/accesorios",
       "destination": "/accesorios.html"
+    },
+    {
+      "source": "/api/accesorios",
+      "destination": "/api/equipos?tipo=accesorios"
+    },
+    {
+      "source": "/api/cron-cierre-pendiente",
+      "destination": "/api/cron?tarea=cierre-pendiente"
+    },
+    {
+      "source": "/api/cron-reparaciones-demoradas",
+      "destination": "/api/cron?tarea=reparaciones-demoradas"
+    },
+    {
+      "source": "/api/cron-resumen-diario",
+      "destination": "/api/cron?tarea=resumen-diario"
+    },
+    {
+      "source": "/api/cron-resumen-telegram",
+      "destination": "/api/cron?tarea=resumen-telegram"
     }
   ],
   "functions": {
