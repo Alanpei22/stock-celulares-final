@@ -699,6 +699,9 @@ function toggleHdrMenu() {
       { icon: '🖨️', label: 'Impresión directa',
         sub: (typeof qzMenuSub === 'function') ? qzMenuSub() : '',
         onClick: () => (typeof configurarImpresoras === 'function') && configurarImpresoras() },
+      // Qué se imprimió, por dónde y desde qué ventana (qz-print.js)
+      { icon: '📋', label: 'Registro de impresiones', sub: 'Para ver por qué salió algo dos veces',
+        onClick: () => (typeof qzRegistroVer === 'function') && qzRegistroVer() },
     ]),
     // Cuentas y horas del personal, juntos: el menú no pasa de diez renglones
     sheetGrupo(toggleHdrMenu, 'Empleados', '👥', 'Empleados', 'Cuentas, permisos y horas', [
@@ -786,6 +789,9 @@ function toggleRep2Menu() {
       { icon: '🖨️', label: 'Impresión directa',
         sub: (typeof qzMenuSub === 'function') ? qzMenuSub() : '',
         onClick: () => (typeof configurarImpresoras === 'function') && configurarImpresoras() },
+      // Qué se imprimió, por dónde y desde qué ventana (qz-print.js)
+      { icon: '📋', label: 'Registro de impresiones', sub: 'Para ver por qué salió algo dos veces',
+        onClick: () => (typeof qzRegistroVer === 'function') && qzRegistroVer() },
     ]),
     { icon: '📉', label: 'Roturas del mes', sub: 'Lo que se rompió o vino roto',
       onClick: () => (typeof tpAbrirRoturas === 'function') && tpAbrirRoturas() },

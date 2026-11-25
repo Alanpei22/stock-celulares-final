@@ -183,7 +183,56 @@ function _qzPagina(tipo) {
 }
 
 // Las imágenes ya armadas → a la impresora, por QZ Tray
-async function _qzMandarPngs(impresora, tipo, pag, pngs, altos) {
+// ── Registro de impresiones ──
+// Alan (25/11): "se sigue imprimiendo varias veces, las etiquetas", después de
+// dos arreglos. Para no seguir adivinando: cada cosa que esta compu manda a
+// una impresora (o a la caja, o al diálogo) queda anotada con la hora, qué
+// ventana fue, por qué camino y de qué orden. Las ventanas de la misma compu
+// comparten la lista, así se ve si dos ventanas imprimieron lo mismo.
+// Se mira en el menú → "Registro de impresiones".
+const _QZ_REG_KEY = 'qzRegistro';
+const _qzVentana = (() => {
+  const pag = (typeof location !== 'undefined' && location.pathname) ? (location.pathname.split('/').pop() || 'index.html').replace('.html', '') : '?';
+  return pag + '·' + Math.random().toString(36).slice(2, 6);
+})();
+let _qzQue = '';   // qué se está imprimiendo ("ingreso N°8700"), lo pone print.js
+function qzQueSeImprime(txt) { _qzQue = String(txt || ''); }
+function qzRegistrar(camino, tipo, extra) {
+  try {
+    const l = JSON.parse(localStorage.getItem(_QZ_REG_KEY) || '[]');
+    l.push(Object.assign({ t: Date.now(), v: _qzVentana, camino, tipo, que: _qzQue }, extra || {}));
+    localStorage.setItem(_QZ_REG_KEY, JSON.stringify(l.slice(-80)));
+  } catch {}
+}
+function qzRegistroVer() {
+  if (typeof closeSheet === 'function') closeSheet();
+  let l = [];
+  try { l = JSON.parse(localStorage.getItem(_QZ_REG_KEY) || '[]'); } catch {}
+  const CAM = { qz: '🖨️ a la impresora', cola: '📥 pedido de otro equipo', enviado: '📤 mandado a la caja', dialogo: '🪟 diálogo de Chrome', repetido: '⛔ frenado (repetido)' };
+  const filas = l.slice().reverse().map(e => {
+    const h = new Date(e.t);
+    const hora = h.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) + ' ' + h.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return `<tr><td>${hora}</td><td>${e.tipo || ''}</td><td>${CAM[e.camino] || e.camino}${e.pags > 1 ? ' · ' + e.pags + ' págs.' : ''}</td>`
+      + `<td>${(e.que || '').replace(/</g, '&lt;')}${e.de ? ' · de ' + String(e.de).replace(/</g, '&lt;') : ''}</td><td>${e.v === _qzVentana ? '<b>esta</b>' : e.v}</td></tr>`;
+  }).join('');
+  document.getElementById('qz-registro-modal')?.remove();
+  const m = document.createElement('div');
+  m.id = 'qz-registro-modal';
+  m.className = 'modal-overlay';
+  m.innerHTML = `<div class="modal-card form-card" style="max-width:760px">
+    <div class="modal-header"><h3>📋 Registro de impresiones <small style="font-weight:500;color:var(--t3)">esta compu · últimas ${l.length}</small></h3>
+      <button class="modal-close" onclick="document.getElementById('qz-registro-modal').remove()">✕</button></div>
+    <div style="padding:6px 16px;font-size:12px;color:var(--t3)">Si una etiqueta sale dos veces, sacale una foto a esta pantalla y mandámela: dice qué ventana la imprimió y por dónde llegó. Ventana "esta" = la que estás mirando.</div>
+    <div class="modal-body" style="max-height:62vh;overflow:auto">
+      ${filas ? `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="text-align:left"><th>Hora</th><th>Qué</th><th>Camino</th><th>Orden</th><th>Ventana</th></tr></thead><tbody>${filas}</tbody></table>`
+              : '<p style="color:var(--t3)">Todavía no se imprimió nada desde que está el registro.</p>'}
+    </div></div>`;
+  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+  document.body.appendChild(m);
+}
+
+async function _qzMandarPngs(impresora, tipo, pag, pngs, altos, extra) {
+  qzRegistrar('qz', tipo, Object.assign({ pags: (pngs || []).length }, extra || {}));
   await qzConectar();
   const alto = pag.alto === 'auto' ? Math.max(...altos) : pag.papelAlto;
   const cfg = qz.configs.create(impresora, {
@@ -444,6 +493,7 @@ async function qzMandarRemoto(tipo, html) {
   const r = _qzRemota() || {};
   const clave = qzClavePedido(tipo, html), ahora = Date.now();
   if (clave === _qzRemUltimo.clave && ahora - _qzRemUltimo.t < QZ_REMOTA_REPETIDO_MS) {
+    qzRegistrar('repetido', tipo);
     if (typeof toast === 'function') toast('🖨️ Esa ya la mandé recién. Si querés otra copia, tocá de nuevo en unos segundos.', 'info');
     return true;   // true: que no abra el diálogo como plan B
   }
@@ -459,8 +509,9 @@ async function qzMandarRemoto(tipo, html) {
       refs.push(await db.collection('cola_impresion').add({
         tipo, pag: Object.assign({}, pag), pngs: parte.pngs, altos: parte.altos,
         fmt: (tipo === 'etiqueta' && typeof etqFormato === 'function') ? etqFormato() : null,
-        de, estado: 'pendiente', creado: Date.now(),
+        de, que: _qzQue || null, estado: 'pendiente', creado: Date.now(),
       }));
+      qzRegistrar('enviado', tipo, { id: refs[refs.length - 1].id, pags: parte.pngs.length });
     }
     if (typeof toast === 'function') toast(`🖨️ Mandado a la impresora de ${r.nombre || 'la caja'}`, 'success');
     _qzSeguirPedido(refs[0]);
@@ -590,7 +641,7 @@ async function qzServidorImprimir(ref) {
       _qzServidorPublicar(true).catch(() => {});
       throw new Error('la etiqueta vino armada en otro sentido (' + job.fmt + ', la caja usa ' + miFmt + '). Ya se corrigió: imprimila de nuevo');
     }
-    await _qzMandarPngs(impresora, job.tipo, job.pag, job.pngs, job.altos);
+    await _qzMandarPngs(impresora, job.tipo, job.pag, job.pngs, job.altos, { de: job.de || '', que: job.que || '', id: ref && ref.id });
     await ref.delete();
   } catch (e) {
     console.error('cola de impresión:', e);

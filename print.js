@@ -689,6 +689,7 @@ function etqAlGuardarPreparar(prefijo, editando) {
 }
 
 function printEtiquetasReparaciones(lista, copias) {
+  if (typeof qzQueSeImprime === 'function') qzQueSeImprime('etiqueta a mano ' + (Array.isArray(lista) ? lista : [lista]).filter(Boolean).map(r => 'N°' + (r.nOrden || '?')).join(', '));
   const reps = _repetir((Array.isArray(lista) ? lista : [lista]).filter(Boolean), copias);
   if (!reps.length) { if (typeof toast === 'function') toast('No hay reparaciones para etiquetar', 'error'); return; }
   _imprimirTocando('etiqueta', _hojaEtiquetas(reps, _etiquetaRepHtml, 'hoja--rep'), 'Etiquetas');
@@ -703,6 +704,7 @@ function printEtiquetasReparaciones(lista, copias) {
 // Van una detrás de la otra: la segunda espera a que se cierre el diálogo de
 // la primera. Si salieran juntas, Chrome muestra solo una.
 function _imprimirEnIframe(html) {
+  if (typeof qzRegistrar === 'function') qzRegistrar('dialogo', /class="pag"|hoja--rep/.test(String(html)) ? 'etiqueta' : 'hoja');
   return new Promise(resolve => {
     const f = document.createElement('iframe');
     f.setAttribute('aria-hidden', 'true');
@@ -775,6 +777,7 @@ function _ingresoYaImpreso(rep, tipo) {
 async function imprimirIngresoReparacion(rep) {
   if (!rep) return {};
   if (_ingresoYaImpreso(rep, 'ingreso')) return {};
+  if (typeof qzQueSeImprime === 'function') qzQueSeImprime('ingreso N°' + (rep.nOrden || '?'));
   if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(rep);
   const pend = {};
   const hoja = _puedeImprimirAca('hoja') ? _buildA5(rep) : (pend.hoja = true, null);
@@ -800,6 +803,7 @@ async function imprimirIngresoReparacion(rep) {
 async function imprimirEtiquetaIngreso(rep) {
   if (!rep) return {};
   if (_ingresoYaImpreso(rep, 'etiqueta-gremio')) return {};
+  if (typeof qzQueSeImprime === 'function') qzQueSeImprime('ingreso gremio N°' + (rep.nOrden || '?'));
   if (!_puedeImprimirAca('etiqueta')) return { etiqueta: true };
   const etq = _hojaEtiquetas([rep], _etiquetaRepHtml, 'hoja--rep');
   if (!(await _imprimirDirecto('etiqueta', etq))) await _imprimirEnIframe(etq);

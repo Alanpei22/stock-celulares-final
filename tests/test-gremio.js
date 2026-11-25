@@ -89,7 +89,7 @@ ok(/imprimirEtiquetaIngreso\(newDoc\)/.test(bloque), 'y manda solo la etiqueta')
 ok(/imprimirIngresoReparacion\(newDoc\)/.test(bloque), 'mientras que uno normal sigue sacando la hoja y la etiqueta');
 
 const pr = leer('print.js');
-const fn = pr.slice(pr.indexOf('async function imprimirEtiquetaIngreso'), pr.indexOf('async function imprimirEtiquetaIngreso') + 400);
+const fn = pr.slice(pr.indexOf('async function imprimirEtiquetaIngreso'), pr.indexOf('async function imprimirEtiquetaIngreso') + 600);   // más largo: ahora anota también qué se imprime (registro)
 ok(/_etiquetaRepHtml/.test(fn), 'la etiqueta es la misma de siempre', fn.slice(0, 200));
 ok(!/_buildA5/.test(fn), 'y no arma la hoja A5');
 // Al guardar ya se esperó a la base: una ventana nueva la bloquea Chrome.

@@ -130,6 +130,14 @@ const leer = f => fs.readFileSync(DIR + f, 'utf8');
   await q2.qzServidorImprimir(ref2);
   ok(IMP2.length === 1, 'aunque la base dejara pasar a las dos, el pedido ya tomado en esta compu no sale otra vez', IMP2.length);
 
+  console.log('\n5) Registro de impresiones (para ver de dónde sale la repetida)');
+  vm.runInContext('qzQueSeImprime("ingreso N°8700"); qzRegistrar("qz", "etiqueta", { pags: 1 })', A.cx);
+  vm.runInContext('qzRegistrar("cola", "etiqueta", { de: "Celu de Nacho" })', B.cx);
+  const reg = JSON.parse(LS.qzRegistro || '[]');
+  ok(reg.length === 2 && reg[0].que === 'ingreso N°8700' && reg[0].v !== reg[1].v && reg[1].de === 'Celu de Nacho', 'cada ventana anota qué imprimió, de qué orden y quién lo mandó, en la misma lista', reg);
+  ok(/_qzMandarPngs\(impresora, job\.tipo, job\.pag, job\.pngs, job\.altos, \{ de: job\.de/.test(qz) && /que: _qzQue \|\| null/.test(qz), 'el pedido del celu viaja con el N° de orden');
+  ok(/label: 'Registro de impresiones'/.test(leer('app.js')), 'en el menú: "Registro de impresiones"');
+
   console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
   process.exit(fails ? 1 : 0);
 })();
