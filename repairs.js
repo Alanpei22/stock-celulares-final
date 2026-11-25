@@ -247,6 +247,21 @@ async function loadAllRepairsHistory(forzar) {
 // ══════════════════════════════════════════════════════════════
 const _PEND_KEY = 'repsPendientes';
 
+// Guarda en el celu. Si no hay lugar, primero se tiran las copias que se
+// pueden volver a bajar de la base (la lista y el historial) y se reintenta:
+// una orden sin subir vale más que el caché. Antes, con el historial ocupando
+// todo el lugar, la copia de seguridad de la orden no se guardaba y no avisaba.
+function _lsGuardar(key, valor) {
+  try { localStorage.setItem(key, valor); return true; } catch {}
+  try {
+    localStorage.removeItem('repairsHistCache');   // _HIST_KEY
+    localStorage.removeItem('repairsCache');       // _REP_CACHE_KEY
+    localStorage.setItem(key, valor);
+    return true;
+  } catch {}
+  return false;
+}
+
 function _pendLeer() {
   try { return JSON.parse(localStorage.getItem(_PEND_KEY) || '[]'); } catch { return []; }
 }
@@ -255,11 +270,13 @@ function _pendLeer() {
 // __tg (el aviso de Telegram, que sale recién cuando la base confirma),
 // __t (cuándo se tomó) y __err (por qué falló el último intento).
 function _pendGuardar(doc, tg) {
-  try {
-    const lista = _pendLeer().filter(d => d.id !== doc.id);
-    lista.push(Object.assign({}, doc, { __tg: tg || '', __t: Date.now() }));
-    localStorage.setItem(_PEND_KEY, JSON.stringify(lista));
-  } catch { /* si no entra (fotos), queda la cola de Firestore */ }
+  const lista = _pendLeer().filter(d => d.id !== doc.id);
+  const item = Object.assign({}, doc, { __tg: tg || '', __t: Date.now() });
+  if (_lsGuardar(_PEND_KEY, JSON.stringify(lista.concat([item])))) return true;
+  // Sin lugar ni así: sin las imágenes (el dibujo del patrón y la foto vieja),
+  // que es lo que más pesa. Los datos de la orden son lo que no se puede perder.
+  const { foto, patronImg, ...liviano } = item;
+  return _lsGuardar(_PEND_KEY, JSON.stringify(lista.concat([liviano])));
 }
 function _pendSinMarcas(doc) {
   const { __tg, __t, __err, ...limpio } = doc || {};
@@ -304,7 +321,9 @@ function _pendBorrar(id) {
 //   · mientras haya órdenes sin subir, ese celu muestra un cartel con
 //     "Reintentar" (_pendAviso).
 function _guardarRepairSinBloquear(doc, tg) {
-  _pendGuardar(doc, tg);
+  if (!_pendGuardar(doc, tg) && typeof toast === 'function') {
+    toast('⚠️ El celu no tiene lugar para guardar una copia de la orden: no cierres la app hasta que diga "registrada"', 'error');
+  }
   db.collection('repairs').doc(doc.id).set(_stripUndefined(_pendSinMarcas(doc)))
     .then(() => {
       _pendBorrar(doc.id);
@@ -321,6 +340,107 @@ function _guardarRepairSinBloquear(doc, tg) {
     });
   // Sin señal la promesa no termina nunca: si a los 20 s no subió, que se vea
   setTimeout(_pendAviso, 20000);
+}
+
+// ── Borrador: el ingreso guardado en el celu ANTES de esperar a la base ──
+// Alan (25/11): "me pasó lo mismo de ayer, ingresé una reparación desde el
+// celular y se perdió, no hay datos". Antes de guardar nada, el ingreso
+// esperaba a la base para sacar el N° de orden (una lectura, la búsqueda de
+// un número libre y una transacción). Con mala señal eso tardaba muchísimo, y
+// si en ese rato se cerraba la app o el formulario, la orden no quedaba en
+// ningún lado: ni en el celu, ni en la base, ni en Telegram. Ahora apenas se
+// toca Guardar queda este borrador; se borra cuando la orden pasa a la cola de
+// subida. Si la app se cerró en el medio, al volver a abrirla aparece un
+// cartel para terminar de guardarla.
+// Es una lista: si se cortan dos seguidos, no se pisan.
+const _BORR_KEY = 'repBorradores';
+function _borradoresLeer() {
+  try { const l = JSON.parse(localStorage.getItem(_BORR_KEY) || '[]'); return Array.isArray(l) ? l : []; } catch { return []; }
+}
+function _borradorGuardar(doc, extra) {
+  const { foto, patronImg, ...liviano } = doc || {};
+  const lista = _borradoresLeer().filter(b => b && b.id !== liviano.id);
+  lista.push(Object.assign(liviano, extra || {}, { __t: Date.now() }));
+  return _lsGuardar(_BORR_KEY, JSON.stringify(lista));
+}
+// El primero que quedó colgado (los de hace menos de 30 s todavía se están
+// guardando en esta misma pantalla)
+function _borradorLeer() {
+  return _borradoresLeer().find(b => b && b.id && Date.now() - (b.__t || 0) >= 30000) || null;
+}
+function _borradorBorrar(id) {
+  try {
+    const lista = _borradoresLeer().filter(b => b && b.id !== id);
+    if (lista.length) localStorage.setItem(_BORR_KEY, JSON.stringify(lista));
+    else localStorage.removeItem(_BORR_KEY);
+  } catch {}
+  _borradorAviso();
+}
+function _borradorAviso() {
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  const b = _borradorLeer();
+  let el = document.getElementById('rep-borrador-barra');
+  if (!b) { if (el && el.remove) el.remove(); return; }
+  const cuantos = _borradoresLeer().filter(x => x && x.id && Date.now() - (x.__t || 0) >= 30000).length;
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'rep-borrador-barra';
+    el.setAttribute('role', 'alert');
+    el.style.cssText = 'position:fixed;left:10px;right:10px;top:calc(10px + env(safe-area-inset-top));z-index:1500;'
+      + 'background:#b45309;color:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.35);'
+      + 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px;max-width:640px;margin:0 auto';
+    document.body.appendChild(el);
+  }
+  const equipo = [b.marca, b.modelo].filter(Boolean).join(' ');
+  const min = Math.max(1, Math.round((Date.now() - (b.__t || 0)) / 60000));
+  el.innerHTML = `<span style="flex:1;min-width:200px"><b>⚠️ ${cuantos > 1 ? cuantos + ' ingresos quedaron' : 'Quedó un ingreso'} a medio guardar: ${esc(equipo)}${b.nombre ? ' · ' + esc(b.nombre) : ''}</b><br>
+      <small style="opacity:.9">Se tomó hace ${min < 120 ? min + ' min' : Math.round(min / 60) + ' h'} y la app se cerró antes de terminar. Todavía NO está en la base.</small></span>
+    <button type="button" onclick="_borradorTerminar('${esc(b.id)}')" style="border:0;border-radius:10px;padding:10px 14px;background:#fff;color:#b45309;font:inherit;font-weight:800;cursor:pointer">Terminar de guardar</button>
+    <button type="button" onclick="_borradorDescartar('${esc(b.id)}')" style="border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:10px 12px;background:transparent;color:#fff;font:inherit;cursor:pointer">Descartar</button>`;
+}
+function _borradorDescartar(id) {
+  if (!confirm('¿Descartar este ingreso? Se pierde y hay que volver a tomarlo.')) return;
+  _borradorBorrar(id);
+}
+// Sigue desde donde quedó: saca el N° y lo manda a la cola de subida, con su
+// aviso de Telegram y su hoja/etiqueta (queda para imprimir en la compu si
+// este aparato no imprime).
+async function _borradorTerminar(id) {
+  const b = _borradoresLeer().find(x => x && x.id === id);
+  if (!b) { _borradorAviso(); return; }
+  const { __t, __orden, __senaMetodo, ...doc } = b;
+  // ¿Llegó a subirse igual (la cola de Firestore la mandó sola)? No se duplica.
+  let ya = null;
+  try { ya = await db.collection('repairs').doc(doc.id).get({ source: 'server' }); }
+  catch (e) { /* sin señal: se sigue igual, la cola la sube después */ }
+  if (ya && ya.exists) {
+    _borradorBorrar(doc.id);
+    const d = typeof ya.data === 'function' ? ya.data() : null;
+    toast(`✅ Ya estaba en la base${d && d.nOrden ? ': N°' + d.nOrden : ''}`, 'success');
+    return;
+  }
+  const { nOrden, provisorio } = await _numeroConTope(Number(__orden) || 0);
+  doc.nOrden = nOrden;
+  if (provisorio) doc.numeroProvisorio = true;
+  _guardarRepairSinBloquear(doc, _tgIngresoTexto(doc) + '\n⏱️ <i>(se terminó de guardar más tarde)</i>');
+  _borradorBorrar(doc.id);
+  if (Number(doc.sena) > 0) _senaAlIngresoACaja(doc, __senaMetodo);
+  if (typeof upsertSeguimientoPublico === 'function') upsertSeguimientoPublico(doc);
+  if (doc.tlf && typeof upsertCliente === 'function') upsertCliente({ tlf: doc.tlf, nombre: doc.nombre, dni: doc.dni });
+  toast(`✅ Ingreso guardado: N°${nOrden}${provisorio ? ' (provisorio: sube cuando vuelva la señal)' : ''}`, 'success');
+  const impr = doc.gremio
+    ? (typeof imprimirEtiquetaIngreso === 'function' ? imprimirEtiquetaIngreso(doc) : null)
+    : (typeof imprimirIngresoReparacion === 'function' ? imprimirIngresoReparacion(doc) : null);
+  Promise.resolve(impr).then(pend => _anotarPendiente(doc.id, pend)).catch(() => {});
+}
+
+// El aviso de Telegram de un ingreso
+function _tgIngresoTexto(d) {
+  const plata = n => (typeof tgMonto === 'function' ? tgMonto(n) : '$' + n);
+  return `🔧 <b>Equipo ingresado #${d.nOrden}</b>\n`
+    + `${esc(d.marca)} ${esc(d.modelo)} — ${esc(d.arreglo)}\n`
+    + `💵 ${plata(d.monto)}${d.sena > 0 ? ` (seña ${plata(d.sena)})` : ''}`
+    + `${d.nombre ? `\n👤 ${esc(d.nombre)}` : ''} · 🕐 ${typeof tgHora === 'function' ? tgHora() : ''}`;
 }
 
 // ── Cartel "órdenes sin subir" (solo en el aparato que las tiene) ──
@@ -401,9 +521,24 @@ async function _numeroDeOrden(ordenInputVal) {
     return { nOrden, provisorio: false };
   } catch (e) {
     console.error('contador de órdenes:', e);
-    const maxLocal = REPAIRS.reduce((m, r) => Math.max(m, Number(r.nOrden) || 0), 7099);
-    return { nOrden: ordenInputVal > 0 ? ordenInputVal : maxLocal + 1, provisorio: true };
+    return _numeroProvisorio(ordenInputVal);
   }
+}
+
+// Sin la base: el siguiente al más alto que tiene este aparato (marcado provisorio)
+function _numeroProvisorio(ordenInputVal) {
+  const maxLocal = REPAIRS.reduce((m, r) => Math.max(m, Number(r.nOrden) || 0), 7099);
+  return { nOrden: ordenInputVal > 0 ? ordenInputVal : maxLocal + 1, provisorio: true };
+}
+
+// Con señal mala el contador (lectura + búsqueda de libre + transacción) podía
+// tardar minutos, y el mostrador quedaba esperando con el botón trabado. A los
+// 8 segundos se sigue con un N° provisorio, el mismo camino que "sin internet".
+function _numeroConTope(ordenInputVal, ms) {
+  let corte;
+  const tope = new Promise(res => { corte = setTimeout(() => res(null), ms || 8000); });
+  return Promise.race([_numeroDeOrden(ordenInputVal), tope])
+    .then(r => { clearTimeout(corte); return r || _numeroProvisorio(ordenInputVal); });
 }
 
 // Primer N° de orden sin reparación, desde `n`. Mira lo cargado en el celu y
@@ -657,6 +792,7 @@ function initRepairs() {
   _hydrateRepairsFromCache(); // pinta la lista al instante desde el cache local
   listenRepairs();
   _pendReintentar();          // ingresos que quedaron sin subir
+  _borradorAviso();           // un ingreso que quedó a medio guardar (la app se cerró)
   // Y apenas vuelve la señal, sin esperar a que se reabra la app
   if (typeof window !== 'undefined' && !window._pendOnline) {
     window._pendOnline = true;
@@ -2263,6 +2399,10 @@ async function _saveRepairAhora() {
 
   const btn = document.getElementById('rep-form-save');
   btn.disabled = true;
+  // Que se vea que está trabajando: con señal mala tarda, y si no se ve nada
+  // dan ganas de cerrar
+  const btnTexto = btn.innerHTML;
+  btn.innerHTML = '⏳ Guardando…';
 
   try {
     if (editingRepairId) {
@@ -2353,30 +2493,13 @@ async function _saveRepairAhora() {
         return;
       }
 
-      // CRIT-06: verificar que el número manual no esté ya en uso.
-      // Si la consulta falla (sin cupo, sin internet) NO se frena el ingreso:
-      // se revisa contra lo que hay en el celu y listo.
-      if (ordenInputVal > 0) {
-        let repetido = REPAIRS.some(r => Number(r.nOrden) === ordenInputVal);
-        if (!repetido) {
-          try {
-            const dupSnap = await db.collection('repairs').where('nOrden', '==', ordenInputVal).limit(1).get();
-            repetido = !dupSnap.empty;
-          } catch (e) { console.error('chequeo de N° repetido:', e); }
-        }
-        if (repetido) {
-          toast(`⚠️ Ya existe una reparación con el N°${ordenInputVal}`, 'error');
-          btn.disabled = false;
-          return;
-        }
-      }
-
-      const { nOrden, provisorio } = await _numeroDeOrden(ordenInputVal);
-
+      // El ingreso se arma primero (no depende de la base) y queda guardado en
+      // el celu ANTES de esperar nada: si la app se cierra mientras se saca el
+      // número, al volver a abrirla se termina de guardar (_borradorAviso).
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const ahora = _repIngresoISO(); // fecha de ingreso elegida con las flechas (hoy por defecto)
       const newDoc = {
-        id, nOrden, marca, modelo, arreglo, arreglos, falla, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
+        id, nOrden: null, marca, modelo, arreglo, arreglos, falla, condicion, codigo, imei, patron, patronImg, monto, sena, costo, presupuesto, tecnico,
         fechaEstimada, nombre, tlf, dni, accesorios, observaciones: obs,
         estado: 'reparando',
         // Fase inicial del tablero (mapea a estado 'reparando')
@@ -2394,21 +2517,47 @@ async function _saveRepairAhora() {
         // Campo NUEVO: las reparaciones de antes no lo tienen y siguen igual.
         gremio
       };
-      // Número dado por el celu porque la base no contestó: queda marcado para
-      // poder revisarlo cuando vuelva a andar.
-      if (provisorio) newDoc.numeroProvisorio = true;
       if (foto) newDoc.foto = foto;
       // Tag con device para que el cross-device listener no nos notifique a nosotros mismos
       if (typeof getDeviceId === 'function') newDoc._sourceDevice = getDeviceId();
+      if (!_borradorGuardar(newDoc, { __orden: ordenInputVal, __senaMetodo: document.getElementById('rep-fi-sena-metodo')?.value || '' })) {
+        toast('⚠️ El celu no tiene lugar para guardar una copia: no cierres la app hasta que diga "registrada"', 'error');
+      }
+
+      // CRIT-06: verificar que el número manual no esté ya en uso.
+      // Si la consulta falla o tarda (sin cupo, sin internet) NO se frena el
+      // ingreso: se revisa contra lo que hay en el celu y listo.
+      if (ordenInputVal > 0) {
+        let repetido = REPAIRS.some(r => Number(r.nOrden) === ordenInputVal);
+        if (!repetido) {
+          try {
+            const dupSnap = await Promise.race([
+              db.collection('repairs').where('nOrden', '==', ordenInputVal).limit(1).get(),
+              new Promise(res => setTimeout(() => res(null), 5000)),
+            ]);
+            repetido = !!dupSnap && !dupSnap.empty;
+          } catch (e) { console.error('chequeo de N° repetido:', e); }
+        }
+        if (repetido) {
+          _borradorBorrar(id);
+          toast(`⚠️ Ya existe una reparación con el N°${ordenInputVal}`, 'error');
+          btn.disabled = false;
+          return;
+        }
+      }
+
+      const { nOrden, provisorio } = await _numeroConTope(ordenInputVal);
+      newDoc.nOrden = nOrden;
+      // Número dado por el celu porque la base no contestó: queda marcado para
+      // poder revisarlo cuando vuelva a andar.
+      if (provisorio) newDoc.numeroProvisorio = true;
       // 📨 Aviso Telegram: equipo ingresado. Sale cuando la base CONFIRMA que
       // la guardó (antes salía al tocar Guardar, aunque no llegara).
-      const tgIngreso = `🔧 <b>Equipo ingresado #${nOrden}</b>\n`
-        + `${esc(marca)} ${esc(modelo)} — ${esc(arreglo)}\n`
-        + `💵 ${typeof tgMonto === 'function' ? tgMonto(monto) : '$' + monto}${sena > 0 ? ` (seña ${typeof tgMonto === 'function' ? tgMonto(sena) : '$' + sena})` : ''}`
-        + `${nombre ? `\n👤 ${esc(nombre)}` : ''} · 🕐 ${typeof tgHora === 'function' ? tgHora() : ''}`;
+      const tgIngreso = _tgIngresoTexto(newDoc);
       // Sin await: el mostrador no espera a Firebase. Si no se puede subir
       // ahora, queda en cola (la de Firestore y la nuestra) y sube sola.
       _guardarRepairSinBloquear(newDoc, tgIngreso);
+      _borradorBorrar(id);   // ya está en la cola de subida
       // La seña es plata que entra HOY: va a la caja como cualquier seña
       // cobrada desde ahí (vinculada a la reparación, así el cobro final
       // descuenta lo ya pagado y si se borra el movimiento se revierte).
@@ -2482,13 +2631,14 @@ async function _saveRepairAhora() {
     toast(msg, 'error');
   } finally {
     btn.disabled = false;
+    btn.innerHTML = btnTexto;
   }
 }
 
 // Movimiento de caja por la seña que se cobró al tomar el equipo. Sin await,
 // como el ingreso: si no hay internet queda en la cola de Firestore.
-function _senaAlIngresoACaja(rep) {
-  const metodo = document.getElementById('rep-fi-sena-metodo')?.value || 'Efectivo';
+function _senaAlIngresoACaja(rep, metodoGuardado) {
+  const metodo = metodoGuardado || document.getElementById('rep-fi-sena-metodo')?.value || 'Efectivo';
   const sena = Number(rep.sena) || 0;
   if (!(sena > 0)) return null;
   const mov = {

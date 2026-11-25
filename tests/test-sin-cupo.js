@@ -30,7 +30,9 @@ const err = (code) => Object.assign(new Error(code), { code });
 
 const ctx = {
   console, Date, Math, JSON, Promise, Number, String, Set, Map,
-  setTimeout: f => { f(); return 0; }, clearTimeout,
+  // Los topes de espera largos (8 s del contador, 5 s del N° repetido) no
+  // vencen en la prueba: la base de mentira contesta enseguida
+  setTimeout: (f, ms) => { if (!(ms >= 5000)) f(); return 0; }, clearTimeout,
   document: {
     getElementById: id => els[id] || mk(id),
     querySelector: () => null, querySelectorAll: () => [], addEventListener() {},
