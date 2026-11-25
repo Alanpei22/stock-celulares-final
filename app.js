@@ -676,6 +676,10 @@ function toggleHdrMenu() {
     { icon: '🔒', label: 'Modo dueño', hide: _soloDueno(), onClick: toggleOwnerLock },
     { divider: true },
     { icon: '☑️', label: 'Seleccionar varios', sub: 'Editar varios equipos a la vez', onClick: enterBatchMode },
+    // Alan (25/11): "no me aparece lo del control". Estaba adentro de Datos y
+    // en un cuadrito de la barra: ahora a un toque (control-equipos.js).
+    { icon: '✅', label: 'Control de stock', sub: 'Checklist de los equipos, con filtros y escáner',
+      onClick: () => (typeof ceAbrir === 'function') && ceAbrir() },
     // Página y estados juntos: el menú no pasa de diez renglones (tests/test-menus.js)
     sheetGrupo(toggleHdrMenu, 'Página de equipos', '🌐', 'Página de equipos', 'Publicar o sacar equipos, el link y los estados', [
       // Alan (23/11): todos los equipos con un interruptor (catalogo-stock.js)
@@ -710,14 +714,11 @@ function toggleHdrMenu() {
       { icon: '⏰', label: 'Horas del personal', sub: 'Entradas y salidas, horas por semana y mes', hide: _soloDueno(),
         onClick: () => (typeof abrirHoras === 'function') && abrirHoras() },
     ]),
-    { icon: '📊', label: 'Estadísticas', hide: !_puede('reporte'), onClick: () => document.getElementById('stats-btn')?.click() },
     { icon: '⚙️', label: 'Configuración', hide: _soloDueno(), onClick: () => document.getElementById('settings-btn')?.click() },
-    sheetGrupo(toggleHdrMenu, 'Datos', '💾', 'Control, costos y backup', 'Control de stock, cargar costos, movimientos, exportar, backup', [
+    sheetGrupo(toggleHdrMenu, 'Datos', '💾', 'Estadísticas, costos y backup', 'Estadísticas, cargar costos, movimientos, exportar, backup', [
       // El menú ya está en diez renglones (tests/test-menus.js): va adentro.
-      // Alan (25/11): checklist para controlar el stock (control-equipos.js).
-      // También está el cuadrito "✅ Control" en la barra de arriba del stock.
-      { icon: '✅', label: 'Control de stock', sub: 'Checklist de los equipos, con filtros y escáner',
-        onClick: () => (typeof ceAbrir === 'function') && ceAbrir() },
+      // Estadísticas vino acá para dejarle lugar arriba al Control de stock.
+      { icon: '📊', label: 'Estadísticas', hide: !_puede('reporte'), onClick: () => document.getElementById('stats-btn')?.click() },
       { icon: '💵', label: 'Cargar costos', sub: 'Todos los equipos en una lista (modo dueño)', hide: _soloDueno(),
         onClick: () => (typeof abrirCostosLista === 'function') && abrirCostosLista('equipo') },
       { icon: '📜', label: 'Movimientos de stock', sub: 'Qué entró y salió: equipos, repuestos y accesorios',
@@ -3127,6 +3128,12 @@ function _handleUrlAction() {
       if (action === 'nueva-reparacion') {
         if (typeof openRepairForm === 'function' && document.getElementById('app') && !document.getElementById('app').classList.contains('app-hidden')) {
           openRepairForm();
+        } else if (retry < 15) setTimeout(() => tryAct(retry + 1), 400);
+      } else if (action === 'control-equipos') {
+        // ✅ Control de stock de equipos, abierto desde el menú de la caja
+        if (typeof ceAbrir === 'function' && typeof STOCK !== 'undefined' && STOCK.some(p => !p.vendido)) {
+          if (typeof switchSection === 'function') switchSection('stock');
+          ceAbrir();
         } else if (retry < 15) setTimeout(() => tryAct(retry + 1), 400);
       } else if (action === 'escanear-reparacion') {
         // 📲 Acceso directo "Escanear reparación": la cámara para leer la

@@ -728,7 +728,7 @@ function toggleInvMenu() {
     { icon: '🔒', label: 'Modo dueño', onClick: openCajaOwnerPin },
     { divider: true },
     { icon: '☑️', label: 'Seleccionar varios', sub: 'Modificar o eliminar muchos a la vez', onClick: () => { closeInvMenu(); invSelEntrar(); } },
-    { icon: '🧙', label: 'Control de stock guiado', sub: 'Recorré uno por uno', onClick: openInvWizard },
+    { icon: '🧙', label: 'Control de stock guiado', sub: 'Accesorios: recorré uno por uno', onClick: openInvWizard },
     sheetGrupo(toggleInvMenu, 'Etiquetas e impresión', '🏷️', 'Etiquetas e impresión',
       'Imprimir, códigos de barras, impresora', _invItemsEtiquetas()),
     { icon: '📉', label: 'Roturas del mes', sub: 'Lo que se rompió o vino roto',
@@ -736,7 +736,11 @@ function toggleInvMenu() {
     { icon: '💵', label: 'Cargar costos', sub: 'En dólares, todos en una lista (modo dueño)',
       onClick: () => { closeInvMenu(); abrirCostosInv(); } },
     // Juntos: el menú no pasa de ocho renglones (tests/test-carga-inventario.js)
-    sheetGrupo(toggleInvMenu, 'Movimientos y datos', '📜', 'Movimientos y datos', 'Qué entró y salió · exportar', [
+    sheetGrupo(toggleInvMenu, 'Movimientos y datos', '📜', 'Movimientos y datos', 'Qué entró y salió · control de equipos · exportar', [
+      // El control de los celulares está en la otra pantalla (control-equipos.js).
+      // Va acá adentro: este menú no pasa de ocho renglones.
+      { icon: '✅', label: 'Control de stock de equipos', sub: 'Checklist de los celulares, con filtros',
+        onClick: () => { location.href = 'index.html?action=control-equipos'; } },
       { icon: '📜', label: 'Movimientos de stock', sub: 'Qué entró y salió, quién y por qué',
         onClick: () => { closeInvMenu(); if (typeof abrirMovStock === 'function') abrirMovStock('accesorio'); } },
       { icon: '💾', label: 'Exportar a CSV', onClick: exportInventarioCSV },

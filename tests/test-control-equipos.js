@@ -103,7 +103,11 @@ ESCRITO.length = 0;
   const html = leer('index.html'), app = leer('app.js');
   ok(/onclick="ceAbrir\(\)"[^>]*>.*id="s-control"/.test(html), 'cuadrito "✅ Control" en la barra del stock');
   ok(/<script defer src="control-equipos\.js"><\/script>/.test(html), 'se carga en la app');
-  ok(/label: 'Control de stock', sub: 'Checklist de los equipos/.test(app), 'y en Stock → ⋯ → Control, costos y backup');
+  // Alan (25/11): "no me aparece lo del control" → a un toque en el menú del Stock
+  const menuStock = app.slice(app.indexOf("openSheet('Stock', ["), app.indexOf("sheetGrupo(toggleHdrMenu, 'Página de equipos'"));
+  ok(/label: 'Control de stock', sub: 'Checklist de los equipos[\s\S]{0,120}ceAbrir\(\)/.test(menuStock), 'en Stock → ⋯, arriba de todo (no escondido en un grupo)');
+  ok(/action === 'control-equipos'[\s\S]{0,300}ceAbrir\(\)/.test(app) && /index\.html\?action=control-equipos/.test(leer('caja.html')) && /index\.html\?action=control-equipos/.test(leer('inventario.js')),
+     'y desde la caja (menú de Inventario) lleva al control de equipos');
   ok(/abrirEscaner\(cod => ceCodigo\(cod\), \{ continuo: true/.test(leer('control-equipos.js')), 'con la cámara escanea uno atrás del otro');
 
   console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
