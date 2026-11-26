@@ -24,6 +24,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="equipos.css">
+<!-- Los accesorios también se ven acá, en su pestaña (accesorios.js / .css) -->
+<link rel="stylesheet" href="accesorios.css">
 </head>
 <body>
 <!-- Alan (21/11): "mirá esta página, ¿podemos modificar a este estilo la
@@ -43,7 +45,7 @@
     <a href="#canje">Plan canje</a>
     <a href="#garantia">Garantía</a>
     <a href="#pagos">Medios de pago</a>
-    <a href="accesorios">Accesorios</a>
+    <a href="#accesorios" data-tab="accesorios">Accesorios</a>
   </div>
   <a class="nav-wa" id="cab-wa" target="_blank" rel="noopener"><span class="ico-wa" aria-hidden="true"></span>Hablanos</a>
 </nav>
@@ -92,6 +94,14 @@
 </section>
 
 <section class="sec sec-gris" id="catalogo">
+  <!-- Alan (26/11): los accesorios en la misma página. Dos pestañas: la de
+       celulares (equipos.js) y la de accesorios (accesorios.js, que trae la
+       lista recién cuando se abre). Link directo: /equipos#accesorios -->
+  <div class="tienda-tabs" role="tablist" aria-label="Qué querés ver">
+    <button type="button" role="tab" data-tab="equipos" class="on" aria-selected="true">📱 Celulares</button>
+    <button type="button" role="tab" data-tab="accesorios" aria-selected="false">🎧 Accesorios</button>
+  </div>
+  <div id="panel-equipos">
   <div class="cat-cab">
     <h2 class="titulo-2">Equipos disponibles.<br><span class="gris">Elegí el tuyo.</span></h2>
     <p class="actualizado" id="actualizado"></p>
@@ -117,6 +127,23 @@
   <main class="grilla" id="grilla" aria-live="polite">
     <div class="ficha esqueleto"></div><div class="ficha esqueleto"></div><div class="ficha esqueleto"></div>
   </main>
+  </div>
+
+  <div id="panel-accesorios" hidden>
+    <div class="cat-cab">
+      <h2 class="titulo-2">Accesorios.<br><span class="gris">Todo para tu celu.</span></h2>
+      <p class="actualizado" id="acc-actualizado"></p>
+    </div>
+    <div class="filtros" aria-label="Filtros de accesorios">
+      <div class="fila-orden">
+        <input class="buscar" id="acc-f-buscar" type="search" placeholder="¿Qué celu tenés? Ej: A54, iPhone 13" autocomplete="off" enterkeyhint="search" aria-label="Buscar accesorios">
+      </div>
+      <div class="chips" id="acc-f-cats"></div>
+    </div>
+    <main class="grilla acc-grilla" id="acc-grilla" aria-live="polite">
+      <div class="ficha esqueleto acc-esq"></div><div class="ficha esqueleto acc-esq"></div><div class="ficha esqueleto acc-esq"></div>
+    </main>
+  </div>
 </section>
 
 <section class="sec sec-gris sec-sin-arriba" id="garantia">
@@ -169,7 +196,7 @@
       <a href="#catalogo">Equipos</a>
       <a href="#canje">Plan canje</a>
       <a href="#pagos">Medios de pago</a>
-      <a href="accesorios">Accesorios para tu celu</a>
+      <a href="#accesorios" data-tab="accesorios">Accesorios para tu celu</a>
     </div>
     <div class="pie-col">
       <p class="pie-lbl">Contacto</p>
@@ -190,6 +217,11 @@
   <button type="button" class="visor-x" id="visor-x" aria-label="Cerrar">✕</button>
 </div>
 
+<div class="visor hidden" id="acc-visor" role="dialog" aria-label="Fotos del accesorio">
+  <div class="visor-pista" id="acc-visor-pista"></div>
+  <button type="button" class="visor-x" id="acc-visor-x" aria-label="Cerrar">✕</button>
+</div>
 <script src="equipos.js"></script>
+<script src="accesorios.js"></script>
 </body>
 </html>

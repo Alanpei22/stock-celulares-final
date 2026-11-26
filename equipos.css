@@ -248,3 +248,9 @@ a { color: inherit; }
 .aviso { position: fixed; left: 50%; bottom: 90px; transform: translate(-50%, 16px); padding: 11px 20px; border-radius: 999px; z-index: 60;
   background: var(--tx); color: #fff; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
 .aviso.ver { opacity: 1; transform: translate(-50%, 0); }
+
+/* ── Pestañas de la tienda: Celulares / Accesorios (Alan, 26/11) ── */
+.tienda-tabs { display: flex; gap: 6px; background: var(--blanco); padding: 6px; border-radius: 999px; width: max-content; max-width: 100%; margin: 0 0 22px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.tienda-tabs button { border: 0; background: transparent; color: var(--tx); font: inherit; font-weight: 700; font-size: 15px; padding: 11px 20px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.tienda-tabs button.on { background: var(--tx); color: #fff; }
+@media (max-width: 420px) { .tienda-tabs { width: 100%; } .tienda-tabs button { flex: 1; padding: 11px 8px; font-size: 14.5px; } }

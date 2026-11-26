@@ -308,6 +308,37 @@
   if (typeof window !== 'undefined') window._equipos = { S, fichaHtml, filtrados, mensajeInteres, mensajeParecido, pintar,
     ordenar, precioComparable, linkEquipo, pintarActualizado };
 
+  // ── Pestañas Celulares / Accesorios ──
+  // Los accesorios los arma accesorios.js (ACC); acá solo se muestra uno u
+  // otro. #accesorios en el link abre directo esa pestaña.
+  function pestana(t, scroll) {
+    const acc = t === 'accesorios';
+    const pe = $('panel-equipos'), pa = $('panel-accesorios');
+    if (!pe || !pa) return;
+    pe.hidden = acc; pa.hidden = !acc;
+    document.querySelectorAll('.tienda-tabs [data-tab]').forEach(b => {
+      const on = b.dataset.tab === t;
+      b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if (acc && typeof globalThis.ACC === 'object' && globalThis.ACC.abrir) globalThis.ACC.abrir();
+    try { history.replaceState(history.state, '', location.pathname + location.search + (acc ? '#accesorios' : '')); } catch (e) {}
+    if (scroll) { const c = $('catalogo'); if (c && c.scrollIntoView) c.scrollIntoView({ behavior: 'smooth' }); }
+  }
+  function engancharPestanas() {
+    if (typeof document === 'undefined' || !document.querySelectorAll) return;
+    document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', ev => {
+      ev.preventDefault();
+      // Las pestañas de arriba de la lista no mueven la página; los links del menú y del pie, sí
+      pestana(b.dataset.tab, !b.closest('.tienda-tabs'));
+    }));
+    // accesorios.js se carga después que este archivo: se espera a que esté
+    if (location.hash === '#accesorios') setTimeout(() => pestana('accesorios', true), 0);
+  }
+
+  // Para los tests
+  if (typeof window !== 'undefined' && window._equipos) window._equipos.pestana = pestana;
+
   enganchar();
+  engancharPestanas();
   cargar();
 })();

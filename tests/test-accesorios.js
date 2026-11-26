@@ -68,7 +68,29 @@ const leer = f => fs.readFileSync(DIR + f, 'utf8');
   ok(/no hacemos envíos/.test(html) && /Retiro en el local/.test(html), 'dice que por ahora es con retiro en el local');
   ok(/src="accesorios-video\.mp4"/.test(html) && fs.statSync(DIR + 'accesorios-video.mp4').size < 3 * 1048576, 'el pedazo del video de accesorios, liviano');
   ok(/"source": "\/accesorios"/.test(leer('vercel.json')), '/accesorios anda como link corto');
-  ok(/href="accesorios"/.test(leer('equipos.html')), 'desde /equipos hay link a accesorios');
+  // Alan (26/11): "que de la misma página de equipos también se puedan ver los accesorios"
+  const eqh = leer('equipos.html');
+  ok(/data-tab="equipos"[^>]*>📱 Celulares/.test(eqh) && /data-tab="accesorios"[^>]*>🎧 Accesorios/.test(eqh), '/equipos tiene las pestañas Celulares y Accesorios');
+  ok(/id="acc-grilla"/.test(eqh) && /id="acc-f-buscar"/.test(eqh) && /<script src="accesorios\.js"><\/script>/.test(eqh) && /href="accesorios\.css"/.test(eqh), 'y adentro, los accesorios con su buscador "¿Qué celu tenés?"');
+  ok(/href="#accesorios" data-tab="accesorios"/.test(eqh), 'el menú de arriba y el pie abren esa pestaña (/equipos#accesorios)');
+  // Embebida: no trae la lista hasta que se abre la pestaña
+  const FETCH = [];
+  const els = {};
+  const elm = id => (els[id] = els[id] || { id, innerHTML: '', textContent: '', value: '', classList: { add() {}, remove() {}, contains: () => true, toggle() {} }, addEventListener() {} });
+  const c2 = { console, String, Array, Set, Math, JSON, encodeURIComponent, URL, URLSearchParams, setTimeout, clearTimeout,
+    fetch: u => { FETCH.push(u); return Promise.resolve({ ok: true, json: () => Promise.resolve({ accesorios: L }) }); },
+    document: { getElementById: id => (id.startsWith('acc-') ? elm(id) : null), querySelectorAll: () => [], addEventListener() {}, activeElement: null },
+    location: { search: '?q=no-tocar', href: 'https://x/equipos?q=no-tocar' }, history: { replaceState: () => { throw new Error('no debería tocar el link'); } } };
+  vm.createContext(c2);
+  vm.runInContext(leer('accesorios.js'), c2, { filename: 'accesorios.js (embebida)' });
+  ok(c2.ACC.EMB === true && FETCH.length === 0, 'adentro de /equipos no trae los accesorios hasta que se abre la pestaña (no gasta en cada visita)');
+  c2.ACC.abrir(); c2.ACC.abrir();
+  await new Promise(r => setTimeout(r, 5));
+  ok(FETCH.length === 1 && FETCH[0] === '/api/equipos?tipo=accesorios', 'al abrirla los trae, una sola vez', FETCH);
+  ok(/Funda silicona/.test(els['acc-grilla'].innerHTML), 'y los pinta en su grilla (acc-grilla), no en la de los celulares');
+  c2.ACC.abrir('A54');
+  ok(/Para tu A54/.test(els['acc-grilla'].innerHTML), 'se le puede pasar el modelo a buscar');
+  ok(/function pestana\(t, scroll\)/.test(leer('equipos.js')) && /location\.hash === '#accesorios'/.test(leer('equipos.js')), 'equipos.js cambia de pestaña (y #accesorios abre directo esa)');
   const caja = leer('caja.html'), inv = leer('inventario.js');
   ok(/id="inv-fi-publicar" type="checkbox">/.test(caja) && !/id="inv-fi-publicar" type="checkbox" checked/.test(caja), 'inventario: "Mostrar en la página", destildado de entrada');
   ok(/id="inv-fi-compat"/.test(caja) && /id="inv-fotos"/.test(caja), 'inventario: "Para qué celu" y fotos');

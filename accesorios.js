@@ -11,8 +11,17 @@
   'use strict';
 
   const WA = '5491172392511';
-  const S = { lista: [], cat: '', q: '', cargado: false };
+  const S = { lista: [], cat: '', q: '', cargado: false, cargando: false };
   const $ = id => (typeof document !== 'undefined' ? document.getElementById(id) : null);
+  // Alan (26/11): "que de la misma página de equipos también se puedan ver
+  // los accesorios". Este mismo archivo arma la pestaña "Accesorios" de
+  // /equipos (EMB: embebida) y la página /accesorios sola. Adentro de /equipos
+  // los elementos llevan "acc-" adelante (ahí ya existen "grilla", "visor"…),
+  // y la lista se trae recién cuando se abre la pestaña.
+  const EMB = !!$('acc-grilla');
+  const ID = EMB
+    ? { grilla: 'acc-grilla', buscar: 'acc-f-buscar', cats: 'acc-f-cats', act: 'acc-actualizado', visor: 'acc-visor', pista: 'acc-visor-pista', x: 'acc-visor-x' }
+    : { grilla: 'grilla', buscar: 'f-buscar', cats: 'f-cats', act: 'actualizado', visor: 'visor', pista: 'visor-pista', x: 'visor-x' };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const waLink = txt => `https://wa.me/${WA}?text=${encodeURIComponent(txt)}`;
@@ -99,7 +108,7 @@
 
   // ── Pintar ────────────────────────────────────────────────
   function pintarCats() {
-    const box = $('f-cats');
+    const box = $(ID.cats);
     if (!box) return;
     const cuenta = {};
     S.lista.forEach(a => { cuenta[a.categoria] = (cuenta[a.categoria] || 0) + 1; });
@@ -110,7 +119,7 @@
   }
 
   function pintar() {
-    const g = $('grilla');
+    const g = $(ID.grilla);
     if (!g) return;
     if (!S.cargado) return;
     if (!S.lista.length) {
@@ -137,15 +146,15 @@
   function abrirVisor(id) {
     const a = S.lista.find(x => x.id === id);
     if (!a || !a.fotos.length) return;
-    $('visor-pista').innerHTML = a.fotos.map(u => `<img src="${esc(u)}" alt="${esc(a.nombre)}">`).join('');
-    $('visor').classList.remove('hidden');
+    $(ID.pista).innerHTML = a.fotos.map(u => `<img src="${esc(u)}" alt="${esc(a.nombre)}">`).join('');
+    $(ID.visor).classList.remove('hidden');
     document.body.style.overflow = 'hidden';
   }
   function cerrarVisor() {
-    const v = $('visor');
+    const v = $(ID.visor);
     if (!v || v.classList.contains('hidden')) return;
     v.classList.add('hidden');
-    $('visor-pista').innerHTML = '';
+    $(ID.pista).innerHTML = '';
     document.body.style.overflow = '';
   }
 
@@ -166,10 +175,11 @@
   // equipos puede mandar directo a los accesorios de un modelo
   function ponerQ(q, desdeHero) {
     S.q = String(q || '').slice(0, 60);
-    const h = $('h-buscar'), f = $('f-buscar');
+    const h = $('h-buscar'), f = $(ID.buscar);
     if (h && document.activeElement !== h) h.value = S.q;
     if (f && document.activeElement !== f) f.value = S.q;
-    try {
+    // (adentro de /equipos no se toca el link: ahí el ?q no es de los accesorios)
+    if (!EMB) try {
       const u = new URL(location.href);
       if (S.q.trim()) u.searchParams.set('q', S.q.trim()); else u.searchParams.delete('q');
       history.replaceState(history.state, '', u.pathname + u.search + u.hash);
@@ -179,59 +189,76 @@
   }
 
   function enganchar() {
-    const vid = $('hero-video');
-    if (vid && typeof vid.play === 'function') heroVideo(vid);
-    $('cab-wa').href = waLink('Hola TechPoint! Quería consultar por un accesorio.');
-    document.querySelectorAll('[data-wa]').forEach(a => { a.href = waLink(a.getAttribute('data-wa')); });
-    const flot = $('wa-flotante');
-    if (flot) {
-      const ver = () => flot.classList.toggle('oculto', (window.scrollY || 0) < 420);
-      window.addEventListener('scroll', ver, { passive: true }); ver();
+    // Lo de la página sola (video, WhatsApp de arriba, buscador grande): en
+    // /equipos eso ya lo maneja equipos.js
+    if (!EMB) {
+      const vid = $('hero-video');
+      if (vid && typeof vid.play === 'function') heroVideo(vid);
+      $('cab-wa').href = waLink('Hola TechPoint! Quería consultar por un accesorio.');
+      document.querySelectorAll('[data-wa]').forEach(a => { a.href = waLink(a.getAttribute('data-wa')); });
+      const flot = $('wa-flotante');
+      if (flot) {
+        const ver = () => flot.classList.toggle('oculto', (window.scrollY || 0) < 420);
+        window.addEventListener('scroll', ver, { passive: true }); ver();
+      }
+      $('h-form').addEventListener('submit', ev => { ev.preventDefault(); ponerQ($('h-buscar').value, true); });
     }
-    $('h-form').addEventListener('submit', ev => { ev.preventDefault(); ponerQ($('h-buscar').value, true); });
     let t;
-    $('f-buscar').addEventListener('input', ev => { clearTimeout(t); t = setTimeout(() => ponerQ(ev.target.value), 150); });
-    $('f-cats').addEventListener('click', ev => {
+    $(ID.buscar).addEventListener('input', ev => { clearTimeout(t); t = setTimeout(() => ponerQ(ev.target.value), 150); });
+    $(ID.cats).addEventListener('click', ev => {
       const b = ev.target.closest('button'); if (!b) return;
       S.cat = b.dataset.c || ''; pintarCats(); pintar();
     });
-    $('grilla').addEventListener('click', ev => {
+    $(ID.grilla).addEventListener('click', ev => {
       const v = ev.target.closest('[data-ver]');
       if (v) { abrirVisor(v.getAttribute('data-ver')); return; }
       if (ev.target.closest('[data-limpiar]')) { S.cat = ''; ponerQ(''); pintarCats(); }
     });
-    $('visor-x').addEventListener('click', cerrarVisor);
-    $('visor').addEventListener('click', ev => { if (ev.target.id === 'visor') cerrarVisor(); });
+    $(ID.x).addEventListener('click', cerrarVisor);
+    $(ID.visor).addEventListener('click', ev => { if (ev.target.id === ID.visor) cerrarVisor(); });
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape') cerrarVisor(); });
   }
 
   function cargar() {
+    S.cargando = true;
     fetch('/api/equipos?tipo=accesorios', { cache: 'no-store' })
       .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
       .then(j => {
         S.lista = (Array.isArray(j.accesorios) ? j.accesorios : []).map(a => ({
           ...a, compat: Array.isArray(a.compat) ? a.compat : [], fotos: Array.isArray(a.fotos) ? a.fotos : [],
         }));
-        S.cargado = true;
-        const act = $('actualizado');
+        S.cargado = true; S.cargando = false;
+        const act = $(ID.act);
         if (act) act.textContent = S.lista.length ? `${S.lista.length} accesorios · precios de hoy` : '';
         pintarCats();
         pintar();
       })
       .catch(e => {
         console.error(e);
-        const g = $('grilla');
+        S.cargando = false;
+        const g = $(ID.grilla);
         if (g) g.innerHTML = `<div class="vacio"><b>No pudimos cargar los accesorios.</b>Probá de nuevo en un rato o escribinos.
           <a class="btn-wa" href="${waLink('Hola TechPoint! Quería consultar por un accesorio.')}" target="_blank" rel="noopener">Escribinos por WhatsApp</a></div>`;
       });
   }
 
   // Para los tests (tests/test-accesorios.js)
-  if (typeof globalThis !== 'undefined') globalThis.ACC = { norm, toks, coincide, buscar, ficha, catInfo, S, pintar };
+  // Abrir la pestaña de /equipos: la lista se trae la primera vez (no en
+  // cada visita a la página de celulares). `q`: el modelo a buscar.
+  function abrir(q) {
+    if (q != null) ponerQ(q);
+    if (!S.cargado && !S.cargando && typeof fetch === 'function') cargar();
+  }
+  if (typeof globalThis !== 'undefined') globalThis.ACC = { norm, toks, coincide, buscar, ficha, catInfo, S, pintar, abrir, EMB };
 
-  if (typeof document !== 'undefined' && $('grilla') && typeof fetch === 'function') {
+  if (typeof document !== 'undefined' && $(ID.grilla) && typeof fetch === 'function') {
     enganchar();
-    try { const q = new URLSearchParams(location.search).get('q'); if (q) ponerQ(q); } catch (e) {}
-    cargar();
+    if (!EMB) {
+      try { const q = new URLSearchParams(location.search).get('q'); if (q) ponerQ(q); } catch (e) {}
+      cargar();
+    }
+    // Si la pestaña ya se abrió antes de que este archivo terminara de cargar
+    // (entrando por /equipos#accesorios), se traen ahora
+    else if ($('panel-accesorios') && !$('panel-accesorios').hidden) abrir();
   }
 })();
