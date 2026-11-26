@@ -106,7 +106,12 @@ console.log('\n2) Equipos que no pueden salir');
 ok(call('cartPublicable', EQ.ip) === true, 'un equipo con precio sale');
 ok(call('cartPublicable', EQ.rl) === false, 'uno a "$67" no: eran dólares en el campo de pesos', call('cartPrecioArs', EQ.rl));
 ok(call('cartPublicable', { id: 'x', precio: 0 }) === false, 'sin precio tampoco');
-ok(call('cartPrecioArs', EQ.us) === 450 * 1465, 'el cargado en dólares pasa por la cotización', call('cartPrecioArs', EQ.us));
+// Alan (26/11): "si están en dólar, convertir el precio y redondear en decena de mil"
+ok(call('cartPrecioArs', EQ.us) === 660000, 'el cargado en dólares pasa por la cotización y sube a la decena de mil (450 × 1.465 = 659.250 → 660.000)', call('cartPrecioArs', EQ.us));
+ok(call('cartPrecioArs', { ...EQ.us, precio: 500000 }) === 660000, 'si está en dólares, manda el dólar aunque la ficha tenga un precio en pesos viejo');
+ok(call('cartPrecioArs', { ...EQ.us, precioUSD: 400 }) === 590000, 'otro: 400 × 1.465 = 586.000 → 590.000');
+ok(call('cartPrecioArs', EQ.ip) === Number(EQ.ip.precio), 'los que están en pesos no cambian');
+ok(/\$660\.000/.test(call('cartelHtml', EQ.us)), 'y así sale impreso en el cartel');
 // Sin cotización a mano no se adivina: queda afuera.
 run('dolarBlue = 0');
 ok(call('cartPublicable', EQ.us) === false, 'en dólares y sin cotización, afuera');

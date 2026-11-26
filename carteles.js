@@ -9,8 +9,9 @@
 //  copia. Si cambiás un precio en la app, el próximo cartel ya sale nuevo.
 //
 //  La plata del cartel:
-//   · Efectivo = el precio del equipo (los cargados en dólares pasan por la
-//     cotización, con el mismo cálculo que la lista de WhatsApp).
+//   · Efectivo = el precio del equipo. Los cargados en dólares pasan por la
+//     cotización del día y se redondean para arriba a la decena de mil
+//     (US$ 450 × 1.465 = $659.250 → $660.000).
 //   · Cuota = precio × (1 + recargo de 3 cuotas) / 3, con el MISMO recargo
 //     que usa la ficha del equipo (`PRICES.c3`, se cambia en Configuración).
 //     Un recargo propio del cartel era garantía de que un día la vidriera
@@ -118,9 +119,28 @@ function cartCuota(precioArs) {
   return cartRedondear(base * (1 + cartRecargo() / 100) / 3);
 }
 
-// El precio en pesos. Usa el mismo cálculo que la lista de WhatsApp para que
-// los dos lados no digan números distintos del mismo equipo.
+// Los cargados en dólares: a pesos con la cotización del día y redondeados
+// para arriba a la decena de mil. Alan (26/11): "si están en dólar, convertir
+// el precio y redondear en decena de mil". Antes salía la cuenta redondeada a
+// la centena (US$ 450 × 1.465 = "$659.300"), o el precio en pesos guardado en
+// la ficha aunque el equipo estuviera en dólares (y ese puede ser viejo).
+const CART_REDONDEO_USD = 10000;
+function cartEsUSD(p) {
+  const usd = Number(p && p.precioUSD) || 0;
+  return usd > 0 && (p.moneda === 'usd' || !(Number(p.precio) > 0));
+}
+function cartDolar() {
+  if (typeof dolarBlue === 'number' && dolarBlue > 0) return dolarBlue;
+  return (typeof getCurrentDolar === 'function' ? (Number(getCurrentDolar()) || 0) : 0);
+}
+
+// El precio en pesos. Los que están en pesos usan el mismo cálculo que la
+// lista de WhatsApp, para que los dos lados no digan números distintos.
 function cartPrecioArs(p) {
+  if (cartEsUSD(p)) {
+    const d = cartDolar();
+    return d > 0 ? Math.ceil(Number(p.precioUSD) * d / CART_REDONDEO_USD) * CART_REDONDEO_USD : 0;
+  }
   if (typeof _listaPrecioNum === 'function') return _listaPrecioNum(p);
   const ars = Number(p && p.precio) || 0;
   if (ars > 0) return ars;
