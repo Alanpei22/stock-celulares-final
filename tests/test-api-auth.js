@@ -65,7 +65,19 @@ Object.keys(PUBLICOS).forEach(f => {
      `/api/${f.replace('.js','')} es pública a propósito (${PUBLICOS[f]}) y no escribe nada`);
 });
 
-endpoints.filter(f => !PUBLICOS[f]).forEach(f => {
+// La tienda online (Alan, 26/11): pública porque el que compra no tiene
+// cuenta, y escribe (el pedido y, con el pago confirmado, stock y caja). Sus
+// cuidados, que no se pueden aflojar:
+const TIENDA = sinComentarios(leer('api/tienda.js'));
+ok(/v1\/payments\/\$\{pagoId\}/.test(TIENDA) && /pagoValido\(pago, p, id\)/.test(TIENDA),
+   '/api/tienda: un aviso de pago no se cree, se le pregunta a Mercado Pago y tiene que ser de ese pedido y por el monto');
+ok(!/body\.(items\[[^\]]*\]\.)?precio/.test(TIENDA) && /armarPedido\(/.test(TIENDA),
+   '/api/tienda: el precio no viene de la página, lo calcula el servidor con el stock');
+ok(/if \(p\.estado === 'pagado'\) return;/.test(TIENDA) && /runTransaction/.test(TIENDA),
+   '/api/tienda: cada pago se procesa una sola vez (transacción)');
+const ESCRIBE_SIN_SESION = { 'tienda.js': true };
+
+endpoints.filter(f => !PUBLICOS[f] && !ESCRIBE_SIN_SESION[f]).forEach(f => {
   const src = sinComentarios(leer(path.join('api', f)));
   const guardado = FORMAS_VALIDAS.some(re => re.test(src));
   ok(guardado, `/api/${f.replace('.js','')} exige alguna autenticación`, f);
@@ -183,8 +195,9 @@ const run = code => vm.runInContext(code, ctx);
 
   const delCliente = fs.readdirSync(raiz('.'))
     .filter(f => f.endsWith('.js') && !f.startsWith('sw.'))
-    // las páginas públicas /equipos y /accesorios no tienen sesión: leen su endpoint público
-    .filter(f => f !== 'equipos.js' && f !== 'accesorios.js');
+    // las páginas públicas /equipos y /accesorios (y su carrito) no tienen
+    // sesión: hablan con sus endpoints públicos
+    .filter(f => f !== 'equipos.js' && f !== 'accesorios.js' && f !== 'tienda.js');
   delCliente.forEach(f => {
     const src = leer(f);
     const pelado = /fetch\(\s*['"`]\/api\//.test(src);

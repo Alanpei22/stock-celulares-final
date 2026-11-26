@@ -82,6 +82,9 @@
     const boton = e.estado === 'sinstock'
       ? `<a class="btn-wa btn-parecido" href="${esc(waLink(mensajeParecido(e)))}" target="_blank" rel="noopener">Pedir uno parecido</a>`
       : `<a class="btn-wa" href="${esc(waLink(mensajeInteres(e)))}" target="_blank" rel="noopener">Me interesa</a>`;
+    // 🛒 Comprar online (tienda.js): solo los disponibles con precio
+    const carrito = e.estado === 'disponible' && e.precio
+      ? `<button type="button" class="btn-carrito" data-carrito="equipo" data-id="${esc(e.id)}" data-nombre="${esc(nombreEquipo(e))}" data-precio="${esc(e.precio)}" data-moneda="${esc(e.moneda || 'ars')}" data-foto="${esc(fotos[0] || '')}">🛒 Agregar al carrito</button>` : '';
     return `<article class="ficha ${e.estado}" data-id="${esc(e.id)}">
       <div class="fotos">
         <div class="pista">${pista}</div>
@@ -95,7 +98,7 @@
         ${bat}
         ${e.detalles ? `<p class="det">${esc(e.detalles)}</p>` : ''}
         <div class="precio-fila">${precioHtml(e)}${gar}</div>
-        ${boton}
+        ${carrito}${boton}
         <button type="button" class="compartir" data-share="${esc(e.id)}" aria-label="Compartir este equipo">Compartir este equipo</button>
       </div>
     </article>`;

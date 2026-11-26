@@ -101,6 +101,7 @@
         <span class="acc-para">${para}</span>
         ${a.detalle ? `<span class="acc-para">${esc(a.detalle)}</span>` : ''}
         <div class="acc-precio-fila">${precio}${disp}</div>
+        ${a.precio ? `<button type="button" class="acc-carrito" data-carrito="accesorio" data-id="${esc(a.id)}" data-nombre="${esc(a.nombre)}" data-precio="${esc(a.precio)}" data-foto="${esc(a.fotos[0] || '')}">🛒 Agregar</button>` : ''}
         <a class="acc-quiero" href="${waLink(msg)}" target="_blank" rel="noopener">Lo quiero</a>
       </div>
     </article>`;

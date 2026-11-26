@@ -29,6 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
+  'test-tienda.js': '🛒 Tienda online: carrito, precios del servidor, seña o total, Mercado Pago y lo que pasa al pagarse (stock, caja, Telegram)',
   'test-vercel-funciones.js': '🚦 Que Vercel acepte el deploy: no más de 12 funciones en /api (con 13 dejó de publicar desde el 22/11)',
   'test-control-equipos.js': '✅ Control de stock de equipos: checklist con filtros, escáner, faltantes y resumen',
   'test-precio-cobro.js': '🏷️ El precio que se pone al cobrar queda en la orden, y la lista de costos también completa precios (a mano o trayéndolos de la caja)',
