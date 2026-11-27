@@ -29,7 +29,7 @@ const path = require('path');
 })();
 
 const QUE_CUBRE = {
-  'test-canal-venta.js': '🌐 Cada venta marca si fue en el local u online (y quién), y el informe de comisiones de las online',
+  'test-canal-venta.js': '🧑‍💼 Cada venta anota quién vendió (en la compu compartida se toca el nombre) y si fue en el local u online; informe por vendedor y comisión de las online',
   'test-tienda.js': '🛒 Tienda online: carrito, precios del servidor, seña o total, Mercado Pago y lo que pasa al pagarse (stock, caja, Telegram)',
   'test-vercel-funciones.js': '🚦 Que Vercel acepte el deploy: no más de 12 funciones en /api (con 13 dejó de publicar desde el 22/11)',
   'test-control-equipos.js': '✅ Control de stock de equipos: checklist con filtros, escáner, faltantes y resumen',

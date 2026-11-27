@@ -2127,8 +2127,11 @@ function openSellModal(id) {
     canjeEn({ caja: 'sell-canje', stock: () => STOCK, cli: ['sell-cli-nombre', 'sell-cli-dni'],
       total: () => Math.max(0, (Number(p?.precio) || 0) - (Number(p?.reservaSena) || 0)) });
   }
-  // 🌐 ¿Local u online? (canal-venta.js)
-  if (typeof cvMontar === 'function') cvMontar('sell', 'sell-canje');
+  // 🧑‍💼 ¿Quién vendió? y 🌐 ¿dónde? (canal-venta.js). Reemplaza al
+  // desplegable de vendedor, para no preguntarlo dos veces.
+  if (typeof cvMontar === 'function' && cvMontar('sell', 'sell-canje')) {
+    const fgV = selV.closest('.fg'); if (fgV) fgV.style.display = 'none';
+  }
   document.getElementById('sell-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
@@ -2142,9 +2145,10 @@ function closeSellModal() {
 async function confirmSell() {
   const id = pendingSellId;
   if (!id) return;
-  if (typeof cvFalta === 'function' && cvFalta('sell')) return;   // 🌐 online: quién la hizo
+  if (typeof cvFalta === 'function' && cvFalta('sell')) return;   // 🧑‍💼 quién vendió
   const p          = STOCK.find(x => x.id === id);
-  const vendedor   = document.getElementById('sell-vendedor').value;
+  // El nombre tocado en "¿Quién vendió?" es el vendedor (canal-venta.js)
+  const vendedor   = (typeof cvLeer === 'function' && cvLeer('sell').vendidoPor) || document.getElementById('sell-vendedor').value;
   const formaPago  = document.getElementById('sell-pago').value;
   const regCaja    = document.getElementById('sell-caja-check')?.checked ?? true;
   // Comprador: opcional. Si no se carga, el comprobante sale como antes.

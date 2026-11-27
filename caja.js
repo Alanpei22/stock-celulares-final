@@ -1079,8 +1079,9 @@ function toggleCajaMenu() {
     sheetGrupo(toggleCajaMenu, 'Informes', '📊', 'Informes', 'Reporte del día, búsquedas y estadísticas', [
       { icon: '🔎', label: 'Buscar en ventas', sub: 'Producto o reparación en todas las fechas', hide: no('reporte'), onClick: openVentasSearch },
       { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', hide: no('reporte'), onClick: openReporteModal },
-      // Alan (27/11): las ventas online de la vendedora llevan comisión (canal-venta.js)
-      { icon: '💸', label: 'Comisiones online', sub: 'Ventas online de cada vendedora y su comisión', hide: !isOwner,
+      // Alan (27/11): quién vendió cada cosa, en el local y online, y la comisión
+      // de las online (canal-venta.js)
+      { icon: '🧑‍💼', label: 'Ventas por vendedor', sub: 'Quién vendió qué, en el local y online, y la comisión', hide: !isOwner,
         onClick: () => (typeof cvAbrirComisiones === 'function') && cvAbrirComisiones() },
       { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
       { icon: '📄', label: 'Reporte financiero', sub: 'Exportar a PDF por período', hide: !isOwner, onClick: () => (typeof openFinanzasReport === 'function') && openFinanzasReport() },
@@ -2186,7 +2187,9 @@ async function confirmVentaEquipo() {
   const d = _veDatos();
   if (!d.precio) { toast('Cargá el precio de venta', 'error'); return; }
   if (!d.marca && !d.modelo) { toast('Cargá al menos la marca o el modelo', 'error'); return; }
-  if (typeof cvFalta === 'function' && cvFalta('ve')) return;   // 🌐 online: quién la hizo
+  if (typeof cvFalta === 'function' && cvFalta('ve')) return;   // 🧑‍💼 quién vendió
+  // El que se tocó es el vendedor (el del comprobante): no se pide dos veces
+  if (typeof cvLeer === 'function' && cvLeer('ve').vendidoPor) d.vendedor = cvLeer('ve').vendidoPor;
   // El IMEI queda impreso en el comprobante y es lo que identifica al equipo
   if (typeof imeiConfirmar === 'function') {
     if (!imeiConfirmar(d.imei, 'IMEI')) return;
@@ -4005,8 +4008,9 @@ async function saveMov() {
   if (typeof tpFrenar === 'function' && tpFrenar('caja', 'usar la caja')) return;
   if (!document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') &&
       typeof tpFrenar === 'function' && tpFrenar('gastos', 'cargar gastos')) return;
-  // 🌐 Venta online: tiene que decir quién la hizo (la compu es de todos)
-  if (typeof cvFalta === 'function' && cvFalta('mov')) return;
+  // 🧑‍💼 Quién vendió (en la cuenta compartida hay que tocarlo). Los cobros de
+  // reparación no lo piden: no son una venta.
+  if (!_selectedRepairItem && typeof cvFalta === 'function' && cvFalta('mov')) return;
   const montoInput = document.getElementById('mov-fi-monto');
   const descInput  = document.getElementById('mov-fi-desc');
   const catWrap    = document.querySelector('#mov-categorias')?.closest('.fg');
@@ -4119,7 +4123,7 @@ async function saveMov() {
   }
   if (!vendedorActivo) vendedorActivo = localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '';
   if (vendedorActivo) data.vendedor = vendedorActivo;
-  // 🌐 Local u online (y quién la vendió): las online llevan comisión
+  // 🧑‍💼 Quién vendió y 🌐 dónde (las online llevan comisión)
   if (tipo === 'ingreso' && !editingMovId && typeof cvAplicar === 'function') cvAplicar(data, 'mov');
 
   // ── Carrito de productos (solo en INGRESO y al CREAR, no editar) ──
