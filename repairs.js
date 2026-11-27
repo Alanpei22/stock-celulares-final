@@ -3351,7 +3351,26 @@ function selectCobroMetodo(metodo) {
   document.querySelectorAll('.cobro-metodo-btn').forEach(b => b.classList.toggle('cobro-m-active', b.dataset.m === metodo));
 }
 
+// Igual que en la caja: el botón se toca dos veces y antes entraban dos
+// cobros. Acá zafaba de casualidad (al cerrar el cartel se borra
+// `_cobroRepair`, y la segunda pasada salía por eso), pero dependía del
+// orden de dos líneas. La bandera lo dice en voz alta.
+let _cobrando = false;
+
 async function confirmarCobro() {
+  if (!_cobroRepair || _cobrando) return;
+  _cobrando = true;
+  const _btnCobro = document.querySelector('.cobro-btn-confirm');
+  if (_btnCobro) _btnCobro.disabled = true;
+  try {
+    await _confirmarCobroInterno();
+  } finally {
+    _cobrando = false;
+    if (_btnCobro) _btnCobro.disabled = false;
+  }
+}
+
+async function _confirmarCobroInterno() {
   if (!_cobroRepair) return;
   const metodo = document.querySelector('.cobro-metodo-btn.cobro-m-active')?.dataset.m || 'Efectivo';
   // Se relee al confirmar: si mientras el cartel estaba abierto se cobró
