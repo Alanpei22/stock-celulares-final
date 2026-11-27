@@ -99,7 +99,12 @@ ok(els['d-hoy'].style.display === 'none', 'si no hay nada, la tarjeta no aparece
 
 console.log('\n4) Órdenes viejas: se cierran juntas');
 ctx.REPAIRS = REPS; vm.runInContext('REPAIRS = this.REPAIRS', ctx);
-await run('hoyCerrarViejas()');
+// hoyCerrarViejas mira el reloj de verdad (Date.now): se lo deja en el AHORA
+// de la prueba. Antes, con el paso de los días, una orden de prueba de octubre
+// también pasaba a ser "vieja" y la prueba fallaba sola.
+const _relojReal = Date.now;
+Date.now = () => AHORA;
+try { await run('hoyCerrarViejas()'); } finally { Date.now = _relojReal; }
 ok(BATCH.length === 2 && BATCH.every(v => v.estado === 'entregado' && v.cierreMasivo), 'las 2 viejas quedan entregadas y marcadas', BATCH);
 ok(BATCH.some(v => v.fechaEntrega === REPS[3].fechaIngreso), 'con la fecha de entonces, no la de hoy (no infla el resumen del día)');
 

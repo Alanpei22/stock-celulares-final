@@ -1079,6 +1079,9 @@ function toggleCajaMenu() {
     sheetGrupo(toggleCajaMenu, 'Informes', '📊', 'Informes', 'Reporte del día, búsquedas y estadísticas', [
       { icon: '🔎', label: 'Buscar en ventas', sub: 'Producto o reparación en todas las fechas', hide: no('reporte'), onClick: openVentasSearch },
       { icon: '📋', label: 'Reporte del día', sub: 'Compartir por WhatsApp', hide: no('reporte'), onClick: openReporteModal },
+      // Alan (27/11): las ventas online de la vendedora llevan comisión (canal-venta.js)
+      { icon: '💸', label: 'Comisiones online', sub: 'Ventas online de cada vendedora y su comisión', hide: !isOwner,
+        onClick: () => (typeof cvAbrirComisiones === 'function') && cvAbrirComisiones() },
       { icon: '📊', label: 'Historial / Stats', hide: !isOwner, onClick: openCajaHistorial },
       { icon: '📄', label: 'Reporte financiero', sub: 'Exportar a PDF por período', hide: !isOwner, onClick: () => (typeof openFinanzasReport === 'function') && openFinanzasReport() },
       // 📥 La caja vieja de las planillas de Drive (importar-historial.js)
@@ -2089,6 +2092,8 @@ function openVentaEqModal(id) {
   set('ve-vendedor', localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '');
 
   const reg = document.getElementById('ve-reg-caja'); if (reg) reg.checked = true;
+  // 🌐 ¿Local u online? (canal-venta.js), arriba de "Registrar en la caja"
+  if (typeof cvMontar === 'function' && reg) cvMontar('ve', reg.closest('label') || reg);
   document.getElementById('ve-mas')?.classList.add('hidden');
   const mb = document.getElementById('ve-mas-btn');
   if (mb) mb.textContent = '➕ Más detalles del equipo y de la operación';
@@ -2258,6 +2263,7 @@ async function confirmVentaEquipo() {
       if (d.clienteNombre) data.clienteNombre = d.clienteNombre;
       if (d.clienteTel)    data.clienteTel    = d.clienteTel;
       if (d.vendedor)      data.vendedor      = d.vendedor;
+      if (typeof cvAplicar === 'function') cvAplicar(data, 've');      // 🌐 local u online
       if (typeof tarjetaAplicar === 'function') tarjetaAplicar(data);   // 💳 lo que se queda Getnet
       const movRef = await db.collection('caja_movimientos').add(
         { ...data, ...(typeof tpFirma === 'function' ? tpFirma() : {}) });   // quién lo cargó
@@ -2651,6 +2657,9 @@ function setMovTipo(tipo) {
   // como "Venta equipo" y todo gasto como "Compra repuesto" si no te acordabas
   // de tocar el chip: el desglose del día y las estadísticas quedaban mintiendo.
   selectCat('');
+  // 🌐 ¿Local u online? (canal-venta.js) Solo al cargar una venta nueva: al
+  // editar no se toca lo que ya tenía.
+  if (typeof cvMontar === 'function') { cvMontar('mov', 'mov-cliente-section'); cvMostrar('mov', tipo === 'ingreso' && !editingMovId); }
   // Captura de cliente solo tiene sentido en ventas (ingreso)
   const cliSec = document.getElementById('mov-cliente-section');
   if (cliSec) cliSec.style.display = (tipo === 'ingreso') ? '' : 'none';
@@ -4107,6 +4116,8 @@ async function saveMov() {
   }
   if (!vendedorActivo) vendedorActivo = localStorage.getItem('cajaVendedor') || ARQUEO?.vendedor || '';
   if (vendedorActivo) data.vendedor = vendedorActivo;
+  // 🌐 Local u online (y quién la vendió): las online llevan comisión
+  if (tipo === 'ingreso' && !editingMovId && typeof cvAplicar === 'function') cvAplicar(data, 'mov');
 
   // ── Carrito de productos (solo en INGRESO y al CREAR, no editar) ──
   let stockUpdates = [];      // un descuento de stock por cada ítem del carrito

@@ -2127,6 +2127,8 @@ function openSellModal(id) {
     canjeEn({ caja: 'sell-canje', stock: () => STOCK, cli: ['sell-cli-nombre', 'sell-cli-dni'],
       total: () => Math.max(0, (Number(p?.precio) || 0) - (Number(p?.reservaSena) || 0)) });
   }
+  // 🌐 ¿Local u online? (canal-venta.js)
+  if (typeof cvMontar === 'function') cvMontar('sell', 'sell-canje');
   document.getElementById('sell-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
@@ -2225,6 +2227,7 @@ async function confirmSell() {
         vendedor: vendedor || null,
         _sourceDevice: (typeof getDeviceId === 'function') ? getDeviceId() : null,
       };
+      if (typeof cvAplicar === 'function') cvAplicar(movData, 'sell');   // 🌐 local u online
       // Costo + ganancia (solo si hay costo cargado).
       // La ganancia es la de la venta ENTERA aunque el movimiento sea solo el
       // saldo: la seña ya entró antes sin costo asociado, así que sumando los
