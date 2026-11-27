@@ -2186,6 +2186,7 @@ async function confirmVentaEquipo() {
   const d = _veDatos();
   if (!d.precio) { toast('Cargá el precio de venta', 'error'); return; }
   if (!d.marca && !d.modelo) { toast('Cargá al menos la marca o el modelo', 'error'); return; }
+  if (typeof cvFalta === 'function' && cvFalta('ve')) return;   // 🌐 online: quién la hizo
   // El IMEI queda impreso en el comprobante y es lo que identifica al equipo
   if (typeof imeiConfirmar === 'function') {
     if (!imeiConfirmar(d.imei, 'IMEI')) return;
@@ -4004,6 +4005,8 @@ async function saveMov() {
   if (typeof tpFrenar === 'function' && tpFrenar('caja', 'usar la caja')) return;
   if (!document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') &&
       typeof tpFrenar === 'function' && tpFrenar('gastos', 'cargar gastos')) return;
+  // 🌐 Venta online: tiene que decir quién la hizo (la compu es de todos)
+  if (typeof cvFalta === 'function' && cvFalta('mov')) return;
   const montoInput = document.getElementById('mov-fi-monto');
   const descInput  = document.getElementById('mov-fi-desc');
   const catWrap    = document.querySelector('#mov-categorias')?.closest('.fg');

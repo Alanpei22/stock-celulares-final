@@ -27,9 +27,14 @@ function nodo(id) {
 }
 const ref = nodo('mov-cliente-section'); ref.parentNode = nodo('form');
 els['mov-cliente-section'] = ref;
-const ctx = { console, String, Number, Math, Object, JSON, Array,
-  localStorage: { getItem: k => (k === 'cajaVendedor' ? 'Mostrador' : null) },
-  tpUsuario: () => ({ nombre: 'Sofi', rol: 'empleado' }),
+const LS = { cajaVendedor: 'Mostrador' };
+const TOASTS = [];
+let MOSTRADOR = false, USUARIO = 'Sofi';
+const ctx = { console, String, Number, Math, Object, JSON, Array, Set, Promise,
+  localStorage: { getItem: k => (k in LS ? LS[k] : null), setItem: (k, v) => { LS[k] = String(v); } },
+  tpUsuario: () => ({ nombre: USUARIO, rol: 'empleado' }),
+  tpMostrador: () => MOSTRADOR,
+  toast: (m, t) => TOASTS.push([m, t]),
   document: {
     getElementById: id => els[id] || null,
     createElement: () => nodo('nuevo'),
@@ -45,12 +50,26 @@ run("cvMontar('mov', 'mov-cliente-section')");
 ok(!!els['mov-canal'] && /En el local/.test(els['mov-canal'].innerHTML) && /Online/.test(els['mov-canal'].innerHTML), 'el selector "🏪 En el local / 🌐 Online" aparece en la venta');
 let d = run("cvAplicar({}, 'mov')");
 ok(d.canal === 'local' && !('vendedorOnline' in d), 'de entrada es en el local (sin comisión)', d);
+// Alan (27/11): "hay una cuenta en común que usan todos, la de la compu
+// principal: ¿cómo hago para que cada uno registre su venta?"
+LS.cvVendedoras = JSON.stringify(['Sofi', 'Caro']);
+USUARIO = 'Mostrador'; MOSTRADOR = true;        // la compu compartida
 run("cvElegir('mov', 'online')");
-ok(els['mov-cv-nombre'].value === 'Sofi', 'al elegir Online, "vendió" se completa con quien está usando la app', els['mov-cv-nombre'].value);
+ok(/Sofi/.test(els['mov-cv-chips'].innerHTML) && /Caro/.test(els['mov-cv-chips'].innerHTML) && /Otra persona/.test(els['mov-cv-chips'].innerHTML), 'al elegir Online aparecen los nombres de las vendedoras para tocar', els['mov-cv-chips'].innerHTML);
+ok(els['mov-cv-nombre'].value === '', 'en la compu compartida no se elige solo: el usuario de la compu no dice quién vendió');
+ok(run("cvFalta('mov')") === true && TOASTS.some(t => /tocá el nombre/.test(t[0])), 'sin tocar un nombre, la venta online no se guarda');
+run("cvQuien('mov', 'Caro')");
 d = run("cvAplicar({}, 'mov')");
-ok(d.canal === 'online' && d.vendedorOnline === 'Sofi', 'la venta queda online y a nombre de ella', d);
+ok(run("cvFalta('mov')") === false && d.canal === 'online' && d.vendedorOnline === 'Caro', 'tocando "Caro", la venta queda online y a nombre de ella', d);
+ok(/cv-chip on[^>]*>Caro/.test(els['mov-cv-chips'].innerHTML), 'y se ve marcado');
+run("cvQuien('mov', '')");
 els['mov-cv-nombre'].value = 'Sofía G.';
-ok(run("cvAplicar({}, 'mov')").vendedorOnline === 'Sofía G.', 'se puede poner otro nombre (si la carga otra persona por ella)');
+ok(run("cvAplicar({}, 'mov')").vendedorOnline === 'Sofía G.', '"Otra persona…" deja escribir el nombre');
+// Con la cuenta propia de ella, en su celu, se elige sola
+USUARIO = 'Sofi'; MOSTRADOR = false;
+run("cvMontar('mov', 'mov-cliente-section')"); run("cvElegir('mov', 'online')");
+ok(els['mov-cv-nombre'].value === 'Sofi', 'con su propia cuenta (no la compartida), ya aparece elegida ella');
+ok(JSON.stringify(run("cvNombresDeTexto('Sofi, caro,  Caro ,\\nNacho')")) === '["Sofi","caro","Nacho"]', 'la lista de nombres se arma separando por comas (sin repetidos)');
 run("cvMontar('mov', 'mov-cliente-section')");
 ok(run("cvAplicar({}, 'mov')").canal === 'local', 'la próxima venta arranca otra vez en local');
 run("cvMostrar('mov', false)");
@@ -81,6 +100,8 @@ ok(/<script src="canal-venta\.js"><\/script>/.test(leer('caja.html')) && /<scrip
 ok(/label: 'Comisiones online'[\s\S]{0,200}hide: !isOwner/.test(caja), 'Caja → Informes → "Comisiones online" (solo el dueño)');
 ok(/collection\('config'\)\.doc\('comisiones'\)/.test(leer('canal-venta.js')) && /'config',/.test(leer('firestore.rules')), 'el % vive en config (solo el dueño lo ve y lo cambia): un empleado no puede tocarse la comisión');
 ok(/where\('canal', '==', 'online'\)/.test(leer('canal-venta.js')), 'el informe lee solo las ventas online (no la caja entera)');
+ok(/if \(typeof cvFalta === 'function' && cvFalta\('mov'\)\) return;/.test(caja) && /cvFalta\('ve'\)\) return;/.test(caja) && /cvFalta\('sell'\)\) return;/.test(app), 'en los tres lugares, sin decir quién vendió online no se guarda');
+ok(/collection\('ajustes_venta'\)\.doc\('vendedoras'\)/.test(leer('canal-venta.js')) && !/'ajustes_venta'/.test(leer('firestore.rules')), 'los nombres se guardan donde los lee la compu compartida (ajustes_venta, no es colección sensible)');
 
 console.log(fails ? `\n❌ ${fails} fallas` : '\n✅ todo bien');
 process.exit(fails ? 1 : 0);

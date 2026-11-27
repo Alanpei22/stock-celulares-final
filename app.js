@@ -2142,6 +2142,7 @@ function closeSellModal() {
 async function confirmSell() {
   const id = pendingSellId;
   if (!id) return;
+  if (typeof cvFalta === 'function' && cvFalta('sell')) return;   // 🌐 online: quién la hizo
   const p          = STOCK.find(x => x.id === id);
   const vendedor   = document.getElementById('sell-vendedor').value;
   const formaPago  = document.getElementById('sell-pago').value;

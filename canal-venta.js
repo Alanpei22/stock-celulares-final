@@ -12,6 +12,14 @@
 // se vende: el cobro de la caja, la venta de equipo de la caja y "Vender"
 // desde el Stock.
 //
+// Compu compartida (Alan, 27/11: "hay una cuenta en común que usan todos, la
+// de la computadora principal, ¿cómo hago para que cada uno registre su
+// venta?"): al elegir Online aparecen los nombres de las vendedoras como
+// botones y hay que tocar quién la hizo; sin eso no se guarda. Solo se elige
+// solo cuando la cuenta es personal de una de ellas (en la compu del
+// mostrador, nunca). La lista de nombres la arma el dueño en el informe y
+// vive en ajustes_venta/vendedoras (la leen todas las cuentas; el % no).
+//
 // La comisión NO se guarda en la venta: la calcula el informe (solo el dueño)
 // con el % de config/comisiones. Así un empleado no puede tocarse la comisión
 // (config solo lo lee y escribe el dueño, ver firestore.rules) y si el % cambia
@@ -33,9 +41,13 @@ function _cvEstilos() {
   .cv-opciones{display:flex;gap:6px}
   .cv-op{flex:1;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:10px;padding:10px 8px;font:inherit;font-weight:700;cursor:pointer}
   .cv-op.on{border-color:var(--accent);background:var(--accent);color:#fff}
-  .cv-quien{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--text2)}
-  .cv-quien input{flex:1;min-width:0}
+  .cv-quien{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text2)}
   .cv-quien.hidden{display:none}
+  .cv-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .cv-chip{border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:999px;padding:8px 14px;font:inherit;font-weight:600;cursor:pointer}
+  .cv-chip.on{border-color:var(--accent);background:var(--accent);color:#fff}
+  .cv-quien input{min-width:0}
+  .cv-quien input.hidden{display:none}
   `;
   document.head.appendChild(s);
 }
@@ -57,13 +69,78 @@ function cvMontar(p, antesDe) {
         <button type="button" class="cv-op on" data-cv="local" onclick="cvElegir('${p}','local')">🏪 En el local</button>
         <button type="button" class="cv-op" data-cv="online" onclick="cvElegir('${p}','online')">🌐 Online</button>
       </div>
-      <div class="cv-quien hidden" id="${p}-cv-quien">Vendió:
-        <input id="${p}-cv-nombre" class="fi" type="text" maxlength="40" autocomplete="off" placeholder="Quién hizo la venta online">
+      <div class="cv-quien hidden" id="${p}-cv-quien"><span>¿Quién hizo la venta? <b>Tocá tu nombre</b></span>
+        <div class="cv-chips" id="${p}-cv-chips"></div>
+        <input id="${p}-cv-nombre" class="fi hidden" type="text" maxlength="40" autocomplete="off" placeholder="Nombre de quien vendió">
       </div>`;
     ref.parentNode.insertBefore(b, ref);
   }
   cvElegir(p, 'local');
+  cvCargarVendedoras().then(() => _cvPintarChips(p));
   return b;
+}
+
+// ── Las vendedoras (los botones con los nombres) ──
+const _CV_LS = 'cvVendedoras';
+let _cvNombres = null;
+function cvVendedoras() {
+  if (_cvNombres) return _cvNombres;
+  try { const l = JSON.parse(localStorage.getItem(_CV_LS) || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; }
+}
+// Una lectura por apertura de la pantalla (y queda guardada en el aparato)
+async function cvCargarVendedoras() {
+  if (_cvNombres || typeof db === 'undefined' || !db) return cvVendedoras();
+  try {
+    const d = await db.collection('ajustes_venta').doc('vendedoras').get();
+    _cvNombres = (d.exists && Array.isArray(d.data().nombres)) ? d.data().nombres.filter(Boolean) : [];
+    try { localStorage.setItem(_CV_LS, JSON.stringify(_cvNombres)); } catch (e) {}
+  } catch (e) { /* sin señal: lo último que se supo */ }
+  return cvVendedoras();
+}
+function cvNombresDeTexto(t) {
+  const vistos = new Set();
+  return String(t || '').split(/[,\n]+/).map(x => x.trim().replace(/\s+/g, ' ').slice(0, 30)).filter(x => {
+    const k = x.toLowerCase(); if (!x || vistos.has(k)) return false; vistos.add(k); return true;
+  }).slice(0, 20);
+}
+
+// ¿La cuenta es personal de una vendedora? (en la compu compartida, nunca)
+function _cvYoSiSoy(lista) {
+  if (typeof tpMostrador === 'function' && tpMostrador()) return '';
+  const yo = _cvYo().toLowerCase();
+  return (lista || []).find(n => n.toLowerCase() === yo) || '';
+}
+
+function _cvPintarChips(p) {
+  const box = typeof document !== 'undefined' && document.getElementById(p + '-cv-chips');
+  if (!box) return;
+  const lista = cvVendedoras();
+  const inp = document.getElementById(p + '-cv-nombre');
+  const actual = inp ? inp.value : '';
+  const esOtro = actual && !lista.some(n => n.toLowerCase() === actual.toLowerCase());
+  box.innerHTML = lista.map(n => `<button type="button" class="cv-chip${actual.toLowerCase() === n.toLowerCase() ? ' on' : ''}" onclick="cvQuien('${p}', this.textContent)">${_cvnEsc(n)}</button>`).join('')
+    + `<button type="button" class="cv-chip${esOtro ? ' on' : ''}" onclick="cvQuien('${p}', '')">${lista.length ? 'Otra persona…' : 'Escribir el nombre…'}</button>`;
+  if (inp) inp.classList.toggle('hidden', !esOtro && !(inp.dataset.otro === '1'));
+}
+
+// Tocar un nombre ('' = escribir otro)
+function cvQuien(p, nombre) {
+  const inp = typeof document !== 'undefined' && document.getElementById(p + '-cv-nombre');
+  if (!inp) return;
+  inp.value = nombre || '';
+  inp.dataset.otro = nombre ? '' : '1';
+  _cvPintarChips(p);
+  if (!nombre) { inp.classList.remove('hidden'); try { inp.focus(); } catch (e) {} }
+}
+
+// Antes de guardar: online sin decir quién → no se guarda
+function cvFalta(p) {
+  const c = cvLeer(p);
+  if (c.canal !== 'online' || c.vendedorOnline) return false;
+  if (typeof toast === 'function') toast('🌐 Venta online: tocá el nombre de quién la hizo', 'error');
+  const b = document.getElementById(p + '-canal');
+  try { b && b.scrollIntoView && b.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {}
+  return true;
 }
 
 function cvElegir(p, canal) {
@@ -74,8 +151,10 @@ function cvElegir(p, canal) {
   const q = document.getElementById(p + '-cv-quien');
   if (q) q.classList.toggle('hidden', b.dataset.canal !== 'online');
   const n = document.getElementById(p + '-cv-nombre');
-  if (n && b.dataset.canal === 'online' && !n.value) n.value = _cvYo();
-  if (n && b.dataset.canal === 'local') n.value = '';
+  // Solo se completa solo si la cuenta es de una de las vendedoras
+  if (n && b.dataset.canal === 'online' && !n.value) n.value = _cvYoSiSoy(cvVendedoras());
+  if (n && b.dataset.canal === 'local') { n.value = ''; n.dataset.otro = ''; }
+  _cvPintarChips(p);
 }
 
 function cvMostrar(p, si) {
@@ -89,7 +168,9 @@ function cvLeer(p) {
   if (!b || b.style.display === 'none') return { canal: 'local', vendedorOnline: '' };
   const canal = b.dataset.canal === 'online' ? 'online' : 'local';
   const n = document.getElementById(p + '-cv-nombre');
-  const quien = canal === 'online' ? (String((n && n.value) || '').trim() || _cvYo()) : '';
+  // Sin nombre elegido queda vacío (cvFalta frena el guardado): con la cuenta
+  // compartida, el usuario de la compu no dice quién vendió
+  const quien = canal === 'online' ? String((n && n.value) || '').trim() : '';
   return { canal, vendedorOnline: quien.slice(0, 40) };
 }
 
@@ -161,6 +242,11 @@ async function cvAbrirComisiones() {
         </select>
       </div>
       <p style="margin:0;font-size:12px;color:var(--text2)">Solo cuentan las ventas marcadas <b>🌐 Online</b>. Las que hace en el local no llevan comisión.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:13px;color:var(--text2)">Vendedoras online (los botones que aparecen al vender):</span>
+        <input id="cv-nombres" class="fi" placeholder="Ej: Sofi, Nacho" style="flex:1;min-width:180px">
+        <button type="button" class="btn-secondary" onclick="cvGuardarNombres()">Guardar</button>
+      </div>
       <div id="cv-cuerpo"><p style="color:var(--text2)">Cargando…</p></div>
     </div></div>`;
   m.addEventListener('click', e => { if (e.target === m) m.remove(); });
@@ -170,6 +256,8 @@ async function cvAbrirComisiones() {
     _cvCfg = cvCfgNormal(d.exists ? d.data() : null);
   } catch (e) { _cvCfg = cvCfgNormal(null); }
   document.getElementById('cv-pct').value = _cvCfg.pct;
+  await cvCargarVendedoras();
+  document.getElementById('cv-nombres').value = cvVendedoras().join(', ');
   document.getElementById('cv-base').value = _cvCfg.base;
   try {
     // Solo las online (pocas): no se lee la caja entera
@@ -181,6 +269,17 @@ async function cvAbrirComisiones() {
     return;
   }
   cvPintar();
+}
+
+async function cvGuardarNombres() {
+  const nombres = cvNombresDeTexto(document.getElementById('cv-nombres')?.value);
+  try {
+    await db.collection('ajustes_venta').doc('vendedoras').set({ nombres }, { merge: true });
+    _cvNombres = nombres;
+    try { localStorage.setItem(_CV_LS, JSON.stringify(nombres)); } catch (e) {}
+    document.getElementById('cv-nombres').value = nombres.join(', ');
+    if (typeof toast === 'function') toast(nombres.length ? `Listo: ${nombres.join(', ')}` : 'Lista vacía', 'success');
+  } catch (e) { if (typeof toast === 'function') toast('No se pudo guardar la lista', 'error'); }
 }
 
 async function cvGuardarCfg() {
