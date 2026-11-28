@@ -118,6 +118,9 @@ ok(call('cartPublicable', EQ.us) === false, 'en dólares y sin cotización, afue
 run('dolarBlue = 1465');
 
 console.log('\n3) Lo que dice cada cartel');
+// Alan (28/11): "cuando haya usado nuevo, que sea un poco más grande, porque la gente no lo ve"
+const tamPastilla = Number((/\.c-pastilla\{[^}]*font-size:(\d+)px/.exec(leer('carteles.js')) || [])[1]);
+ok(tamPastilla >= 18, 'NUEVO / USADO en letra grande (antes 12px)', tamPastilla);
 let h = call('cartelHtml', EQ.ip);
 ok(/iPhone 13/.test(h) && /Apple/.test(h), 'marca y modelo');
 ok(/128 GB/.test(h), '"128GB" se escribe "128 GB"');

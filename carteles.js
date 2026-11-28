@@ -308,8 +308,12 @@ body{font-family:${f.fam},'Segoe UI',system-ui,sans-serif;color:#16161D;backgrou
 .c-top{background:${color};color:#fff;border-radius:18px;padding:14px 14px 16px}
 .c-top-fila{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .c-biz{font-size:12px;font-weight:${f.peso};letter-spacing:.12em}
-.c-pastilla{background:#fff;color:${color};font-size:12px;font-weight:${f.peso};
-  border-radius:999px;padding:2px 10px;white-space:nowrap}
+/* NUEVO / USADO bien grande: Alan (28/11) "que sea un poco más grande,
+   porque la gente no lo ve". Antes 12px; el cartel tenía ~14px libres abajo
+   en el peor caso (modelo en dos renglones, RAM, garantía y batería), y esto
+   usa ~10: medido con el cartel dibujado, no se corta. */
+.c-pastilla{background:#fff;color:${color};font-size:19px;font-weight:${f.peso};letter-spacing:.03em;
+  border-radius:999px;padding:3px 14px;white-space:nowrap;line-height:1.1}
 .c-marca{font-size:19px;font-weight:${f.medio};margin-top:6px}
 /* Dos renglones como máximo: con tres el cartel se desarma. */
 .c-modelo{font-weight:${f.peso};line-height:1.05;display:-webkit-box;-webkit-line-clamp:2;
