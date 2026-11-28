@@ -119,7 +119,8 @@ run('dolarBlue = 1465');
 
 console.log('\n3) Lo que dice cada cartel');
 // Alan (28/11): "cuando haya usado nuevo, que sea un poco más grande, porque la gente no lo ve"
-const tamPastilla = Number((/\.c-pastilla\{[^}]*font-size:(\d+)px/.exec(leer('carteles.js')) || [])[1]);
+// (el CSS tiene ${color} adentro: no se puede cortar en la primera llave)
+const tamPastilla = Number((/\.c-pastilla\{[\s\S]{0,120}?font-size:(\d+)px/.exec(leer('carteles.js')) || [])[1]);
 ok(tamPastilla >= 18, 'NUEVO / USADO en letra grande (antes 12px)', tamPastilla);
 let h = call('cartelHtml', EQ.ip);
 ok(/iPhone 13/.test(h) && /Apple/.test(h), 'marca y modelo');
