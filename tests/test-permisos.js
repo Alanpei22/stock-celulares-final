@@ -77,7 +77,10 @@ const tiene = (src, fn, perm) => { const i = src.indexOf(fn); return i >= 0 && n
  [rep, 'function openRepairForm(', 'reparaciones'], [rep, 'async function saveRepair(', 'reparaciones'], [rep, 'async function deleteRepair(', 'borrar'],
  [inv, 'function openProductoForm(', 'inventario'], [inv, 'async function saveProducto(', 'inventario'],
  [r2, 'function openRepuestoForm(', 'inventario'], [r2, 'function saveRepuesto(', 'inventario'], [r2, 'function deleteRepuesto(', 'borrar'],
- [caja, 'function openMovForm(', 'caja'], [caja, 'async function saveMov(', 'caja'], [caja, 'async function saveMov(', 'gastos'], [caja, 'function deleteMov(', 'borrar'],
+ // saveMov es un envoltorio contra el doble toque; los permisos los pide el
+ // cuerpo, _saveMovInterno.
+ [caja, 'function openMovForm(', 'caja'], [caja, 'async function _saveMovInterno(', 'caja'],
+ [caja, 'async function _saveMovInterno(', 'gastos'], [caja, 'function deleteMov(', 'borrar'],
 ].forEach(([src, fn, perm]) => ok(tiene(src, fn, perm), `${fn.replace(/(async )?function /, '').replace('(', '')}(): permiso "${perm}"`));
 ok(/tpEmpleadoPuede\('borrar'\)\)\s*\? \(cb => \{ if \(confirm/.test(caja), 'empleado con permiso de borrar: confirma sin PIN de dueño');
 ok(/tipo === 'egreso' && typeof tpPuede === 'function' && !tpPuede\('gastos'\)\) tipo = 'ingreso'/.test(caja), 'sin permiso de gastos, la caja solo cobra');

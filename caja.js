@@ -4004,7 +4004,31 @@ function _clearRepairItem(clearText = true) {
   _updateMovResumen();
 }
 
+// ── Doble toque = doble cobro ───────────────────────────────
+// En el mostrador se apura y la pantalla tarda: el botón de cobrar se toca
+// dos veces. Antes eso guardaba DOS movimientos — la venta entraba dos veces
+// en la caja del día y el stock se descontaba dos veces — porque no había
+// nada que frenara la segunda pasada mientras la primera esperaba a Firebase.
+//
+// La traba es la bandera, no el botón: deshabilitarlo es solo para que se
+// vea. El `finally` la suelta aunque la guardada falle, para poder reintentar.
+let _guardandoMov = false;
+
 async function saveMov() {
+  if (_guardandoMov) return;
+  _guardandoMov = true;
+  const _btnMov = document.getElementById('mov-save-btn');
+  const _txtMov = _btnMov ? _btnMov.textContent : '';
+  if (_btnMov) { _btnMov.disabled = true; _btnMov.textContent = '⏳ Guardando…'; }
+  try {
+    return await _saveMovInterno();
+  } finally {
+    _guardandoMov = false;
+    if (_btnMov) { _btnMov.disabled = false; _btnMov.textContent = _txtMov; }
+  }
+}
+
+async function _saveMovInterno() {
   if (typeof tpFrenar === 'function' && tpFrenar('caja', 'usar la caja')) return;
   if (!document.getElementById('mov-btn-ingreso')?.classList.contains('tipo-active') &&
       typeof tpFrenar === 'function' && tpFrenar('gastos', 'cargar gastos')) return;
